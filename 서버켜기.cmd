@@ -2,13 +2,9 @@
 setlocal
 cd /d "%~dp0"
 set "PYTHONUTF8=1"
-if exist "%~dp0artifacts\experts\venv\Scripts\python.exe" (
-  "%~dp0artifacts\experts\venv\Scripts\python.exe" "%~dp0start_stockrl.py" %*
-) else (
-  py -3 "%~dp0start_stockrl.py" %*
-)
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_local.ps1"
 if errorlevel 1 (
-  echo Server startup failed. See runtime\markets\korea\web.stderr.log
+  echo Startup failed. Read the message above and check Node.js, frontend dependencies, and ports 8766/5173.
   pause
   exit /b 1
 )

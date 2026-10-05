@@ -9,11 +9,8 @@
 | `docs/reports/` | 측정 JSON·실행 및 정리 결과 |
 | 프로젝트 옆 `금융매매모델-휴지통` | 복구 가능한 미사용 문서·화면·탈락 시험 작업파일 |
 | `Desktop/모델` | 운영 체크포인트와 PT 백업 |
-| `Desktop/모델/experts/market` | 시장 전문가 원본 가중치와 가중치 압축파일 |
+| `Desktop/모델/experts/market` | 시장 분석 전문가 원본 가중치 |
 | `Desktop/모델/experts/action` | MacroHFT·주식 정책 등 매매 판단 원본 가중치 |
-| `Desktop/모델/experts/market` | 시장 분석 원본 가중치 |
-| `Desktop/모델/experts/fusion` | 진단용 fusion 가중치 |
-| `Desktop/모델/experts/archives` | 원본 가중치가 포함된 다운로드 압축파일 |
 | `artifacts/experts/checkpoints` | 전문가 config·라이선스·다운로드 메타데이터 |
 | `artifacts/experts/sources` | 원본 모델 구현과 전처리 코드 |
 | `artifacts/experts/native_data` | 원본 시장 입력 자료 |
@@ -24,15 +21,14 @@
 | `runtime/markets` | 기존 Champion/Candidate 계좌·feed·replay |
 | `runtime/gpu-owner.lock` | TradingMoE 실행과 전문가 진단이 공유하는 GPU 잠금 |
 
-바탕화면 모델 폴더 최상단에는 다음 5개 운영 PT와 원본 가중치를 모은
+바탕화면 모델 폴더 최상단에는 운영 PT와 원본 가중치를 모은
 `experts` 폴더가 있습니다. 원본의 `.pth`·`.safetensors`·정책 `.zip`·
 MacroHFT `.pkl` 형식을 유지합니다.
 
 - `champion.pt`
 - `candidate.pt`
-- `old-champion.pt`
 - `TradingMoE.pt`
-- `TradingMoE.before-stock-policies.pt`
+- `TradingMoE-<build-id>.pt` (MoE 생성 결과)
 
 경로의 기준은 `src/stockrl/paths.py`입니다. 시작 버튼은 프로젝트의
 `artifacts/experts/venv/Scripts/python.exe`로 worker를 실행하고,

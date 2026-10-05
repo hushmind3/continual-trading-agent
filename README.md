@@ -4,13 +4,13 @@ TradingMoE를 중심으로 금융 시계열 전문가를 실행하고, 가상계
 
 ## 현재 동작 구조
 
-- 시장 Feed, Champion, Candidate, 전용 TradingMoE 실행, 자동 조립 시험은 각각 제어됩니다. 서버를 켜는 것만으로 모델이나 Feed를 시작하지 않습니다.
-- Champion과 Candidate는 독립된 실행 상태와 가상계좌·학습 상태를 유지합니다. 자동 조립은 Candidate 자리를 이용해 후보를 평가하며, 8GB 모델 파일을 후보마다 복제하지 않습니다.
-- TradingMoE는 시장 분석 전문가, MacroHFT 정책 전문가, 주식 정책 전문가의 등록 정보를 이용해 현재 입력에 적용 가능한 의견을 모읍니다. 원본 전문가 가중치는 보존하고, 조합과 제어에 연결된 학습 가능한 부분을 업데이트합니다.
+- 시장 Feed, Champion, Candidate, 전용 TradingMoE 실행은 각각 제어됩니다. 서버를 켜는 것만으로 모델이나 Feed를 시작하지 않습니다.
+- Champion과 Candidate는 독립된 실행 상태와 가상계좌·학습 상태를 유지합니다. Candidate 등록은 `MoE 생성`에서 만든 TradingMoE 구성을 `candidate.pt`로 교체하는 방식으로 진행합니다.
+- TradingMoE는 선택된 시장 분석 전문가와 매매 판단 전문가를 Router·Fusion·Attention·Controller로 연결합니다. 원본 전문가 가중치는 고정하고, paper 결과와 replay를 사용해 adapter·controller를 업데이트합니다.
 - 가상 주문은 체결 비용과 계좌 손익을 반영합니다. 현재 서버 상태에서 실제 주문 실행은 비활성화되어 있습니다.
 - 전용 TradingMoE 연속 실행은 프로젝트에 포함된 MacroHFT 공식 ETHUSDT 과거 입력을 사용합니다. 이는 실시간 ETH 매매나 수익성 검증을 뜻하지 않습니다. 주식 정책은 필요한 종목·기간 입력이 있을 때만 적용됩니다.
 
-화면은 `운영`에서 전체 시세·계산 자원·모델별 캐시·학습 경험·가중치 업데이트 상태를 확인하고, `자동매매`에서 Champion·Candidate·TradingMoE의 실행 제어와 각 가상계좌를 확인하도록 나뉩니다. `조립 · 자동실험`은 조합 구성과 평가가 중심이며, 구성 전문가의 역할은 이름을 눌러 확인합니다.
+화면은 `운영`에서 전체 실행 상태·계좌·학습·자원을 확인하고, `자동매매`에서 Champion·Candidate·TradingMoE의 실행 제어와 가상계좌를 확인하도록 나뉩니다. `MoE 생성`에서는 시장 분석 Expert와 매매 판단 Expert를 선택해 독립 TradingMoE 파일을 만들고 Candidate로 등록합니다. `승급전`은 등록된 Candidate와 Champion의 평가를 담당합니다.
 
 ## Windows 설치 및 실행
 
@@ -19,7 +19,7 @@ TradingMoE를 중심으로 금융 시계열 전문가를 실행하고, 가상계
 1. 저장소를 clone하거나 GitHub에서 내려받습니다.
 2. Node.js LTS를 설치한 뒤 `설치.cmd`를 실행합니다.
 3. `frontend` 폴더에서 `npm ci`를 한 번 실행합니다.
-4. 모델을 실행하려면 기존 PC의 바탕화면 `모델` 폴더를 새 PC 바탕화면으로 복사합니다. 체크포인트와 원본 전문가 가중치는 GitHub에 포함되지 않으므로, 이 파일 없이 받을 수 있는 것은 코드와 화면까지입니다.
+4. 모델을 실행하려면 기존 PC의 바탕화면 `모델` 폴더를 새 PC 바탕화면으로 복사하거나 필요한 Expert 가중치를 다시 다운로드합니다. 체크포인트와 원본 전문가 가중치는 GitHub에 포함되지 않습니다.
 5. `서버켜기.cmd`를 실행합니다. Python API `http://127.0.0.1:8766`과 React/Vite 화면 `http://127.0.0.1:5173`을 함께 켜고 브라우저를 엽니다.
 6. 화면에서 Feed와 실행할 모델을 각각 시작합니다.
 
@@ -46,7 +46,7 @@ Python 서버는 `frontend/dist`를 제공합니다. 프론트엔드를 수정�
 - [문서 안내](docs/README.md)
 - [Champion/Candidate 실행 제어](docs/model-lifecycle.md)
 - [TradingMoE 학습·가상매매](docs/trading-moe-learning.md)
-- [자동 조립과 후보 평가](docs/assembly.md)
+- [MoE 생성과 후보 평가](docs/assembly.md)
 - [전문가와 모델 파일 배치](docs/project-storage.md)
 - [주식 정책 전문가](docs/stock_policy_experts.md)
 - `docs/reports/`의 수치와 측정 결과는 해당 기록 시점의 자료입니다. 현재 실행 상태나 계좌 값은 로컬 대시보드/API에서 확인합니다.

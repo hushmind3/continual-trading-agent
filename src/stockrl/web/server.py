@@ -114,7 +114,10 @@ def serve(host: str = "127.0.0.1", port: int = 8766, runtime: str | None = None,
             if route.startswith("/api/assembly/"):
                 action=route.removeprefix("/api/assembly/")
                 try:
-                    if action in ("start","stop"):result=assembly.start(action=="start")
+                    if action=="build":result=assembly.build_model(payload)
+                    elif action=="build/cancel":result=assembly.cancel_build()
+                    elif action=="register":result=assembly.register_candidate()
+                    elif action in ("start","stop"):result=assembly.start(action=="start")
                     elif action=="generate":assembly.generate();result={"ok":True}
                     elif action=="next":result=assembly.next()
                     elif action=="settings":result=assembly.settings(payload)

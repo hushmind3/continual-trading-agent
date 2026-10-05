@@ -151,6 +151,12 @@ class TradingMoE(nn.Module):
         self.scheduler=FairGpuScheduler()
         self.gpu_lock=GPU_OWNER_LOCK
         self.experts.requires_grad_(False).eval()
+        configured_experts = self.config.get("assembly_enabled_experts")
+        if configured_experts:
+            self.assembly_enabled = set(configured_experts)
+        configured_routing = self.config.get("assembly_routing")
+        if configured_routing:
+            self.controller.assembly_routing = configured_routing
 
     def parameter_groups(self,train_experts=()):
         groups=[]
@@ -252,6 +258,8 @@ class TradingMoE(nn.Module):
         if recipe.get("controller_variant")!="vertical_native_prior_v1":raise ValueError("unsupported controller variant")
         self.assembly_enabled=set(recipe["enabled_experts"])
         self.controller.assembly_routing={"market":recipe["market_routing"],"policy":recipe["policy_routing"]}
+        self.config["assembly_enabled_experts"] = sorted(self.assembly_enabled)
+        self.config["assembly_routing"] = self.controller.assembly_routing
 
     def save_assembly_state(self,path,optimizer=None):
         """Only learned modules; frozen expert weights never enter this file."""

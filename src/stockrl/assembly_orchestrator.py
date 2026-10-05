@@ -93,6 +93,9 @@ class AssemblyOrchestrator:
         self._successful_operations = []
         self.experts = []
         self.worker = None
+        self.build = {"status":"idle","phase":"대기","progress":0,"message":"전문가를 선택해 TradingMoE를 생성하세요."}
+        self.build_thread = None
+        self.build_cancel = threading.Event()
         self.scan_registry(force=True)
         if self.champion:
             self._history()
@@ -576,6 +579,99 @@ class AssemblyOrchestrator:
             self._persist()
             return {"ok":True}
 
+    def _build_recipe(self, market_experts, action_experts, build_id):
+        selected = list(dict.fromkeys([*market_experts, *action_experts]))
+        by_id = {expert["id"]:expert for expert in self.experts}
+        unknown = [key for key in selected if key not in by_id]
+        if unknown: raise ValueError("등록되지 않은 전문가: "+", ".join(unknown))
+        invalid = [key for key in selected if not by_id[key].get("eligible")]
+        if invalid: raise ValueError("사용할 수 없는 전문가: "+", ".join(invalid))
+        actual_market = [key for key in market_experts if by_id[key].get("role")=="market"]
+        actual_action = [key for key in action_experts if by_id[key].get("role")=="policy"]
+        if not actual_market: raise ValueError("시장 분석 전문가를 하나 이상 선택하세요.")
+        if not actual_action: raise ValueError("매매 판단 전문가를 하나 이상 선택하세요.")
+        return {"candidate_id":build_id,"parent_id":None,"base_checkpoint":str(self.checkpoint),
+            "base_checkpoint_hash":self.state.get("base_hash"),"enabled_experts":sorted(selected),
+            "expert_roles":{key:by_id[key]["role"] for key in selected},
+            "symbol_applicability":{key:by_id[key].get("universe") for key in selected},
+            "native_inputs":{key:by_id[key].get("input_shapes",{}) for key in selected},
+            "expert_versions":{key:by_id[key].get("version") for key in selected},
+            "refresh_seconds":{key:7200 if by_id[key].get("role")=="market" else 60 for key in selected},
+            "cache_interval_seconds":60,"market_routing":{"top_k":0,"temperature":1.0},
+            "policy_routing":{"top_k":0,"temperature":1.0},"controller_variant":"vertical_native_prior_v1",
+            "mutation_description":"수동 전문가 선택","created_at":now(),"evaluation_state":"assembled",
+            "trainable_state":None,"market_experts":list(actual_market),"action_experts":list(actual_action)}
+
+    def _set_build(self, **values):
+        with self.lock:self.build.update(values)
+
+    def _build_worker(self, recipe, target):
+        build_id = recipe["candidate_id"]
+        try:
+            self._set_build(status="running",phase="공용 모델 로드",progress=12,message="공용 TradingMoE checkpoint를 읽는 중입니다.")
+            from .trading_moe import TradingMoE
+            if self.build_cancel.is_set():raise InterruptedError("TradingMoE 생성이 취소되었습니다.")
+            model,_ = TradingMoE.load_checkpoint(self.checkpoint)
+            self._set_build(phase="전문가 구성 적용",progress=38,message="시장 분석·매매 판단 전문가와 Controller를 연결하는 중입니다.")
+            model.apply_assembly_recipe(recipe)
+            if self.build_cancel.is_set():raise InterruptedError("TradingMoE 생성이 취소되었습니다.")
+            self._set_build(phase="TradingMoE.pt 저장",progress=55,message="선택한 구성을 모델 파일로 저장하는 중입니다. 파일 크기에 따라 시간이 걸릴 수 있습니다.")
+            model.save_checkpoint(target)
+            self._set_build(phase="파일 검증",progress=92,message="생성된 TradingMoE.pt를 확인하는 중입니다.")
+            if not target.is_file() or target.stat().st_size <= 0:raise ValueError("TradingMoE.pt 저장 결과가 없습니다.")
+            recipe["artifact_path"] = str(target)
+            recipe["artifact_bytes"] = target.stat().st_size
+            self._set_build(status="ready",phase="생성 완료",progress=100,message="TradingMoE.pt 생성이 완료되었습니다.",path=str(target),bytes=target.stat().st_size,recipe=recipe,finished_at=now())
+        except InterruptedError as exc:
+            target.unlink(missing_ok=True)
+            self._set_build(status="cancelled",phase="취소됨",progress=0,message=str(exc),error=str(exc),finished_at=now())
+        except Exception as exc:
+            target.unlink(missing_ok=True)
+            self._set_build(status="error",phase="생성 실패",progress=0,message=f"{type(exc).__name__}: {exc}",error=f"{type(exc).__name__}: {exc}",finished_at=now())
+
+    def build_model(self, payload):
+        with self.lock:
+            if self.build_thread and self.build_thread.is_alive():return {"ok":False,"error":"이미 TradingMoE 생성이 진행 중입니다."}
+            market = payload.get("market_experts",[]); action = payload.get("action_experts",[])
+            if not isinstance(market,list) or not isinstance(action,list):raise ValueError("전문가 선택 목록이 올바르지 않습니다.")
+            build_id="moe-"+uuid.uuid4().hex[:12]
+            recipe=self._build_recipe(market,action,build_id)
+            target=DEFAULT_MODEL_DIR/("TradingMoE-"+build_id+".pt")
+            self.build_cancel.clear()
+            self.build={"id":build_id,"status":"queued","phase":"대기열","progress":0,"message":"TradingMoE 생성을 시작합니다.",
+                "created_at":now(),"market_experts":market,"action_experts":action,"recipe":recipe,"path":str(target)}
+            self.build_thread=threading.Thread(target=self._build_worker,args=(recipe,target),daemon=True,name="moe-assembly-build")
+            self.build_thread.start()
+            return {"ok":True,"build":deepcopy(self.build)}
+
+    def cancel_build(self):
+        with self.lock:
+            if not self.build_thread or not self.build_thread.is_alive():return {"ok":True,"already_stopped":True,"build":deepcopy(self.build)}
+            self.build_cancel.set()
+            self.build["message"]="TradingMoE 생성 취소를 요청했습니다. 현재 단계가 끝나면 중지됩니다."
+            return {"ok":True,"build":deepcopy(self.build)}
+
+    def register_candidate(self):
+        with self.lock:
+            if self.build.get("status") != "ready" or not self.build.get("path"):
+                raise ValueError("완료된 TradingMoE 생성 결과가 없습니다.")
+            source=Path(self.build["path"]); target=DEFAULT_MODEL_DIR/"candidate.pt"
+            if not source.is_file():raise ValueError("생성된 TradingMoE.pt를 찾을 수 없습니다.")
+            if self.supervisor is not None:
+                worker=self.supervisor._moe_model_worker("candidate")
+                if worker.process():raise ValueError("Candidate가 실행 중입니다. 먼저 정지하세요.")
+            if target.is_file():
+                archive=PROJECT_TRASH_DIR/"model-candidates"/("candidate-"+datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")+".pt")
+                archive.parent.mkdir(parents=True,exist_ok=True);shutil.move(str(target),str(archive))
+            shutil.move(str(source),str(target))
+            recipe=deepcopy(self.build.get("recipe") or {})
+            recipe.update(candidate_id=self.build.get("id"),evaluation_state="registered",artifact_path=str(target))
+            self.current=recipe
+            self.build.update(status="registered",phase="Candidate 등록 완료",progress=100,message="생성된 TradingMoE.pt를 Candidate로 등록했습니다.",path=str(target),finished_at=now(),recipe=recipe)
+            self.state["message"]="수동 조립 TradingMoE가 Candidate로 등록되었습니다."
+            self._persist()
+            return {"ok":True,"message":self.state["message"],"build":deepcopy(self.build)}
+
     def start(self, enabled):
         with self.lock:
             self.state["enabled"] = enabled
@@ -664,4 +760,5 @@ class AssemblyOrchestrator:
                 "candidate":candidate,"queue":deepcopy(self.queue),"history":lines[::-1],
                 "experts":deepcopy(self.experts),"worker":worker,"checkpoint_copies":0,
                 "history_stats":deepcopy(self.history_stats),
-                "candidate_state_bytes":Path(candidate["trainable_state"]).stat().st_size if candidate.get("trainable_state") and Path(candidate["trainable_state"]).is_file() else 0}
+                "candidate_state_bytes":Path(candidate["trainable_state"]).stat().st_size if candidate.get("trainable_state") and Path(candidate["trainable_state"]).is_file() else 0,
+                "build":deepcopy(self.build)}

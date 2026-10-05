@@ -5,7 +5,7 @@ export const destinations=[
   {name:'시장 · 판단',hash:'markets',icon:Activity},
   {name:'경험 학습',hash:'learning',icon:GraduationCap},
   {name:'승급전',hash:'promotionTrial',icon:Trophy},
-  {name:'조립 · 자동실험',hash:'assembly',icon:FlaskConical},
+  {name:'MoE 생성',hash:'assembly',icon:FlaskConical},
   {name:'연결 설정',hash:'connection',icon:Settings2},
   {name:'상세 · 기록',hash:'system',icon:Terminal},
 ];

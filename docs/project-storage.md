@@ -10,8 +10,8 @@
 | 프로젝트 옆 `금융매매모델-휴지통` | 복구 가능한 미사용 문서·화면·탈락 시험 작업파일 |
 | `Desktop/모델` | 운영 체크포인트와 PT 백업 |
 | `Desktop/모델/experts/market` | 시장 전문가 원본 가중치와 가중치 압축파일 |
-| `Desktop/모델/experts/stock` | 주식 정책 원본 가중치와 검증용 정책 묶음 |
-| `Desktop/모델/experts/vendor` | MacroHFT 6개와 vendor 소스에 포함됐던 원본 모델 가중치 |
+| `Desktop/모델/experts/action` | MacroHFT·주식 정책 등 매매 판단 원본 가중치 |
+| `Desktop/모델/experts/market` | 시장 분석 원본 가중치 |
 | `Desktop/모델/experts/fusion` | 진단용 fusion 가중치 |
 | `Desktop/모델/experts/archives` | 원본 가중치가 포함된 다운로드 압축파일 |
 | `artifacts/experts/checkpoints` | 전문가 config·라이선스·다운로드 메타데이터 |

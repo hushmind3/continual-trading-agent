@@ -145,7 +145,9 @@ class _StatusMixin:
                     "source":"TradingMoE · 공식 ETHUSDT 과거 가상매매" if not trial else "TradingMoE · 조립 Candidate 시험",
                     "memory_scope":"worker","account_scope":"long_term","account_path":str(account_path),
                     "learning_active":live and bool(native.get("learning_active")),"learning":learning,
-                    "optimizer_updates":native.get("optimizer_updates",0),"replay":native.get("replay",{}),"books":books}
+                    "optimizer_updates":native.get("optimizer_updates",0),"replay":native.get("replay",{}),"books":books,
+                    "cache":native.get("cache",{}),"decision":decision,"fills":native.get("fills",[]),
+                    "reward_points":native.get("reward_points",{})}
                 accounts[role]={**summary,"books":books,"training":runtime[role]["learning_active"],
                     "version":native.get("optimizer_updates",0),"last_inference_seconds":decision.get("seconds"),
                     "last_full_decision_timestamp":decision.get("as_of"),"account_scope":runtime[role]["account_scope"]}

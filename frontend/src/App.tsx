@@ -24,7 +24,7 @@ export default function App() {
                   {page === 0 ? "전체 실행 상황" : "현재 상태"}
                 </p>
                 <h1 className="text-[27px] font-semibold tracking-tight">
-                  {page === 0 ? "운영 제어" : destinations[page].name}
+                  {destinations[page].name}
                 </h1>
               </div>
             </div>

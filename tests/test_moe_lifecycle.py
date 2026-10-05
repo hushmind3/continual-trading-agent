@@ -124,6 +124,7 @@ class MoELifecycleTests(unittest.TestCase):
         self.workers['candidate'].status.return_value={'status':'running','alive':True,'pid':123,
             'load_count':1,'learning_active':True,'optimizer_updates':17,
             'learning':{'loss':.25,'samples':4},'replay':{'untrained':2},
+            'cache':{'available':True,'market_outputs':3,'stored_decisions':2,'bytes':4096},
             'compute':{'inference_device':'cuda:0','allocated_bytes':128}}
         with patch('stockrl.provider_credentials.public_status',return_value={'provider':'public','environment':'paper'}):
             status=self.supervisor.status()
@@ -131,6 +132,7 @@ class MoELifecycleTests(unittest.TestCase):
         self.assertEqual(status['agent_health']['candidate']['status'],'healthy')
         self.assertEqual(status['learning']['candidate_optimizer_steps'],17)
         self.assertEqual(status['learning']['replay_current'],2)
+        self.assertEqual(status['model_runtime']['candidate']['cache']['market_outputs'],3)
 
     def test_reset_does_not_touch_assembly_trial_accounts(self):
         worker=self.workers['candidate'];worker.runner_script='run_assembly_trial.py'

@@ -9,6 +9,7 @@ from ..expert_registry import atomic_json
 from ..paths import EXPERT_ASSETS_DIR, TRADING_MOE_CHECKPOINT
 from ..state_io import read_json
 from ..state_io import rotate_worker_log
+from ..state_io import evidence_status
 
 
 class TradingMoELifecycle:
@@ -33,6 +34,8 @@ class TradingMoELifecycle:
     def status(self):
         with self.lock:
             data=self.read(self.state/"worker_status.json")
+            data["cache"] = evidence_status(self.state)
+            data.setdefault("source_kind", "historical_paper" if self.runner_script == "run_native_vertical_trading.py" else "historical_evaluation")
             process=self.process()
             if process is None:
                 previous=data.get("status")

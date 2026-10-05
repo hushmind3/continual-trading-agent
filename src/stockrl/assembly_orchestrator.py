@@ -85,6 +85,7 @@ class AssemblyOrchestrator:
         self.current = read(self.directory / "current_recipe.json")
         self.champion = read(self.directory / "champion_recipe.json")
         self.state.setdefault("expert_trials", {})
+        self.state.setdefault("generation_basis", "expert_registry_pool_v1")
         self.history_stats = {"mutations":{}, "experts":{}, "families":{}}
         self._history_signature = None
         self._seen_fingerprints = set()
@@ -150,7 +151,7 @@ class AssemblyOrchestrator:
             if not self.champion:
                 with self.lock:self._seed_champion()
             return
-        self.state["message"] = "공용 checkpoint hash 확인 중 · PT 복사 없음"
+        self.state["message"] = "공용 TradingMoE 모델 확인 중 · 전체 모델 복사 없음"
         digest = hashlib.sha256()
         with self.checkpoint.open("rb") as handle:
             for chunk in iter(lambda:handle.read(8*1024**2), b""):
@@ -158,7 +159,7 @@ class AssemblyOrchestrator:
                 digest.update(chunk)
         with self.lock:
             self.state.update(base_signature=signature, base_hash=digest.hexdigest())
-            self.state["message"]="공용 checkpoint 준비 완료 · 자동조립 " + ("실행" if self.state["enabled"] else "정지")
+            self.state["message"]="전문가 조립 기준 준비 완료 · 자동조립 " + ("실행" if self.state["enabled"] else "정지")
             self._seed_champion()
             self._persist()
 
@@ -179,7 +180,7 @@ class AssemblyOrchestrator:
             "refresh_seconds":{e["id"]:7200 if e["role"] == "market" else 60 for e in eligible},
             "cache_interval_seconds":60,"market_routing":{"top_k":0,"temperature":1.0},
             "policy_routing":{"top_k":0,"temperature":1.0},
-            "controller_variant":"vertical_native_prior_v1","mutation_description":"현재 Champion 기본 조립",
+            "controller_variant":"vertical_native_prior_v1","mutation_description":"Champion 비교 기준",
             "created_at":now(),"evaluation_state":"champion","trainable_state":None}
         self._persist()
 
@@ -307,16 +308,38 @@ class AssemblyOrchestrator:
                 trial.update(status="tested" if outcome=="qualified" else outcome,candidate_id=recipe.get("candidate_id"))
 
     def _candidate_base(self):
-        candidate = deepcopy(self.champion)
-        candidate.update(candidate_id="asm-"+uuid.uuid4().hex[:12],parent_id=self.champion["candidate_id"],
+        # New candidates come from the expert pool, never from the latest
+        # Champion recipe. Champion remains only the paired score/promotion
+        # reference. Newly registered experts enter as an isolated ON probe;
+        # rejected revisions stay out of the pool until their version changes.
+        eligible = [e for e in self.experts if e["eligible"]]
+        rejected = {key for key, trial in self.state["expert_trials"].items()
+                    if trial.get("status") == "rejected" and
+                    trial.get("version") == self.state["registry_versions"].get(key)}
+        enabled = [e for e in eligible if e["id"] not in rejected and
+                   (e["id"] not in self.state["expert_trials"] or
+                    self.state["expert_trials"][e["id"]].get("status") != "untested")]
+        # Initial registry entries have no expert_trials entry; they form the
+        # first complete assembly pool. Later untested revisions are probed.
+        versions = {e["id"]:e["version"] for e in eligible}
+        pool_id = "expert-pool-" + hashlib.sha256(json.dumps(versions,sort_keys=True).encode()).hexdigest()[:12]
+        candidate = {
+            "candidate_id":pool_id,"parent_id":None,
+            "base_checkpoint":str(self.checkpoint),"base_checkpoint_hash":self.state["base_hash"],
+            "enabled_experts":sorted(e["id"] for e in enabled),
+            "expert_roles":{e["id"]:e["role"] for e in eligible},
+            "symbol_applicability":{e["id"]:e["universe"] for e in eligible},
+            "native_inputs":{e["id"]:e["input_shapes"] for e in eligible},
+            "expert_versions":versions,
+            "refresh_seconds":{e["id"]:7200 if e["role"]=="market" else 60 for e in eligible},
+            "cache_interval_seconds":60,"market_routing":{"top_k":0,"temperature":1.0},
+            "policy_routing":{"top_k":0,"temperature":1.0},
+            "controller_variant":"vertical_native_prior_v1",
+            "mutation_description":"등록된 전문가 조합 기준","factory_revision":pool_id,
+        }
+        candidate.update(candidate_id="asm-"+uuid.uuid4().hex[:12],parent_id=pool_id,
             created_at=now(),evaluation_state="queued",scores={},trainable_state=None,
             mutation_operations=[],probed_experts=[])
-        for e in self.experts:
-            key=e["id"]
-            for name,value in (("expert_roles",e["role"]),("symbol_applicability",e["universe"]),
-                               ("native_inputs",e["input_shapes"]),("expert_versions",e["version"])):
-                candidate.setdefault(name,{})[key]=value
-            candidate["refresh_seconds"].setdefault(key,7200 if e["role"]=="market" else 60)
         return candidate
 
     def _mutation_pool(self, recipe):
@@ -379,7 +402,9 @@ class AssemblyOrchestrator:
             effective=selected if 0<selected<count else count
             if field=="temperature" and effective<2:return False
             if field=="top_k":
-                old=int(self.champion[group].get("top_k",0))
+                # Router changes are mutations from the factory defaults,
+                # independent of whichever recipe is currently Champion.
+                old=0
                 if effective==(old if 0<old<count else count):return False
         return True
 
@@ -529,7 +554,7 @@ class AssemblyOrchestrator:
             self.state["trial_paused"] = False
             self.current["evaluation_state"] = "replay"
             self.current["reason"] = None
-            self.state["message"] = "현재 Candidate 시험 시작 · 같은 조건으로 Champion과 비교"
+            self.state["message"] = "전문가 조합 Candidate 시험 시작 · Champion과 같은 조건으로 비교"
             (self.directory/"results"/(self.current["candidate_id"]+".json")).unlink(missing_ok=True)
             result = worker.start()
             if not result.get("ok"):

@@ -1,77 +1,49 @@
+import { BrainCircuit, ChevronRight, Radio } from "lucide-react";
 import {
-  ArrowDown,
-  ChevronRight,
-  GraduationCap,
-  Radio,
-  Trophy,
-} from "lucide-react";
-import { Legend, Switch, Outcome, QueryState } from "../components/controls";
-import { useWorkspace } from "../state/Workspace";
-import { ModelCard } from "../components/ModelCard";
+  Action,
+  Legend,
+  Outcome,
+  QueryState,
+  Switch,
+} from "../components/controls";
 import { ResourcePanel } from "../components/ResourcePanel";
-import type { WorkspaceState } from "../state/Workspace";
-type Props = Pick<
-  WorkspaceState,
-  | "filter"
-  | "setFilter"
-  | "paper"
-  | "setPaper"
-  | "learn"
-  | "setLearn"
-  | "feed"
-  | "setFeed"
-  | "models"
-  | "selected"
-  | "setSelected"
-  | "toggleModel"
-  | "setPage"
-  | "connected"
-  | "pending"
-  | "command"
->;
-export function OperationPage({
-  filter,
-  setFilter,
-  paper,
-  setPaper,
-  learn,
-  setLearn,
-  feed,
-  setFeed,
-  models,
-  selected,
-  setSelected,
-  toggleModel,
-  setPage,
-  connected,
-  pending,
-  command,
-}: Props) {
-  const { status, observe, setObserve } = useWorkspace();
-  const visibleModels = models.filter(
-    (model) =>
-      filter === "전체" ||
-      (filter === "실행 중"
-        ? model.running
-        : model.available && !model.enabled),
-  );
+import { ModelTelemetry } from "../components/ModelTelemetry";
+import { date, number } from "../format";
+import { useWorkspace } from "../state/Workspace";
+
+export function OperationPage() {
+  const {
+    status,
+    moe,
+    assembly,
+    models,
+    connected,
+    observe,
+    setObserve,
+    paper,
+    setPaper,
+    learn,
+    setLearn,
+    feed,
+    setFeed,
+    pending,
+    command,
+    setPage,
+  } = useWorkspace();
+  const freshness = status.data?.feed_metrics?.fresh_symbols_5m;
   return (
     <>
       <QueryState {...status} />
-      <div className="mb-7 flex flex-wrap items-center justify-between gap-5 border-b border-white/8 pb-5">
-        <div className="flex items-center gap-1 rounded-xl bg-black/15 p-1">
-          {["전체", "실행 중", "정지"].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`rounded-lg px-4 py-2 text-xs font-medium transition ${filter === f ? "bg-slate-100 text-slate-900 shadow-sm" : "text-slate-500 hover:text-white"}`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+      <QueryState {...moe} />
+      <section className="mb-6 border-b border-white/8 pb-5">
+        <h2 className="mb-4 text-sm font-semibold">
+          운영 모드{" "}
+          <span className="ml-2 text-xs font-normal text-slate-500">
+            Champion · Candidate 허용 설정
+          </span>
+        </h2>
         <div
-          className="flex flex-wrap gap-5 text-xs text-slate-400"
+          className="flex flex-wrap gap-x-6 gap-y-4 text-xs text-slate-400"
           aria-label="Champion·Candidate 실행 허용 설정"
         >
           <label className="flex items-center gap-2.5">
@@ -102,11 +74,11 @@ export function OperationPage({
             />
           </label>
         </div>
-      </div>
-      <Outcome forKey="modes" />
-      <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_260px]">
+        <Outcome forKey="modes" />
+      </section>
+      <div className="grid items-start gap-7 xl:grid-cols-[minmax(0,1fr)_260px]">
         <section className="min-w-0">
-          <div className="mb-3 flex items-center gap-4 rounded-2xl border border-white/8 bg-[#192333] p-5">
+          <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-white/8 bg-[#192333] p-5">
             <div
               className={`flex size-11 shrink-0 items-center justify-center rounded-full ${feed ? "bg-emerald-400/12 text-emerald-300" : "bg-slate-700 text-slate-400"}`}
             >
@@ -120,95 +92,97 @@ export function OperationPage({
                 </Legend>
               </div>
             </div>
-            <button
-              onClick={() => {
-                setFeed(!feed);
-              }}
+            <Action
               disabled={!connected || !!pending.feed}
-              className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-400 transition hover:border-sky-300/50 hover:text-sky-300"
+              onClick={() => setFeed(!feed)}
             >
               {pending.feed
                 ? "요청 중"
                 : feed
-                  ? "시세·운영모델 정지"
+                  ? "시세·Champion·Candidate 정지"
                   : "시세 시작"}
-            </button>
+            </Action>
             {feed && (
-              <button
+              <Action
                 disabled={!!pending.feed}
                 onClick={() =>
                   void command("/api/feed/reconnect", {}, "시세 재연결", "feed")
                 }
-                className="px-3 text-xs text-sky-300 disabled:opacity-40"
               >
                 재연결
-              </button>
+              </Action>
             )}
           </div>
           <Outcome forKey="feed" />
-          <div className="mb-3 flex justify-center text-slate-600">
-            <ArrowDown size={19} />
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {visibleModels.map((model) => (
-              <ModelCard
-                key={model.name}
-                model={model}
-                selected={selected === model.name}
-                learning={model.running && !!model.data.learning_active}
-                onSelect={() => setSelected(model.name)}
-                onToggle={() => toggleModel(model.name)}
-              />
-            ))}
-          </div>
-          {visibleModels.length === 0 && (
-            <div className="py-16 text-center text-sm text-slate-500">
-              해당 상태의 모델이 없습니다.
+          <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-4 text-xs">
+            <div>
+              <dt className="text-slate-500">수집 대상</dt>
+              <dd className="mt-2 text-lg tabular-nums">
+                {number(status.data?.configured_instruments)}종목
+              </dd>
             </div>
-          )}
-          <div className="mt-7 grid gap-4 sm:grid-cols-2">
-            <button
-              onClick={() => {
-                setPage(4);
-                setSelected(null);
-              }}
-              className="group flex items-center gap-4 rounded-2xl bg-violet-400/8 p-5 text-left transition hover:bg-violet-400/14"
-            >
-              <GraduationCap size={25} className="text-violet-300" />
-              <div className="flex-1">
-                <h3 className="text-sm font-medium text-violet-100">
-                  학습 모니터
-                </h3>
-                <p className="mt-1.5 text-xs text-slate-500">
-                  경험 처리와 업데이트 확인
-                </p>
-              </div>
-              <ChevronRight
-                size={17}
-                className="text-violet-300 transition group-hover:translate-x-1"
-              />
-            </button>
+            <div>
+              <dt className="text-slate-500">최근 5분 수신</dt>
+              <dd className="mt-2 text-lg tabular-nums">
+                {number(
+                  Array.isArray(freshness) ? freshness.length : undefined,
+                )}
+                종목
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">저장된 시세</dt>
+              <dd className="mt-2 text-lg tabular-nums">
+                {number(status.data?.feed_rows)}행
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">최근 상태 갱신</dt>
+              <dd className="mt-2 text-lg tabular-nums">
+                {date(status.data?.status_updated_at)}
+              </dd>
+            </div>
+          </dl>
+          <ModelTelemetry models={models} />
+          <div className="mt-4 flex flex-wrap gap-x-7 gap-y-3 text-xs">
             <button
               onClick={() => setPage(5)}
-              className="group flex items-center gap-4 rounded-2xl bg-amber-300/8 p-5 text-left transition hover:bg-amber-300/14"
+              className="text-slate-400 hover:text-sky-300"
             >
-              <Trophy size={25} className="text-amber-200" />
-              <div className="flex-1">
-                <h3 className="text-sm font-medium text-amber-100">
-                  승급 평가
-                </h3>
-                <p className="mt-1.5 text-xs text-slate-500">
-                  Champion · Candidate 비교
-                </p>
-              </div>
-              <ChevronRight
-                size={17}
-                className="text-amber-200 transition group-hover:translate-x-1"
-              />
+              조립 자동화 ·{" "}
+              {assembly.error
+                ? "연결 확인 필요"
+                : !assembly.data
+                  ? "확인 중"
+                  : assembly.data.enabled
+                    ? "실행 중"
+                    : "정지"}
+            </button>
+            <button
+              onClick={() => setPage(4)}
+              className="text-slate-400 hover:text-amber-200"
+            >
+              승급 평가 ·{" "}
+              {status.data?.validation_comparison?.active ? "평가 중" : "대기"}
             </button>
           </div>
+          <button
+            onClick={() => setPage(1)}
+            className="mt-7 flex w-full items-center gap-4 rounded-xl bg-sky-400/8 p-4 text-left transition-colors hover:bg-sky-400/12"
+          >
+            <BrainCircuit size={23} className="text-sky-300" />
+            <div className="flex-1">
+              <h2 className="text-sm font-medium text-sky-200">
+                자동매매 열기
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                세 모델의 실행 제어·가상계좌·학습 상태
+              </p>
+            </div>
+            <ChevronRight size={16} className="text-sky-300" />
+          </button>
         </section>
-        <ResourcePanel onDetails={() => setPage(8)} />
+        <ResourcePanel onDetails={() => setPage(7)} />
       </div>
     </>
   );

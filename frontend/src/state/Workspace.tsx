@@ -16,7 +16,7 @@ import type {
   Registry,
   SystemStatus,
 } from "../api/types";
-import { destinations, modelDefinitions } from "../config";
+import { destinations, modelDefinitions, pageIndex } from "../config";
 import { stateLabel } from "../format";
 export interface Event {
   id: number;
@@ -41,12 +41,7 @@ function useWorkspaceState() {
     setNoticeState(value);
     if (value) setReadId(sequence.current);
   }
-  const [page, setPageState] = useState(() =>
-    Math.max(
-      0,
-      destinations.findIndex((d) => d.hash === location.hash.slice(1)),
-    ),
-  );
+  const [page, setPageState] = useState(() => pageIndex(location.hash.slice(1)));
   const [filter, setFilter] = useState("전체");
   const [events, setEvents] = useState<Event[]>([]);
   const [pending, setPending] = useState<Record<string, boolean>>({});
@@ -70,10 +65,7 @@ function useWorkspaceState() {
   }, []);
   useEffect(() => {
     const hash = () => {
-      const index = destinations.findIndex(
-        (d) => d.hash === location.hash.slice(1),
-      );
-      setPageState(Math.max(0, index));
+      setPageState(pageIndex(location.hash.slice(1)));
       setSelected(null);
     };
     window.addEventListener("hashchange", hash);

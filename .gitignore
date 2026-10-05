@@ -33,8 +33,6 @@ __pycache__/
 /runtime/gpu-owner.lock
 
 # Recoverable local cleanup; never upload archived datasets/source ZIPs.
-/휴지통/
-
 # Process-local locks and SQLite shared-memory files are recreated at runtime.
 *.sqlite3-shm
 *.sqlite3-wal

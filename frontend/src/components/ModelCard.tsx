@@ -1,6 +1,7 @@
 import { ArrowUpRight, Pause, Play } from "lucide-react";
 import { Action, Legend, Outcome } from "./controls";
 import { AccountSummary } from "./AccountSummary";
+import { DecisionView, FillList } from "./Execution";
 import type { RuntimeModel } from "../state/Workspace";
 import { bytes, number, date, actionLabel, percent } from "../format";
 type Props = {
@@ -80,6 +81,43 @@ export function ModelCard({
         </p>
       )}
       <AccountSummary books={model.data.books} />
+      <details className="mt-5 text-xs text-slate-400">
+        <summary className="cursor-pointer">판단 · 학습 · 체결 상세</summary>
+        <DecisionView decision={model.data.decision} live={model.running} />
+        <dl className="grid grid-cols-2 gap-3 border-y border-white/7 py-3">
+          <div>
+            <dt>학습 대기 경험</dt>
+            <dd className="mt-1 text-slate-200">
+              {number(
+                model.data.replay?.remaining_for_update ??
+                  model.data.replay?.untrained,
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>손익 확정 대기</dt>
+            <dd className="mt-1 text-slate-200">
+              {number(model.data.replay?.pending)}
+            </dd>
+          </div>
+          <div>
+            <dt>최근 학습 오차</dt>
+            <dd className="mt-1 text-slate-200">
+              {number(model.data.learning?.loss, 6)}
+            </dd>
+          </div>
+          <div>
+            <dt>최근 학습</dt>
+            <dd className="mt-1 text-slate-200">
+              {date(model.data.learning?.updated_at)}
+            </dd>
+          </div>
+        </dl>
+        <h4 className="mt-4 text-xs font-medium text-slate-300">
+          최근 가상 체결
+        </h4>
+        <FillList fills={model.data.fills} />
+      </details>
       <div className="mt-6">
         <Action
           disabled={

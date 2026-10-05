@@ -56,6 +56,28 @@ LOG_BYTES = 4 * 1024 * 1024
 CACHE_ROWS = 64
 
 
+def evidence_status(state):
+    """Read cache counters without creating storage or decoding native outputs."""
+    path = Path(state) / "evidence.sqlite3"
+    if not path.is_file():
+        return {"available": False}
+    try:
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=1)) as db:
+            counts = {name: db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                      for name, table in (("stored_outputs", "packets"), ("stored_decisions", "contexts"), ("cycles", "cache"))}
+            counts["market_outputs"] = db.execute("SELECT COUNT(*) FROM refs WHERE owner='market'").fetchone()[0]
+            counts["latest_as_of"] = db.execute("SELECT MAX(stamp) FROM cache").fetchone()[0]
+        size = 0
+        for file in (path, path.with_name(path.name + "-wal"), path.with_name(path.name + "-shm")):
+            try:
+                size += file.stat().st_size
+            except FileNotFoundError:
+                pass
+        return {"available": True, "bytes": size, **counts}
+    except (OSError, sqlite3.Error) as exc:
+        return {"available": False, "error": type(exc).__name__}
+
+
 def retire_trial_debug(directory, trash):
     directory = Path(directory).resolve()
     trash = Path(trash).resolve()

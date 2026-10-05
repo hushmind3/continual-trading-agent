@@ -13,6 +13,14 @@ API: /api/assembly/status, start, stop, generate, next, settings, trial/start, t
 - 탈락/승격 후보의 시험 계좌와 replay 작업파일은 프로젝트 밖의 금융매매모델-휴지통/assembly-experiments로 이동한다. recipe, 작은 state와 성적·이유는 남는다.
 - 웹 재시작은 동일 Candidate worker에 재연결한다. 정지 후 재개도 저장된 recipe/계좌를 사용한다.
 
+## 조립 기준과 승급 판단
+
+자동조립의 부모는 Champion이 아니라 현재 Expert Registry의 전문가 풀이다. 후보는 이 풀에서 독립적으로 조합되며 recipe의 `parent_id`는 `expert-pool-<revision>`을 가리킨다. 새 revision은 개별 시험에 넣고, 탈락한 revision은 다음 후보의 기본 조합에서 제외한다.
+
+Champion은 후보 생성 기준이 아니다. 현재 Champion 구성은 같은 입력·계좌 조건에서 성적을 비교하는 기준이고, Candidate 슬롯은 조립 후보를 적용해 시험하는 자리다. 통과한 구성만 설정에 따라 Champion recipe로 승격한다.
+
+실행은 Champion/Candidate가 공유하는 TradingMoE PT를 읽고, 후보별 recipe와 작은 학습 상태만 바꾼다. 전체 PT를 복제하지 않는다.
+
 ## 재사용
 
 Expert Registry의 실제 id, 원본 hash/revision, role, universe, native input shape를 읽는다. 프론트에 전문가 이름/목록을 하드코딩하지 않는다.

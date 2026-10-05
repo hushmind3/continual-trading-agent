@@ -57,7 +57,7 @@ export function DetailDrawer({
               </Action>
             </> : selected==='빠른 실행' ? <div className="space-y-3">
               {models.map(entry=><Action key={entry.role} disabled={!entry.available||entry.busy||['loading','starting','saving','stopping'].includes(entry.data.status??'')} onClick={()=>toggleModel(entry.name)} className="w-full justify-between"><span>{entry.name}</span><span>{entry.busy?'요청 중':entry.enabled?'저장 후 정지':'시작'}</span></Action>)}
-              <Action onClick={()=>{setPage(0);setSelected(null);}} className="w-full">운영 화면 열기</Action>
+              <Action onClick={()=>{setPage(1);setSelected(null);}} className="w-full">자동매매 화면 열기</Action>
             </div> : null}
           </section>
         </div>

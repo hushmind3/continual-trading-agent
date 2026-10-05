@@ -94,7 +94,7 @@ class PaperBridgeTests(unittest.TestCase):
 from contextlib import closing
 import sqlite3
 from unittest.mock import patch
-from stockrl.state_io import EvidenceJournal, append_log, retire_trial_debug, WorkerLog
+from stockrl.state_io import EvidenceJournal, append_log, retire_trial_debug, WorkerLog, evidence_status
 
 class RuntimeStorageTests(unittest.TestCase):
     def setUp(self):
@@ -119,6 +119,27 @@ class RuntimeStorageTests(unittest.TestCase):
         self.assertNotIn("expert_inputs", restored["2026-10-01"][0])
         self.journal.save_contexts({}, checkpoint_saved=True)
         self.assertEqual(self.journal.load_contexts(), {})
+
+    def test_cache_status_reads_counts_without_changing_evidence(self):
+        self.journal.save_contexts(self.contexts)
+        self.journal.save_market([self.packet])
+        self.journal.record_cycle({"timestamp": "2026-10-01", "decision": self.decision})
+        before = self.journal.path.read_bytes()
+        status = evidence_status(self.root)
+        self.assertTrue(status["available"])
+        self.assertEqual(status["market_outputs"], 1)
+        self.assertEqual(status["stored_outputs"], 1)
+        self.assertEqual(status["stored_decisions"], 1)
+        self.assertEqual(status["cycles"], 1)
+        self.assertEqual(status["latest_as_of"], "2026-10-01")
+        self.assertGreater(status["bytes"], 0)
+        self.assertEqual(self.journal.path.read_bytes(), before)
+        self.assertEqual(self.journal.load_contexts()["2026-10-01"][1]["raw_outputs"], [self.packet])
+
+    def test_cache_status_does_not_create_missing_storage(self):
+        missing = self.root / "unused_model"
+        self.assertEqual(evidence_status(missing), {"available": False})
+        self.assertFalse(missing.exists())
 
     def test_raw_outputs_are_stored_once_and_cycle_summaries_are_small(self):
         self.journal.save_contexts(self.contexts)

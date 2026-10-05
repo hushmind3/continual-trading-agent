@@ -6,7 +6,7 @@
 
 - [새 Windows 컴퓨터 설치](windows-install.md)
 - [폴더·모델·실행 상태 저장 위치](project-storage.md)
-- [React 화면과 API 기능 대조](frontend.md)
+- React 화면 소스와 API 연결: `../frontend/src/`, `../src/stockrl/web/`
 - [Champion/Candidate 실행 제어](model-lifecycle.md)
 - [TradingMoE 실행·GPU·학습](trading-moe-learning.md)
 - [자동조립·후보 생성·평가](assembly.md)

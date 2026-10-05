@@ -19,6 +19,7 @@ __pycache__/
 # Downloaded vendor demonstration data/plots and native datasets remain local.
 /artifacts/experts/native_data/**/*.npy
 /artifacts/experts/sources/**/*.csv
+!/artifacts/experts/sources/TSFM_Finance/data/two_stocks_excess_returns.csv
 /artifacts/experts/sources/**/*.npy
 /artifacts/experts/sources/**/*.npz
 /artifacts/experts/sources/**/*.pkl

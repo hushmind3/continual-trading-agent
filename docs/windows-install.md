@@ -16,6 +16,7 @@
 - `src/stockrl/paper_account.py`, `moe_paper.py`: 새 가상계좌와 별도 MoE replay 생성.
 - `artifacts/experts/registry.template.json`: 20개 expert의 경로 독립 메타데이터. 첫 사용 시 runtime registry를 생성.
 - 공식 ETHUSDT `df_val.feather`: 현재 과거 가상매매 경로에 필요한 원본 입력. DB/replay와 구분해서 프로젝트에 포함.
+- `artifacts/experts/sources/TSFM_Finance/data/two_stocks_excess_returns.csv`: TimesFM·Chronos의 현재 실행 경로가 읽는 원본 참조 입력. 설치 후 별도 다운로드 없이 사용할 수 있도록 포함.
 
 ## 전달하지 않는 실행 데이터
 

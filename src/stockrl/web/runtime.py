@@ -48,7 +48,8 @@ class Supervisor(_StatusMixin, _AccountResetMixin):
         self.settings_path.parent.mkdir(parents=True, exist_ok=True)
         settings = _json(self.settings_path) or _json(ROOT / "configs" / "web_settings.default.json")
         self.mode = settings.get("mode", "live")
-        self.horizon = settings.get("horizon", horizon)
+        self.horizon = (str(self.operating_rules['reward_credit_seconds'])+'s' if self.operating_rules['reward_credit_kind']=='seconds'
+            else str(self.operating_rules['reward_credit_observations'])+'bar')
         self.autonomy_enabled = bool(settings.get("paper_enabled", settings.get("autonomy_enabled", True)))
         self.observe_enabled = bool(settings.get("observe_enabled", True))
         self.learning_enabled = bool(settings.get("learning_enabled", True))
@@ -116,7 +117,8 @@ class Supervisor(_StatusMixin, _AccountResetMixin):
                 return {"ok": True, "message": "System is already running."}
             self.mode, self.profile = mode, self.runtime / mode
             # Bundled mock history is daily, so one source bar is its meaningful horizon.
-            self.horizon = "1bar" if mode == "mock" else (horizon or self.horizon)
+            rules=getattr(self,'operating_rules',operating_rules())
+            self.horizon=(str(rules['reward_credit_seconds'])+'s' if rules['reward_credit_kind']=='seconds' else str(rules['reward_credit_observations'])+'bar')
             self.profile.mkdir(parents=True, exist_ok=True)
             self.settings_path.write_text(json.dumps({"mode": mode, "horizon": self.horizon,
                 "autonomy_enabled":self.autonomy_enabled,"paper_enabled":self.autonomy_enabled,

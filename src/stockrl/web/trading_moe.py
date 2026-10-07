@@ -84,7 +84,7 @@ class TradingMoELifecycle:
             previous=self.read(self.state/"worker_status.json")
             atomic_json(self.state/"worker_status.json",{**previous,"status":"loading","error":None,"stop_requested":False})
             command=[str(python),"-u",str(ROOT/"scripts"/self.runner_script),
-                "--root",str(self.artifacts),"--checkpoint",str(checkpoint),"--state",str(self.state),"--resume","--continuous","--interval","0.1"]
+                "--root",str(self.artifacts),"--checkpoint",str(checkpoint),"--state",str(self.state),"--resume","--continuous"]
             command.extend(self.extra_args)
             if self.runner_script=='run_native_vertical_trading.py':
                 command.extend(['--mode',self.source_mode,'--market',str(self.market)])

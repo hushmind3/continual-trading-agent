@@ -11,21 +11,31 @@ from .paper_account import PaperAccount, _currency
 from .replay_store import GlobalReplayBuffer
 from .rewards import _RewardMixin
 from .experience import REWARD_VERSION
+from .operating_rules import operating_rules
 
 
 class TradingMoEPaper(_RewardMixin):
-    def __init__(self, state_dir, *, fee=.001, slippage=.0001, credit_seconds=3600):
+    def __init__(self, state_dir, *, fee=.001, slippage=.0001, credit_seconds=None,settings=None):
         state_dir = Path(state_dir)
         state_dir.mkdir(parents=True, exist_ok=True)
         self.paper_account = PaperAccount(state_dir / "paper_account.json", fee, slippage)
         self.replay = GlobalReplayBuffer(journal_path=state_dir / "replay.sqlite3", dual_learning=False)
         self.metrics = {}
-        self.horizon_kind, self.horizon_amount = "seconds", int(credit_seconds)
+        rules=settings or operating_rules()
+        self.horizon_kind='seconds' if credit_seconds is not None else rules['reward_credit_kind']
+        self.horizon_amount=int(credit_seconds if credit_seconds is not None else
+            rules['reward_credit_seconds'] if self.horizon_kind=='seconds' else rules['reward_credit_observations'])
         if self.horizon_amount < 1:
             raise ValueError("reward credit interval must be positive")
         # Existing reward engine uses this pending kind for non-Champion roles.
         # It is isolated in this MoE's own journal, not Candidate's live DB.
         self.pending = self.replay.load_pending("candidate_portfolio")
+        # Existing named native runners used a 60-second horizon. Pin old work
+        # to that horizon rather than changing its meaning on config migration.
+        legacy_native=state_dir.name in ('champion_moe','candidate_moe','native_vertical','native_vertical_run') or 'assembly' in state_dir.parts
+        for decision in self.pending:
+            if 'moe_credit_kind' not in decision:
+                decision.update(moe_credit_kind='seconds',moe_credit_amount=int(credit_seconds if credit_seconds is not None else 60 if legacy_native else 3600))
 
     def advance(self, panel, index, *, enabled=True):
         fills = self.paper_account.process_bar(panel, index, enabled=enabled)
@@ -109,6 +119,7 @@ class TradingMoEPaper(_RewardMixin):
                 self.pending.append({"timestamp":stamp,"decision_id":decision_id,"symbol":symbol,
                     "symbol_index":j,"input_symbols":list(panel.symbols),
                     "action":{"SELL":0,"HOLD":1,"BUY":2}[actions_by_symbol[symbol]],
+                    'moe_credit_kind':self.horizon_kind,'moe_credit_amount':self.horizon_amount,
                     **decision_inputs,"reward_version":REWARD_VERSION,
                     "entry_price":float(panel.closes[index,j]),"bars_elapsed":0,
                     "equity_before":self.paper_account.normalized_equity(),

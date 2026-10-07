@@ -153,6 +153,7 @@ class RuntimeStorageTests(unittest.TestCase):
         self.assertEqual(EvidenceJournal(self.root).cached_rows()[0]["decision"]["raw_outputs"], [self.packet])
 
     def test_cache_eviction_never_deletes_pending_evidence(self):
+        self.journal.cache_rows=64
         self.journal.save_contexts(self.contexts)
         for index in range(70):
             self.journal.record_cycle({"timestamp": f"{index:03d}", "decision": None})
@@ -196,7 +197,7 @@ class RuntimeStorageTests(unittest.TestCase):
 
     def test_assembly_reads_actual_raw_outputs_from_deduplicated_cache(self):
         journal = EvidenceJournal(self.root / "runtime/model")
-        for index in range(8):
+        for index in range(24):
             journal.record_cycle({"timestamp": f"2026-10-01T00:{index:02d}:00", "decision": self.decision})
         scripts = Path(__file__).resolve().parents[1] / "scripts"
         import sys
@@ -207,7 +208,7 @@ class RuntimeStorageTests(unittest.TestCase):
             rows, source = fn()
         finally:
             sys.path.remove(str(scripts))
-        self.assertEqual(len(rows), 8)
+        self.assertEqual(len(rows), 24)
         self.assertEqual(rows[0]["decision"]["raw_outputs"], [self.packet])
         self.assertTrue(source.endswith("evidence.sqlite3"))
 

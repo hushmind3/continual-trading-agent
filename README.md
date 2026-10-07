@@ -5,10 +5,10 @@ TradingMoE를 중심으로 금융 시계열 전문가를 실행하고, 가상계
 ## 현재 동작 구조
 
 - 시장 Feed, Champion, Candidate, 전용 TradingMoE 실행은 각각 제어됩니다. 서버를 켜는 것만으로 모델이나 Feed를 시작하지 않습니다.
-- Champion과 Candidate는 독립된 실행 상태와 가상계좌·학습 상태를 유지합니다. Candidate 등록은 `MoE 생성`에서 만든 TradingMoE 구성을 `candidate.pt`로 교체하는 방식으로 진행합니다.
+- Champion과 Candidate는 독립된 실행 상태와 가상계좌·학습 상태를 유지합니다. Candidate 등록은 `MoE 생성`에서 만든 TradingMoE 구성을 `candidate.pt`로 교체하는 방식으로 진행합니다. 승급은 실제 학습 가중치를 고정해 비교하고, 통과한 Adapter·Router·Fusion·Attention·Controller와 optimizer를 Champion에 적용합니다. 이전 Champion 학습 상태는 `모델/rollback`에 보존합니다.
 - TradingMoE는 선택된 시장 분석 전문가와 매매 판단 전문가를 Router·Fusion·Attention·Controller로 연결합니다. 원본 전문가 가중치는 고정하고, paper 결과와 replay를 사용해 adapter·controller를 업데이트합니다.
 - 가상 주문은 체결 비용과 계좌 손익을 반영합니다. 현재 서버 상태에서 실제 주문 실행은 비활성화되어 있습니다.
-- 전용 TradingMoE 연속 실행은 프로젝트에 포함된 MacroHFT 공식 ETHUSDT 과거 입력을 사용합니다. 이는 실시간 ETH 매매나 수익성 검증을 뜻하지 않습니다. 주식 정책은 필요한 종목·기간 입력이 있을 때만 적용됩니다.
+- 운영의 live 모드는 수집기의 완료 시세를 Expert 입력으로 사용합니다. 주식 정책에는 완료 일봉과 실제 가상계좌 상태를 공급하며, 입력 부족은 전문가별 상태로 표시합니다. MacroHFT의 native 36+9 특징과 MarketGPT의 ITCH 입력은 해당 실시간 원본 스트림이 있을 때만 사용합니다. 과거 ETHUSDT 입력은 명시적인 historical 모드에서 사용합니다.
 
 화면은 `운영`에서 전체 실행 상태·계좌·학습·자원을 확인하고, `자동매매`에서 Champion·Candidate·TradingMoE의 실행 제어와 가상계좌를 확인하도록 나뉩니다. `MoE 생성`에서는 시장 분석 Expert와 매매 판단 Expert를 선택해 독립 TradingMoE 파일을 만들고 Candidate로 등록합니다. `승급전`은 등록된 Candidate와 Champion의 평가를 담당합니다.
 
@@ -38,6 +38,16 @@ npm run build     # 결과: frontend/dist
 ```
 
 Python 서버는 `frontend/dist`를 제공합니다. 프론트엔드를 수정한 뒤 운영 화면에 반영하려면 빌드를 다시 실행해야 합니다.
+
+운영 학습 설정은 `configs/online_learning.json`에서 읽습니다. reward horizon, batch, optimizer step 수, learning rate, checkpoint 주기와 평가 조건이 이 파일에 정의되어 있으며 worker 상태의 `effective_settings`에서 실제 적용값을 확인할 수 있습니다. 기존 미성숙 reward에는 판단 당시 horizon을 유지합니다.
+
+학습 checkpoint는 원본 Expert를 포함한 `<모델명>.pt`와 작은 `<모델명>.trainable.pt`로 구성됩니다. loader는 작은 파일이 있으면 함께 복원합니다. 다른 PC로 학습을 이어가려면 두 파일과 계좌·replay·evidence 상태를 함께 옮깁니다. 승급 평가 전 Champion·Candidate를 저장 후 정지하고, 동일 조건 평가를 통과하면 `학습 가중치 승격`을 실행합니다. `이전 Champion 복원`은 가중치와 optimizer를 복원하며 운영계좌를 초기화하지 않습니다.
+
+과거 데이터 실행은 별도 상태 폴더를 지정합니다.
+
+```powershell
+& artifacts/experts/venv/Scripts/python.exe scripts/run_native_vertical_trading.py --root artifacts/experts --checkpoint "$env:USERPROFILE/Desktop/모델/TradingMoE.pt" --state runtime/trading_moe/historical --mode historical --resume --steps 6
+```
 
 계좌와 학습 상태는 각 PC의 로컬 저장소에 남고 GitHub에는 올라가지 않습니다. 다른 PC에서 계좌와 학습을 이어가려면 모델을 정상 정지한 뒤 실행 상태 자료를 별도로 옮겨야 합니다. 저장 위치와 이동 범위는 [저장 위치 안내](docs/project-storage.md)를 참고하세요. 비밀번호·API 키를 저장소에 넣지 마십시오.
 

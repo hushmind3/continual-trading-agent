@@ -202,7 +202,7 @@ class GlobalReplayBuffer:
             additions = {"timestamp": "TEXT", "day": "TEXT", "eligible": "INTEGER DEFAULT 0",
                          "training_uses": "INTEGER NOT NULL DEFAULT 0", "error": "TEXT",
                          "experience_key": "TEXT", "champion_training_uses":"INTEGER NOT NULL DEFAULT 0",
-                         "bootstrap_window_key":"TEXT"}
+                         "bootstrap_window_key":"TEXT","portfolio_value":"INTEGER NOT NULL DEFAULT 0"}
             with db:
                 for name, declaration in additions.items():
                     if name not in columns:
@@ -214,6 +214,7 @@ class GlobalReplayBuffer:
                          int(self._training_eligible(metadata)), row_id))
                 db.execute("CREATE UNIQUE INDEX IF NOT EXISTS experience_key_idx ON experiences(experience_key)")
                 db.execute("CREATE INDEX IF NOT EXISTS experience_fifo_idx ON experiences(eligible,error,training_uses,timestamp,id)")
+                db.execute('CREATE INDEX IF NOT EXISTS experience_value_fifo_idx ON experiences(portfolio_value,eligible,error,training_uses,timestamp,id)')
                 self._ensure_performance_indexes(db)
                 db.execute("INSERT OR IGNORE INTO daily_learning(day,enqueued) SELECT day,COUNT(*) FROM experiences GROUP BY day")
                 db.execute("CREATE TABLE IF NOT EXISTS replay_settings(key TEXT PRIMARY KEY,value TEXT)")
@@ -225,8 +226,10 @@ class GlobalReplayBuffer:
                     db.execute("INSERT INTO replay_settings VALUES('dual_learning','1')")
             # Load metadata and at most a small RAM cache. No startup pruning.
             with db:
-                for (blob,) in db.execute("SELECT metadata FROM experiences"):
+                for row_id,blob in db.execute("SELECT id,metadata FROM experiences"):
                     metadata=pickle.loads(blob)
+                    if 'portfolio_value' not in columns:
+                        db.execute('UPDATE experiences SET portfolio_value=? WHERE id=?',(int(bool(metadata.get('portfolio_value_transition'))),row_id))
                     if metadata.get("portfolio_value_transition"):
                         db.execute("INSERT OR IGNORE INTO portfolio_value_stamps VALUES(?)",(metadata["timestamp"],))
             rows = db.execute("SELECT id,window_key,metadata,training_uses FROM experiences ORDER BY id LIMIT ?",
@@ -319,9 +322,9 @@ class GlobalReplayBuffer:
                         if getattr(exp,"origin_model","champion")!="champion":
                             identity_fields=(*identity_fields,exp.origin_model)
                         identity=hashlib.sha256(repr(identity_fields).encode()).hexdigest()
-                        cursor=db.execute("INSERT OR IGNORE INTO experiences(window_key,metadata,timestamp,day,eligible,experience_key,bootstrap_window_key) VALUES(?,?,?,?,?,?,?)",
+                        cursor=db.execute("INSERT OR IGNORE INTO experiences(window_key,metadata,timestamp,day,eligible,experience_key,bootstrap_window_key,portfolio_value) VALUES(?,?,?,?,?,?,?,?)",
                             (key,self._metadata(exp),exp.timestamp,self._day(exp.timestamp),
-                             int(self._training_eligible(vars(exp))),identity,exp.bootstrap_window_key))
+                             int(self._training_eligible(vars(exp))),identity,exp.bootstrap_window_key,int(exp.portfolio_value_transition)))
                         if cursor.rowcount:
                             saved.append((exp,int(cursor.lastrowid),key))
                             origin=getattr(exp,"origin_model","champion")
@@ -500,7 +503,7 @@ class GlobalReplayBuffer:
         with self.lock, closing(self._connect()) as db, db:
             db.execute("DELETE FROM pending_records WHERE kind=? AND record_key=?", (kind, key))
 
-    def pending_batch(self, batch_size, passes=1, exclude_row_ids=(), learner="candidate", *, timestamps=None):
+    def pending_batch(self, batch_size, passes=1, exclude_row_ids=(), learner="candidate", *, timestamps=None,portfolio_values_only=False):
         if learner not in ("candidate","champion"):
             raise ValueError("unknown learner")
         uses_by_id=self._champion_memory_uses if learner=="champion" else self._memory_uses
@@ -509,13 +512,15 @@ class GlobalReplayBuffer:
             if not self.journal_path:
                 rows = [row for row in self.items if self._training_eligible(vars(row)) and
                         uses_by_id.get(id(row), 0) < passes and id(row) not in exclude_row_ids
-                        and (timestamps is None or row.timestamp in timestamps)]
+                        and (timestamps is None or row.timestamp in timestamps)
+                        and (not portfolio_values_only or row.portfolio_value_transition)]
                 for row in rows:
                     row._replay_training_uses=uses_by_id.get(id(row),0)
                 return sorted(rows, key=lambda row: (row.timestamp, uses_by_id.get(id(row), 0)))[:batch_size]
             with closing(self._connect()) as db:
                 excluded = sorted(set(exclude_row_ids))
                 clause = (" AND id NOT IN (" + ",".join("?" for _ in excluded) + ")") if excluded else ""
+                if portfolio_values_only:clause+=' AND portfolio_value=1'
                 parameters = [passes, *excluded]
                 if timestamps is not None:
                     import json
@@ -529,6 +534,14 @@ class GlobalReplayBuffer:
     def sample(self, batch_size, exclude_ids=None):
         excluded = [self.row_ids.get(key, key) for key in (exclude_ids or ())]
         return self.pending_batch(batch_size, exclude_row_ids=excluded)
+
+    def context_row_ids(self,timestamp,origin='trading_moe'):
+        """All outcome rows for one credited decision, even across FIFO batches."""
+        if not self.journal_path:return {}
+        with self.lock,closing(self._connect()) as db:
+            return {int(row_id):1 for row_id,blob in db.execute(
+                'SELECT id,metadata FROM experiences WHERE timestamp=? AND eligible=1 AND error IS NULL',(timestamp,))
+                if pickle.loads(blob).get('origin_model')==origin}
 
     def retained_row_count(self, row_ids):
         """Rows updated in RAM, retained until their checkpoint is durable."""

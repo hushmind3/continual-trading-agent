@@ -7,7 +7,8 @@ from pathlib import Path
 import uuid
 import torch
 
-from .state_io import atomic_json, read_json
+from .state_io import atomic_json
+from .operating_rules import operating_rules
 
 
 def trainable_path(checkpoint):
@@ -65,7 +66,7 @@ def training_state(checkpoint):
         controller={k.removeprefix('controller.'):v.clone() for k,v in saved['state_dict'].items() if k.startswith('controller.')},
         adapters={k.removeprefix('adapters.'):v.clone() for k,v in saved['state_dict'].items() if k.startswith('adapters.')},
         optimizer=deepcopy(saved.get('optimizer_state')),optimizer_updates=saved.get('optimizer_updates',0),
-        learning_state={k:saved['config'][k] for k in ('replay_account_episode','applied_replay_rows') if k in saved['config']},
+        learning_state={k:saved['config'][k] for k in ('replay_account_episode','applied_replay_rows','applied_replay_contexts') if k in saved['config']},
         assembly_config={k:saved['config'][k] for k in ('assembly_enabled_experts','assembly_routing') if k in saved['config']},
         frozen_signature=frozen_signature(saved['config'],saved['expert_mapping']),source_checkpoint=checkpoint_identity(checkpoint))
 
@@ -91,8 +92,12 @@ def snapshot_pair(champion,candidate,directory,candidate_recipe=None):
         before=source_token(checkpoint);state=training_state(checkpoint)
         if source_token(checkpoint)!=before:raise ValueError(role+' changed while its evaluation snapshot was captured')
         if role=='candidate' and candidate_recipe:
-            state['assembly_config']=dict(assembly_enabled_experts=list(candidate_recipe['enabled_experts']),
-                assembly_routing=dict(market=candidate_recipe['market_routing'],policy=candidate_recipe['policy_routing']))
+            configuration=state.get('assembly_config',{})
+            enabled=configuration.get('assembly_enabled_experts',list(state['feature_sizes']))
+            routing=configuration.get('assembly_routing',dict(market=dict(top_k=0,temperature=1.),policy=dict(top_k=0,temperature=1.)))
+            if (set(enabled)!=set(candidate_recipe['enabled_experts']) or
+                routing!=dict(market=candidate_recipe['market_routing'],policy=candidate_recipe['policy_routing'])):
+                raise ValueError('requested recipe differs from the actual trained Candidate; register that configuration first')
         path=directory/(role+'.pt');save_state(state,path)
         receipt[role]=dict(path=str(path.resolve()),sha256=file_digest(path),source=str(Path(checkpoint).resolve()),
             source_token=before,optimizer_updates=state['optimizer_updates'],frozen_signature=state['frozen_signature'])
@@ -102,11 +107,12 @@ def snapshot_pair(champion,candidate,directory,candidate_recipe=None):
 
 
 def promote(champion,result,rollback_root):
+    rules=operating_rules()
     pair=result.get('evaluation_states',{})
     paper=result.get('scores',{}).get('paper',{})
-    if (result.get('state')!='qualified' or not pair or paper.get('delta',0)<=0 or
-        paper.get('candidate',{}).get('net_return',0)<=0 or
-        paper.get('candidate',{}).get('max_drawdown',float('inf'))>paper.get('champion',{}).get('max_drawdown',0)+.01):
+    if (result.get('state')!='qualified' or set(pair)!= {'champion','candidate'} or paper.get('delta',0)<=float(rules['promotion_min_delta']) or
+        paper.get('candidate',{}).get('net_return',0)<=float(rules['promotion_min_return']) or
+        paper.get('candidate',{}).get('max_drawdown',float('inf'))>paper.get('champion',{}).get('max_drawdown',0)+float(rules['promotion_drawdown_tolerance'])):
         raise ValueError('verified learned-state evaluation and passing paper scores are required')
     for role,record in pair.items():
         if file_digest(record['path'])!=record['sha256']:raise ValueError(role+' evaluation snapshot changed')

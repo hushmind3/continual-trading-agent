@@ -26,7 +26,8 @@ from stockrl.expert_system import registry_owner
 from stockrl.paths import TRADING_MOE_CHECKPOINT
 from stockrl.state_io import EvidenceJournal, WorkerLog
 from stockrl.moe_live import LiveInputStream, live_snapshot
-from stockrl.moe_promotion import load_runtime_state,save_runtime_state,trainable_path
+from stockrl.moe_promotion import save_runtime_state,trainable_path
+from stockrl.operating_rules import operating_rules,RULES_PATH
 
 worker_status_path=None
 
@@ -85,6 +86,14 @@ def save_contexts(state,contexts,evidence=None):
     # Retain the evidence used by each pending action, including an action
     # immediately before market-cache refresh. Never relabel it as newer data.
     (evidence or EvidenceJournal(state)).save_contexts(contexts)
+
+
+def training_context(snapshot,decision):
+    # Native outputs already contain the learning input; do not retain a full
+    # multi-year stock history again for every reward waiting to mature.
+    snapshot={k:v for k,v in snapshot.items() if k not in ('expert_inputs','stock_policy_history','policy_account')}
+    decision={k:v for k,v in decision.items() if k!='fusion_output'}
+    return snapshot,decision
 
 
 def publish_paper_status(root,state,bridge,decision,row,model,completed=False):
@@ -148,23 +157,33 @@ def runtime_modes(state):
     return {key:bool(flags.get(key,False)) for key in ("observe_enabled","paper_enabled","learning_enabled")}
 
 
-def learn_saved_contexts(model,optimizer,bridge,contexts):
-    batch=bridge.replay.pending_batch(256,
-        exclude_row_ids={int(k) for k in model.config.get("applied_replay_rows",{})},timestamps=contexts)
+def learn_saved_contexts(model,optimizer,bridge,contexts,settings=None):
+    rules=settings or operating_rules()
+    batch=bridge.replay.pending_batch(int(rules['training_batch_size']),
+        exclude_row_ids={int(k) for k in model.config.get("applied_replay_rows",{})},timestamps=contexts,portfolio_values_only=True)
     ack={};latest=None;logs=[]
+    credited=model.config.setdefault('applied_replay_contexts',{})
+    for stamp in credited:ack.update(bridge.replay.context_row_ids(stamp))
     for exp in batch:
+        if exp.timestamp in credited:
+            ack.update(bridge.replay.context_row_ids(exp.timestamp));continue
         if exp.source!="paper_account_portfolio" or not exp.portfolio_value_transition:continue
+        if len(logs)>=int(rules['training_optimizer_steps']):continue
         context=contexts.get(exp.timestamp)
         if not context:continue
         snapshot,original=context
-        latest=update_controller(model,optimizer,exp,snapshot,original["raw_outputs"],original["trading_output"]["target_weights"],original["trading_output"]["cash_weights_by_currency"],original["trading_output"]["actions"])
+        with registry_owner(model.gpu_lock,wait=True,on_wait=getattr(model,'gpu_wait_callback',None)),model.scheduler.work('online_learning_replay'):
+            latest=update_controller(model,optimizer,exp,snapshot,original["raw_outputs"],original["trading_output"]["target_weights"],original["trading_output"]["cash_weights_by_currency"],original["trading_output"]["actions"],settings=rules)
         logs.append({"timestamp":exp.timestamp,**latest})
-        ack.update({e._replay_row_id:1 for e in batch if e.timestamp==exp.timestamp})
+        credited[exp.timestamp]=True
+        ack.update(bridge.replay.context_row_ids(exp.timestamp))
     for exp in batch:
         if exp._replay_row_id in ack:exp._updated=True
     if ack:
         model.config.setdefault("applied_replay_rows",{}).update({str(k):1 for k in ack})
-        for stamp in {exp.timestamp for exp in batch if exp._replay_row_id in ack}:contexts.pop(stamp,None)
+        pending_stamps={item['timestamp'] for item in bridge.pending}
+        for stamp in credited:
+            if stamp not in pending_stamps:contexts.pop(stamp,None)
     return latest,logs
 
 
@@ -176,9 +195,10 @@ def main():
     p.add_argument("--recipe",type=Path,help="shared expert base with a separate small learned state")
     p.add_argument('--mode',choices=('live','historical'),default='historical')
     p.add_argument('--market',type=Path,help='completed collector CSV for live mode')
+    p.add_argument('--settings',type=Path,default=RULES_PATH,help='single operating settings file')
     p.add_argument("--device",default="cuda:0");p.add_argument("--resume",action="store_true")
     p.add_argument("--continuous",action="store_true",help="keep one model resident and run until stop.request")
-    p.add_argument("--interval",type=float,default=2,help="wall seconds between historical decisions")
+    p.add_argument("--interval",type=float,help="legacy argument; cadence is configured by inference_poll_seconds")
     args=p.parse_args()
     args.state.mkdir(parents=True,exist_ok=True)
     sys.stdout=sys.stderr=WorkerLog(args.state/"activity.log")
@@ -189,12 +209,13 @@ def main():
 
 
 def run(args):
+    args.rules=operating_rules(getattr(args,'settings',None))
+    args.interval=float(args.rules['inference_poll_seconds'])
     torch.set_num_threads(4)
     checkpoint=args.checkpoint or TRADING_MOE_CHECKPOINT
     publish_worker(args.state,status="loading",load_count=0,error=None,stop_requested=False,gpu_waiting=False,gpu_wait_seconds=0,message=f"{checkpoint.name}를 한 번 적재하는 중입니다.")
     load_started=time.perf_counter()
     model,saved=TradingMoE.load_checkpoint(checkpoint)
-    if trainable_path(checkpoint).is_file():saved=load_runtime_state(model,checkpoint)
     assembly_recipe=None
     if args.recipe:
         assembly_recipe=json.loads(args.recipe.read_text(encoding="utf-8"))
@@ -210,11 +231,12 @@ def run(args):
     publish_worker(args.state,model,status="loading",load_count=1,load_seconds=time.perf_counter()-load_started,
         parameters=sum(p.numel() for p in model.parameters()),checkpoint_bytes=checkpoint.stat().st_size,message="계좌와 optimizer 상태를 복원하는 중입니다.")
     groups=model.parameter_groups()
-    optimizer=torch.optim.AdamW(groups,lr=1e-4)
+    optimizer=torch.optim.AdamW(groups,lr=float(args.rules['learning_rate']))
     if args.resume and saved:
-        try:optimizer.load_state_dict(saved)
-        except ValueError:pass
-    bridge=TradingMoEPaper(args.state,credit_seconds=60)
+        optimizer.load_state_dict(saved)
+        for group in optimizer.param_groups:group['lr']=float(args.rules['learning_rate'])
+    bridge=TradingMoEPaper(args.state,settings=args.rules)
+    publish_worker(args.state,model,bridge,effective_settings=args.rules)
     def gpu_wait(waiting,seconds):
         publish_worker(args.state,model,bridge,gpu_waiting=waiting,gpu_wait_seconds=seconds,
             message="다른 모델의 GPU 작업을 기다립니다 · 종료하지 않고 차례대로 실행" if waiting else "GPU 차례 확보 · 가상매매를 이어 실행합니다.")
@@ -222,6 +244,7 @@ def run(args):
     episode=bridge.paper_account.state["episode_id"]
     if model.config.get("replay_account_episode")!=episode:
         model.config["applied_replay_rows"]={}
+        model.config['applied_replay_contexts']={}
         model.config["replay_account_episode"]=episode
     if getattr(args,'mode','historical')=='live':
         if not args.market:raise ValueError('live mode requires --market; historical inputs are never substituted')
@@ -252,12 +275,13 @@ def run(args):
     if first>=len(native):
         publish_worker(args.state,model,bridge,status="stopped",message="확보된 과거 시세 구간을 모두 처리했습니다.")
         return
-    evidence=EvidenceJournal(args.state)
+    evidence=EvidenceJournal(args.state,cache_rows=args.rules['evidence_cache_rows'])
     if args.resume:
         if not evidence.load_contexts():evidence.migrate_legacy_contexts()
         contexts.update(evidence.load_contexts())
     inputs=market_inputs(args.root,native,first)
     market_packets=None
+    tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
     step_count=len(native)-first if args.continuous else args.steps+2
     publish_worker(args.state,model,bridge,status="running",message="공식 ETHUSDT 과거 구간을 이어 실행합니다.")
     for step in range(step_count):
@@ -265,9 +289,12 @@ def run(args):
         while args.continuous and not modes["observe_enabled"] and not (args.state/"stop.request").exists():
             latest=None
             if modes["learning_enabled"]:
-                latest,logs=learn_saved_contexts(model,optimizer,bridge,contexts)
+                latest,logs=learn_saved_contexts(model,optimizer,bridge,contexts,args.rules)
                 update_logs.extend(logs);update_logs=update_logs[-1:]
                 save_contexts(args.state,contexts,evidence)
+                if checkpoint_due(model,tracker,args.rules):
+                    save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
+                    tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
             publish_worker(args.state,model,bridge,learning=latest,status="running",modes=modes,
                 learning_active=latest is not None,message="새 판단 중지 · 저장 경험 학습 허용" if modes["learning_enabled"] else "새 판단·학습 중지 · 모델 메모리 유지")
             time.sleep(.25)
@@ -292,7 +319,7 @@ def run(args):
             book=bridge.paper_account.snapshot()['books']['USD']
             snapshot['policy_account']=dict(cash=book['cash'],nav=book['equity'],positions={s:p['quantity'] for s,p in book['positions'].items()})
             for key in model.controller.macro_policy_ids:snapshot["expert_inputs"][key]={**policy_data,"variant":model.experts[key].entry["variant"]}
-            refresh_steps=max(1,min(assembly_recipe["refresh_seconds"][k] for k in model.controller.market_ids if k in assembly_recipe["enabled_experts"])//60) if assembly_recipe else 120
+            refresh_steps=max(1,min(assembly_recipe["refresh_seconds"][k] for k in model.controller.market_ids if k in assembly_recipe["enabled_experts"])//60) if assembly_recipe else max(1,int(args.rules['market_expert_refresh_seconds'])//60)
             if market_packets is None or (args.continuous and step%refresh_steps==0):
                 inputs=market_inputs(args.root,native,index)
                 snapshot["expert_inputs"].update(inputs)
@@ -314,10 +341,10 @@ def run(args):
             decision["native_decision_seconds"]=time.perf_counter()-started
             decision["current_weights"]=snapshot["current_weights"]
             orders=bridge.submit(decision,panel,pi,paper_executable=modes["paper_enabled"])
-            contexts[str(panel.dates[pi])] = (snapshot,decision)
+            contexts[str(panel.dates[pi])] = training_context(snapshot,decision)
         latest_learning=None
         if modes["learning_enabled"]:
-            latest_learning,logs=learn_saved_contexts(model,optimizer,bridge,contexts)
+            latest_learning,logs=learn_saved_contexts(model,optimizer,bridge,contexts,args.rules)
             update_logs.extend(logs)
         # Save once after this short continuous run, then acknowledge the rows.
         row={"timestamp":stamp,"decision":decision,"orders":orders,"fills":fills,
@@ -328,6 +355,9 @@ def run(args):
         publish_paper_status(args.root,args.state,bridge,decision,row,model)
         save_contexts(args.state,contexts,evidence)
         evidence.record_cycle(row)
+        if checkpoint_due(model,tracker,args.rules):
+            save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
+            tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
         publish_worker(args.state,model,bridge,row,decision,latest_learning,status="running",modes=modes,learning_active=latest_learning is not None)
         last=str(panel.dates[pi])
         print(json.dumps({"step":step,"actions":decision["trading_output"]["actions"] if decision else None,
@@ -361,36 +391,41 @@ def run(args):
 
 def save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe=None):
     bridge.paper_account.save();save_contexts(args.state,contexts,evidence)
-    if getattr(args,'mode','historical')=='live':
-        path=save_runtime_state(model,optimizer,args.checkpoint or TRADING_MOE_CHECKPOINT)
-        if assembly_recipe:
-            assembly_recipe['trainable_state']=str(path)
-            atomic_json(args.recipe,assembly_recipe)
-    elif assembly_recipe:
-        small_path=args.recipe.parent/"trainable"/(assembly_recipe["candidate_id"]+".pt")
-        model.save_assembly_state(small_path,optimizer)
-        assembly_recipe["trainable_state"]=str(small_path)
+    path=save_runtime_state(model,optimizer,args.checkpoint or TRADING_MOE_CHECKPOINT)
+    if assembly_recipe:
+        assembly_recipe['trainable_state']=str(path)
         atomic_json(args.recipe,assembly_recipe)
-    else:
-        checkpoint=args.checkpoint or TRADING_MOE_CHECKPOINT
-        model.save_checkpoint(checkpoint,optimizer)
     bridge.replay.acknowledge_training({int(k):v for k,v in model.config.get("applied_replay_rows",{}).items()})
     evidence.save_contexts(contexts,checkpoint_saved=True)
+    retained=set(contexts)|{item['timestamp'] for item in bridge.pending}
+    model.config['applied_replay_contexts']={k:v for k,v in model.config.get('applied_replay_contexts',{}).items() if k in retained}
+    model.config['applied_replay_rows']={}
+
+
+def checkpoint_due(model,tracker,rules):
+    return (time.monotonic()-tracker['time']>=float(rules['checkpoint_interval_seconds']) or
+        model.optimizer_updates-tracker['updates']>=int(rules['checkpoint_every_updates']))
 
 
 def run_live(args,model,optimizer,bridge,assembly_recipe=None):
+    rules=getattr(args,'rules',None) or operating_rules(getattr(args,'settings',None))
     stream=LiveInputStream(args.market,bridge.paper_account.state['last_timestamp'])
-    evidence=EvidenceJournal(args.state)
+    evidence=EvidenceJournal(args.state,cache_rows=rules['evidence_cache_rows'])
     contexts=evidence.load_contexts() if args.resume else {}
     completed=0
+    tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
+    market_cache={};last_market={}
     try:
         while not (args.state/'stop.request').exists():
             modes=runtime_modes(args.state)
             item=stream.next_frame() if modes['observe_enabled'] else None
             latest=None
             if item is None:
-                if modes['learning_enabled']:latest,_=learn_saved_contexts(model,optimizer,bridge,contexts)
+                if modes['learning_enabled']:latest,_=learn_saved_contexts(model,optimizer,bridge,contexts,rules)
                 save_contexts(args.state,contexts,evidence)
+                if checkpoint_due(model,tracker,rules):
+                    save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
+                    tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
                 publish_worker(args.state,model,bridge,status='running',source_kind='live',modes=modes,
                     learning=latest,learning_active=latest is not None,message='새 완료 시세 대기',market_path=str(args.market))
                 time.sleep(max(.1,args.interval))
@@ -401,17 +436,38 @@ def run_live(args,model,optimizer,bridge,assembly_recipe=None):
             fills=bridge.advance(panel,index,enabled=modes['paper_enabled'])
             # Fill changes holdings: rebuild the account-aware native input.
             panel,index,snapshot,account=live_snapshot(model,args.market,frame,stamp,bridge.paper_account)
-            with torch.no_grad():decision,_=model(snapshot,torch.as_tensor(account,dtype=torch.float32),device=args.device,explore=True)
+            packets=[];reused=set()
+            for key in [*model.controller.market_ids,*model.controller.macro_policy_ids]:
+                if hasattr(model,'assembly_enabled') and key not in model.assembly_enabled:continue
+                data=snapshot['expert_inputs'].get(key)
+                if not data:continue
+                cached=market_cache.get(key)
+                age=(pd.Timestamp(stamp)-last_market[key]).total_seconds() if key in last_market else float('inf')
+                interval=(assembly_recipe or {}).get('refresh_seconds',{}).get(key,rules['market_expert_refresh_seconds'])
+                if cached and age<float(interval) and set(cached['symbols']).issubset(snapshot['symbols']):
+                    packet=cached;reused.add(key)
+                else:
+                    with registry_owner(model.gpu_lock,wait=True,on_wait=getattr(model,'gpu_wait_callback',None)),model.scheduler.work('champion_live'):
+                        packet=model.experts[key](model.root,data,args.device)
+                    packet.update(expert=key,native_features_verified=bool(data.get('native_features_verified')))
+                    if key in model.controller.market_ids:market_cache[key]=packet;last_market[key]=pd.Timestamp(stamp)
+                packets.append(packet)
+            with torch.no_grad():decision,_=model(snapshot,torch.as_tensor(account,dtype=torch.float32),packets=packets,device=args.device,explore=True)
+            for key in reused:decision['expert_status'][key]['status']='cached'
+            evidence.save_market(list(market_cache.values()))
             decision.update(current_weights=snapshot['current_weights'],source_kind='live',market_path=str(args.market))
             executable=bool(decision['trading_output'].get('paper_executable'))
             orders=bridge.submit(decision,panel,index,paper_executable=modes['paper_enabled'] and executable)
             if modes['paper_enabled'] and executable:
-                contexts[str(panel.dates[index])]=(snapshot,decision)
-            if modes['learning_enabled']:latest,_=learn_saved_contexts(model,optimizer,bridge,contexts)
+                contexts[str(panel.dates[index])]=training_context(snapshot,decision)
+            if modes['learning_enabled']:latest,_=learn_saved_contexts(model,optimizer,bridge,contexts,rules)
             row=dict(timestamp=str(panel.dates[index]),decision=decision,orders=orders,fills=fills,
                 books=bridge.paper_account.snapshot()['books'],reward_points=bridge.paper_account.reward_points(),
                 seconds=time.perf_counter()-started,replay_rows=bridge.replay.stats()['total'])
             save_contexts(args.state,contexts,evidence);evidence.record_cycle(row)
+            if checkpoint_due(model,tracker,rules):
+                save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
+                tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
             publish_worker(args.state,model,bridge,row,decision,latest,status='running',source_kind='live',
                 learning_active=latest is not None,modes=modes,input_status=snapshot['input_status'])
             completed+=1

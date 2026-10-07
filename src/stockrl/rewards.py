@@ -313,11 +313,11 @@ class _RewardMixin:
                 matured=(current>=reward_start+np.timedelta64(int(dec["credit_seconds"]),"s")
                          if dec.get("credit_seconds") else
                          dec["credit_observations_elapsed"]>=int(dec["credit_observations_target"]))
-            elif self.horizon_kind=="bars":
+            elif dec.get('moe_credit_kind',self.horizon_kind)=="bars":
                 dec["bars_elapsed"]=int(dec.get("bars_elapsed",0))+1
-                matured=dec["bars_elapsed"]>=self.horizon_amount
+                matured=dec["bars_elapsed"]>=int(dec.get('moe_credit_amount',self.horizon_amount))
             else:
-                matured=current>=reward_start+np.timedelta64(self.horizon_amount,"s")
+                matured=current>=reward_start+np.timedelta64(int(dec.get('moe_credit_amount',self.horizon_amount)),"s")
             if not matured and not terminal:
                 retain(dec,"reward_horizon"); continue
             final_equity=float(dec.get("reset_equity",now)) if terminal else now

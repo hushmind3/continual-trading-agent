@@ -550,6 +550,8 @@ class AssemblyOrchestrator:
                 self._persist()
                 return {"ok":True,"message":"현재 시험 정지 요청 · 성적과 작은 state 저장"}
             if not self.current:self.generate()
+            if self.supervisor is not None and self.supervisor._moe_model_worker('champion').process():
+                raise ValueError('평가 전 Champion을 저장 후 정지하세요. 실제 저장 가중치를 고정해 비교합니다.')
             if self.current.get("base_checkpoint_hash") != self.state.get("base_hash"):
                 raise ValueError("공용 PT가 변경됐습니다. 이전 hash의 recipe를 새 PT 성적으로 평가하지 않습니다.")
             worker = self._candidate_worker()
@@ -657,8 +659,6 @@ class AssemblyOrchestrator:
             from .trading_moe import TradingMoE
             if self.build_cancel.is_set():raise InterruptedError("TradingMoE 생성이 취소되었습니다.")
             model,_ = TradingMoE.load_checkpoint(self.checkpoint)
-            from .moe_promotion import load_runtime_state
-            load_runtime_state(model,self.checkpoint)
             self._set_build(phase="전문가 구성 적용",progress=38,message="시장 분석·매매 판단 전문가와 Controller를 연결하는 중입니다.")
             model.apply_assembly_recipe(recipe)
             if self.build_cancel.is_set():raise InterruptedError("TradingMoE 생성이 취소되었습니다.")

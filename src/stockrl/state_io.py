@@ -53,7 +53,6 @@ import zlib
 
 # Deduplicated MoE evidence and bounded runtime diagnostics.
 LOG_BYTES = 4 * 1024 * 1024
-CACHE_ROWS = 64
 
 
 def evidence_status(state):
@@ -143,7 +142,9 @@ def _decode(value):
 
 
 class EvidenceJournal:
-    def __init__(self, state):
+    def __init__(self, state,*,cache_rows=None):
+        from .operating_rules import operating_rules
+        self.cache_rows=int(cache_rows if cache_rows is not None else operating_rules()['evidence_cache_rows'])
         self.path = Path(state) / "evidence.sqlite3"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as db, db:
@@ -248,7 +249,7 @@ class EvidenceJournal:
             stamp = row["timestamp"]
             db.execute("INSERT OR REPLACE INTO cache VALUES (?,?)", (stamp, _encode(summary)))
             self._references(db, "cache:" + stamp, decision["evidence_refs"] if decision else [])
-            stale = db.execute("SELECT stamp FROM cache ORDER BY stamp DESC LIMIT -1 OFFSET ?", (CACHE_ROWS,)).fetchall()
+            stale = db.execute("SELECT stamp FROM cache ORDER BY stamp DESC LIMIT -1 OFFSET ?", (self.cache_rows,)).fetchall()
             for (old,) in stale:
                 db.execute("DELETE FROM cache WHERE stamp=?", (old,))
                 db.execute("DELETE FROM refs WHERE owner=?", ("cache:" + old,))

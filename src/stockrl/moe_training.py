@@ -3,9 +3,11 @@ import torch
 from torch.nn import functional as F
 from torch.distributions import Dirichlet
 from .trading_moe import parameter_digest
+from .operating_rules import operating_rules
 
 
-def update_controller(model,optimizer,experience,snapshot,packets,target_weights,cash_weight,actions=None):
+def update_controller(model,optimizer,experience,snapshot,packets,target_weights,cash_weight,actions=None,*,settings=None):
+    rules=settings or operating_rules()
     if experience.origin_model!="trading_moe" or experience.source!="paper_account_portfolio":
         raise ValueError("controller learns only the MoE's actual paper outcomes")
     if experience.portfolio_reward is None:raise ValueError("paper NAV reward is missing")
@@ -18,7 +20,7 @@ def update_controller(model,optimizer,experience,snapshot,packets,target_weights
     versions=[p._version for p in model.experts.parameters()]
     optimizer.zero_grad(set_to_none=True)
     output=model.controller(evidence,validity,account,model.policy_q(packets,snapshot["symbols"]))
-    reward=torch.tensor(100*float(experience.portfolio_reward),dtype=torch.float32,device=device)
+    reward=torch.tensor(float(rules['training_reward_scale'])*float(experience.portfolio_reward),dtype=torch.float32,device=device)
     predicted=output["value"].mean()
     advantage=(reward-predicted).detach()
     # Action credit plus the actual submitted portfolio allocation, not a
@@ -45,11 +47,11 @@ def update_controller(model,optimizer,experience,snapshot,packets,target_weights
     router=output["router_probabilities"]
     entropy=-(router*router.clamp_min(1e-8).log()).sum(-1).mean()
     value_loss=F.smooth_l1_loss(predicted,reward)
-    loss=-advantage*(log_action+allocation_logp)+.5*value_loss-.005*entropy
+    loss=-advantage*(log_action+allocation_logp)+float(rules['value_loss_weight'])*value_loss-float(rules['router_entropy_weight'])*entropy
     loss.backward()
     grads={name:float(p.grad.norm()) for name,p in model.controller.named_parameters() if p.grad is not None}
     if not grads or not all(torch.isfinite(torch.tensor(v)) for v in grads.values()):raise ValueError("invalid controller gradients")
-    torch.nn.utils.clip_grad_norm_(model.controller.parameters(),1)
+    torch.nn.utils.clip_grad_norm_(model.controller.parameters(),float(rules['gradient_clip_norm']))
     optimizer.step();model.optimizer_updates+=1
     after=parameter_digest(model.controller)
     if after==before:raise ValueError("controller update did not change weights")

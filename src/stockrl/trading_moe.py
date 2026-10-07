@@ -284,7 +284,7 @@ class TradingMoE(nn.Module):
         torch.save({"format":"trading_moe_assembly_v1","feature_sizes":self.config["feature_sizes"],
             "controller":self.controller.state_dict(),"adapters":self.adapters.state_dict(),
             "optimizer":optimizer.state_dict() if optimizer else None,"optimizer_updates":self.optimizer_updates,
-            "learning_state":{key:self.config[key] for key in ("replay_account_episode","applied_replay_rows") if key in self.config},
+            "learning_state":{key:self.config[key] for key in ("replay_account_episode","applied_replay_rows","applied_replay_contexts") if key in self.config},
             'assembly_config':{key:self.config[key] for key in ('assembly_enabled_experts','assembly_routing') if key in self.config},
             'frozen_signature':frozen_signature(self.config,{k:e.entry for k,e in self.experts.items()}),
             'source_checkpoint':source_checkpoint},temporary)
@@ -296,7 +296,7 @@ class TradingMoE(nn.Module):
             raise ValueError("assembly state does not match shared base")
         self.controller.load_state_dict(state["controller"]);self.adapters.load_state_dict(state["adapters"])
         self.optimizer_updates=state["optimizer_updates"]
-        for key in ('replay_account_episode','applied_replay_rows'):self.config.pop(key,None)
+        for key in ('replay_account_episode','applied_replay_rows','applied_replay_contexts'):self.config.pop(key,None)
         self.config.update(state.get("learning_state",{}))
         configuration=state.get('assembly_config',{})
         for key in ('assembly_enabled_experts','assembly_routing'):self.config.pop(key,None)
@@ -378,6 +378,8 @@ class TradingMoE(nn.Module):
         previous=saved["metadata"].get("pre_expansion_optimizer_state")
         if optimizer_state is None and previous and model.controller.stock_policy_ids:
             optimizer_state=model._expand_optimizer_state(previous)
+        from .moe_promotion import trainable_path,load_runtime_state
+        if trainable_path(path).is_file():optimizer_state=load_runtime_state(model,path)
         return model,optimizer_state
 
     def _expand_optimizer_state(self,previous):

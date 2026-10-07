@@ -82,7 +82,7 @@ export function SystemPage() {
                 <summary className="cursor-pointer text-sky-300">전문가 실행 상태</summary>
                 <ul className="mt-3 space-y-2">{Object.entries(model.data.expert_status).map(([id,execution])=><li key={id} className="border-b border-white/8 py-2">
                   <div className="flex justify-between gap-3"><span>{registry.data?.experts?.find(e=>e.id===id)?.name??id}</span>
-                    <span className={execution.status==='executed'?'text-emerald-300':'text-amber-300'}>{execution.status==='executed'?'실행됨':execution.status==='disabled'?'구성 제외':'입력 대기'}</span></div>
+                    <span className={['executed','cached'].includes(execution.status)?'text-emerald-300':'text-amber-300'}>{execution.status==='executed'?'실행됨':execution.status==='cached'?'저장 출력 사용':execution.status==='disabled'?'구성 제외':'입력 대기'}</span></div>
                   {execution.reason&&<p className="mt-1 break-words text-slate-500">{execution.reason}</p>}
                   {execution.as_of&&<p className="mt-1 text-slate-500">입력 시각 {date(execution.as_of)}</p>}
                   {execution.news_status==='native_missing_news_neutral_3'&&<p className="mt-1 text-slate-500">뉴스 미수신 · 원본 정책의 중립값 적용</p>}

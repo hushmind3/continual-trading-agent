@@ -38,7 +38,7 @@ class LiveInputStream:
             stamp = future[0]
         self.last = stamp
         self.reader.processed_through = str(stamp)
-        return frame.loc[frame.date <= stamp], stamp
+        return frame.loc[frame.date <= stamp].sort_values('date').groupby('symbol',sort=False).tail(128), stamp
 
 
 def daily_history(market, stamp):
@@ -119,18 +119,23 @@ def live_snapshot(model, market, frame, stamp, account,*,daily_frame=None):
         costs=sum(float(book.get(k,0)) for k in ('fees','slippage','spread','sell_tax')),
         drawdown=max(0.,1-float(book['equity'])/peak),volatility=volatility)
     if not daily.empty:
-        closes=daily.pivot(index='date',columns='symbol',values='close')
+        observed=daily.copy();observed['trading_day']=observed.date.dt.normalize()
+        closes=observed.pivot_table(index='trading_day',columns='symbol',values='close',aggfunc='last')
         if '^GSPC' in closes:
-            returns=closes.pct_change(fill_method=None)
-            series={s:(returns[s]-returns['^GSPC']).dropna().tail(128) for s in panel.symbols if s in returns and s!='^GSPC'}
+            returns=pd.DataFrame({s:closes[s].dropna().pct_change() for s in closes})
+            series={s:(returns[s]-returns['^GSPC']).dropna().tail(128) for s in panel.symbols
+                if s in returns and s!='^GSPC' and panel.groups[s][1] in ('equity','etf')}
             series={s:v for s,v in series.items() if len(v)>=32}
             if series:
-                length=min(len(v) for v in series.values())
-                rates=dict(symbols=list(series), as_of=str(max(v.index[-1] for v in series.values())),
-                    series=[v.tail(length).tolist() for v in series.values()], horizon=1,sampling_seconds=86400,
-                    units='daily_excess_return', observation_timestamps=[v.index.astype(str).tolist()[-length:] for v in series.values()],
-                    input_authenticity='completed_live_daily_return_minus_SP500')
-                snapshot['expert_inputs'].update(chronos=rates,timesfm=rates)
+                dates=next(iter(series.values())).index
+                for value in series.values():dates=dates.intersection(value.index)
+                dates=dates.sort_values()[-128:]
+                if len(dates)>=32:
+                    rates=dict(symbols=list(series), as_of=str(dates[-1]),
+                        series=[v.loc[dates].tolist() for v in series.values()], horizon=1,sampling_seconds=86400,
+                        units='daily_excess_return', observation_timestamps=[dates.astype(str).tolist() for v in series.values()],
+                        input_authenticity='completed_live_daily_return_minus_SP500')
+                    snapshot['expert_inputs'].update(chronos=rates,timesfm=rates)
     # Optional authentic native streams: no old packaged feature/ITCH fallback.
     feature_path=Path(market).with_name('native_macrophft.csv')
     if feature_path.is_file() and 'ETHUSDT' in panel.symbols:

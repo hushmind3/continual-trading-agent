@@ -31,11 +31,17 @@ def update_controller(model,optimizer,experience,snapshot,packets,target_weights
         indices=[j for j,s in enumerate(snapshot["symbols"]) if s in actionable]
         if not indices:raise ValueError("no actionable paper decision to credit")
         log_action=torch.stack([log_probabilities[j,{"SELL":0,"HOLD":1,"BUY":2}[actions[snapshot["symbols"][j]]]] for j in indices]).mean()
-    allocation=torch.cat([output["allocation_scores"][0],output["cash_scores"][0]])
-    distribution=Dirichlet(F.softplus(allocation)+1)
-    weights=torch.tensor([target_weights[s] for s in snapshot["symbols"]]+[cash_weight],device=device).clamp_min(1e-8)
-    weights=weights/weights.sum()
-    allocation_logp=distribution.log_prob(weights)
+    cash_by_currency=cash_weight if isinstance(cash_weight,dict) else {'USD':cash_weight}
+    allocations=[]
+    for currency,cash in cash_by_currency.items():
+        indices=[j for j,s in enumerate(snapshot['symbols']) if snapshot['currencies'][s]==currency]
+        if not indices:continue
+        allocation=torch.cat([output['allocation_scores'][0,indices],output['cash_scores'][0]])
+        distribution=Dirichlet(F.softplus(allocation)+1)
+        weights=torch.tensor([target_weights[snapshot['symbols'][j]] for j in indices]+[cash],device=device).clamp_min(1e-8)
+        allocations.append(distribution.log_prob(weights/weights.sum()))
+    if not allocations:raise ValueError('no currency allocation to credit')
+    allocation_logp=torch.stack(allocations).mean()
     router=output["router_probabilities"]
     entropy=-(router*router.clamp_min(1e-8).log()).sum(-1).mean()
     value_loss=F.smooth_l1_loss(predicted,reward)

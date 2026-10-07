@@ -199,11 +199,14 @@ class TradingMoE(nn.Module):
 
     def forward(self,snapshot,account_state,*,packets=None,device="cpu",explore=False):
         started=time.perf_counter();profiles=[];unavailable_policies={}
+        expert_status={k:dict(snapshot.get('input_status',{}).get(k,{'status':'blocked','reason':'native input unavailable'})) for k in self.experts}
         if packets is None:
             packets=[]
             with registry_owner(self.gpu_lock,wait=True,on_wait=getattr(self,"gpu_wait_callback",None)):
                 for key,expert in self.experts.items():
-                    if hasattr(self,"assembly_enabled") and key not in self.assembly_enabled:continue
+                    if hasattr(self,"assembly_enabled") and key not in self.assembly_enabled:
+                        expert_status[key]={'status':'disabled','reason':'not selected in this configuration'}
+                        continue
                     data=snapshot["expert_inputs"].get(key)
                     if key in self.config.get("stock_policy_ids",()) and data is None:
                         data=expert.prepare_input(snapshot)
@@ -227,6 +230,9 @@ class TradingMoE(nn.Module):
             if np.datetime64(packet["as_of"])>np.datetime64(snapshot["as_of"]):raise ValueError("expert evidence contains future information")
             if packet["expert"].startswith("macrophft_") and not packet.get("native_features_verified"):
                 raise ValueError("unverified MacroHFT evidence cannot enter the controller")
+        for packet in packets:
+            expert_status[packet['expert']]={'status':'executed','as_of':packet['as_of'],
+                'symbols':packet['symbols'],'seconds':packet.get('forward_seconds')}
         evidence,validity=self.prepare(packets,snapshot["symbols"])
         policy_q=self.policy_q(packets,snapshot["symbols"])
         outputs=self.controller(evidence,validity,account_state.to(next(self.controller.parameters()).device),policy_q)
@@ -248,7 +254,7 @@ class TradingMoE(nn.Module):
             "raw_outputs":packets,"used_experts":[p["expert"] for p in packets],"selected_experts":[p["expert"] for p in packets],
             "evidence_as_of":{p["expert"]:p["as_of"] for p in packets},
             "policy_validity":outputs["policy_validity"].tolist(),"profiles":profiles,
-            "unavailable_stock_policies":unavailable_policies,
+            "unavailable_stock_policies":unavailable_policies,"expert_status":expert_status,
             "decision_seconds":time.perf_counter()-started,"training_performed":False}
         return result,outputs
 

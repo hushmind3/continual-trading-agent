@@ -25,6 +25,7 @@ from stockrl.expert_registry import atomic_json
 from stockrl.expert_system import registry_owner
 from stockrl.paths import TRADING_MOE_CHECKPOINT
 from stockrl.state_io import EvidenceJournal, WorkerLog
+from stockrl.moe_live import LiveInputStream, live_snapshot
 
 worker_status_path=None
 
@@ -66,13 +67,15 @@ def publish_worker(state,model=None,bridge=None,row=None,decision=None,learning=
     if row:data.update(market_timestamp=row["timestamp"],cycle_seconds=row["seconds"])
     if decision:
         output=decision["trading_output"];symbols=list(output["actions"])
-        eth=symbols.index("ETHUSDT")
-        cash=output["cash_weights_by_currency"]["USD"]+sum(weight for symbol,weight in output["target_weights"].items() if symbol not in decision["tradable_symbols"])
-        data["decision"]={"action":output["actions"]["ETHUSDT"],"target_weight":output["target_weights"]["ETHUSDT"],
-            "current_weight":decision["current_weights"].get("ETHUSDT",0),"cash_weight":cash,"as_of":decision["as_of"],
-            "value":decision["fusion_output"]["native_head_output"]["value"][0][eth],"seconds":decision.get("native_decision_seconds",decision["decision_seconds"])}
-        data["stages"]={"market":len([x for x in decision["used_experts"] if not x.startswith("macrophft_")])==8,
-            "state":True,"policy":len([x for x in decision["used_experts"] if x.startswith("macrophft_")])==6,"controller":True,"action":True}
+        primary='ETHUSDT' if 'ETHUSDT' in symbols else next(iter(decision.get('tradable_symbols') or symbols))
+        data['decisions']={s:dict(symbol=s,action=output['actions'][s],target_weight=output['target_weights'][s],
+            current_weight=decision['current_weights'].get(s,0),as_of=decision['as_of']) for s in symbols}
+        data['decision']={**data['decisions'][primary], 'cash_weights_by_currency':output['cash_weights_by_currency'],
+            'value':decision['fusion_output']['native_head_output']['value'][0][symbols.index(primary)],
+            'seconds':decision.get('native_decision_seconds',decision['decision_seconds'])}
+        data['expert_status']=decision.get('expert_status',{})
+        data['stages']={'market':bool(set(decision['used_experts']) & set(model.controller.market_ids)),
+            'state':True,'policy':bool(set(decision['used_experts']) & set(model.controller.policy_ids)),'controller':True,'action':True}
     if learning:data["learning"]={"loss":learning["loss"],"reward_points":learning["reward_points"],"updated_at":data["updated_at"]}
     atomic_json(path,data)
 
@@ -153,7 +156,7 @@ def learn_saved_contexts(model,optimizer,bridge,contexts):
         context=contexts.get(exp.timestamp)
         if not context:continue
         snapshot,original=context
-        latest=update_controller(model,optimizer,exp,snapshot,original["raw_outputs"],original["trading_output"]["target_weights"],original["trading_output"]["cash_weights_by_currency"]["USD"],original["trading_output"]["actions"])
+        latest=update_controller(model,optimizer,exp,snapshot,original["raw_outputs"],original["trading_output"]["target_weights"],original["trading_output"]["cash_weights_by_currency"],original["trading_output"]["actions"])
         logs.append({"timestamp":exp.timestamp,**latest})
         ack.update({e._replay_row_id:1 for e in batch if e.timestamp==exp.timestamp})
     for exp in batch:
@@ -170,6 +173,8 @@ def main():
     p.add_argument("--state",type=Path,default=Path("runtime/trading_moe/native_vertical"))
     p.add_argument("--checkpoint",type=Path,help="use this named model file without renaming or copying it")
     p.add_argument("--recipe",type=Path,help="shared expert base with a separate small learned state")
+    p.add_argument('--mode',choices=('live','historical'),default='historical')
+    p.add_argument('--market',type=Path,help='completed collector CSV for live mode')
     p.add_argument("--device",default="cuda:0");p.add_argument("--resume",action="store_true")
     p.add_argument("--continuous",action="store_true",help="keep one model resident and run until stop.request")
     p.add_argument("--interval",type=float,default=2,help="wall seconds between historical decisions")
@@ -214,6 +219,9 @@ def run(args):
     if model.config.get("replay_account_episode")!=episode:
         model.config["applied_replay_rows"]={}
         model.config["replay_account_episode"]=episode
+    if getattr(args,'mode','historical')=='live':
+        if not args.market:raise ValueError('live mode requires --market; historical inputs are never substituted')
+        return run_live(args,model,optimizer,bridge,assembly_recipe)
     initial=deepcopy(bridge.paper_account.snapshot())
     native=pd.read_feather(args.root/"native_data/MacroHFT/df_val.feather")
     native.timestamp=pd.to_datetime(native.timestamp)
@@ -321,14 +329,7 @@ def run(args):
             while time.monotonic()<deadline and not (args.state/"stop.request").exists():time.sleep(min(.1,max(0,deadline-time.monotonic())))
     publish_worker(args.state,model,bridge,status="saving",stop_requested=True,message="계좌·replay·optimizer·TradingMoE.pt를 저장하는 중입니다.")
     bridge.paper_account.save();save_contexts(args.state,contexts,evidence)
-    if assembly_recipe:
-        small_path=args.recipe.parent/"trainable"/(assembly_recipe["candidate_id"]+".pt")
-        model.save_assembly_state(small_path,optimizer)
-        assembly_recipe["trainable_state"]=str(small_path)
-        atomic_json(args.recipe,assembly_recipe)
-    else:model.save_checkpoint(checkpoint,optimizer)
-    bridge.replay.acknowledge_training({int(k):v for k,v in model.config.get("applied_replay_rows",{}).items()})
-    evidence.save_contexts(contexts,checkpoint_saved=True)
+    save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
     if rows:publish_paper_status(args.root,args.state,bridge,None,rows[-1],model,completed=True)
     publish_worker(args.state,model,bridge,status="stopped",stop_requested=False,message="저장 완료 · 다음 시작은 같은 계좌와 학습 상태에서 이어집니다.")
     if args.continuous:return
@@ -347,6 +348,62 @@ def run(args):
         "live_executable":False}
     atomic_json(args.state/"report.json",report)
     print(json.dumps({k:v for k,v in report.items() if k not in ("initial","final","native_Q","fills","steps","updates")}),flush=True)
+
+
+def save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe=None):
+    bridge.paper_account.save();save_contexts(args.state,contexts,evidence)
+    if assembly_recipe:
+        small_path=args.recipe.parent/"trainable"/(assembly_recipe["candidate_id"]+".pt")
+        model.save_assembly_state(small_path,optimizer)
+        assembly_recipe["trainable_state"]=str(small_path)
+        atomic_json(args.recipe,assembly_recipe)
+    else:model.save_checkpoint(args.checkpoint or TRADING_MOE_CHECKPOINT,optimizer)
+    bridge.replay.acknowledge_training({int(k):v for k,v in model.config.get("applied_replay_rows",{}).items()})
+    evidence.save_contexts(contexts,checkpoint_saved=True)
+
+
+def run_live(args,model,optimizer,bridge,assembly_recipe=None):
+    stream=LiveInputStream(args.market,bridge.paper_account.state['last_timestamp'])
+    evidence=EvidenceJournal(args.state)
+    contexts=evidence.load_contexts() if args.resume else {}
+    completed=0
+    try:
+        while not (args.state/'stop.request').exists():
+            modes=runtime_modes(args.state)
+            item=stream.next_frame() if modes['observe_enabled'] else None
+            latest=None
+            if item is None:
+                if modes['learning_enabled']:latest,_=learn_saved_contexts(model,optimizer,bridge,contexts)
+                save_contexts(args.state,contexts,evidence)
+                publish_worker(args.state,model,bridge,status='running',source_kind='live',modes=modes,
+                    learning=latest,learning_active=latest is not None,message='새 완료 시세 대기',market_path=str(args.market))
+                time.sleep(max(.1,args.interval))
+                continue
+            frame,stamp=item
+            started=time.perf_counter()
+            panel,index,snapshot,account=live_snapshot(model,args.market,frame,stamp,bridge.paper_account)
+            fills=bridge.advance(panel,index,enabled=modes['paper_enabled'])
+            # Fill changes holdings: rebuild the account-aware native input.
+            panel,index,snapshot,account=live_snapshot(model,args.market,frame,stamp,bridge.paper_account)
+            with torch.no_grad():decision,_=model(snapshot,torch.as_tensor(account,dtype=torch.float32),device=args.device,explore=True)
+            decision.update(current_weights=snapshot['current_weights'],source_kind='live',market_path=str(args.market))
+            executable=bool(decision['trading_output'].get('paper_executable'))
+            orders=bridge.submit(decision,panel,index,paper_executable=modes['paper_enabled'] and executable)
+            if modes['paper_enabled'] and executable:
+                contexts[str(panel.dates[index])]=(snapshot,decision)
+            if modes['learning_enabled']:latest,_=learn_saved_contexts(model,optimizer,bridge,contexts)
+            row=dict(timestamp=str(panel.dates[index]),decision=decision,orders=orders,fills=fills,
+                books=bridge.paper_account.snapshot()['books'],reward_points=bridge.paper_account.reward_points(),
+                seconds=time.perf_counter()-started,replay_rows=bridge.replay.stats()['total'])
+            save_contexts(args.state,contexts,evidence);evidence.record_cycle(row)
+            publish_worker(args.state,model,bridge,row,decision,latest,status='running',source_kind='live',
+                learning_active=latest is not None,modes=modes,input_status=snapshot['input_status'])
+            completed+=1
+            if not args.continuous and completed>=args.steps:break
+    finally:
+        save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
+        publish_worker(args.state,model,bridge,status='stopped',source_kind='live',learning_active=False,
+            stop_requested=False,message='실시간 계좌·학습 상태 저장 완료')
 
 
 if __name__=="__main__":

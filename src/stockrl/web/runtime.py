@@ -179,6 +179,8 @@ class Supervisor(_StatusMixin, _AccountResetMixin):
         if worker is None or worker.state!=state or worker.checkpoint!=checkpoint:
             worker=TradingMoELifecycle(checkpoint=checkpoint,state=state)
             self.moe_model_workers[role]=worker
+        worker.source_mode='live' if self.mode=='live' else 'historical'
+        worker.market=(self.profile or self.runtime/self.mode)/'market.csv'
         if role=="champion":
             recipe=ROOT/"runtime/assembly/champion_recipe.json"
             if recipe.is_file() and _json(recipe).get("enabled_experts"):

@@ -127,6 +127,12 @@ def serve(host: str = "127.0.0.1", port: int = 8766, runtime: str | None = None,
                     return self._send({**result,"assembly":assembly.status()},200 if result.get("ok") else 409)
                 except (ValueError,OSError) as exc:return self._send({"error":str(exc)},409)
             if route in ("/api/trading-moe/start","/api/trading-moe/stop"):
+                if route.endswith('/start'):
+                    if not supervisor.run_requested:
+                        started=supervisor.start(supervisor.mode,supervisor.horizon)
+                        if not started.get('ok'):return self._send(started,400)
+                    trading_moe.source_mode='live' if supervisor.mode=='live' else 'historical'
+                    trading_moe.market=supervisor.profile/'market.csv'
                 result=trading_moe.start() if route.endswith("/start") else trading_moe.stop()
                 return self._send(result,200 if result.get("ok") else 400)
             if route in ("/api/models/champion/start","/api/models/champion/stop",

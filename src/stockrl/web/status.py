@@ -141,13 +141,13 @@ class _StatusMixin:
                     "ram_weight_bytes":native.get("worker_ram_bytes",0),
                     "gpu_weight_bytes":compute.get("allocated_bytes",0) if live else 0,
                     "last_decision":decision.get("as_of"),"decision_seconds":decision.get("seconds"),
-                    "updated_at":native.get("updated_at"),"source_kind":"saved_operating_account" if saved_account else "historical_paper",
-                    "source":"TradingMoE · 공식 ETHUSDT 과거 가상매매" if not trial else "TradingMoE · 조립 Candidate 시험",
+                    "updated_at":native.get("updated_at"),"source_kind":"saved_operating_account" if saved_account else native.get('source_kind','historical_paper'),
+                    "source":("TradingMoE · 실시간 시세 가상매매" if native.get('source_kind')=='live' else "TradingMoE · 과거 가상매매") if not trial else "TradingMoE · Candidate 시험",
                     "memory_scope":"worker","account_scope":"long_term","account_path":str(account_path),
                     "learning_active":live and bool(native.get("learning_active")),"learning":learning,
                     "optimizer_updates":native.get("optimizer_updates",0),"replay":native.get("replay",{}),"books":books,
                     "cache":native.get("cache",{}),"decision":decision,"fills":native.get("fills",[]),
-                    "reward_points":native.get("reward_points",{})}
+                    "reward_points":native.get("reward_points",{}),'expert_status':native.get('expert_status',{}),'input_status':native.get('input_status',{})}
                 accounts[role]={**summary,"books":books,"training":runtime[role]["learning_active"],
                     "version":native.get("optimizer_updates",0),"last_inference_seconds":decision.get("seconds"),
                     "last_full_decision_timestamp":decision.get("as_of"),"account_scope":runtime[role]["account_scope"]}
@@ -161,8 +161,9 @@ class _StatusMixin:
                 metrics[role+"_last_completed_round"]={"samples":learning.get("samples"),"loss":learning.get("loss"),
                     "optimizer_updates":native.get("optimizer_updates",0)}
                 if decision:
-                    decisions.append({"symbol":"ETHUSDT","date":decision.get("as_of"),"action":decision.get("action"),
-                        "target_weight":decision.get("target_weight"),"value":decision.get("value"),"role":role})
+                    for item in native.get('decisions',{}).values() or [decision]:
+                        decisions.append({"symbol":item.get('symbol','ETHUSDT'),"date":item.get("as_of"),"action":item.get("action"),
+                            "target_weight":item.get("target_weight"),"value":item.get("value"),"role":role})
             assembly=getattr(self,"assembly_orchestrator",None)
             experiment=assembly.status() if assembly else {}
             candidate=experiment.get("candidate",{}); scores=candidate.get("scores",{})

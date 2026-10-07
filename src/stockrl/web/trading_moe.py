@@ -6,7 +6,7 @@ import threading
 import psutil
 from .resources import ROOT
 from ..expert_registry import atomic_json
-from ..paths import EXPERT_ASSETS_DIR, TRADING_MOE_CHECKPOINT
+from ..paths import EXPERT_ASSETS_DIR, TRADING_MOE_CHECKPOINT, default_runtime_dir
 from ..state_io import read_json
 from ..state_io import rotate_worker_log
 from ..state_io import evidence_status
@@ -21,6 +21,8 @@ class TradingMoELifecycle:
         self.lock=threading.RLock()
         self.runner_script="run_native_vertical_trading.py"
         self.extra_args=[]
+        self.source_mode='live'
+        self.market=default_runtime_dir()/'live'/'market.csv'
 
     read = staticmethod(read_json)
 
@@ -35,7 +37,7 @@ class TradingMoELifecycle:
         with self.lock:
             data=self.read(self.state/"worker_status.json")
             data["cache"] = evidence_status(self.state)
-            data.setdefault("source_kind", "historical_paper" if self.runner_script == "run_native_vertical_trading.py" else "historical_evaluation")
+            data.setdefault("source_kind", self.source_mode if self.runner_script == "run_native_vertical_trading.py" else "historical_evaluation")
             process=self.process()
             if process is None:
                 previous=data.get("status")
@@ -84,6 +86,8 @@ class TradingMoELifecycle:
             command=[str(python),"-u",str(ROOT/"scripts"/self.runner_script),
                 "--root",str(self.artifacts),"--checkpoint",str(checkpoint),"--state",str(self.state),"--resume","--continuous","--interval","0.1"]
             command.extend(self.extra_args)
+            if self.runner_script=='run_native_vertical_trading.py':
+                command.extend(['--mode',self.source_mode,'--market',str(self.market)])
             try:
                 rotate_worker_log(self.state/"worker.log")
                 with (self.state/"worker.log").open("ab") as log:

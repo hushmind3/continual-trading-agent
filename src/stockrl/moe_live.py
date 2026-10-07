@@ -55,7 +55,7 @@ def daily_history(market, stamp):
     return result
 
 
-def live_snapshot(model, market, frame, stamp, account):
+def live_snapshot(model, market, frame, stamp, account,*,daily_frame=None):
     panel = GlobalMarketPanel(market, raw_frame=frame)
     index = len(panel.dates)-1
     pstate, astate = account.model_inputs(panel, index)
@@ -86,7 +86,7 @@ def live_snapshot(model, market, frame, stamp, account):
         snapshot['expert_inputs']['kronos'] = dict(symbols=list(histories), as_of=str(stamp), bars=candles,
             horizon=1, sampling_seconds=60, future_timestamps=[str(pd.Timestamp(stamp)+pd.Timedelta(minutes=1))],
             amount_observed=False, input_authenticity='live_OHLCV_amount_price_volume_proxy')
-    daily = daily_history(market, stamp)
+    daily = daily_history(market, stamp) if daily_frame is None else daily_frame.loc[daily_frame.date<pd.Timestamp(stamp).normalize()].copy()
     if not daily.empty:
         news_path=Path(market).with_name('stock_policy_news.csv')
         if news_path.is_file():

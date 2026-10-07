@@ -4,7 +4,7 @@ import { Action, Outcome, Progress, QueryState } from "../components/controls";
 import { EvaluationScoreboard } from "../components/EvaluationScoreboard";
 import { number, stateLabel } from "../format";
 export function PromotionPage() {
-  const { status, assembly, command, pending } = useWorkspace();
+  const { status, assembly, command, pending,models } = useWorkspace();
   const comparison = status.data?.validation_comparison;
   const candidate = assembly.data?.candidate;
   const active = !!comparison?.active;
@@ -44,6 +44,12 @@ export function PromotionPage() {
         </Action>
       </div>
       <Outcome forKey="assembly" />
+      <div className="my-4 flex flex-wrap gap-3">
+        <Action disabled={candidate?.evaluation_state!=='qualified'||models.some(m=>m.role!=='trading-moe'&&m.enabled)||!!pending.assembly}
+          onClick={()=>void command('/api/assembly/promote',{},'Candidate 학습 가중치 승격','assembly')}>학습 가중치 승격</Action>
+        {assembly.data?.last_promotion && <Action disabled={models.some(m=>m.role==='champion'&&m.enabled)||!!pending.assembly}
+          onClick={()=>void command('/api/assembly/rollback',{},'이전 Champion 복원','assembly')}>이전 Champion 복원</Action>}
+      </div>
       <div className="my-6">
         <div className="mb-3 flex justify-between text-xs text-slate-400">
           <span>평가 진행</span>

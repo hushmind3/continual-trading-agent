@@ -554,6 +554,13 @@ class AssemblyOrchestrator:
                 raise ValueError("공용 PT가 변경됐습니다. 이전 hash의 recipe를 새 PT 성적으로 평가하지 않습니다.")
             worker = self._candidate_worker()
             if worker.process():return {"ok":True,"already_running":True}
+            from .moe_promotion import snapshot_pair
+            candidate_checkpoint=(self.supervisor.model_dir/'candidate.pt')
+            if not candidate_checkpoint.is_file():raise ValueError('Candidate 모델 파일이 없습니다.')
+            snapshots=self.directory/'evaluation'/self.current['candidate_id']
+            receipt=snapshot_pair(self.checkpoint,candidate_checkpoint,snapshots,self.current)
+            atomic_json(snapshots/'states.json',receipt)
+            worker.extra_args=['--assembly-root',str(self.directory),'--evaluation-states',str(snapshots/'states.json')]
             self.state["trial_paused"] = False
             self.current["evaluation_state"] = "replay"
             self.current["reason"] = None
@@ -570,6 +577,44 @@ class AssemblyOrchestrator:
                 self.supervisor._write_autonomy()
             self._persist()
             return result
+
+    def promote(self):
+        with self.lock:
+            if not self.current or self.current.get('evaluation_state')!='qualified':
+                raise ValueError('실제 학습 state 비교를 통과한 Candidate가 필요합니다.')
+            if self.supervisor:
+                for role in ('champion','candidate'):
+                    if self.supervisor._moe_model_worker(role).process():
+                        raise ValueError('승격 전 Champion과 Candidate를 저장 후 정지하세요.')
+            result=read(self.directory/'results'/(self.current['candidate_id']+'.json'))
+            expected=(self.directory/'evaluation'/self.current['candidate_id']).resolve()
+            for record in result.get('evaluation_states',{}).values():
+                if not Path(record['path']).resolve().is_relative_to(expected):raise ValueError('평가 state 경로가 현재 시험에 속하지 않습니다.')
+            from .moe_promotion import promote
+            previous=deepcopy(self.champion)
+            receipt=promote(self.checkpoint,result,self.checkpoint.parent/'rollback')
+            receipt['previous_recipe']=previous
+            self.state['last_promotion']=receipt
+            self.current.update(evaluation_state='promoted',trainable_state=str(self.checkpoint.with_name(self.checkpoint.stem+'.trainable.pt')))
+            self.champion=deepcopy(self.current)
+            self.state['promotions']+=1
+            self._archive('Candidate 실제 학습 가중치·optimizer를 Champion으로 승격')
+            self.current={}
+            self._persist()
+            return {'ok':True,'message':'Candidate 학습 state 승격 완료','rollback':receipt['backup']}
+
+    def rollback(self):
+        with self.lock:
+            if self.supervisor and self.supervisor._moe_model_worker('champion').process():
+                raise ValueError('rollback 전 Champion을 저장 후 정지하세요.')
+            receipt=self.state.get('last_promotion')
+            if not receipt:raise ValueError('복원 가능한 Champion 승격 기록이 없습니다.')
+            from .moe_promotion import rollback
+            rollback(self.checkpoint,receipt)
+            self.champion=deepcopy(receipt['previous_recipe'])
+            self.state['message']='이전 Champion 가중치·optimizer 복원 완료'
+            self._persist()
+            return {'ok':True,'message':self.state['message']}
 
     def settings(self, payload):
         with self.lock:
@@ -612,6 +657,8 @@ class AssemblyOrchestrator:
             from .trading_moe import TradingMoE
             if self.build_cancel.is_set():raise InterruptedError("TradingMoE 생성이 취소되었습니다.")
             model,_ = TradingMoE.load_checkpoint(self.checkpoint)
+            from .moe_promotion import load_runtime_state
+            load_runtime_state(model,self.checkpoint)
             self._set_build(phase="전문가 구성 적용",progress=38,message="시장 분석·매매 판단 전문가와 Controller를 연결하는 중입니다.")
             model.apply_assembly_recipe(recipe)
             if self.build_cancel.is_set():raise InterruptedError("TradingMoE 생성이 취소되었습니다.")
@@ -663,6 +710,8 @@ class AssemblyOrchestrator:
             if target.is_file():
                 archive=PROJECT_TRASH_DIR/"model-candidates"/("candidate-"+datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")+".pt")
                 archive.parent.mkdir(parents=True,exist_ok=True);shutil.move(str(target),str(archive))
+                sidecar=target.with_name(target.stem+'.trainable.pt')
+                if sidecar.is_file():shutil.move(str(sidecar),str(archive.with_name(archive.stem+'.trainable.pt')))
             shutil.move(str(source),str(target))
             recipe=deepcopy(self.build.get("recipe") or {})
             recipe.update(candidate_id=self.build.get("id"),evaluation_state="registered",artifact_path=str(target))
@@ -696,11 +745,8 @@ class AssemblyOrchestrator:
                         self.supervisor._write_autonomy()
                     if result["state"] == "qualified":
                         if self.state["settings"]["auto_promote"]:
-                            self.current["evaluation_state"]="promoted"
-                            self.champion=deepcopy(self.current)
-                            self.state["promotions"]+=1
-                            self._archive("같은 시점·비용·초기 자금의 paper 비교 통과 · Champion recipe 승격")
-                            self.current={}
+                            try:self.promote()
+                            except ValueError as exc:self.state['message']=str(exc)
                         else:
                             self.state["message"]="비교 통과 · 자동 승격 OFF · 후보 유지"
                             self._event("qualified",self.current,self.state["message"],scores=self.current.get("scores",{}))

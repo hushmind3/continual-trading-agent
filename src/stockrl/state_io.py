@@ -178,7 +178,7 @@ class EvidenceJournal:
             return None
         keys = ("as_of", "currencies", "trading_output", "tradable_symbols", "used_experts",
                 "selected_experts", "evidence_as_of", "policy_validity", "decision_seconds",
-                "native_decision_seconds", "current_weights")
+                "native_decision_seconds", "current_weights",'source_kind','market_path','expert_status')
         result = {key: decision[key] for key in keys if key in decision}
         result["evidence_refs"] = self._packet_ids(db, decision["raw_outputs"])
         return result

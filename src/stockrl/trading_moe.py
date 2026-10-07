@@ -276,14 +276,18 @@ class TradingMoE(nn.Module):
         self.config["assembly_enabled_experts"] = sorted(self.assembly_enabled)
         self.config["assembly_routing"] = self.controller.assembly_routing
 
-    def save_assembly_state(self,path,optimizer=None):
+    def save_assembly_state(self,path,optimizer=None,*,source_checkpoint=None):
         """Only learned modules; frozen expert weights never enter this file."""
         destination=Path(path);destination.parent.mkdir(parents=True,exist_ok=True)
         temporary=destination.with_suffix(".partial")
+        from .moe_promotion import frozen_signature
         torch.save({"format":"trading_moe_assembly_v1","feature_sizes":self.config["feature_sizes"],
             "controller":self.controller.state_dict(),"adapters":self.adapters.state_dict(),
             "optimizer":optimizer.state_dict() if optimizer else None,"optimizer_updates":self.optimizer_updates,
-            "learning_state":{key:self.config[key] for key in ("replay_account_episode","applied_replay_rows") if key in self.config}},temporary)
+            "learning_state":{key:self.config[key] for key in ("replay_account_episode","applied_replay_rows") if key in self.config},
+            'assembly_config':{key:self.config[key] for key in ('assembly_enabled_experts','assembly_routing') if key in self.config},
+            'frozen_signature':frozen_signature(self.config,{k:e.entry for k,e in self.experts.items()}),
+            'source_checkpoint':source_checkpoint},temporary)
         temporary.replace(destination)
 
     def load_assembly_state(self,path):
@@ -292,7 +296,15 @@ class TradingMoE(nn.Module):
             raise ValueError("assembly state does not match shared base")
         self.controller.load_state_dict(state["controller"]);self.adapters.load_state_dict(state["adapters"])
         self.optimizer_updates=state["optimizer_updates"]
+        for key in ('replay_account_episode','applied_replay_rows'):self.config.pop(key,None)
         self.config.update(state.get("learning_state",{}))
+        configuration=state.get('assembly_config',{})
+        for key in ('assembly_enabled_experts','assembly_routing'):self.config.pop(key,None)
+        self.config.update(configuration)
+        if configuration.get('assembly_enabled_experts'):
+            self.assembly_enabled=set(configuration['assembly_enabled_experts'])
+        elif hasattr(self,'assembly_enabled'):del self.assembly_enabled
+        self.controller.assembly_routing=configuration.get('assembly_routing',{})
         return state.get("optimizer")
 
     def policy_q(self,packets,symbols):
@@ -328,10 +340,11 @@ class TradingMoE(nn.Module):
             archive.extractall(root)
         experts={}
         for key,entry in saved["expert_mapping"].items():
-            if cached_market and not key.startswith("macrophft_"):
+            if cached_market and not key.startswith("macrophft_") and not entry.get('stock_policy'):
                 # Replay trials reuse actual native market/stock outputs; no
                 # native body materialization. Six crypto Q modules remain real.
                 experts[key]=nn.Identity()
+                experts[key].entry=entry
                 continue
             prefix=f"experts.{key}.models."
             count=saved["config"]["native_module_counts"][key]

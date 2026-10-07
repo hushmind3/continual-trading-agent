@@ -91,8 +91,9 @@ class AssemblyTests(unittest.TestCase):
         self.assertEqual(self.worker.current["evaluation_state"],"qualified")
         self.assertEqual(self.worker.state["promotions"],0)
         self.worker.settings({"auto_promote":True});self.worker.tick()
-        self.assertEqual(self.worker.champion["candidate_id"],qualified)
-        self.assertEqual(self.worker.state["promotions"],1)
+        self.assertNotEqual(self.worker.champion["candidate_id"],qualified)
+        self.assertEqual(self.worker.state["promotions"],0)
+        self.assertIn('verified learned-state',self.worker.state['message'])
 
     def add_expert(self, key="m_new", backend="timesfm", universe=None):
         document=json.loads(self.registry.read_text())
@@ -166,7 +167,8 @@ class AssemblyTests(unittest.TestCase):
         self.worker.tick()
         self.assertEqual(self.worker.state["expert_trials"]["m_new"]["status"],"tested")
         self.worker.settings({"auto_promote":True});self.worker.tick()
-        self.assertEqual(self.worker.state["expert_trials"]["m_new"]["status"],"promoted")
+        self.assertEqual(self.worker.state["expert_trials"]["m_new"]["status"],"tested")
+        self.assertEqual(self.worker.state['promotions'],0)
 
     def test_policy_mutation_searches_both_router_fields(self):
         pool=self.worker._mutation_pool(self.worker._candidate_base())

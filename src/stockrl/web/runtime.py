@@ -175,6 +175,7 @@ class Supervisor(_StatusMixin, _AccountResetMixin):
         from .trading_moe import TradingMoELifecycle
         state=(self.profile or self.runtime/self.mode)/"agent"/(role+"_moe")
         worker=self.moe_model_workers.get(role)
+        if worker is not None and worker.runner_script=='run_assembly_trial.py' and worker.state==state and worker.process():return worker
         checkpoint=self.model_dir/("candidate.pt" if role=="candidate" and (self.model_dir/"candidate.pt").is_file() else "champion.pt")
         if worker is None or worker.state!=state or worker.checkpoint!=checkpoint:
             worker=TradingMoELifecycle(checkpoint=checkpoint,state=state)

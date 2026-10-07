@@ -26,6 +26,7 @@ from stockrl.expert_system import registry_owner
 from stockrl.paths import TRADING_MOE_CHECKPOINT
 from stockrl.state_io import EvidenceJournal, WorkerLog
 from stockrl.moe_live import LiveInputStream, live_snapshot
+from stockrl.moe_promotion import load_runtime_state,save_runtime_state,trainable_path
 
 worker_status_path=None
 
@@ -193,12 +194,15 @@ def run(args):
     publish_worker(args.state,status="loading",load_count=0,error=None,stop_requested=False,gpu_waiting=False,gpu_wait_seconds=0,message=f"{checkpoint.name}를 한 번 적재하는 중입니다.")
     load_started=time.perf_counter()
     model,saved=TradingMoE.load_checkpoint(checkpoint)
+    if trainable_path(checkpoint).is_file():saved=load_runtime_state(model,checkpoint)
     assembly_recipe=None
     if args.recipe:
         assembly_recipe=json.loads(args.recipe.read_text(encoding="utf-8"))
-        model.apply_assembly_recipe(assembly_recipe)
-        if assembly_recipe.get("trainable_state"):
-            saved=model.load_assembly_state(assembly_recipe["trainable_state"])
+        if not trainable_path(checkpoint).is_file():
+            model.apply_assembly_recipe(assembly_recipe)
+            if assembly_recipe.get("trainable_state"):
+                saved=model.load_assembly_state(assembly_recipe["trainable_state"])
+                model.apply_assembly_recipe(assembly_recipe)
     model.runtime_checkpoint=checkpoint
     if args.device.startswith("cuda") and not torch.cuda.is_available():raise RuntimeError("CUDA is required for the requested GPU worker")
     model.set_learning_device(args.device)
@@ -357,12 +361,19 @@ def run(args):
 
 def save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe=None):
     bridge.paper_account.save();save_contexts(args.state,contexts,evidence)
-    if assembly_recipe:
+    if getattr(args,'mode','historical')=='live':
+        path=save_runtime_state(model,optimizer,args.checkpoint or TRADING_MOE_CHECKPOINT)
+        if assembly_recipe:
+            assembly_recipe['trainable_state']=str(path)
+            atomic_json(args.recipe,assembly_recipe)
+    elif assembly_recipe:
         small_path=args.recipe.parent/"trainable"/(assembly_recipe["candidate_id"]+".pt")
         model.save_assembly_state(small_path,optimizer)
         assembly_recipe["trainable_state"]=str(small_path)
         atomic_json(args.recipe,assembly_recipe)
-    else:model.save_checkpoint(args.checkpoint or TRADING_MOE_CHECKPOINT,optimizer)
+    else:
+        checkpoint=args.checkpoint or TRADING_MOE_CHECKPOINT
+        model.save_checkpoint(checkpoint,optimizer)
     bridge.replay.acknowledge_training({int(k):v for k,v in model.config.get("applied_replay_rows",{}).items()})
     evidence.save_contexts(contexts,checkpoint_saved=True)
 

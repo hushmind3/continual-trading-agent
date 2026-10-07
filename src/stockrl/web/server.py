@@ -117,6 +117,8 @@ def serve(host: str = "127.0.0.1", port: int = 8766, runtime: str | None = None,
                     if action=="build":result=assembly.build_model(payload)
                     elif action=="build/cancel":result=assembly.cancel_build()
                     elif action=="register":result=assembly.register_candidate()
+                    elif action=='promote':result=assembly.promote()
+                    elif action=='rollback':result=assembly.rollback()
                     elif action in ("start","stop"):result=assembly.start(action=="start")
                     elif action=="generate":assembly.generate();result={"ok":True}
                     elif action=="next":result=assembly.next()

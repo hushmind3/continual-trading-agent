@@ -1,5 +1,6 @@
 """Focused integration checks; synthetic fixtures never enter operational storage."""
 import importlib.util
+import sys
 import json
 from pathlib import Path
 import tempfile
@@ -17,6 +18,8 @@ from stockrl.moe_paper import TradingMoEPaper
 from stockrl.trading_moe import TradingMoE
 from stockrl.moe_stock_policies import StockPolicyExpert
 from stockrl.paths import DEFAULT_MODEL_DIR,EXPERT_ASSETS_DIR
+from stockrl.moe_promotion import (save_runtime_state,load_runtime_state,trainable_path,
+    snapshot_pair,promote,rollback,training_state)
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('integration_native_runner',ROOT/'scripts/run_native_vertical_trading.py')
@@ -145,6 +148,95 @@ class StockPolicyIntegrationTests(unittest.TestCase):
             status=result['expert_status']['stock_finrl_ppo']
             self.assertEqual(status['status'],'blocked')
             self.assertIn('missing trained-universe',status['reason'])
+
+
+class PromotionIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)
+        self.champion=self.root/'champion.pt';self.candidate=self.root/'candidate.pt'
+        self.model=fixture_model(self.root)
+        self.optimizer=torch.optim.AdamW(self.model.parameter_groups(),lr=1e-4)
+        self.model.save_checkpoint(self.champion,self.optimizer)
+        self.model.save_checkpoint(self.candidate,self.optimizer)
+        with torch.no_grad():
+            self.model.controller.market_fusion.policy.bias[2]+=1.5
+            self.model.controller.market_fusion.allocation.bias[0]+=.8
+        loss=sum(p.square().sum() for g in self.model.parameter_groups() for p in g['params'])
+        self.optimizer.zero_grad();loss.backward();self.optimizer.step()
+        self.model.optimizer_updates=7
+        self.model.config['applied_replay_rows']={'42':1};self.model.config['replay_account_episode']='candidate-only'
+        save_runtime_state(self.model,self.optimizer,self.candidate)
+        self.pair=snapshot_pair(self.champion,self.candidate,self.root/'evaluation')
+        self.result=dict(state='qualified',evaluation_states=self.pair,scores={'paper':dict(delta=.02,
+            champion=dict(net_return=.01,max_drawdown=.02),candidate=dict(net_return=.03,max_drawdown=.01))})
+    def tearDown(self):self.temp.cleanup()
+
+    def test_actual_weights_optimizer_and_rollback_are_preserved(self):
+        champion_before=self.champion.read_bytes();candidate_before=self.candidate.read_bytes()
+        prior=training_state(self.champion)
+        receipt=promote(self.champion,self.result,self.root/'rollback')
+        winner=training_state(self.champion)
+        self.assertEqual(winner['optimizer_updates'],7)
+        self.assertTrue(winner['optimizer']['state'])
+        self.assertEqual(winner['learning_state'],{})
+        self.assertEqual(winner['candidate_learning_lineage']['applied_replay_rows'],{'42':1})
+        self.assertTrue(torch.equal(winner['controller']['market_fusion.policy.bias'],self.model.controller.market_fusion.policy.bias))
+        restored=fixture_model(self.root);saved=load_runtime_state(restored,self.champion)
+        opt=torch.optim.AdamW(restored.parameter_groups(),lr=1e-4);opt.load_state_dict(saved)
+        self.assertEqual(restored.optimizer_updates,7)
+        rollback(self.champion,receipt)
+        rolled=training_state(self.champion)
+        self.assertTrue(torch.equal(rolled['controller']['market_fusion.policy.bias'],prior['controller']['market_fusion.policy.bias']))
+        self.assertEqual(rolled['optimizer_updates'],0)
+        self.assertEqual(self.champion.read_bytes(),champion_before)
+        self.assertEqual(self.candidate.read_bytes(),candidate_before)
+
+    def test_pair_evaluates_distinct_learned_outputs(self):
+        snapshot=dict(symbols=['AAPL'],as_of='2026-10-07',currencies={'AAPL':'USD'},current_weights={'AAPL':0},expert_inputs={})
+        outputs=[]
+        for role in ('champion','candidate'):
+            self.model.load_assembly_state(self.pair[role]['path'])
+            with torch.no_grad():result,_=self.model(snapshot,torch.zeros(1,1,16),packets=[])
+            outputs.append(result['trading_output']['action_probabilities'])
+        self.assertNotEqual(outputs[0],outputs[1])
+
+    def test_state_changed_after_evaluation_cannot_be_promoted(self):
+        self.model.optimizer_updates+=1
+        save_runtime_state(self.model,self.optimizer,self.candidate)
+        with self.assertRaisesRegex(ValueError,'changed after evaluation'):promote(self.champion,self.result,self.root/'rollback')
+        self.assertFalse(trainable_path(self.champion).exists())
+
+    def test_recipe_only_scores_cannot_publish_weights(self):
+        with self.assertRaisesRegex(ValueError,'verified learned-state'):
+            promote(self.champion,dict(state='qualified',scores={}),self.root/'rollback')
+
+    def test_paired_paper_evaluation_uses_each_actual_snapshot(self):
+        sys.path.insert(0,str(ROOT/'scripts'))
+        trial_spec=importlib.util.spec_from_file_location('integration_trial',ROOT/'scripts/run_assembly_trial.py')
+        trial=importlib.util.module_from_spec(trial_spec);trial_spec.loader.exec_module(trial)
+        from stockrl.market_panel import GlobalMarketPanel
+        frame=bars(40);frame.date=pd.to_datetime(frame.date)
+        market=self.root/'market.csv';frame.to_csv(market,index=False)
+        panel=GlobalMarketPanel(market,raw_frame=frame)
+        rows=[]
+        for i in range(35,39):
+            data=dict(symbols=['AAPL'],as_of=str(frame.date.iloc[i]),series=[[float(frame.close.iloc[i])]])
+            packet=self.model.experts['fincast'](None,data,'cpu');packet['expert']='fincast'
+            rows.append(dict(timestamp=str(frame.date.iloc[i]),decision=dict(raw_outputs=[packet])))
+        args=SimpleNamespace(candidate_id='candidate',state=self.root/'trial',evaluation_market=market,
+            evaluation_frame=frame,evaluation_daily=pd.DataFrame(columns=['date']),device='cpu')
+        args.state.mkdir()
+        states_before={role:Path(record['path']).read_bytes() for role,record in self.pair.items()}
+        scores=[]
+        for role in ('champion','candidate'):
+            recipe=dict(candidate_id=role,refresh_seconds={'fincast':7200})
+            scores.append(trial.evaluate(args,self.model,recipe,'paper',rows,None,panel,self.pair[role]['path']))
+        self.assertEqual(scores[0]['decisions'],scores[1]['decisions'])
+        self.assertEqual(scores[0]['initial_NAV'],scores[1]['initial_NAV'])
+        self.assertEqual(scores[0]['first_as_of'],scores[1]['first_as_of'])
+        self.assertGreater(scores[0]['trades'],0)
+        self.assertGreater(scores[1]['net_return'],scores[0]['net_return'])
+        for role,record in self.pair.items():self.assertEqual(Path(record['path']).read_bytes(),states_before[role])
 
 
 if __name__=='__main__':unittest.main()

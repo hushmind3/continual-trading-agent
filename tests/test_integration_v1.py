@@ -98,6 +98,7 @@ class LiveIntegrationTests(unittest.TestCase):
 
     def test_live_inference_fill_reward_learning_and_checkpoint_ack(self):
         model=fixture_model(self.root);frozen=model.experts['fincast'].weight.detach().clone()
+        with torch.no_grad():model.controller.market_fusion.policy.bias[2]=8. # deterministic fill fixture
         optimizer=torch.optim.AdamW(model.parameter_groups(),lr=1e-4)
         state=self.root/'state';bridge=TradingMoEPaper(state,credit_seconds=1)
         args=SimpleNamespace(market=self.market,state=state,root=self.root,checkpoint=self.root/'fixture.pt',
@@ -114,8 +115,11 @@ class LiveIntegrationTests(unittest.TestCase):
         self.assertTrue(torch.equal(frozen,model.experts['fincast'].weight))
         self.assertTrue(args.checkpoint.exists())
         self.assertEqual(model.optimizer_updates,1)
-        self.assertEqual(bridge.replay.stats()['eligible'],2)
-        self.assertEqual(bridge.replay.stats()['total'],2)
+        # With asynchronous learning, the second matured decision may remain
+        # queued at stop; no fixed scheduling order is assumed.
+        self.assertIn(bridge.replay.stats()['eligible'],(0,2))
+        self.assertEqual(bridge.replay.stats()['total'],bridge.replay.stats()['eligible'])
+        self.assertTrue(bridge.pending) # newest outcome remains immature
         self.assertTrue(trainable_path(args.checkpoint).exists())
         status=json.loads((state/'worker_status.json').read_text())
         self.assertEqual(status['source_kind'],'live')
@@ -181,6 +185,7 @@ class PromotionIntegrationTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)
         self.champion=self.root/'champion.pt';self.candidate=self.root/'candidate.pt'
         self.model=fixture_model(self.root)
+        with torch.no_grad():self.model.controller.market_fusion.policy.bias[2]=.5
         self.optimizer=torch.optim.AdamW(self.model.parameter_groups(),lr=1e-4)
         self.model.save_checkpoint(self.champion,self.optimizer)
         self.model.save_checkpoint(self.candidate,self.optimizer)
@@ -326,7 +331,9 @@ class SettingsIntegrationTests(unittest.TestCase):
     def test_saved_context_and_unlearned_replay_resume_with_small_checkpoint(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);market=root/'market.csv';bars().to_csv(market,index=False)
-            model=fixture_model(root);optimizer=torch.optim.AdamW(model.parameter_groups(),lr=.002)
+            model=fixture_model(root)
+            with torch.no_grad():model.controller.market_fusion.policy.bias[2]=8. # deterministic fill fixture
+            optimizer=torch.optim.AdamW(model.parameter_groups(),lr=.002)
             checkpoint=root/'fixture.pt';model.save_checkpoint(checkpoint,optimizer)
             base_bytes=checkpoint.read_bytes();bridge=TradingMoEPaper(root/'state',credit_seconds=1)
             rules=operating_rules();rules.update(training_batch_size=1,training_optimizer_steps=1,checkpoint_every_updates=1,learning_rate=.002)
@@ -337,14 +344,16 @@ class SettingsIntegrationTests(unittest.TestCase):
                 count[0]+=1;bars(count[0]).iloc[-1:].to_csv(market,index=False,header=False,mode='a')
             with patch.object(runner.time,'sleep',side_effect=append),patch.object(runner,'save_runtime',wraps=runner.save_runtime) as saver:
                 runner.run_live(args,model,optimizer,bridge)
-                self.assertGreaterEqual(saver.call_count,2)
-            self.assertGreater(bridge.replay.stats()['eligible'],0)
+                self.assertGreaterEqual(saver.call_count,1) # completed async work is saved at stop
+            remaining=bridge.replay.stats()['eligible']
+            self.assertTrue(bridge.pending)
             reloaded=fixture_model(root)
             saved=load_runtime_state(reloaded,checkpoint)
             resumed_optimizer=torch.optim.AdamW(reloaded.parameter_groups(),lr=.002);resumed_optimizer.load_state_dict(saved)
             self.assertEqual(resumed_optimizer.param_groups[0]['lr'],.002)
             restored_bridge=TradingMoEPaper(args.state,credit_seconds=1)
-            args.steps=1
+            self.assertEqual(restored_bridge.replay.stats()['eligible'],remaining)
+            args.steps=3 # collect later real bars to mature the saved outcomes
             with patch.object(runner.time,'sleep',side_effect=append):runner.run_live(args,reloaded,resumed_optimizer,restored_bridge)
             self.assertGreater(reloaded.optimizer_updates,model.optimizer_updates)
             self.assertEqual(checkpoint.read_bytes(),base_bytes)

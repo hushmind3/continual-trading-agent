@@ -13,7 +13,7 @@ from torch import nn
 from .expert_system import adapter_features, build_fusion_head, decode_trading_output, registry_owner
 from .moe_native import NativeExpert, native_call
 from . import expert_backends
-from .gpu_scheduler import FairGpuScheduler
+from .gpu_scheduler import FairGpuScheduler, ResourceMonitor
 from .moe_inputs import MacroHFTInputAdapter,macro_adapter_metadata
 from .paths import EXPERT_ASSETS_DIR, GPU_OWNER_LOCK
 
@@ -149,6 +149,7 @@ class TradingMoE(nn.Module):
         self.macro_input_adapter=MacroHFTInputAdapter(**(metadata.get("macro_input_adapter") or macro_adapter_metadata(root)))
         self.optimizer_updates=0
         self.scheduler=FairGpuScheduler()
+        self.resources=ResourceMonitor()
         self.gpu_lock=GPU_OWNER_LOCK
         self.experts.requires_grad_(False).eval()
         configured_experts = self.config.get("assembly_enabled_experts")
@@ -225,8 +226,9 @@ class TradingMoE(nn.Module):
                         data.get("feature_schema")!="MacroHFT_36+9" or data.get("symbols")!=["ETHUSDT"]):continue
                     if key=="marketgpt" and (not data.get("native_features_verified") or
                         data.get("token_schema")!="MarketGPT_ITCH_Vocab_v3"):continue
-                    with self.scheduler.work("champion_live"):
-                        packet=expert(self.root,data,device)
+                    chosen=self.resources.native_device(key,device)
+                    with self.scheduler.work("champion_live"),self.resources.measure('expert:'+key,chosen):
+                        packet=expert(self.root,data,chosen)
                     packet["expert"]=key
                     packet["native_features_verified"]=bool(data.get("native_features_verified"))
                     packets.append(packet)
@@ -248,13 +250,10 @@ class TradingMoE(nn.Module):
         trading=decode_trading_output(outputs,snapshot,outputs["coverage"][0].tolist())
         trading["policy_status"]="trained_vertical_controller" if self.optimizer_updates else "native_policy_prior"
         trading["reason"]="Applicable frozen stock/crypto policy prior plus market/account-conditioned controller"
-        probabilities=outputs["policy_logits"][0].softmax(-1)
-        for n,s in enumerate(snapshot["symbols"]):
-            if outputs["policy_validity"][0,n].any():
-                chosen=(torch.distributions.Categorical(probabilities[n]).sample() if explore else probabilities[n].argmax())
-                trading["actions"][s]=["SELL","HOLD","BUY"][int(chosen)]
+        from .moe_policy import select_action
+        behavior=select_action(outputs,snapshot,trading,explore=explore,version=self.optimizer_updates)
         trading["exploration_enabled"]=bool(explore)
-        trading["paper_executable"]=bool(outputs["coverage"].any())
+        trading["paper_executable"]=behavior is not None
         result={"as_of":snapshot["as_of"],"currencies":snapshot["currencies"],"trading_output":trading,
             "tradable_symbols":snapshot.get("tradable_symbols",snapshot["symbols"]),
             "adapter_status":"connected","pipeline_timings":{"total_seconds":time.perf_counter()-started},
@@ -264,7 +263,7 @@ class TradingMoE(nn.Module):
             "evidence_as_of":{p["expert"]:p["as_of"] for p in packets},
             "policy_validity":outputs["policy_validity"].tolist(),"profiles":profiles,
             "unavailable_stock_policies":unavailable_policies,"expert_status":expert_status,
-            "decision_seconds":time.perf_counter()-started,"training_performed":False}
+            "decision_seconds":time.perf_counter()-started,"training_performed":False,"behavior":behavior}
         return result,outputs
 
     def apply_assembly_recipe(self,recipe):
@@ -281,10 +280,12 @@ class TradingMoE(nn.Module):
         destination=Path(path);destination.parent.mkdir(parents=True,exist_ok=True)
         temporary=destination.with_suffix(".partial")
         from .moe_promotion import frozen_signature
+        from torchrl.checkpoint import GlobalRNGState
         torch.save({"format":"trading_moe_assembly_v1","feature_sizes":self.config["feature_sizes"],
             "controller":self.controller.state_dict(),"adapters":self.adapters.state_dict(),
             "optimizer":optimizer.state_dict() if optimizer else None,"optimizer_updates":self.optimizer_updates,
-            "learning_state":{key:self.config[key] for key in ("replay_account_episode","applied_replay_rows","applied_replay_contexts") if key in self.config},
+            "learning_state":{key:self.config[key] for key in ("replay_account_episode","applied_replay_rows","applied_replay_contexts","training_cutoff") if key in self.config},
+            "rng":GlobalRNGState().state_dict(),
             'assembly_config':{key:self.config[key] for key in ('assembly_enabled_experts','assembly_routing') if key in self.config},
             'frozen_signature':frozen_signature(self.config,{k:e.entry for k,e in self.experts.items()}),
             'source_checkpoint':source_checkpoint},temporary)
@@ -296,7 +297,8 @@ class TradingMoE(nn.Module):
             raise ValueError("assembly state does not match shared base")
         self.controller.load_state_dict(state["controller"]);self.adapters.load_state_dict(state["adapters"])
         self.optimizer_updates=state["optimizer_updates"]
-        for key in ('replay_account_episode','applied_replay_rows','applied_replay_contexts'):self.config.pop(key,None)
+        self.resume_rng=state.get('rng')
+        for key in ('replay_account_episode','applied_replay_rows','applied_replay_contexts','training_cutoff'):self.config.pop(key,None)
         self.config.update(state.get("learning_state",{}))
         configuration=state.get('assembly_config',{})
         for key in ('assembly_enabled_experts','assembly_routing'):self.config.pop(key,None)

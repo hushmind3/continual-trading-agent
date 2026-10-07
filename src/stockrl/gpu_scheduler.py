@@ -5,6 +5,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+import psutil
 
 
 class FairGpuScheduler:
@@ -73,3 +74,58 @@ class FairGpuScheduler:
                 "waiting":[{"role":role,"wait_seconds":now-requested}
                            for _,role,requested in sorted(self.queue,key=lambda item:(self.priority(item[1]),item[2]))],
                 "last":{role:dict(data) for role,data in self.last.items()}}
+
+
+class ResourceMonitor:
+    """Bounded measurements and admission using observed runtime footprints."""
+    def __init__(self):
+        from .operating_rules import operating_rules
+        self.process=psutil.Process()
+        self.measurements={}
+        self.reserve_mib=int(operating_rules()['native_vram_reserve_mib'])
+        self.process.cpu_percent(None)
+
+    def native_device(self,expert,requested,reserve_mib=None):
+        import torch
+        previous=self.measurements.get('expert:'+expert,{})
+        if psutil.virtual_memory().available < max(64*1024**2,previous.get('rss_growth_bytes',0)):
+            raise MemoryError('available RAM is below observed native execution footprint')
+        if requested.startswith('cuda'):
+            free,_=torch.cuda.mem_get_info(requested)
+            required=previous.get('vram_growth_bytes',0)+(self.reserve_mib if reserve_mib is None else reserve_mib)*1024**2
+            if free<required:return 'cpu'
+        return requested
+
+    @contextmanager
+    def measure(self,name,device='cpu'):
+        import torch
+        start=time.perf_counter();rss=self.process.memory_info().rss
+        cpu=self.process.cpu_times();io=self.process.io_counters()
+        cuda=device.startswith('cuda') and torch.cuda.is_available()
+        allocated=torch.cuda.memory_allocated(device) if cuda else 0
+        if cuda:torch.cuda.reset_peak_memory_stats(device)
+        try:yield
+        finally:
+            current_cpu=self.process.cpu_times();current_io=self.process.io_counters()
+            delta=max(0,self.process.memory_info().rss-rss)
+            gpu_delta=max(0,torch.cuda.max_memory_allocated(device)-allocated) if cuda else 0
+            old=self.measurements.get(name,{})
+            self.measurements[name]=dict(seconds=time.perf_counter()-start,device=device,
+                runs=old.get('runs',0)+1,rss_growth_bytes=max(delta,old.get('rss_growth_bytes',0)),
+                vram_growth_bytes=max(gpu_delta,old.get('vram_growth_bytes',0)),
+                cpu_seconds=current_cpu.user+current_cpu.system-cpu.user-cpu.system,
+                read_bytes=current_io.read_bytes-io.read_bytes,write_bytes=current_io.write_bytes-io.write_bytes)
+            if len(self.measurements)>64:self.measurements.pop(next(iter(self.measurements)))
+
+    def snapshot(self):
+        import torch
+        memory=self.process.memory_info();io=self.process.io_counters()
+        result=dict(available_ram_bytes=psutil.virtual_memory().available,rss_bytes=memory.rss,
+            peak_rss_bytes=getattr(memory,'peak_wset',memory.rss),cpu_percent=self.process.cpu_percent(None),
+            threads=self.process.num_threads(),read_bytes=io.read_bytes,write_bytes=io.write_bytes,
+            measurements=dict(self.measurements))
+        if torch.cuda.is_initialized():
+            free,total=torch.cuda.mem_get_info()
+            result['gpu']=dict(free_bytes=free,total_bytes=total,allocated_bytes=torch.cuda.memory_allocated(),
+                reserved_bytes=torch.cuda.memory_reserved(),peak_allocated_bytes=torch.cuda.max_memory_allocated())
+        return result

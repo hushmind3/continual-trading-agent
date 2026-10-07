@@ -66,7 +66,7 @@ def training_state(checkpoint):
         controller={k.removeprefix('controller.'):v.clone() for k,v in saved['state_dict'].items() if k.startswith('controller.')},
         adapters={k.removeprefix('adapters.'):v.clone() for k,v in saved['state_dict'].items() if k.startswith('adapters.')},
         optimizer=deepcopy(saved.get('optimizer_state')),optimizer_updates=saved.get('optimizer_updates',0),
-        learning_state={k:saved['config'][k] for k in ('replay_account_episode','applied_replay_rows','applied_replay_contexts') if k in saved['config']},
+        learning_state={k:saved['config'][k] for k in ('replay_account_episode','applied_replay_rows','applied_replay_contexts','training_cutoff') if k in saved['config']},
         assembly_config={k:saved['config'][k] for k in ('assembly_enabled_experts','assembly_routing') if k in saved['config']},
         frozen_signature=frozen_signature(saved['config'],saved['expert_mapping']),source_checkpoint=checkpoint_identity(checkpoint))
 

@@ -17,7 +17,8 @@ def operating_rules(path=None):
     if int(rules["validation_min_market_minutes"]) < 1:
         raise ValueError("validation_min_market_minutes must be positive")
     for key in ("training_batch_size","training_optimizer_steps","checkpoint_every_updates","evidence_cache_rows",
-                'evaluation_max_observations','evaluation_min_observations','market_expert_refresh_seconds'):
+                'evaluation_max_observations','evaluation_min_observations','market_expert_refresh_seconds',
+                'max_policy_lag','learner_queue_capacity','learner_ram_reserve_mib','native_vram_reserve_mib','cpu_threads'):
         if int(rules[key]) < 1:
             raise ValueError(f"{key} must be positive")
     if int(rules['reward_credit_observations']) < 1:
@@ -33,6 +34,9 @@ def operating_rules(path=None):
     for key in ('value_loss_weight','router_entropy_weight','replay_rejection_tolerance','promotion_min_delta','promotion_min_return','promotion_drawdown_tolerance'):
         if not math.isfinite(float(rules[key])) or float(rules[key])<0:raise ValueError(key+' must be finite and nonnegative')
     if not 0<float(rules['evaluation_replay_fraction'])<1:raise ValueError('evaluation_replay_fraction must be between zero and one')
+    if not 0<float(rules['policy_clip_epsilon'])<1:raise ValueError('policy_clip_epsilon must be between zero and one')
+    if int(rules['learner_queue_capacity'])!=1:raise ValueError('one outstanding learner batch is supported')
+    if not math.isfinite(float(rules['max_importance_ratio'])) or float(rules['max_importance_ratio'])<1:raise ValueError('max_importance_ratio must be finite and >=1')
     if int(rules['evaluation_max_observations'])<int(rules['evaluation_min_observations']):raise ValueError('evaluation maximum is below minimum')
     if int(rules['evidence_cache_rows'])<int(rules['evaluation_max_observations']):raise ValueError('evidence cache cannot hold the evaluation interval')
     for key,default in (("goal_target_multiple",10.0),("goal_win_bonus_points",100.0)):

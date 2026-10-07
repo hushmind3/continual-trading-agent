@@ -19,7 +19,7 @@ import torch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 from stockrl.trading_moe import TradingMoE,parameter_digest
 from stockrl.moe_paper import TradingMoEPaper
-from stockrl.moe_training import update_controller
+from stockrl.moe_training import update_batch
 from stockrl.market_panel import GlobalMarketPanel
 from stockrl.expert_registry import atomic_json
 from stockrl.expert_system import registry_owner
@@ -51,6 +51,7 @@ def publish_worker(state,model=None,bridge=None,row=None,decision=None,learning=
     except (OSError,ValueError):data={}
     data.update(changes,pid=os.getpid(),updated_at=datetime.now(timezone.utc).isoformat())
     if model is not None:
+        data['resources']=model.resources.snapshot()
         data.update(optimizer_updates=model.optimizer_updates,
             applied_replay_rows=len(model.config.get("applied_replay_rows",{})))
         learner_device=next(model.controller.parameters()).device
@@ -78,6 +79,9 @@ def publish_worker(state,model=None,bridge=None,row=None,decision=None,learning=
         data['expert_status']=decision.get('expert_status',{})
         data['stages']={'market':bool(set(decision['used_experts']) & set(model.controller.market_ids)),
             'state':True,'policy':bool(set(decision['used_experts']) & set(model.controller.policy_ids)),'controller':True,'action':True}
+    if getattr(model,'online_learner',None):
+        data['learner']=dict(model.online_learner.stats)
+        data['learning_active']=model.online_learner.busy
     if learning:data["learning"]={"loss":learning["loss"],"reward_points":learning["reward_points"],"updated_at":data["updated_at"]}
     atomic_json(path,data)
 
@@ -157,34 +161,54 @@ def runtime_modes(state):
     return {key:bool(flags.get(key,False)) for key in ("observe_enabled","paper_enabled","learning_enabled")}
 
 
+def commit_learning(model,bridge,contexts,records):
+    ack={};credited=model.config.setdefault('applied_replay_contexts',{})
+    for exp,_,_ in records:
+        credited[exp.timestamp]=True
+    for stamp in credited:ack.update(bridge.replay.context_row_ids(stamp))
+    if records:
+        ends=[str(exp.reward_end_timestamp or exp.timestamp) for exp,_,_ in records]
+        model.config['training_cutoff']=max([model.config.get('training_cutoff',''),*ends])
+    model.config.setdefault('applied_replay_rows',{}).update({str(k):1 for k in ack})
+    pending_stamps={item['timestamp'] for item in bridge.pending}
+    for stamp in credited:
+        if stamp not in pending_stamps:contexts.pop(stamp,None)
+
+
 def learn_saved_contexts(model,optimizer,bridge,contexts,settings=None):
     rules=settings or operating_rules()
+    learner=getattr(model,'online_learner',None)
+    latest=None;logs=[]
+    if learner:
+        completed=learner.poll(model,optimizer)
+        if completed:
+            latest,records=completed;commit_learning(model,bridge,contexts,records);logs.append(latest)
+        if learner.busy:return latest,logs
     batch=bridge.replay.pending_batch(int(rules['training_batch_size']),
-        exclude_row_ids={int(k) for k in model.config.get("applied_replay_rows",{})},timestamps=contexts,portfolio_values_only=True)
-    ack={};latest=None;logs=[]
-    credited=model.config.setdefault('applied_replay_contexts',{})
-    for stamp in credited:ack.update(bridge.replay.context_row_ids(stamp))
+        exclude_row_ids={int(k) for k in model.config.get('applied_replay_rows',{})},timestamps=contexts,portfolio_values_only=True)
+    records=[];credited=model.config.setdefault('applied_replay_contexts',{})
     for exp in batch:
-        if exp.timestamp in credited:
-            ack.update(bridge.replay.context_row_ids(exp.timestamp));continue
-        if exp.source!="paper_account_portfolio" or not exp.portfolio_value_transition:continue
-        if len(logs)>=int(rules['training_optimizer_steps']):continue
+        if exp.timestamp in credited:continue
+        if exp.source!='paper_account_portfolio' or not exp.portfolio_value_transition:continue
         context=contexts.get(exp.timestamp)
-        if not context:continue
-        snapshot,original=context
-        with registry_owner(model.gpu_lock,wait=True,on_wait=getattr(model,'gpu_wait_callback',None)),model.scheduler.work('online_learning_replay'):
-            latest=update_controller(model,optimizer,exp,snapshot,original["raw_outputs"],original["trading_output"]["target_weights"],original["trading_output"]["cash_weights_by_currency"],original["trading_output"]["actions"],settings=rules)
-        logs.append({"timestamp":exp.timestamp,**latest})
-        credited[exp.timestamp]=True
-        ack.update(bridge.replay.context_row_ids(exp.timestamp))
-    for exp in batch:
-        if exp._replay_row_id in ack:exp._updated=True
-    if ack:
-        model.config.setdefault("applied_replay_rows",{}).update({str(k):1 for k in ack})
-        pending_stamps={item['timestamp'] for item in bridge.pending}
-        for stamp in credited:
-            if stamp not in pending_stamps:contexts.pop(stamp,None)
+        if context:records.append((exp,*context))
+    if records:
+        if learner:learner.submit(records)
+        else:
+            for _ in range(int(rules['training_optimizer_steps'])):
+                latest=update_batch(model,optimizer,records,settings=rules)
+            logs.append(latest);commit_learning(model,bridge,contexts,records)
+    else:commit_learning(model,bridge,contexts,[])
     return latest,logs
+
+
+def finish_learning(model,optimizer,bridge,contexts):
+    learner=getattr(model,'online_learner',None)
+    if learner:
+        completed=learner.poll(model,optimizer,wait=True)
+        if completed:commit_learning(model,bridge,contexts,completed[1])
+        learner.close()
+
 
 
 def main():
@@ -211,11 +235,15 @@ def main():
 def run(args):
     args.rules=operating_rules(getattr(args,'settings',None))
     args.interval=float(args.rules['inference_poll_seconds'])
-    torch.set_num_threads(4)
+    torch.set_num_threads(int(args.rules['cpu_threads']))
     checkpoint=args.checkpoint or TRADING_MOE_CHECKPOINT
     publish_worker(args.state,status="loading",load_count=0,error=None,stop_requested=False,gpu_waiting=False,gpu_wait_seconds=0,message=f"{checkpoint.name}를 한 번 적재하는 중입니다.")
     load_started=time.perf_counter()
-    model,saved=TradingMoE.load_checkpoint(checkpoint)
+    from stockrl.gpu_scheduler import ResourceMonitor
+    resources=ResourceMonitor();resources.reserve_mib=int(args.rules['native_vram_reserve_mib'])
+    with resources.measure('model_load'):
+        model,saved=TradingMoE.load_checkpoint(checkpoint)
+    model.resources=resources
     assembly_recipe=None
     if args.recipe:
         assembly_recipe=json.loads(args.recipe.read_text(encoding="utf-8"))
@@ -235,6 +263,9 @@ def run(args):
     if args.resume and saved:
         optimizer.load_state_dict(saved)
         for group in optimizer.param_groups:group['lr']=float(args.rules['learning_rate'])
+    if args.resume and getattr(model,'resume_rng',None):
+        from torchrl.checkpoint import GlobalRNGState
+        GlobalRNGState().load_state_dict(model.resume_rng)
     bridge=TradingMoEPaper(args.state,settings=args.rules)
     publish_worker(args.state,model,bridge,effective_settings=args.rules)
     def gpu_wait(waiting,seconds):
@@ -246,6 +277,8 @@ def run(args):
         model.config["applied_replay_rows"]={}
         model.config['applied_replay_contexts']={}
         model.config["replay_account_episode"]=episode
+    from stockrl.moe_learner import AsyncLearner
+    model.online_learner=AsyncLearner(model,optimizer,args.rules)
     if getattr(args,'mode','historical')=='live':
         if not args.market:raise ValueError('live mode requires --market; historical inputs are never substituted')
         return run_live(args,model,optimizer,bridge,assembly_recipe)
@@ -367,6 +400,7 @@ def run(args):
             deadline=time.monotonic()+max(0,args.interval)
             while time.monotonic()<deadline and not (args.state/"stop.request").exists():time.sleep(min(.1,max(0,deadline-time.monotonic())))
     publish_worker(args.state,model,bridge,status="saving",stop_requested=True,message="계좌·replay·optimizer·TradingMoE.pt를 저장하는 중입니다.")
+    finish_learning(model,optimizer,bridge,contexts)
     bridge.paper_account.save();save_contexts(args.state,contexts,evidence)
     save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
     if rows:publish_paper_status(args.root,args.state,bridge,None,rows[-1],model,completed=True)
@@ -391,7 +425,8 @@ def run(args):
 
 def save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe=None):
     bridge.paper_account.save();save_contexts(args.state,contexts,evidence)
-    path=save_runtime_state(model,optimizer,args.checkpoint or TRADING_MOE_CHECKPOINT)
+    with model.resources.measure('checkpoint'):
+        path=save_runtime_state(model,optimizer,args.checkpoint or TRADING_MOE_CHECKPOINT)
     if assembly_recipe:
         assembly_recipe['trainable_state']=str(path)
         atomic_json(args.recipe,assembly_recipe)
@@ -412,6 +447,8 @@ def run_live(args,model,optimizer,bridge,assembly_recipe=None):
     stream=LiveInputStream(args.market,bridge.paper_account.state['last_timestamp'])
     evidence=EvidenceJournal(args.state,cache_rows=rules['evidence_cache_rows'])
     contexts=evidence.load_contexts() if args.resume else {}
+    from stockrl.moe_learner import AsyncLearner
+    if not hasattr(model,'online_learner'):model.online_learner=AsyncLearner(model,optimizer,rules)
     completed=0
     tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
     market_cache={};last_market={}
@@ -448,7 +485,9 @@ def run_live(args,model,optimizer,bridge,assembly_recipe=None):
                     packet=cached;reused.add(key)
                 else:
                     with registry_owner(model.gpu_lock,wait=True,on_wait=getattr(model,'gpu_wait_callback',None)),model.scheduler.work('champion_live'):
-                        packet=model.experts[key](model.root,data,args.device)
+                        chosen=model.resources.native_device(key,args.device,rules['native_vram_reserve_mib'])
+                        with model.resources.measure('expert:'+key,chosen):
+                            packet=model.experts[key](model.root,data,chosen)
                     packet.update(expert=key,native_features_verified=bool(data.get('native_features_verified')))
                     if key in model.controller.market_ids:market_cache[key]=packet;last_market[key]=pd.Timestamp(stamp)
                 packets.append(packet)
@@ -473,6 +512,7 @@ def run_live(args,model,optimizer,bridge,assembly_recipe=None):
             completed+=1
             if not args.continuous and completed>=args.steps:break
     finally:
+        finish_learning(model,optimizer,bridge,contexts)
         save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
         publish_worker(args.state,model,bridge,status='stopped',source_kind='live',learning_active=False,
             stop_requested=False,message='실시간 계좌·학습 상태 저장 완료')

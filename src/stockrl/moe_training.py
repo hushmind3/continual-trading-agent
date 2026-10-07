@@ -1,65 +1,92 @@
-"""Small controller update from the existing executed paper-account replay."""
+"""Batched realized-horizon NAV learning through the public TorchRL objective.
+
+Legacy behavior probabilities cannot be reconstructed: those rows train value.
+"""
+import json
 import torch
 from torch.nn import functional as F
-from torch.distributions import Dirichlet
-from .trading_moe import parameter_digest
+from tensordict import TensorDict
+from tensordict.nn import TensorDictModule
+from torchrl.objectives import ClipPPOLoss
+from .moe_policy import TorchRLActor
 from .operating_rules import operating_rules
+from .trading_moe import parameter_digest
 
 
-def update_controller(model,optimizer,experience,snapshot,packets,target_weights,cash_weight,actions=None,*,settings=None):
-    rules=settings or operating_rules()
-    if experience.origin_model!="trading_moe" or experience.source!="paper_account_portfolio":
-        raise ValueError("controller learns only the MoE's actual paper outcomes")
-    if experience.portfolio_reward is None:raise ValueError("paper NAV reward is missing")
-    pstate=torch.as_tensor(experience.portfolio_state,dtype=torch.float32)
-    astate=torch.as_tensor(experience.account_state,dtype=torch.float32).expand(len(pstate),-1)
-    device=next(model.controller.parameters()).device
-    account=torch.cat([pstate,astate],-1)[None].to(device)
-    evidence,validity=model.prepare(packets,snapshot["symbols"])
-    before=parameter_digest(model.controller)
-    versions=[p._version for p in model.experts.parameters()]
+def update_batch(model, optimizer, records, *, settings=None):
+    rules = settings or operating_rules()
+    device = next(model.controller.parameters()).device
+    groups = {}
+    for exp, snapshot, decision in records:
+        if (exp.origin_model != 'trading_moe' or exp.source != 'paper_account_portfolio'
+                or exp.portfolio_reward is None):
+            raise ValueError('learner requires actual paper NAV outcomes')
+        behavior = decision.get('behavior')
+        usable = bool(behavior and behavior['stochastic'] and
+                      behavior['schema'] == 'joint_categorical_dirichlet_v1' and
+                      0 <= model.optimizer_updates - behavior['policy_version'] <= rules['max_policy_lag'])
+        key = (tuple(snapshot['symbols']), json.dumps(behavior['layout'], sort_keys=True) if usable else None)
+        groups.setdefault(key, []).append((exp, snapshot, decision, usable))
+    if not groups:
+        return None
     optimizer.zero_grad(set_to_none=True)
-    output=model.controller(evidence,validity,account,model.policy_q(packets,snapshot["symbols"]))
-    reward=torch.tensor(float(rules['training_reward_scale'])*float(experience.portfolio_reward),dtype=torch.float32,device=device)
-    predicted=output["value"].mean()
-    advantage=(reward-predicted).detach()
-    # Action credit plus the actual submitted portfolio allocation, not a
-    # made-up profitable label or a price prediction substituted for reward.
-    log_probabilities=output["policy_logits"].log_softmax(-1)[0]
-    if actions is None:
-        log_action=log_probabilities[experience.symbol_index,experience.action]
-    else:
-        actionable=snapshot.get("tradable_symbols",snapshot["symbols"])
-        indices=[j for j,s in enumerate(snapshot["symbols"]) if s in actionable]
-        if not indices:raise ValueError("no actionable paper decision to credit")
-        log_action=torch.stack([log_probabilities[j,{"SELL":0,"HOLD":1,"BUY":2}[actions[snapshot["symbols"][j]]]] for j in indices]).mean()
-    cash_by_currency=cash_weight if isinstance(cash_weight,dict) else {'USD':cash_weight}
-    allocations=[]
-    for currency,cash in cash_by_currency.items():
-        indices=[j for j,s in enumerate(snapshot['symbols']) if snapshot['currencies'][s]==currency]
-        if not indices:continue
-        allocation=torch.cat([output['allocation_scores'][0,indices],output['cash_scores'][0]])
-        distribution=Dirichlet(F.softplus(allocation)+1)
-        weights=torch.tensor([target_weights[snapshot['symbols'][j]] for j in indices]+[cash],device=device).clamp_min(1e-8)
-        allocations.append(distribution.log_prob(weights/weights.sum()))
-    if not allocations:raise ValueError('no currency allocation to credit')
-    allocation_logp=torch.stack(allocations).mean()
-    router=output["router_probabilities"]
-    entropy=-(router*router.clamp_min(1e-8).log()).sum(-1).mean()
-    value_loss=F.smooth_l1_loss(predicted,reward)
-    loss=-advantage*(log_action+allocation_logp)+float(rules['value_loss_weight'])*value_loss-float(rules['router_entropy_weight'])*entropy
+    before = parameter_digest(model.controller)
+    losses = []; value_losses = []; clip_fractions = []; kl = []
+    policy_rows = 0
+    for rows in groups.values():
+        evidence_rows = []; mask_rows = []; account_rows = []; q_rows = []
+        for exp, snapshot, decision, _ in rows:
+            evidence, mask = model.prepare(decision['raw_outputs'], snapshot['symbols'])
+            evidence_rows.append(evidence); mask_rows.append(mask)
+            q_rows.append(model.policy_q(decision['raw_outputs'], snapshot['symbols']))
+            p = torch.as_tensor(exp.portfolio_state, dtype=torch.float32, device=device)
+            a = torch.as_tensor(exp.account_state, dtype=torch.float32, device=device).expand(len(p), -1)
+            account_rows.append(torch.cat([p, a], -1))
+        evidence = {k: torch.cat([e[k] for e in evidence_rows]) for k in evidence_rows[0]}
+        masks = {k: torch.cat([e[k] for e in mask_rows]) for k in mask_rows[0]}
+        q = {k: torch.cat([e[k] for e in q_rows]) for k in q_rows[0]}
+        output = model.controller(evidence, masks, torch.stack(account_rows), q)
+        predicted = output['value'].mean(-1, keepdim=True)
+        target = torch.tensor([[float(rules['training_reward_scale'])*float(e.portfolio_reward)]
+                               for e, _, _, _ in rows], device=device)
+        if rows[0][3]:
+            behavior = [d['behavior'] for _, _, d, _ in rows]
+            td = TensorDict(dict(logits=output['policy_logits'], scores=output['allocation_scores'],
+                cash=output['cash_scores'], predicted=predicted, value_target=target,
+                advantage=target-torch.tensor([[b['value']] for b in behavior], device=device),
+                sample_log_prob=torch.tensor([b['log_prob'] for b in behavior], device=device),
+                action=torch.tensor([b['action'] for b in behavior], device=device)), batch_size=[len(rows)])
+            loss_module = ClipPPOLoss(TorchRLActor(behavior[0]['layout']),
+                TensorDictModule(torch.nn.Identity(), ['predicted'], ['state_value']),
+                functional=False, clip_epsilon=float(rules['policy_clip_epsilon']),
+                entropy_bonus=False, critic_coeff=float(rules['value_loss_weight']),
+                log_explained_variance=False, max_importance_ratio=float(rules['max_importance_ratio']))
+            result = loss_module(td)
+            objective = result['loss_objective'] + result['loss_critic']
+            value_losses.append(result['loss_critic'].detach())
+            clip_fractions.append(float(result['clip_fraction']))
+            kl.append(float(result['kl_approx']))
+            policy_rows += len(rows)
+        else:
+            value = F.smooth_l1_loss(predicted, target)
+            objective = float(rules['value_loss_weight'])*value
+            value_losses.append(value.detach())
+        gates = output['router_probabilities']
+        entropy = -(gates*gates.clamp_min(1e-8).log()).sum(-1).mean()
+        losses.append((objective-float(rules['router_entropy_weight'])*entropy)*len(rows)/len(records))
+    loss = sum(losses)
+    if not torch.isfinite(loss):
+        raise ValueError('nonfinite training loss; replay has not been acknowledged')
     loss.backward()
-    grads={name:float(p.grad.norm()) for name,p in model.controller.named_parameters() if p.grad is not None}
-    if not grads or not all(torch.isfinite(torch.tensor(v)) for v in grads.values()):raise ValueError("invalid controller gradients")
-    torch.nn.utils.clip_grad_norm_(model.controller.parameters(),float(rules['gradient_clip_norm']))
-    optimizer.step();model.optimizer_updates+=1
-    after=parameter_digest(model.controller)
-    if after==before:raise ValueError("controller update did not change weights")
-    if versions!=[p._version for p in model.experts.parameters()] or any(p.grad is not None or p.requires_grad for p in model.experts.parameters()):
-        raise ValueError("frozen native expert was changed")
-    return {"loss":float(loss.detach()),"value_loss":float(value_loss.detach()),"reward_points":float(reward),
-        "adapter_gradient_norm":sum(float(p.grad.norm()) for p in model.adapters.parameters() if p.grad is not None),
-        "router_gradient_norm":sum(v for k,v in grads.items() if k.startswith("router")),
-        "fusion_gradient_norm":sum(v for k,v in grads.items() if k.startswith("market_fusion.projections") or k.startswith("market_fusion.cross_attention")),
-        "controller_gradient_norm":sum(v for k,v in grads.items() if k.startswith("controller_norm") or k.startswith("market_fusion.policy")),
-        "controller_before":before,"controller_after":after,"expert_versions_unchanged":True,"optimizer_updates":model.optimizer_updates}
+    parameters = [p for group in optimizer.param_groups for p in group['params']]
+    norm = torch.nn.utils.clip_grad_norm_(parameters, float(rules['gradient_clip_norm']), error_if_nonfinite=True)
+    optimizer.step(); model.optimizer_updates += 1
+    after = parameter_digest(model.controller)
+    if after == before:
+        raise ValueError('controller update did not change weights')
+    return dict(loss=float(loss.detach()), value_loss=float(torch.stack(value_losses).mean()),
+        reward_points=sum(float(e.portfolio_reward)*rules['training_reward_scale'] for e,_,_ in records)/len(records),
+        contexts=len(records), policy_contexts=policy_rows, value_only_contexts=len(records)-policy_rows,
+        gradient_norm=float(norm), clip_fraction=sum(clip_fractions)/max(1,len(clip_fractions)),
+        approximate_kl=sum(kl)/max(1,len(kl)), controller_before=before, controller_after=after,
+        expert_versions_unchanged=True, optimizer_updates=model.optimizer_updates)

@@ -5,8 +5,8 @@ TradingMoE를 중심으로 금융 시계열 전문가를 실행하고, 가상계
 ## 현재 동작 구조
 
 - 시장 Feed, Champion, Candidate, 전용 TradingMoE 실행은 각각 제어됩니다. 서버를 켜는 것만으로 모델이나 Feed를 시작하지 않습니다.
-- Champion과 Candidate는 독립된 실행 상태와 가상계좌·학습 상태를 유지합니다. Candidate 등록은 `MoE 생성`에서 만든 TradingMoE 구성을 `candidate.pt`로 교체하는 방식으로 진행합니다. 승급은 실제 학습 가중치를 고정해 비교하고, 통과한 Adapter·Router·Fusion·Attention·Controller와 optimizer를 Champion에 적용합니다. 이전 Champion 학습 상태는 `모델/rollback`에 보존합니다.
-- TradingMoE는 선택된 시장 분석 전문가와 매매 판단 전문가를 Router·Fusion·Attention·Controller로 연결합니다. 원본 전문가 가중치는 고정하고, paper 결과와 replay를 사용해 adapter·controller를 업데이트합니다.
+- Champion은 고정된 운영 정책이고 Candidate와 전용 TradingMoE는 온라인 학습 정책입니다. 각 실행은 독립된 가상계좌와 상태를 사용하며, 이 분리는 `stable_champion` 설정으로 제어됩니다. Candidate 등록은 `MoE 생성`에서 만든 TradingMoE 구성을 `candidate.pt`로 교체하는 방식으로 진행합니다. 승급은 실제 학습 가중치를 고정해 비교하고, 통과한 Adapter·Router·Fusion·Attention·Controller와 optimizer를 Champion에 적용합니다. 이전 Champion 학습 상태는 `모델/rollback`에 보존합니다.
+- TradingMoE는 선택된 시장 분석 전문가와 매매 판단 전문가를 Router·Fusion·Attention·Controller로 연결합니다. 원본 전문가 가중치는 고정하고, 확정된 가상계좌 손익으로 Adapter·Controller를 학습합니다. CPU 학습은 추론과 분리되며 TorchRL의 정책 손실을 사용합니다. 행동 당시 확률·정책 버전을 기록하고, 확률 없는 이전 경험은 value 학습으로 처리합니다.
 - 가상 주문은 체결 비용과 계좌 손익을 반영합니다. 현재 서버 상태에서 실제 주문 실행은 비활성화되어 있습니다.
 - 운영의 live 모드는 수집기의 완료 시세를 Expert 입력으로 사용합니다. 주식 정책에는 완료 일봉과 실제 가상계좌 상태를 공급하며, 입력 부족은 전문가별 상태로 표시합니다. MacroHFT의 native 36+9 특징과 MarketGPT의 ITCH 입력은 해당 실시간 원본 스트림이 있을 때만 사용합니다. 과거 ETHUSDT 입력은 명시적인 historical 모드에서 사용합니다.
 
@@ -41,7 +41,7 @@ Python 서버는 `frontend/dist`를 제공합니다. 프론트엔드를 수정�
 
 운영 학습 설정은 `configs/online_learning.json`에서 읽습니다. reward horizon, batch, optimizer step 수, learning rate, checkpoint 주기와 평가 조건이 이 파일에 정의되어 있으며 worker 상태의 `effective_settings`에서 실제 적용값을 확인할 수 있습니다. 기존 미성숙 reward에는 판단 당시 horizon을 유지합니다.
 
-학습 checkpoint는 원본 Expert를 포함한 `<모델명>.pt`와 작은 `<모델명>.trainable.pt`로 구성됩니다. loader는 작은 파일이 있으면 함께 복원합니다. 다른 PC로 학습을 이어가려면 두 파일과 계좌·replay·evidence 상태를 함께 옮깁니다. 승급 평가 전 Champion·Candidate를 저장 후 정지하고, 동일 조건 평가를 통과하면 `학습 가중치 승격`을 실행합니다. `이전 Champion 복원`은 가중치와 optimizer를 복원하며 운영계좌를 초기화하지 않습니다.
+학습 checkpoint는 원본 Expert를 포함한 `<모델명>.pt`와 작은 `<모델명>.trainable.pt`로 구성됩니다. loader는 작은 파일이 있으면 함께 복원합니다. 다른 PC로 학습을 이어가려면 두 파일과 계좌·replay·evidence 상태를 함께 옮깁니다. checkpoint는 optimizer와 RNG도 복원합니다. 계좌·미성숙 결과는 같은 SQLite transaction으로 저장하고, JSON 표시 파일이 유실돼도 복구합니다. 실행 실패는 제한된 횟수와 backoff로 복원하며, 명시적으로 정지한 모델은 재시작하지 않습니다. 승급 평가 전 Champion·Candidate를 저장 후 정지하고, 저장 이후 새로 수집한 실시간 구간의 동일 조건 평가를 통과하면 `학습 가중치 승격`을 실행합니다. `이전 Champion 복원`은 가중치와 optimizer를 복원하며 운영계좌를 초기화하지 않습니다.
 
 과거 데이터 실행은 별도 상태 폴더를 지정합니다.
 

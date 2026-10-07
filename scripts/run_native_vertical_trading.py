@@ -441,7 +441,7 @@ def checkpoint_due(model,tracker,rules):
 
 def run_live(args,model,optimizer,bridge,assembly_recipe=None):
     rules=getattr(args,'rules',None) or operating_rules(getattr(args,'settings',None))
-    stream=LiveInputStream(args.market,bridge.paper_account.state['last_timestamp'])
+    stream=LiveInputStream(args.market,bridge.paper_account.state['last_timestamp'],follow_latest=True)
     evidence=EvidenceJournal(args.state,cache_rows=rules['evidence_cache_rows'])
     contexts=evidence.load_contexts() if args.resume else {}
     from stockrl.moe_learner import AsyncLearner
@@ -461,7 +461,8 @@ def run_live(args,model,optimizer,bridge,assembly_recipe=None):
                     save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
                     tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
                 publish_worker(args.state,model,bridge,status='running',source_kind='live',modes=modes,
-                    learning=latest,learning_active=latest is not None,message='새 완료 시세 대기',market_path=str(args.market))
+                    learning=latest,learning_active=latest is not None,message='새 완료 시세 대기',market_path=str(args.market),
+                    input_policy='latest_tradable_quote',skipped_quote_backlog=stream.skipped_backlog)
                 time.sleep(max(.1,args.interval))
                 continue
             frame,stamp=item
@@ -510,7 +511,8 @@ def run_live(args,model,optimizer,bridge,assembly_recipe=None):
                 save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe)
                 tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
             publish_worker(args.state,model,bridge,row,decision,latest,status='running',source_kind='live',
-                learning_active=latest is not None,modes=modes,input_status=snapshot['input_status'])
+                learning_active=latest is not None,modes=modes,input_status=snapshot['input_status'],
+                input_policy='latest_tradable_quote',skipped_quote_backlog=stream.skipped_backlog)
             completed+=1
             if not args.continuous and completed>=args.steps:break
     finally:

@@ -81,6 +81,18 @@ class LiveIntegrationTests(unittest.TestCase):
         self.assertNotIn('marketgpt',snapshot['expert_inputs'])
         self.assertEqual(account.shape,(1,1,16))
 
+    def test_live_resume_selects_current_tradable_quote_without_reference_tick_starvation(self):
+        source=bars(38)
+        reference=source.iloc[-1:].copy();reference['date']='2026-10-07T14:38:22'
+        reference['symbol']='FX';reference['market']='FX';reference['asset_class']='fx'
+        pd.concat((source,reference)).to_csv(self.market,index=False)
+        stream=LiveInputStream(self.market,'2026-10-07T14:00',follow_latest=True)
+        frame,stamp=stream.next_frame()
+        self.assertEqual(stamp,pd.Timestamp('2026-10-07T14:37'))
+        self.assertGreater(stream.skipped_backlog,0)
+        self.assertLessEqual(frame.date.max(),stamp)
+        self.assertIsNone(stream.next_frame())
+
     def test_daily_excess_returns_align_real_trading_days_not_provider_clock(self):
         with sqlite3.connect(self.root/'timeframes.sqlite3') as db:
             db.execute('CREATE TABLE daily_bars(symbol TEXT,stamp_ns INTEGER,open REAL,high REAL,low REAL,close REAL,volume REAL)')

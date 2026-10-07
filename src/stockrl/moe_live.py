@@ -12,11 +12,13 @@ from .paper_account import _currency
 
 
 class LiveInputStream:
-    def __init__(self, market, last=None):
+    def __init__(self, market, last=None,*,follow_latest=False):
         self.market = Path(market)
         self.reader = IncrementalMarketCSV(self.market)
         self.last = pd.Timestamp(last) if last else None
         self.reader.processed_through = last
+        self.follow_latest=follow_latest
+        self.skipped_backlog=0
 
     def next_frame(self):
         if not self.market.is_file():
@@ -25,17 +27,28 @@ class LiveInputStream:
         if frame.empty:
             return None
         frame = frame.copy()
-        frame['date'] = pd.to_datetime(frame.date, utc=True).dt.tz_convert(None)
+        frame['date'] = pd.to_datetime(frame.date, utc=True,format='mixed').dt.tz_convert(None)
         dates = sorted(frame.date.unique())
+        if self.follow_latest:
+            # Reference-only FX/index events cannot displace fresh tradable
+            # stock bars. Old raw quotes remain in the feed/history store;
+            # existing pending outcomes and unlearned replay are untouched.
+            allowed={str(m)+'|'+str(a) for m,a in frame[['market','asset_class']].drop_duplicates().itertuples(index=False,name=None)
+                     if _currency(str(m),str(a)) is not None}
+            eligible=frame.loc[(frame.market.astype(str)+'|'+frame.asset_class.astype(str)).isin(allowed)]
+            dates=sorted(eligible.date.unique())
+            if not dates:return None
         # A new live account starts at the latest completed quote, not a replay
-        # of yesterday's feed backlog. Resumption consumes every later quote.
+        # of yesterday's feed backlog. Explicit replay consumes remaining
+        # quotes chronologically; live operation follows the newest tradable bar.
         if self.last is None:
             stamp = pd.Timestamp(dates[-1])
         else:
             future = [pd.Timestamp(d) for d in dates if pd.Timestamp(d) > self.last]
             if not future:
                 return None
-            stamp = future[0]
+            stamp = future[-1] if self.follow_latest else future[0]
+            if self.follow_latest:self.skipped_backlog+=max(0,len(future)-1)
         self.last = stamp
         self.reader.processed_through = str(stamp)
         return frame.loc[frame.date <= stamp].sort_values('date').groupby('symbol',sort=False).tail(128), stamp

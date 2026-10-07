@@ -49,7 +49,8 @@ class PaperBridgeTests(unittest.TestCase):
                 for learning in (False,True):
                     expected=dict(observe_enabled=observe,paper_enabled=paper,learning_enabled=learning)
                     (state.parent/"autonomy.json").write_text(json.dumps(expected))
-                    self.assertEqual(modes(state),expected)
+                    self.assertEqual(modes(state),{**expected,'learning_enabled':False})
+                    self.assertEqual(modes(state,{'stable_champion':False}),expected)
         # The standalone MoE screen remains independent of the legacy controls.
         self.assertTrue(all(modes(Path(self.temp.name)/"native_vertical_run").values()))
 
@@ -199,15 +200,8 @@ class RuntimeStorageTests(unittest.TestCase):
         journal = EvidenceJournal(self.root / "runtime/model")
         for index in range(24):
             journal.record_cycle({"timestamp": f"2026-10-01T00:{index:02d}:00", "decision": self.decision})
-        scripts = Path(__file__).resolve().parents[1] / "scripts"
-        import sys
-        sys.path.insert(0, str(scripts))
-        try:
-            fn = runpy.run_path(str(scripts / "run_assembly_trial.py"))["cached_rows"]
-            fn.__globals__["PROJECT_ROOT"] = self.root
-            rows, source = fn()
-        finally:
-            sys.path.remove(str(scripts))
+        rows=journal.cached_rows()
+        source=str(journal.path)
         self.assertEqual(len(rows), 24)
         self.assertEqual(rows[0]["decision"]["raw_outputs"], [self.packet])
         self.assertTrue(source.endswith("evidence.sqlite3"))

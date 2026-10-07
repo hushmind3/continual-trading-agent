@@ -29,6 +29,7 @@ def serve(host: str = "127.0.0.1", port: int = 8766, runtime: str | None = None,
     supervisor = Supervisor(runtime_path, fee, horizon, config, model_dir, settings_dir)
     restart_server_requested = threading.Event()
     trading_moe = TradingMoELifecycle()
+    supervisor.trading_moe=trading_moe
     assembly = AssemblyOrchestrator(supervisor)
 
     class Handler(BaseHTTPRequestHandler):

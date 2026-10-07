@@ -109,6 +109,7 @@ class OnlineLearningTests(unittest.TestCase):
                 learner.submit(rows);self.assertIsNone(learner.poll(self.model,self.optimizer,wait=True))
             self.assertIn('injected',learner.error)
             for key,value in original.items():self.assertTrue(torch.equal(value,self.model.controller.state_dict()[key]))
+            self.assertFalse(learner.submit(rows));learner.retry_after=0
             self.assertTrue(learner.submit(rows));self.assertIsNotNone(learner.poll(self.model,self.optimizer,wait=True))
         finally:learner.close()
 
@@ -158,3 +159,210 @@ class OnlineLearningTests(unittest.TestCase):
             self.assertEqual(monitor.native_device('e','cuda:0'),'cpu')
         with patch('stockrl.gpu_scheduler.psutil.virtual_memory',return_value=SimpleNamespace(available=1)):
             with self.assertRaises(MemoryError):monitor.native_device('e','cpu')
+
+    def test_account_and_pending_restore_after_json_publication_failure(self):
+        from stockrl.moe_paper import TradingMoEPaper
+        from test_moe_paper import panel
+        root=self.root/'account';bridge=TradingMoEPaper(root);market=panel()
+        bridge.advance(market,0)
+        original=(root/'paper_account.json').read_bytes()
+        result=dict(as_of=str(market.dates[0]),trading_output=dict(actions={'AAPL':'BUY'},
+            target_weights={'AAPL':.4},cash_weights_by_currency={'USD':.6}))
+        with patch.object(bridge.paper_account,'save',side_effect=OSError('injected JSON failure')):
+            with self.assertRaises(OSError):bridge.submit(result,market,0,paper_executable=True)
+        self.assertEqual((root/'paper_account.json').read_bytes(),original)
+        loaded=TradingMoEPaper(root)
+        self.assertEqual(len(loaded.pending),1)
+        self.assertEqual(len(loaded.paper_account.state['pending']),1)
+        self.assertEqual(len(loaded.advance(market,1)),1)
+
+    def test_future_evaluation_excludes_training_and_capture(self):
+        from stockrl.moe_evaluation import future_rows,validate_evaluation
+        pair={role:dict(holdout_after='2026-10-07T14:00:00Z') for role in ('champion','candidate')}
+        rows=[{'timestamp':stamp} for stamp in ('2026-10-07T13:59','2026-10-07T14:00','2026-10-07T14:01')]
+        self.assertEqual(future_rows(rows,pair),rows[-1:])
+        scores={phase:{side:dict(first_as_of=first,last_as_of=last,decisions=2)
+            for side in pair} for phase,first,last in [('replay','2026-10-07T14:01','2026-10-07T14:02'),
+                                                     ('paper','2026-10-07T14:03','2026-10-07T14:04')]}
+        validate_evaluation(pair,scores)
+        for side in pair:scores['paper'][side]['first_as_of']='2026-10-07T14:02'
+        with self.assertRaisesRegex(ValueError,'overlaps'):validate_evaluation(pair,scores)
+
+    def test_holdout_collector_waits_for_actual_new_feed_and_survives_restart(self):
+        from stockrl.moe_evaluation import collect_holdout
+        from test_integration_v1 import bars
+        market=self.root/'market.csv';bars().to_csv(market,index=False)
+        args=SimpleNamespace(market=market,state=self.root/'evaluation',device='cpu',rules=dict(self.rules))
+        args.rules.update(evaluation_min_observations=3,validation_min_market_minutes=3)
+        pair={role:dict(holdout_after='2026-10-07T14:34:00Z') for role in ('champion','candidate')}
+        counter=[35];progress=[]
+        def append(_):
+            counter[0]+=1;bars(counter[0]).iloc[-1:].to_csv(market,index=False,header=False,mode='a')
+        with patch('stockrl.moe_evaluation.time.sleep',side_effect=append):
+            rows,source=collect_holdout(args,self.model,pair,progress.append)
+        self.assertEqual(len(rows),3);self.assertEqual(progress[-1],3)
+        self.assertEqual(rows[0]['decision']['source_kind'],'live')
+        self.assertIn('14:35',rows[0]['timestamp'])
+        resumed,_=collect_holdout(args,self.model,pair,progress.append)
+        self.assertEqual([r['timestamp'] for r in rows],[r['timestamp'] for r in resumed])
+
+    def test_requested_worker_recovery_is_bounded_and_stop_is_respected(self):
+        from stockrl.web.trading_moe import TradingMoELifecycle
+        from stockrl.expert_registry import atomic_json
+        worker=TradingMoELifecycle(checkpoint=self.root/'fake.pt',state=self.root/'worker')
+        worker.state.mkdir()
+        atomic_json(worker.record,dict(requested=True,restart_attempts=0,created=0))
+        with patch.object(worker,'process',return_value=None),patch.object(worker,'start',return_value={'ok':True}) as start:
+            self.assertIsNone(worker.recover());self.assertFalse(start.called)
+            record=worker.read(worker.record);record['retry_at']=0;atomic_json(worker.record,record)
+            self.assertEqual(worker.recover(),{'ok':True});start.assert_called_once_with(recovery=True)
+            record=worker.read(worker.record);record['restart_attempts']=self.rules['runtime_restart_attempts'];atomic_json(worker.record,record)
+            self.assertTrue(worker.recover()['exhausted']);self.assertFalse(worker.read(worker.record)['requested'])
+            worker.stop();self.assertIsNone(worker.recover())
+
+    def test_exchange_holidays_skip_cash_markets_without_stopping_crypto(self):
+        from datetime import datetime,timezone
+        from stockrl.live_feed import _market_session_open
+        holiday=datetime(2026,10,9,1,tzinfo=timezone.utc) # Korean Hangul day, 10am KST
+        self.assertFalse(_market_session_open({'market':'KRX'},holiday))
+        self.assertTrue(_market_session_open({'market':'CRYPTO','asset_class':'crypto'},holiday))
+        day=datetime(2026,12,25,15,tzinfo=timezone.utc)
+        self.assertFalse(_market_session_open({'market':'US'},day))
+        normal=datetime(2026,10,7,1,tzinfo=timezone.utc)
+        self.assertTrue(_market_session_open({'market':'KRX'},normal))
+
+    def test_missing_or_corrupt_account_json_restores_canonical_sqlite_account(self):
+        from stockrl.moe_paper import TradingMoEPaper
+        from test_moe_paper import panel
+        root=self.root/'account';bridge=TradingMoEPaper(root);bridge.advance(panel(),0)
+        saved=deepcopy(bridge.paper_account.state)
+        path=root/'paper_account.json';path.unlink()
+        self.assertEqual(TradingMoEPaper(root).paper_account.state,saved)
+        path.write_text('{broken')
+        self.assertEqual(TradingMoEPaper(root).paper_account.state,saved)
+
+    def test_stable_policy_does_not_accumulate_unlearnable_new_experiences(self):
+        from stockrl.moe_paper import TradingMoEPaper
+        from test_moe_paper import panel
+        bridge=TradingMoEPaper(self.root/'stable',collect_experience=False);market=panel()
+        bridge.advance(market,0)
+        result=dict(as_of=str(market.dates[0]),trading_output=dict(actions={'AAPL':'BUY'},
+            target_weights={'AAPL':.4},cash_weights_by_currency={'USD':.6}))
+        bridge.submit(result,market,0,paper_executable=True);bridge.advance(market,1)
+        self.assertEqual(len(bridge.pending),0);self.assertEqual(bridge.replay.stats()['total'],0)
+        self.assertEqual(bridge.paper_account.state['books']['USD']['trade_count'],1)
+
+    def test_corrupt_optimizer_output_is_not_published(self):
+        learner=AsyncLearner(self.model,self.optimizer,self.rules)
+        try:
+            actual_step=learner.optimizer.step
+            def corrupt():
+                actual_step()
+                with torch.no_grad():next(learner.model.controller.parameters()).fill_(float('nan'))
+            with patch.object(learner.optimizer,'step',side_effect=corrupt):
+                learner.submit([record(self.model)])
+                self.assertIsNone(learner.poll(self.model,self.optimizer,wait=True))
+            self.assertIn('nonfinite weights',learner.error)
+            self.assertTrue(all(torch.isfinite(p).all() for p in self.model.controller.parameters()))
+            self.assertEqual(self.model.optimizer_updates,0)
+        finally:learner.close()
+
+    def test_vectorized_panel_exactly_matches_original_forward_fill(self):
+        from stockrl.market_panel import GlobalMarketPanel,GLOBAL_FEATURES
+        from test_integration_v1 import bars
+        import pandas as pd
+        frame=bars(25)
+        other=bars(25).iloc[5::3].copy();other['symbol']='MSFT';other['close']*=2
+        frame=pd.concat((frame,other),ignore_index=True)
+        panel=GlobalMarketPanel(self.root/'market.csv',raw_frame=frame)
+        features=np.zeros_like(panel.features);closes=np.full_like(panel.closes,np.nan);observed=np.zeros_like(panel.observed)
+        for _,row in panel.frame.iterrows():
+            i=list(panel.dates).index(row.date.to_datetime64());j=panel.symbols.index(row.symbol)
+            features[i,j]=row[list(GLOBAL_FEATURES)].to_numpy(np.float32)
+            closes[i,j]=row.close;observed[i,j]=True
+        for j in range(len(panel.symbols)):
+            for i in range(1,len(panel.dates)):
+                if not observed[i,j]:features[i,j]=features[i-1,j];closes[i,j]=closes[i-1,j]
+        np.testing.assert_array_equal(panel.features,features)
+        np.testing.assert_array_equal(panel.closes,closes)
+        np.testing.assert_array_equal(panel.observed,observed)
+
+    def test_new_pending_captures_one_real_bar_not_unused_duplicate_history(self):
+        from stockrl.market_panel import GlobalMarketPanel
+        from stockrl.moe_paper import TradingMoEPaper
+        from test_integration_v1 import bars
+        panel=GlobalMarketPanel(self.root/'market.csv',raw_frame=bars(40));bridge=TradingMoEPaper(self.root/'account')
+        bridge.advance(panel,35)
+        result=dict(as_of=str(panel.dates[35]),trading_output=dict(actions={'AAPL':'BUY'},
+            target_weights={'AAPL':.4},cash_weights_by_currency={'USD':.6}))
+        bridge.submit(result,panel,35,paper_executable=True)
+        self.assertEqual(bridge.pending[0]['features'].shape,(1,1,17))
+        np.testing.assert_array_equal(bridge.pending[0]['features'][0],panel.features[35])
+
+    def test_native_backend_does_not_override_configured_cpu_threads(self):
+        from stockrl.moe_native import native_call
+        source='def run_native(backend,root,data,device):\n import torch\n torch.set_num_threads(9)\n loaded_seconds=0\n return {"threads":torch.get_num_threads()}\n'
+        torch.set_num_threads(2)
+        try:
+            result=native_call('fixture',self.root,{},runner_source=source)
+            self.assertEqual(result['threads'],2)
+        finally:torch.set_num_threads(4)
+
+    def test_restart_preserves_behavior_likelihood_and_policy_learning(self):
+        from stockrl.state_io import EvidenceJournal
+        exp,snapshot,decision=record(self.model)
+        journal=EvidenceJournal(self.root/'state');journal.save_contexts({exp.timestamp:(snapshot,decision)})
+        restored=EvidenceJournal(self.root/'state').load_contexts()[exp.timestamp]
+        self.assertEqual(restored[1]['behavior'],decision['behavior'])
+        result=update_batch(self.model,self.optimizer,[(exp,*restored)],settings=self.rules)
+        self.assertEqual(result['policy_contexts'],1);self.assertEqual(result['value_only_contexts'],0)
+
+    @unittest.skipUnless(torch.cuda.is_available(),'CUDA unavailable')
+    def test_native_rng_isolation_preserves_cuda_action_sampling(self):
+        from stockrl.moe_native import native_call
+        torch.cuda.manual_seed_all(19);state=torch.cuda.get_rng_state()
+        expected=torch.rand(3,device='cuda:0');torch.cuda.set_rng_state(state)
+        source='def run_native(backend,root,data,device):\n import torch\n torch.manual_seed(2026)\n loaded_seconds=0\n return {"sample":torch.rand(3,device=device).cpu().tolist()}\n'
+        native_call('fixture',self.root,{},device='cuda:0',runner_source=source)
+        self.assertTrue(torch.equal(expected,torch.rand(3,device='cuda:0')))
+
+    def test_toto_partial_patch_padding_is_masked_not_fake_prices(self):
+        import json
+        from stockrl.moe_native import native_call
+        from stockrl import expert_backends
+        directory=self.root/'checkpoints/Toto-2.0-313m';directory.mkdir(parents=True)
+        (directory/'config.json').write_text(json.dumps({'patch_size':32}))
+        captured={}
+        class Model(torch.nn.Module):
+            def forecast(self,inputs,**kwargs):
+                captured.update(inputs);captured.update(kwargs)
+                return torch.zeros(9,1,2,1)
+        module=SimpleNamespace(Toto2ModelConfig=lambda **kw:SimpleNamespace(**kw),Toto2Model=Model)
+        series=np.arange(74).reshape(2,37).astype(float)+100
+        with patch.object(expert_backends,'toto_native_module',return_value=module):
+            result=native_call('toto',self.root,dict(series=series.tolist(),symbols=['A','B'],horizon=1),modules=[Model()])
+        self.assertEqual(captured['target'].shape,(1,2,64));self.assertTrue(captured['has_missing_values'])
+        self.assertFalse(captured['target_mask'][...,:27].any())
+        self.assertTrue(captured['target_mask'][...,27:].all())
+        np.testing.assert_array_equal(captured['target'][0,...,27:].numpy(),series)
+        self.assertEqual(result['context_padding'],27)
+
+    def test_symbol_universe_can_grow_and_shrink_without_rebuilding_controller(self):
+        rows=[]
+        for n in (1,17,5):
+            symbols=[f'S{j}' for j in range(n)]
+            snapshot=dict(symbols=symbols,currencies={s:'USD' for s in symbols},current_weights={s:0. for s in symbols},
+                as_of=str(n),tradable_symbols=symbols,expert_inputs={})
+            packet=dict(expert='fincast',native_output=[[100.+j] for j in range(n)],symbols=symbols,
+                as_of=str(n),layout='symbol,horizon',units='price',horizon=1,sampling_seconds=60)
+            with torch.no_grad():decision,_=self.model(snapshot,torch.zeros(1,n,16),packets=[packet],explore=True)
+            weights=decision['trading_output']['target_weights']
+            self.assertEqual(set(weights),set(symbols))
+            self.assertAlmostEqual(sum(weights.values())+decision['trading_output']['cash_weights_by_currency']['USD'],1.,places=5)
+            exp=Experience(np.zeros((1,n,17),np.float32),np.arange(n),np.zeros(n,int),np.zeros(n,int),
+                np.ones((1,n),bool),0,2,.01,str(n),source='paper_account_portfolio',origin_model='trading_moe',
+                portfolio_state=np.zeros((n,8),np.float32),account_state=np.zeros(8,np.float32),
+                portfolio_reward=.01,portfolio_value_transition=True)
+            rows.append((exp,snapshot,decision))
+        result=update_batch(self.model,self.optimizer,rows,settings=self.rules)
+        self.assertEqual(result['policy_contexts'],3)

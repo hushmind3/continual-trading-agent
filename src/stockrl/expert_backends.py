@@ -261,9 +261,18 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
         frozen(model)
         def infer():
             x = torch.tensor(series[None], device=device)
-            return model.forecast({"target": x, "target_mask": torch.ones_like(x, dtype=torch.bool),
+            mask = torch.ones_like(x,dtype=torch.bool)
+            padding = (-x.shape[-1]) % int(cfg.patch_size)
+            if padding:
+                # Official target_mask marks padding as missing, not observed
+                # zero prices. Preserve every real observation in a full patch.
+                x=torch.nn.functional.pad(x,(padding,0))
+                mask=torch.nn.functional.pad(mask,(padding,0),value=False)
+            extra['context_padding']=padding
+            extra['context_padding_observed']=False
+            return model.forecast({"target": x, "target_mask": mask,
                 "series_ids": torch.zeros((1,len(series)),device=device,dtype=torch.long)},
-                horizon=horizon, has_missing_values=False).float().cpu().numpy()
+                horizon=horizon, has_missing_values=bool(padding)).float().cpu().numpy()
         layout = "nine_quantiles,batch,variate,horizon"
         units = data.get("units", "native_series")
     elif expert == "kronos":

@@ -18,7 +18,8 @@ def operating_rules(path=None):
         raise ValueError("validation_min_market_minutes must be positive")
     for key in ("training_batch_size","training_optimizer_steps","checkpoint_every_updates","evidence_cache_rows",
                 'evaluation_max_observations','evaluation_min_observations','market_expert_refresh_seconds',
-                'max_policy_lag','learner_queue_capacity','learner_ram_reserve_mib','native_vram_reserve_mib','cpu_threads'):
+                'max_policy_lag','learner_queue_capacity','learner_ram_reserve_mib','native_vram_reserve_mib','cpu_threads',
+                'runtime_restart_attempts','runtime_restart_base_seconds'):
         if int(rules[key]) < 1:
             raise ValueError(f"{key} must be positive")
     if int(rules['reward_credit_observations']) < 1:
@@ -36,6 +37,7 @@ def operating_rules(path=None):
     if not 0<float(rules['evaluation_replay_fraction'])<1:raise ValueError('evaluation_replay_fraction must be between zero and one')
     if not 0<float(rules['policy_clip_epsilon'])<1:raise ValueError('policy_clip_epsilon must be between zero and one')
     if int(rules['learner_queue_capacity'])!=1:raise ValueError('one outstanding learner batch is supported')
+    if not isinstance(rules['stable_champion'],bool):raise ValueError('stable_champion must be boolean')
     if not math.isfinite(float(rules['max_importance_ratio'])) or float(rules['max_importance_ratio'])<1:raise ValueError('max_importance_ratio must be finite and >=1')
     if int(rules['evaluation_max_observations'])<int(rules['evaluation_min_observations']):raise ValueError('evaluation maximum is below minimum')
     if int(rules['evidence_cache_rows'])<int(rules['evaluation_max_observations']):raise ValueError('evidence cache cannot hold the evaluation interval')

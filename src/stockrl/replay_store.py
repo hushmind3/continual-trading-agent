@@ -225,13 +225,15 @@ class GlobalReplayBuffer:
                         db.execute("UPDATE daily_learning SET first_trained=MAX(0,first_trained-?) WHERE day=?",(count,day))
                     db.execute("INSERT INTO replay_settings VALUES('dual_learning','1')")
             # Load metadata and at most a small RAM cache. No startup pruning.
-            with db:
-                for row_id,blob in db.execute("SELECT id,metadata FROM experiences"):
-                    metadata=pickle.loads(blob)
-                    if 'portfolio_value' not in columns:
+            if 'portfolio_value' not in columns:
+                with db:
+                    for row_id,blob in db.execute("SELECT id,metadata FROM experiences"):
+                        metadata=pickle.loads(blob)
                         db.execute('UPDATE experiences SET portfolio_value=? WHERE id=?',(int(bool(metadata.get('portfolio_value_transition'))),row_id))
-                    if metadata.get("portfolio_value_transition"):
-                        db.execute("INSERT OR IGNORE INTO portfolio_value_stamps VALUES(?)",(metadata["timestamp"],))
+                        if metadata.get("portfolio_value_transition"):
+                            origin=metadata.get('origin_model','champion')
+                            stamp=metadata['timestamp'] if origin=='champion' else origin+'|'+metadata['timestamp']
+                            db.execute("INSERT OR IGNORE INTO portfolio_value_stamps VALUES(?)",(stamp,))
             rows = db.execute("SELECT id,window_key,metadata,training_uses FROM experiences ORDER BY id LIMIT ?",
                               (self.items.maxlen,)).fetchall()
             for row in rows:
@@ -406,9 +408,22 @@ class GlobalReplayBuffer:
             if deleted:
                 db.execute("INSERT INTO observation_counts VALUES('candidate',1) ON CONFLICT(name) DO UPDATE SET total=total+1")
 
-    def save_pending_kind(self,kind,pending):
+    def save_pending_kind(self,kind,pending,*,account_state=None):
         with self.lock, closing(self._connect()) as db, db:
             self._save_pending_rows(db,kind,pending)
+            if account_state is not None:
+                db.execute("INSERT OR REPLACE INTO observer_state VALUES('moe_account',?)",
+                    (zlib.compress(pickle.dumps(account_state,protocol=5),1),))
+
+    def environment_account(self):
+        """Canonical MoE account committed with its pending outcomes."""
+        with self.lock,closing(self._connect()) as db:
+            row=db.execute("SELECT payload FROM observer_state WHERE name='moe_account'").fetchone()
+            return pickle.loads(zlib.decompress(row[0])) if row else None
+
+    def unlearned_timestamps(self):
+        with self.lock,closing(self._connect()) as db:
+            return {row[0] for row in db.execute('SELECT DISTINCT timestamp FROM experiences WHERE training_uses=0')}
 
     def record_account_score(self,role,stamp,episode,points):
         """Persist one score delta per actual timestamp; restart is not reward."""

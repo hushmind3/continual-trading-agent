@@ -100,7 +100,8 @@ def snapshot_pair(champion,candidate,directory,candidate_recipe=None):
                 raise ValueError('requested recipe differs from the actual trained Candidate; register that configuration first')
         path=directory/(role+'.pt');save_state(state,path)
         receipt[role]=dict(path=str(path.resolve()),sha256=file_digest(path),source=str(Path(checkpoint).resolve()),
-            source_token=before,optimizer_updates=state['optimizer_updates'],frozen_signature=state['frozen_signature'])
+            source_token=before,optimizer_updates=state['optimizer_updates'],frozen_signature=state['frozen_signature'],
+            holdout_after=max(datetime.now(timezone.utc).isoformat(),state.get('learning_state',{}).get('training_cutoff','')))
     if receipt['champion']['frozen_signature']!=receipt['candidate']['frozen_signature']:
         raise ValueError('the pair does not share the same frozen experts and native schemas')
     return receipt
@@ -117,6 +118,8 @@ def promote(champion,result,rollback_root):
     for role,record in pair.items():
         if file_digest(record['path'])!=record['sha256']:raise ValueError(role+' evaluation snapshot changed')
         if source_token(record['source'])!=record['source_token']:raise ValueError(role+' learned state changed after evaluation; reevaluate')
+    from .moe_evaluation import validate_evaluation
+    validate_evaluation(pair,result['scores'])
     if pair['champion']['frozen_signature']!=pair['candidate']['frozen_signature']:
         raise ValueError('frozen expert identity differs')
     if Path(pair['champion']['source']).resolve()!=Path(champion).resolve():raise ValueError('evaluation belongs to another Champion')
@@ -129,7 +132,7 @@ def promote(champion,result,rollback_root):
     # Replay row IDs are local to the Candidate DB. They must never consume
     # Champion experiences with coincidentally equal IDs.
     winner['candidate_learning_lineage']=deepcopy(winner.get('learning_state',{}))
-    winner['learning_state']={}
+    winner['learning_state']={k:v for k,v in winner.get('learning_state',{}).items() if k=='training_cutoff'}
     winner['source_checkpoint']=checkpoint_identity(champion)
     save_state(winner,trainable_path(champion))
     receipt=dict(backup=str(old.resolve()),backup_sha256=file_digest(old),

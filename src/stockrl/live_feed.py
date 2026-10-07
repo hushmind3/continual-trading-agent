@@ -14,6 +14,7 @@ import queue
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,11 +29,17 @@ import requests
 _MARKET_PROVIDER_FACTORIES: dict[str, Any] = {}
 
 
+@lru_cache(maxsize=16)
+def _exchange_calendar(name,year):
+    import exchange_calendars
+    return exchange_calendars.get_calendar(name,start=f'{year}-01-01',end=f'{year}-12-31')
+
+
 def _market_session_open(item: dict, now_utc: datetime) -> bool:
     """Skip historical quote downloads while a market is closed.
 
-    This is a polling schedule, not an exchange holiday calendar. Freshness is
-    still decided from actual bar timestamps, never from this schedule alone.
+    Cash-market holidays use exchange-calendars. Provider freshness still
+    depends on actual quote timestamps. FX/crypto/futures keep their own hours.
     """
     market = str(item.get("market", ""))
     if item.get("poll_outside_session"):
@@ -54,6 +61,10 @@ def _market_session_open(item: dict, now_utc: datetime) -> bool:
         return (weekday == 6 and minute >= 17 * 60) or weekday in (0, 1, 2, 3) or (
             weekday == 4 and minute < 17 * 60)
     if weekday >= 5:
+        return False
+    exchange={'KRX':'XKRX','KOSDAQ':'XKRX','US':'XNYS','NYSE':'XNYS','NASDAQ':'XNYS',
+              'Japan':'XTKS','HongKong':'XHKG','Germany':'XETR','UK':'XLON'}.get(market)
+    if exchange and not _exchange_calendar(exchange,local.year).is_session(pd.Timestamp(local.date())):
         return False
     windows = {
         "KRX": (9 * 60, 15 * 60 + 30), "KOSDAQ": (9 * 60, 15 * 60 + 30),

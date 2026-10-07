@@ -309,7 +309,18 @@ class Supervisor(_StatusMixin, _AccountResetMixin):
         while True:
             time.sleep(2)
             with self.lock:
+                dedicated=getattr(self,'trading_moe',None)
+                if dedicated is not None:dedicated.recover()
                 if not self.run_requested or self.stopping or not self.profile:continue
+                for role,enabled in list(self.model_enabled.items()):
+                    if not enabled:continue
+                    worker=self._moe_model_worker(role)
+                    recovered=worker.recover()
+                    if recovered and recovered.get('exhausted'):
+                        self.model_enabled[role]=False;self._write_autonomy()
+                    elif recovered and recovered.get('ok'):
+                        from .workers import AttachedWorker
+                        self.children[role]=AttachedWorker(worker.read(worker.record))
                 for name,proc in list(self.children.items()):
                     code=proc.poll()
                     if code is None:continue
@@ -317,9 +328,7 @@ class Supervisor(_StatusMixin, _AccountResetMixin):
                     handle=self.log_handles.pop(name,None)
                     if handle:handle.close()
                     if name in self.model_enabled:
-                        # A failed load must be visible, never an automatic reload loop.
-                        self.model_enabled[name]=False
-                        self._write_autonomy()
+                        # Recovery is bounded by the lifecycle's retry budget.
                         self._log(f"{name} stopped ({code}); saved state retained")
                         continue
                     if name!="feed" or (self.mode=="mock" and code==0):continue

@@ -179,7 +179,7 @@ class EvidenceJournal:
             return None
         keys = ("as_of", "currencies", "trading_output", "tradable_symbols", "used_experts",
                 "selected_experts", "evidence_as_of", "policy_validity", "decision_seconds",
-                "native_decision_seconds", "current_weights",'source_kind','market_path','expert_status')
+                "native_decision_seconds", "current_weights",'source_kind','market_path','expert_status','behavior')
         result = {key: decision[key] for key in keys if key in decision}
         result["evidence_refs"] = self._packet_ids(db, decision["raw_outputs"])
         return result
@@ -237,8 +237,11 @@ class EvidenceJournal:
             db.execute("INSERT OR REPLACE INTO metadata VALUES ('market',?)", (_encode(ids),))
             self._references(db, "market", ids)
 
-    def record_cycle(self, row):
+    def record_cycle(self, row,*,replace_stamp=None):
         with closing(self._connect()) as db, db:
+            if replace_stamp and replace_stamp!=row['timestamp']:
+                db.execute('DELETE FROM cache WHERE stamp=?',(replace_stamp,))
+                db.execute('DELETE FROM refs WHERE owner=?',('cache:'+replace_stamp,))
             decision = self._decision(db, row.get("decision"))
             books = {currency: {key: book.get(key) for key in
                      ("equity", "cash", "net_pnl", "trade_count", "fees", "slippage")}

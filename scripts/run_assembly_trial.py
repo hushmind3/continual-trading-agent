@@ -22,38 +22,13 @@ from stockrl.expert_system import registry_owner
 from stockrl.market_panel import GlobalMarketPanel
 from stockrl.moe_paper import TradingMoEPaper
 from stockrl.trading_moe import TradingMoE
-from stockrl.paths import PROJECT_ROOT, PROJECT_TRASH_DIR
+from stockrl.paths import PROJECT_ROOT, PROJECT_TRASH_DIR,default_runtime_dir
+from stockrl.moe_evaluation import collect_holdout,validate_evaluation
 from stockrl.moe_live import live_snapshot,daily_history
 from stockrl.moe_promotion import snapshot_pair,file_digest
 from stockrl.operating_rules import operating_rules,RULES_PATH
 from stockrl.state_io import EvidenceJournal, append_log, WorkerLog, retire_trial_debug
 from run_native_vertical_trading import publish_worker, release_offloaded_pages
-
-
-def cached_rows(settings=None):
-    rules=settings or operating_rules()
-    minimum=int(rules['evaluation_min_observations']);maximum=int(rules['evaluation_max_observations'])
-    """Bounded tail, not a full runtime journal scan."""
-    stores=sorted((PROJECT_ROOT/"runtime").glob("**/evidence.sqlite3"),key=lambda p:p.stat().st_mtime,reverse=True)
-    for path in stores:
-        if "assembly" in path.parts:continue
-        rows=[row for row in EvidenceJournal(path.parent).cached_rows() if row.get("decision")]
-        if len(rows)>=minimum:return rows[-maximum:],str(path)
-    files=list((PROJECT_ROOT/"runtime").glob("**/cycles.jsonl"))
-    files=sorted((p for p in files if "assembly" not in p.parts),key=lambda p:p.stat().st_mtime,reverse=True)
-    for path in files:
-        rows=[]
-        with path.open("rb") as handle:
-            handle.seek(max(0,path.stat().st_size-16*1024**2))
-            for line in handle.read().splitlines():
-                try:row=json.loads(line)
-                except ValueError:continue
-                decision=row.get("decision") or {}
-                if decision.get("raw_outputs") and decision.get("trading_output"):
-                    rows.append(row)
-        rows=sorted({r["timestamp"]:r for r in rows}.values(),key=lambda r:r["timestamp"])
-        if len(rows)>=minimum:return rows[-maximum:],str(path)
-    raise ValueError(f'실제 native 출력 cache가 {minimum}시점 이상 필요합니다.')
 
 
 def evaluate(args,model,recipe,phase,rows,native,panel,state_file):
@@ -159,6 +134,7 @@ def main():
     parser.add_argument("--state",type=Path,required=True);parser.add_argument("--assembly-root",type=Path,required=True)
     parser.add_argument('--evaluation-states',type=Path)
     parser.add_argument('--settings',type=Path,default=RULES_PATH)
+    parser.add_argument('--market',type=Path,default=default_runtime_dir()/'live'/'market.csv')
     parser.add_argument("--device",default="cuda:0");parser.add_argument("--interval",type=float)
     parser.add_argument("--resume",action="store_true");parser.add_argument("--continuous",action="store_true")
     args=parser.parse_args();args.state.mkdir(parents=True,exist_ok=True)
@@ -169,18 +145,24 @@ def main():
     result_file=args.assembly_root/"results"/(args.candidate_id+".json");result_file.parent.mkdir(exist_ok=True)
     result={"candidate_id":args.candidate_id,"state":"blocked","scores":{}}
     try:
-        torch.set_num_threads(4)
+        torch.set_num_threads(int(args.rules['cpu_threads']))
         publish_worker(args.state,status="loading",evaluation_stage="replay",assembly_candidate_id=args.candidate_id,error=None)
-        rows,source=cached_rows(args.rules)
-        minutes={pd.Timestamp(row['timestamp']).floor('min') for row in rows}
-        if len(minutes)<int(args.rules['validation_min_market_minutes']):
-            raise ValueError(f"평가에 실제 관측 {args.rules['validation_min_market_minutes']}분이 필요합니다. 현재 {len(minutes)}분입니다.")
         snapshots=args.assembly_root/'evaluation'/args.candidate_id
         receipt=read(args.evaluation_states) if args.evaluation_states else snapshot_pair(args.checkpoint,
             args.checkpoint.with_name('candidate.pt'),snapshots,recipe)
         for record in receipt.values():
             if file_digest(record['path'])!=record['sha256']:raise ValueError('evaluation state hash mismatch')
         result['evaluation_states']=receipt
+        # Fixed snapshots first, then new real Feed observations. Old cached
+        # trials remain diagnostic history and cannot qualify for promotion.
+        model,_=TradingMoE.load_checkpoint(args.checkpoint)
+        if args.device.startswith('cuda') and not torch.cuda.is_available():raise ValueError('CUDA unavailable')
+        model.set_learning_device(args.device);release_offloaded_pages()
+        def notify(count):
+            publish_worker(args.state,model,status='running',evaluation_stage='collecting_holdout',
+                evaluation_observations=count,evaluation_required=args.rules['validation_min_market_minutes'],
+                message=f"미학습 실시간 평가 구간 수집 {count}/{args.rules['validation_min_market_minutes']}분",learning_active=False)
+        rows,source=collect_holdout(args,model,receipt,notify)
         market_ages={}
         for row in rows:
             for packet in row["decision"]["raw_outputs"]:
@@ -191,9 +173,6 @@ def main():
             "market_ages":{key:sorted(ages) for key,ages in market_ages.items()}}
         # Decode only the small trained modules and six real native policy bodies.
         # All eight large market expert bodies stay in their shared file/cache.
-        model,_=TradingMoE.load_checkpoint(args.checkpoint,cached_market=True)
-        if args.device.startswith("cuda") and not torch.cuda.is_available():raise ValueError("CUDA를 사용할 수 없습니다.")
-        model.set_learning_device(args.device);release_offloaded_pages()
         champion_state=receipt['champion']['path']
         candidate_state=Path(receipt['candidate']['path'])
         result["trainable_state"]=str(candidate_state)
@@ -230,6 +209,7 @@ def main():
                 break
         else:
             compared=result["scores"]["paper"]
+            result['holdout_after']=validate_evaluation(receipt,result['scores'])
             passes=compared["delta"]>float(args.rules['promotion_min_delta']) and compared["candidate"]["net_return"]>float(args.rules['promotion_min_return']) and compared["candidate"]["max_drawdown"]<=compared["champion"]["max_drawdown"]+float(args.rules['promotion_drawdown_tolerance'])
             result.update(state="qualified" if passes else "rejected",
                 reason="분리된 paper 구간 비용 차감 비교 통과" if passes else "paper 비교: 양수 수익·Champion 초과·손실폭 조건 미충족")

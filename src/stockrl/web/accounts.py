@@ -37,6 +37,8 @@ class _AccountResetMixin:
                             decision.update(fill_expected=False,trade_executed=False)
                     replay.save_pending_kind("candidate_portfolio",pending)
                 account.reset()
+                if journal.exists():
+                    replay.save_pending_kind('candidate_portfolio',pending,account_state=account.state)
                 saved=read_json(worker.state/"worker_status.json")
                 # Preserve optimizer/replay counters, discard stale account snapshots.
                 saved.update(books=account.snapshot()["books"],fills=[],pending_orders={},

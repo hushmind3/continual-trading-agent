@@ -37,8 +37,17 @@ class NativeExpert(nn.Module):
         cpu_parameters=[(p,p.detach()) for p in self.parameters()] if frozen else []
         cpu_buffers=[(module,name,value) for module in self.modules() for name,value in module._buffers.items() if value is not None] if frozen else []
         try:
-            return native_call(self.entry["backend"], root, data, device,
-                               modules=list(self.models))
+            try:
+                result=native_call(self.entry["backend"], root, data, device,modules=list(self.models))
+            except torch.cuda.OutOfMemoryError:
+                if not device.startswith('cuda'):raise
+                # Restore original mmap views before retrying on CPU.
+                for parameter,value in cpu_parameters:parameter.data=value
+                for module,name,value in cpu_buffers:module._buffers[name]=value
+                torch.cuda.empty_cache()
+                result=native_call(self.entry["backend"],root,data,'cpu',modules=list(self.models))
+                result['resource_fallback']='cuda_out_of_memory_to_cpu'
+            return result
         finally:
             if frozen:
                 for parameter,value in cpu_parameters:parameter.data=value
@@ -58,6 +67,10 @@ def _compiled_runner(runner):
         def visit_Call(self,node):
             node=self.generic_visit(node)
             name=node.func.id if isinstance(node.func,ast.Name) else node.func.attr if isinstance(node.func,ast.Attribute) else ""
+            if name=='set_num_threads' and isinstance(node.func,ast.Attribute) and isinstance(node.func.value,ast.Name) and node.func.value.id=='torch':
+                # Standalone backend initialization must not override the
+                # registered runtime's single CPU scheduling configuration.
+                return ast.Constant(None)
             if name=="load_native_pretrained":
                 return ast.Call(ast.Name("_pretrained",ast.Load()),node.args,node.keywords)
             if name in constructors:
@@ -140,5 +153,6 @@ def native_call(backend, root, data, device="cpu", *, modules=None, states=None,
     namespace.update(_construct=construct,_pretrained=pretrained,_weights=weights,_restore=restore,_load_only=load_only)
     exec(code,namespace)
     # Baseline backend reseeds isolated workers; do not overwrite policy RNG here.
-    with torch.random.fork_rng(devices=[]):
+    devices=list(range(torch.cuda.device_count())) if torch.cuda.is_initialized() else []
+    with torch.random.fork_rng(devices=devices):
         return namespace["run_native"](backend,Path(root),data,device)

@@ -5,6 +5,7 @@ No broker API, model loading, account reset or optimizer lives in this bridge.
 from pathlib import Path
 from types import SimpleNamespace
 import math
+import json
 import numpy as np
 
 from .paper_account import PaperAccount, _currency
@@ -15,12 +16,24 @@ from .operating_rules import operating_rules
 
 
 class TradingMoEPaper(_RewardMixin):
-    def __init__(self, state_dir, *, fee=.001, slippage=.0001, credit_seconds=None,settings=None):
+    def __init__(self, state_dir, *, fee=.001, slippage=.0001, credit_seconds=None,settings=None,collect_experience=True):
         state_dir = Path(state_dir)
         state_dir.mkdir(parents=True, exist_ok=True)
-        self.paper_account = PaperAccount(state_dir / "paper_account.json", fee, slippage)
         self.replay = GlobalReplayBuffer(journal_path=state_dir / "replay.sqlite3", dual_learning=False)
+        saved=self.replay.environment_account()
+        account_path=state_dir/'paper_account.json'
+        if saved:
+            try:json.loads(account_path.read_text(encoding='utf-8'))
+            except (OSError,ValueError):
+                from .state_io import atomic_json
+                atomic_json(saved,account_path)
+        self.paper_account = PaperAccount(account_path, fee, slippage)
+        if saved and saved['episode_id']==self.paper_account.state['episode_id']:
+            if self.paper_account.state!=saved:
+                self.paper_account.state=saved
+                self.paper_account.save()
         self.metrics = {}
+        self.collect_experience=collect_experience
         rules=settings or operating_rules()
         self.horizon_kind='seconds' if credit_seconds is not None else rules['reward_credit_kind']
         self.horizon_amount=int(credit_seconds if credit_seconds is not None else
@@ -41,7 +54,7 @@ class TradingMoEPaper(_RewardMixin):
         fills = self.paper_account.process_bar(panel, index, enabled=enabled)
         self.pending = self._mature_portfolio(self.pending, panel, index, fills,
                                              account=self.paper_account, origin_model="trading_moe")
-        self.replay.save_pending_kind("candidate_portfolio", self.pending)
+        self.replay.save_pending_kind("candidate_portfolio", self.pending,account_state=self.paper_account.state)
         self.paper_account.save()
         return fills
 
@@ -94,8 +107,15 @@ class TradingMoEPaper(_RewardMixin):
             probs = np.eye(3,dtype=np.float32)[acts]
             allocation = [weights[s] for s in sub.symbols] + [paper_cash[currency]]
             queued |= self.paper_account.queue_decisions(sub,index,probs,True,allocation,acts)
+        if not self.collect_experience:
+            self.replay.save_pending_kind('candidate_portfolio',self.pending,account_state=self.paper_account.state)
+            self.paper_account.save()
+            return dict(paper_executable=True,live_executable=False,orders=sorted(queued),
+                        pending_orders=dict(self.paper_account.state['pending']))
         existing = {d["decision_id"] for d in self.pending}
-        start = max(0,index-127)
+        # Learning consumes the captured native outputs + account state. A
+        # second 128-bar OHLCV copy per pending decision serves no MoE input.
+        start = index
         decision_inputs = None
         for indices in tradable.values():
             for j in indices:
@@ -126,7 +146,7 @@ class TradingMoEPaper(_RewardMixin):
                     "symbol_pnl_before":self.paper_account.symbol_net_pnl(symbol),
                     "fill_expected":decision_id in queued,"is_validation":False,
                     "moe_run_id":result.get("run_id")})
-        self.replay.save_pending_kind("candidate_portfolio",self.pending)
+        self.replay.save_pending_kind("candidate_portfolio",self.pending,account_state=self.paper_account.state)
         self.paper_account.save()
         return {"paper_executable":True,"live_executable":False,"orders":sorted(queued),
                 "pending_orders":dict(self.paper_account.state["pending"])}

@@ -227,11 +227,16 @@ class GlobalMarketPanel:
                                     for s in self.symbols],np.int64)
         self.market_ids = np.zeros(n,np.int64); self.asset_ids = np.zeros(n,np.int64)
         self.groups = {}
-        date_ix = {d:i for i,d in enumerate(self.dates)}; sym_ix = {s:i for i,s in enumerate(self.symbols)}
-        for _, row in df.iterrows():
-            i,j=date_ix[row.date.to_datetime64()],sym_ix[str(row.symbol)]
-            self.features[i,j]=row[list(GLOBAL_FEATURES)].to_numpy(np.float32)
-            self.closes[i,j]=float(row.close); self.observed[i,j]=True
+        # Scatter numeric blocks directly: constructing one pandas Series per
+        # observed row dominated latency for broad live universes.
+        date_indices=np.searchsorted(self.dates,df.date.to_numpy(dtype='datetime64[ns]'))
+        symbol_indices=pd.Categorical(df.symbol.astype(str),categories=self.symbols).codes
+        self.features[date_indices,symbol_indices]=df.loc[:,list(GLOBAL_FEATURES)].to_numpy(np.float32)
+        self.closes[date_indices,symbol_indices]=df.close.to_numpy(np.float64)
+        self.observed[date_indices,symbol_indices]=True
+        sym_ix={s:i for i,s in enumerate(self.symbols)}
+        for row in df.groupby('symbol',sort=False).tail(1).itertuples(index=False):
+            j=sym_ix[str(row.symbol)]
             if self.uses_market_context:
                 self.market_ids[j]=self._map_market_ids[str(row.symbol)]
                 self.asset_ids[j]=self._map_asset_ids[str(row.symbol)]
@@ -241,10 +246,10 @@ class GlobalMarketPanel:
         # Point-in-time forward fill closes/features per instrument; mask still
         # marks actual exchange observations so stale prices never earn reward.
         for j in range(n):
-            for i in range(1,t):
-                if not self.observed[i,j]:
-                    self.features[i,j]=self.features[i-1,j]
-                    self.closes[i,j]=self.closes[i-1,j]
+            indices=np.maximum.accumulate(np.where(self.observed[:,j],np.arange(t),-1))
+            known=indices>=0
+            self.features[known,j]=self.features[indices[known],j]
+            self.closes[known,j]=self.closes[indices[known],j]
 
     def multiscale_at(self, index: int) -> np.ndarray:
         """Completed 1/3/5/15/60-minute and day/week/month context as of a bar."""

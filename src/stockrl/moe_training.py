@@ -25,11 +25,19 @@ def update_batch(model, optimizer, records, *, settings=None):
         usable = bool(behavior and behavior['stochastic'] and
                       behavior['schema'] == 'joint_categorical_dirichlet_v1' and
                       0 <= model.optimizer_updates - behavior['policy_version'] <= rules['max_policy_lag'])
-        key = (tuple(snapshot['symbols']), json.dumps(behavior['layout'], sort_keys=True) if usable else None)
+        layout=(dict(active=behavior['layout']['active'],groups=[dict(currency=g['currency'],indices=g['indices'])
+                for g in behavior['layout']['groups']]) if usable else None)
+        # Per-observation currency budgets scale the executed simplex, but do
+        # not change its normalized probability law or tensor layout.
+        key = (tuple(snapshot['symbols']), json.dumps(layout, sort_keys=True) if usable else None)
         groups.setdefault(key, []).append((exp, snapshot, decision, usable))
     if not groups:
         return None
     optimizer.zero_grad(set_to_none=True)
+    experts=getattr(model,'experts',None)
+    if experts is not None and any(p.requires_grad or p.grad is not None for p in experts.parameters()):
+        raise ValueError('online training must not update native Expert bodies')
+    versions=[p._version for p in experts.parameters()] if experts is not None else []
     before = parameter_digest(model.controller)
     losses = []; value_losses = []; clip_fractions = []; kl = []
     policy_rows = 0
@@ -81,6 +89,10 @@ def update_batch(model, optimizer, records, *, settings=None):
     parameters = [p for group in optimizer.param_groups for p in group['params']]
     norm = torch.nn.utils.clip_grad_norm_(parameters, float(rules['gradient_clip_norm']), error_if_nonfinite=True)
     optimizer.step(); model.optimizer_updates += 1
+    if not all(torch.isfinite(p).all() for p in parameters):
+        raise ValueError('optimizer produced nonfinite weights; do not publish or acknowledge replay')
+    if experts is not None and versions!=[p._version for p in experts.parameters()]:
+        raise ValueError('frozen Expert parameter version changed')
     after = parameter_digest(model.controller)
     if after == before:
         raise ValueError('controller update did not change weights')

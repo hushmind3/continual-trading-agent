@@ -55,8 +55,8 @@ def daily_history(market, stamp):
     return result
 
 
-def live_snapshot(model, market, frame, stamp, account,*,daily_frame=None):
-    panel = GlobalMarketPanel(market, raw_frame=frame)
+def live_snapshot(model, market, frame, stamp, account,*,daily_frame=None,panel=None):
+    if panel is None:panel = GlobalMarketPanel(market, raw_frame=frame)
     index = len(panel.dates)-1
     pstate, astate = account.model_inputs(panel, index)
     snapshot = dict(as_of=str(panel.dates[index]), symbols=panel.symbols,

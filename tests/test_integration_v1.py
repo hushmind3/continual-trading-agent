@@ -200,6 +200,13 @@ class PromotionIntegrationTests(unittest.TestCase):
         self.pair=snapshot_pair(self.champion,self.candidate,self.root/'evaluation')
         self.result=dict(state='qualified',evaluation_states=self.pair,scores={'paper':dict(delta=.02,
             champion=dict(net_return=.01,max_drawdown=.02),candidate=dict(net_return=.03,max_drawdown=.01))})
+        boundary=max(pd.Timestamp(r['holdout_after']) for r in self.pair.values())
+        for side in ('champion','candidate'):
+            self.result['scores']['paper'][side].update(first_as_of=(boundary+pd.Timedelta(minutes=3)).isoformat(),
+                last_as_of=(boundary+pd.Timedelta(minutes=6)).isoformat(),decisions=4)
+        self.result['scores']['replay']=dict(delta=.01,**{side:dict(net_return=.01,
+            first_as_of=(boundary+pd.Timedelta(minutes=1)).isoformat(),
+            last_as_of=(boundary+pd.Timedelta(minutes=2)).isoformat(),decisions=2) for side in ('champion','candidate')})
     def tearDown(self):self.temp.cleanup()
 
     def test_actual_weights_optimizer_and_rollback_are_preserved(self):

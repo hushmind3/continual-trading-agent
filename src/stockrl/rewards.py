@@ -371,6 +371,9 @@ class _RewardMixin:
                     behavior_log_prob=dec.get("behavior_log_prob"),
                     trade_executed=dec.get("trade_executed",True))
                 exp.origin_model=origin_model;account_exp.origin_model=origin_model
+                for experience in (exp,account_exp):
+                    experience.reward_end_timestamp=str(current)
+                    experience.reward_quote_timestamp=str(panel.dates[end_index])
                 if closed_mark:
                     last_quote = np.flatnonzero(panel.observed[:end_index+1,symbol_ix])[-1]
                     for experience in (exp,account_exp):

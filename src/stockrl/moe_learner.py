@@ -34,13 +34,14 @@ class AsyncLearner:
         self.stats = dict(device='cpu', capacity=1, queue=0, updates=model.optimizer_updates,
                           contexts=0, queue_wait_seconds=0., training_seconds=0., deferred=0)
         self.ram_delta = 0
+        self.retry_after=0.
 
     @property
     def busy(self):
         return self.future is not None
 
     def submit(self, records):
-        if self.busy or not records:return False
+        if self.busy or not records or time.monotonic()<self.retry_after:return False
         required = int(self.rules['learner_ram_reserve_mib'])*1024**2 + self.ram_delta
         if psutil.virtual_memory().available < required:
             self.stats['deferred'] += 1
@@ -66,6 +67,7 @@ class AsyncLearner:
             result = self.future.result()
         except Exception as exc:
             self.error = f'{type(exc).__name__}: {exc}'
+            self.retry_after=time.monotonic()+float(self.rules['runtime_restart_base_seconds'])
             self.stats.update(queue=0, error=self.error)
             # Restore from the last published state if the optimizer failed.
             self.model.controller.load_state_dict(model.controller.state_dict())

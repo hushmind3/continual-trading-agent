@@ -13,7 +13,7 @@ from torch import nn
 from .expert_system import adapter_features, build_fusion_head, decode_trading_output, registry_owner
 from .moe_native import NativeExpert, native_call
 from . import expert_backends
-from .gpu_scheduler import FairGpuScheduler, ResourceMonitor
+from .gpu_scheduler import FairGpuScheduler, ResourceMonitor, release_offloaded_pages
 from .moe_inputs import MacroHFTInputAdapter,macro_adapter_metadata
 from .paths import EXPERT_ASSETS_DIR, GPU_OWNER_LOCK
 
@@ -264,6 +264,8 @@ class TradingMoE(nn.Module):
             "policy_validity":outputs["policy_validity"].tolist(),"profiles":profiles,
             "unavailable_stock_policies":unavailable_policies,"expert_status":expert_status,
             "decision_seconds":time.perf_counter()-started,"training_performed":False,"behavior":behavior}
+        if not cached:
+            with self.resources.measure('mmap_page_trim'):release_offloaded_pages()
         return result,outputs
 
     def apply_assembly_recipe(self,recipe):

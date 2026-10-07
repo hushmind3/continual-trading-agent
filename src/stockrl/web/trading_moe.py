@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import threading
+import time
 import psutil
 from .resources import ROOT
 from ..expert_registry import atomic_json
@@ -68,11 +69,10 @@ class TradingMoELifecycle:
                     data["fills"]=account.get("fills",[])[-20:]
                     report=self.read(self.state/"report.json")
                     data.setdefault("optimizer_updates",report.get("optimizer_updates",0))
-                data.setdefault("parameters",2227295521)
             if process and (self.state/"stop.request").exists():data["stop_requested"]=True
             return data
 
-    def start(self):
+    def start(self,*,recovery=False):
         with self.lock:
             if self.process():return {"ok":True,"already_running":True,"state":self.status()}
             checkpoint=self.checkpoint
@@ -94,13 +94,42 @@ class TradingMoELifecycle:
                     worker=subprocess.Popen(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,
                         creationflags=subprocess.CREATE_NO_WINDOW if os.name=="nt" else 0)
                 process=psutil.Process(worker.pid)
-                atomic_json(self.record,{"pid":worker.pid,"created":process.create_time(),"command":process.cmdline()})
+                prior=self.read(self.record)
+                atomic_json(self.record,{"pid":worker.pid,"created":process.create_time(),"command":process.cmdline(),
+                    'requested':True,'restart_attempts':prior.get('restart_attempts',0) if recovery else 0})
                 return {"ok":True,"state":self.status()}
             except OSError as exc:
                 return {"ok":False,"error":str(exc)}
 
     def stop(self):
         with self.lock:
+            if self.record.is_file():
+                record=self.read(self.record);record['requested']=False;atomic_json(self.record,record)
             if not self.process():return {"ok":True,"already_stopped":True,"state":self.status()}
             (self.state/"stop.request").write_text("save and exit",encoding="utf-8")
             return {"ok":True,"message":"현재 사이클 후 계좌·replay·optimizer·PT를 저장하고 종료합니다.","state":self.status()}
+
+    def recover(self):
+        """Retry requested live workers with bounded backoff; never restart a trial."""
+        with self.lock:
+            record=self.read(self.record)
+            if not record.get('requested') or self.runner_script=='run_assembly_trial.py':return None
+            if (self.state/'stop.request').exists():return None
+            if self.process():
+                if record.get('restart_attempts') and time.time()-record['created']>=120:
+                    record['restart_attempts']=0;atomic_json(self.record,record)
+                return None
+            from ..operating_rules import operating_rules
+            rules=operating_rules();attempts=record.get('restart_attempts',0)
+            if attempts>=rules['runtime_restart_attempts']:
+                record['requested']=False;atomic_json(self.record,record)
+                status=self.read(self.state/'worker_status.json')
+                status.update(status='error',error='자동 복원 시도 한도 도달 · 원인 확인 후 다시 시작하세요.')
+                atomic_json(self.state/'worker_status.json',status)
+                return {'ok':False,'exhausted':True}
+            if 'retry_at' not in record:
+                record['retry_at']=time.time()+rules['runtime_restart_base_seconds']*2**attempts
+                atomic_json(self.record,record);return None
+            if time.time()<record['retry_at']:return None
+            record['restart_attempts']=attempts+1;record.pop('retry_at',None);atomic_json(self.record,record)
+            return self.start(recovery=True)

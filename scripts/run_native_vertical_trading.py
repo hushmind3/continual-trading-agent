@@ -28,20 +28,9 @@ from stockrl.state_io import EvidenceJournal, WorkerLog
 from stockrl.moe_live import LiveInputStream, live_snapshot
 from stockrl.moe_promotion import save_runtime_state,trainable_path
 from stockrl.operating_rules import operating_rules,RULES_PATH
+from stockrl.gpu_scheduler import release_offloaded_pages
 
 worker_status_path=None
-
-
-def release_offloaded_pages():
-    """Let Windows reclaim inactive mmap checkpoint pages, without unloading modules."""
-    if os.name=="nt":
-        import ctypes
-        from ctypes import wintypes
-        kernel=ctypes.WinDLL("kernel32",use_last_error=True)
-        kernel.GetCurrentProcess.restype=wintypes.HANDLE
-        trim=ctypes.WinDLL("psapi",use_last_error=True).EmptyWorkingSet
-        trim.argtypes=[wintypes.HANDLE];trim.restype=wintypes.BOOL
-        trim(kernel.GetCurrentProcess())
 
 
 def publish_worker(state,model=None,bridge=None,row=None,decision=None,learning=None,**changes):
@@ -52,6 +41,7 @@ def publish_worker(state,model=None,bridge=None,row=None,decision=None,learning=
     data.update(changes,pid=os.getpid(),updated_at=datetime.now(timezone.utc).isoformat())
     if model is not None:
         data['resources']=model.resources.snapshot()
+        data['stable_policy']=getattr(model,'stable_policy',False)
         data.update(optimizer_updates=model.optimizer_updates,
             applied_replay_rows=len(model.config.get("applied_replay_rows",{})))
         learner_device=next(model.controller.parameters()).device
@@ -82,6 +72,8 @@ def publish_worker(state,model=None,bridge=None,row=None,decision=None,learning=
     if getattr(model,'online_learner',None):
         data['learner']=dict(model.online_learner.stats)
         data['learning_active']=model.online_learner.busy
+        data['learning_error']=model.online_learner.error
+        if 'error' not in changes:data['error']=model.online_learner.error
     if learning:data["learning"]={"loss":learning["loss"],"reward_points":learning["reward_points"],"updated_at":data["updated_at"]}
     atomic_json(path,data)
 
@@ -150,7 +142,7 @@ def market_inputs(root,frame,index):
         "fincast":price,"exaone":price,"timemoe":price,"marketgpt":itch}
 
 
-def runtime_modes(state):
+def runtime_modes(state,rules=None):
     """Named models share the operator's flags; standalone MoE keeps its own lifecycle."""
     if state.name not in ("champion_moe", "candidate_moe"):
         return dict(observe_enabled=True, paper_enabled=True, learning_enabled=True)
@@ -158,7 +150,9 @@ def runtime_modes(state):
         flags=json.loads((state.parent/"autonomy.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return dict(observe_enabled=False, paper_enabled=False, learning_enabled=False)
-    return {key:bool(flags.get(key,False)) for key in ("observe_enabled","paper_enabled","learning_enabled")}
+    modes={key:bool(flags.get(key,False)) for key in ("observe_enabled","paper_enabled","learning_enabled")}
+    if (rules or operating_rules())['stable_champion'] and state.name=='champion_moe':modes['learning_enabled']=False
+    return modes
 
 
 def commit_learning(model,bridge,contexts,records):
@@ -266,7 +260,8 @@ def run(args):
     if args.resume and getattr(model,'resume_rng',None):
         from torchrl.checkpoint import GlobalRNGState
         GlobalRNGState().load_state_dict(model.resume_rng)
-    bridge=TradingMoEPaper(args.state,settings=args.rules)
+    model.stable_policy=args.rules['stable_champion'] and args.state.name=='champion_moe'
+    bridge=TradingMoEPaper(args.state,settings=args.rules,collect_experience=not model.stable_policy)
     publish_worker(args.state,model,bridge,effective_settings=args.rules)
     def gpu_wait(waiting,seconds):
         publish_worker(args.state,model,bridge,gpu_waiting=waiting,gpu_wait_seconds=seconds,
@@ -278,7 +273,7 @@ def run(args):
         model.config['applied_replay_contexts']={}
         model.config["replay_account_episode"]=episode
     from stockrl.moe_learner import AsyncLearner
-    model.online_learner=AsyncLearner(model,optimizer,args.rules)
+    if not model.stable_policy:model.online_learner=AsyncLearner(model,optimizer,args.rules)
     if getattr(args,'mode','historical')=='live':
         if not args.market:raise ValueError('live mode requires --market; historical inputs are never substituted')
         return run_live(args,model,optimizer,bridge,assembly_recipe)
@@ -318,7 +313,7 @@ def run(args):
     step_count=len(native)-first if args.continuous else args.steps+2
     publish_worker(args.state,model,bridge,status="running",message="공식 ETHUSDT 과거 구간을 이어 실행합니다.")
     for step in range(step_count):
-        modes=runtime_modes(args.state)
+        modes=runtime_modes(args.state,args.rules)
         while args.continuous and not modes["observe_enabled"] and not (args.state/"stop.request").exists():
             latest=None
             if modes["learning_enabled"]:
@@ -331,7 +326,7 @@ def run(args):
             publish_worker(args.state,model,bridge,learning=latest,status="running",modes=modes,
                 learning_active=latest is not None,message="새 판단 중지 · 저장 경험 학습 허용" if modes["learning_enabled"] else "새 판단·학습 중지 · 모델 메모리 유지")
             time.sleep(.25)
-            modes=runtime_modes(args.state)
+            modes=runtime_modes(args.state,args.rules)
         if args.continuous and (args.state/"stop.request").exists():break
         index=first+step;stamp=str(native.iloc[index].timestamp)
         pi=int(np.flatnonzero(panel.dates==np.datetime64(stamp))[0])
@@ -356,10 +351,9 @@ def run(args):
             if market_packets is None or (args.continuous and step%refresh_steps==0):
                 inputs=market_inputs(args.root,native,index)
                 snapshot["expert_inputs"].update(inputs)
-                with torch.no_grad():decision,_=model(snapshot,account,device=args.device,explore=True)
+                with torch.no_grad():decision,_=model(snapshot,account,device=args.device,explore=not getattr(model,"stable_policy",False))
                 market_packets=[p for p in decision["raw_outputs"] if p["expert"] in model.controller.market_ids]
                 evidence.save_market(market_packets)
-                release_offloaded_pages()
             else:
                 packets=list(market_packets)
                 for key in model.controller.macro_policy_ids:
@@ -370,7 +364,7 @@ def run(args):
                     packet["expert"]=key;packet["native_features_verified"]=True
                     packets.append(packet)
                     if args.device.startswith("cuda"):torch.cuda.empty_cache()
-                with torch.no_grad():decision,_=model(snapshot,account,packets=packets,explore=True)
+                with torch.no_grad():decision,_=model(snapshot,account,packets=packets,explore=not getattr(model,"stable_policy",False))
             decision["native_decision_seconds"]=time.perf_counter()-started
             decision["current_weights"]=snapshot["current_weights"]
             orders=bridge.submit(decision,panel,pi,paper_executable=modes["paper_enabled"])
@@ -424,6 +418,9 @@ def run(args):
 
 
 def save_runtime(args,model,optimizer,bridge,contexts,evidence,assembly_recipe=None):
+    retained=bridge.replay.unlearned_timestamps()|{item['timestamp'] for item in bridge.pending}
+    # Discard only orphan contexts, never evidence for unlearned outcomes.
+    for stamp in set(contexts)-retained:contexts.pop(stamp,None)
     bridge.paper_account.save();save_contexts(args.state,contexts,evidence)
     with model.resources.measure('checkpoint'):
         path=save_runtime_state(model,optimizer,args.checkpoint or TRADING_MOE_CHECKPOINT)
@@ -448,13 +445,13 @@ def run_live(args,model,optimizer,bridge,assembly_recipe=None):
     evidence=EvidenceJournal(args.state,cache_rows=rules['evidence_cache_rows'])
     contexts=evidence.load_contexts() if args.resume else {}
     from stockrl.moe_learner import AsyncLearner
-    if not hasattr(model,'online_learner'):model.online_learner=AsyncLearner(model,optimizer,rules)
+    if not hasattr(model,'online_learner') and not getattr(model,'stable_policy',False):model.online_learner=AsyncLearner(model,optimizer,rules)
     completed=0
     tracker=dict(time=time.monotonic(),updates=model.optimizer_updates)
     market_cache={};last_market={}
     try:
         while not (args.state/'stop.request').exists():
-            modes=runtime_modes(args.state)
+            modes=runtime_modes(args.state,rules)
             item=stream.next_frame() if modes['observe_enabled'] else None
             latest=None
             if item is None:
@@ -469,11 +466,12 @@ def run_live(args,model,optimizer,bridge,assembly_recipe=None):
                 continue
             frame,stamp=item
             started=time.perf_counter()
-            panel,index,snapshot,account=live_snapshot(model,args.market,frame,stamp,bridge.paper_account)
+            panel=GlobalMarketPanel(args.market,raw_frame=frame);index=len(panel.dates)-1
             fills=bridge.advance(panel,index,enabled=modes['paper_enabled'])
             # Fill changes holdings: rebuild the account-aware native input.
-            panel,index,snapshot,account=live_snapshot(model,args.market,frame,stamp,bridge.paper_account)
-            packets=[];reused=set()
+            with model.resources.measure('input_preparation'):
+                panel,index,snapshot,account=live_snapshot(model,args.market,frame,stamp,bridge.paper_account,panel=panel)
+            packets=[];reused=set();refreshed=False
             for key in [*model.controller.market_ids,*model.controller.macro_policy_ids]:
                 if hasattr(model,'assembly_enabled') and key not in model.assembly_enabled:continue
                 data=snapshot['expert_inputs'].get(key)
@@ -489,16 +487,20 @@ def run_live(args,model,optimizer,bridge,assembly_recipe=None):
                         with model.resources.measure('expert:'+key,chosen):
                             packet=model.experts[key](model.root,data,chosen)
                     packet.update(expert=key,native_features_verified=bool(data.get('native_features_verified')))
-                    if key in model.controller.market_ids:market_cache[key]=packet;last_market[key]=pd.Timestamp(stamp)
+                    if key in model.controller.market_ids:
+                        market_cache[key]=packet;last_market[key]=pd.Timestamp(stamp);refreshed=True
                 packets.append(packet)
-            with torch.no_grad():decision,_=model(snapshot,torch.as_tensor(account,dtype=torch.float32),packets=packets,device=args.device,explore=True)
+            if refreshed:
+                with model.resources.measure('mmap_page_trim'):release_offloaded_pages()
+            with torch.no_grad():decision,_=model(snapshot,torch.as_tensor(account,dtype=torch.float32),packets=packets,device=args.device,explore=not getattr(model,"stable_policy",False))
             for key in reused:decision['expert_status'][key]['status']='cached'
             evidence.save_market(list(market_cache.values()))
             decision.update(current_weights=snapshot['current_weights'],source_kind='live',market_path=str(args.market))
             executable=bool(decision['trading_output'].get('paper_executable'))
-            orders=bridge.submit(decision,panel,index,paper_executable=modes['paper_enabled'] and executable)
-            if modes['paper_enabled'] and executable:
+            if modes['paper_enabled'] and executable and bridge.collect_experience:
                 contexts[str(panel.dates[index])]=training_context(snapshot,decision)
+                save_contexts(args.state,contexts,evidence) # write evidence before order intent
+            orders=bridge.submit(decision,panel,index,paper_executable=modes['paper_enabled'] and executable)
             if modes['learning_enabled']:latest,_=learn_saved_contexts(model,optimizer,bridge,contexts,rules)
             row=dict(timestamp=str(panel.dates[index]),decision=decision,orders=orders,fills=fills,
                 books=bridge.paper_account.snapshot()['books'],reward_points=bridge.paper_account.reward_points(),

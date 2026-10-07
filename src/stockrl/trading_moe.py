@@ -200,17 +200,24 @@ class TradingMoE(nn.Module):
     def forward(self,snapshot,account_state,*,packets=None,device="cpu",explore=False):
         started=time.perf_counter();profiles=[];unavailable_policies={}
         expert_status={k:dict(snapshot.get('input_status',{}).get(k,{'status':'blocked','reason':'native input unavailable'})) for k in self.experts}
-        if packets is None:
-            packets=[]
+        cached=packets is not None
+        packets=list(packets or [])
+        if not cached or self.config.get('stock_policy_ids'):
             with registry_owner(self.gpu_lock,wait=True,on_wait=getattr(self,"gpu_wait_callback",None)):
                 for key,expert in self.experts.items():
+                    if cached and (key not in self.config.get('stock_policy_ids',()) or any(p['expert']==key for p in packets)):continue
                     if hasattr(self,"assembly_enabled") and key not in self.assembly_enabled:
                         expert_status[key]={'status':'disabled','reason':'not selected in this configuration'}
                         continue
                     data=snapshot["expert_inputs"].get(key)
                     if key in self.config.get("stock_policy_ids",()) and data is None:
-                        data=expert.prepare_input(snapshot)
-                        if data is None:unavailable_policies[key]="symbol outside universe or native history/account unavailable"
+                        try:data=expert.prepare_input(snapshot)
+                        except (ValueError,KeyError) as exc:
+                            data=None;expert.input_error=str(exc)
+                        if data is None:
+                            reason=getattr(expert,'input_error',None) or 'native stock observation unavailable'
+                            unavailable_policies[key]=reason
+                            expert_status[key]={'status':'blocked','reason':reason}
                     if key in self.config.get("stock_policy_ids",()) and data is not None:
                         data={**data,"requested_symbols":snapshot["symbols"]}
                     if data is None:continue
@@ -233,6 +240,8 @@ class TradingMoE(nn.Module):
         for packet in packets:
             expert_status[packet['expert']]={'status':'executed','as_of':packet['as_of'],
                 'symbols':packet['symbols'],'seconds':packet.get('forward_seconds')}
+            if packet['expert'] in self.config.get('stock_policy_ids',[]):
+                expert_status[packet['expert']]['news_status']=snapshot.get('stock_policy_news_status')
         evidence,validity=self.prepare(packets,snapshot["symbols"])
         policy_q=self.policy_q(packets,snapshot["symbols"])
         outputs=self.controller(evidence,validity,account_state.to(next(self.controller.parameters()).device),policy_q)

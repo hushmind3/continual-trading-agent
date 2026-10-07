@@ -15,6 +15,8 @@ from torch import nn
 from stockrl.moe_live import LiveInputStream, live_snapshot
 from stockrl.moe_paper import TradingMoEPaper
 from stockrl.trading_moe import TradingMoE
+from stockrl.moe_stock_policies import StockPolicyExpert
+from stockrl.paths import DEFAULT_MODEL_DIR,EXPERT_ASSETS_DIR
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('integration_native_runner',ROOT/'scripts/run_native_vertical_trading.py')
@@ -89,6 +91,60 @@ class LiveIntegrationTests(unittest.TestCase):
         status=json.loads((state/'worker_status.json').read_text())
         self.assertEqual(status['source_kind'],'live')
         self.assertEqual(status['decision']['symbol'],'AAPL')
+
+
+class StockPolicyIntegrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        path=DEFAULT_MODEL_DIR/'experts/action/stock/verified-policies.pt'
+        if not path.exists():raise unittest.SkipTest('local original stock policy weights unavailable')
+        cls.saved=torch.load(path,map_location='cpu',weights_only=True)
+        cls.native=json.loads((EXPERT_ASSETS_DIR/'stock-policies/native-inputs.json').read_text(encoding='utf-8'))
+
+    def test_all_six_original_policies_execute_and_stay_frozen(self):
+        executed=[]
+        for key,entry in self.saved['entries'].items():
+            expert=StockPolicyExpert.restore(entry,self.saved['states'][key])
+            before={k:v.clone() for k,v in expert.state_dict().items()}
+            output=expert(None,self.native[key],'cpu')
+            self.assertTrue(output['native_features_verified']);self.assertTrue(output['common_output'])
+            for name,value in expert.state_dict().items():self.assertTrue(torch.equal(before[name],value),key)
+            executed.append(key)
+        self.assertEqual(len(executed),6)
+
+    def test_live_history_and_account_build_each_native_observation(self):
+        universe=sorted({s for e in self.saved['entries'].values() for s in e['stock_policy']['universe']})
+        records=[]
+        # Native preprocessing integration fixture, explicitly test-only.
+        dates=pd.bdate_range('2025-01-01',periods=180)
+        for j,symbol in enumerate(universe):
+            for i,day in enumerate(dates):
+                price=100+j+i*.1+np.sin(i/3)
+                records.append(dict(date=str(day),symbol=symbol,open=price-.2,high=price+1,low=price-1,
+                    close=price,volume=10000+10*i+i%7,llm_sentiment=3.,llm_risk=3.))
+        for key,entry in self.saved['entries'].items():
+            expert=StockPolicyExpert.restore(entry,self.saved['states'][key])
+            snapshot=dict(as_of=str(dates[-1]),symbols=universe,stock_policy_history=records,
+                policy_account=dict(cash=10000.,nav=10000.,positions={}))
+            data=expert.prepare_input(snapshot)
+            self.assertIsNotNone(data,(key,expert.input_error))
+            output=expert(None,data,'cpu')
+            self.assertTrue(output['common_output'],key)
+            self.assertEqual(len(data['observations'][0]),entry['stock_policy']['observation_size'])
+
+    def test_missing_universe_is_reported_in_runtime_status(self):
+        with tempfile.TemporaryDirectory() as temp:
+            model=fixture_model(Path(temp))
+            entry=self.saved['entries']['stock_finrl_ppo']
+            model.experts['stock_finrl_ppo']=StockPolicyExpert.restore(entry,self.saved['states']['stock_finrl_ppo'])
+            model.config['stock_policy_ids']=['stock_finrl_ppo']
+            snapshot=dict(symbols=['AAPL'],as_of='2026-10-07',currencies={'AAPL':'USD'},current_weights={'AAPL':0.},
+                expert_inputs={},stock_policy_history=[dict(date='2026-10-06',symbol='AAPL',close=100.,open=100.,high=101.,low=99.,volume=1000)],
+                policy_account=dict(cash=10000.,nav=10000.,positions={}))
+            with torch.no_grad():result,_=model(snapshot,torch.zeros(1,1,16))
+            status=result['expert_status']['stock_finrl_ppo']
+            self.assertEqual(status['status'],'blocked')
+            self.assertIn('missing trained-universe',status['reason'])
 
 
 if __name__=='__main__':unittest.main()

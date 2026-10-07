@@ -201,7 +201,7 @@ class EvidenceJournal:
             for stamp, (snapshot, decision) in contexts.items():
                 packed = self._decision(db, decision)
                 # Training consumes symbol/account state, not expert input arrays.
-                snapshot = {key: value for key, value in snapshot.items() if key != "expert_inputs"}
+                snapshot = {key: value for key, value in snapshot.items() if key not in ("expert_inputs","stock_policy_history")}
                 data = _encode({"snapshot": snapshot, "decision": packed})
                 previous = db.execute("SELECT data FROM contexts WHERE stamp=?", (stamp,)).fetchone()
                 if previous is None or previous[0] != data:

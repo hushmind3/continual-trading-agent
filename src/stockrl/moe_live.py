@@ -88,6 +88,37 @@ def live_snapshot(model, market, frame, stamp, account):
             amount_observed=False, input_authenticity='live_OHLCV_amount_price_volume_proxy')
     daily = daily_history(market, stamp)
     if not daily.empty:
+        news_path=Path(market).with_name('stock_policy_news.csv')
+        if news_path.is_file():
+            news=pd.read_csv(news_path)
+            news['date']=pd.to_datetime(news.date,utc=True).dt.tz_convert(None)
+            news=news.loc[news.date<pd.Timestamp(stamp).normalize()].drop_duplicates(['date','symbol'],keep='last')
+            daily=daily.merge(news[['date','symbol','llm_sentiment','llm_risk']],on=['date','symbol'],how='left')
+        # The released DAPO backtest explicitly defines score 3 for missing news.
+        # Report that fallback; never present it as a measured LLM opinion.
+        missing_news=any(k not in daily or daily[k].isna().any() for k in ('llm_sentiment','llm_risk'))
+        for key in ('llm_sentiment','llm_risk'):
+            daily[key]=daily[key].fillna(3.) if key in daily else 3.
+        snapshot['stock_policy_news_status']='native_missing_news_neutral_3' if missing_news else 'observed'
+        history=daily.copy();history['date']=history.date.astype(str)
+        snapshot['stock_policy_history']=history.to_dict('records')
+    book=account.snapshot()['books']['USD']
+    metrics=account.state.setdefault('policy_metrics',{})
+    peak=max(float(metrics.get('USD_peak',book['initial_cash'])),float(book['equity']))
+    metrics['USD_peak']=peak
+    volatility=0.
+    if not daily.empty and book['positions']:
+        prices=daily.pivot(index='date',columns='symbol',values='close')
+        weights={s:float(p['quantity'])*float(book['marks'].get(s,p['average_cost']))/float(book['equity'])
+            for s,p in book['positions'].items() if s in prices}
+        if weights:
+            changes=prices[list(weights)].pct_change(fill_method=None).dropna()
+            if len(changes)>1:volatility=float((changes*pd.Series(weights)).sum(axis=1).std())
+    snapshot['policy_account']=dict(cash=float(book['cash']),nav=float(book['equity']),
+        positions={s:float(p['quantity']) for s,p in book['positions'].items()},trades=int(book['trade_count']),
+        costs=sum(float(book.get(k,0)) for k in ('fees','slippage','spread','sell_tax')),
+        drawdown=max(0.,1-float(book['equity'])/peak),volatility=volatility)
+    if not daily.empty:
         closes=daily.pivot(index='date',columns='symbol',values='close')
         if '^GSPC' in closes:
             returns=closes.pct_change(fill_method=None)
@@ -121,4 +152,7 @@ def live_snapshot(model, market, frame, stamp, account):
         if key in reasons:reasons[key]='live ETHUSDT native 36+9 fields are required in native_macrophft.csv'
     if 'marketgpt' in reasons:reasons['marketgpt']='contemporaneous native ITCH tokens are required in native_itch.json'
     snapshot['input_status']={key:dict(status='ready' if key in snapshot['expert_inputs'] else 'blocked',reason=reasons.get(key)) for key in model.config['feature_sizes']}
+    for key in model.config.get('stock_policy_ids',[]):
+        snapshot['input_status'][key]=dict(status='pending',reason='native observation preparation',
+            news_status=snapshot.get('stock_policy_news_status'))
     return panel,index,snapshot,np.column_stack([pstate,np.broadcast_to(astate,(len(pstate),len(astate)))])[None]

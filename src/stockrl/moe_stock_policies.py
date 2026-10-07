@@ -72,28 +72,38 @@ class StockPolicyExpert(nn.Module):
         return symbol.upper() in self.entry['stock_policy']['universe']
 
     def prepare_input(self, snapshot):
+        self.input_error=None
         records = snapshot.get('stock_policy_history')
-        if records is None or not any(self.applicable(s) for s in snapshot['symbols']):
-            return None
+        if not records:return self._unavailable('completed daily stock history is missing')
+        if not any(self.applicable(s) for s in snapshot['symbols']):
+            return self._unavailable('none of the current symbols belongs to the trained universe')
         spec = self.entry['stock_policy']
         df = history_frame(records, snapshot['as_of'])
         account = snapshot.get('policy_account', {})
         cash = float(account.get('cash', 0))
         nav = float(account.get('nav', cash))
         if nav <= 0:
-            return None
+            return self._unavailable('positive paper-account NAV is required')
         positions = account.get('positions', {})
         observations, symbols, prices, dates = [], [], [], []
         if spec['kind'] in ('dapo', 'a2c', 'ppo', 'sac'):
+            required=spec['universe']
+            missing=set(required)-set(df.Ticker)
+            if missing:return self._unavailable('missing trained-universe history: '+', '.join(sorted(missing)))
+            # Whole native portfolio observations share one completed date.
+            coverage=df[df.Ticker.isin(required)].groupby('Date').Ticker.nunique()
+            complete=coverage[coverage==len(required)]
+            if complete.empty:return self._unavailable('no completed date covers the entire trained universe')
+            df=df[(df.Date<=complete.index[-1]) & df.Ticker.isin(required)].copy()
             if not set(spec['indicators']).issubset(df.columns):
                 df = self._portfolio_features(df, spec['indicators'])
             latest = df[df.Date == df.Date.max()].set_index('Ticker')
             required = spec['universe']
             if not set(required).issubset(latest.index) or latest.index.duplicated().any():
-                return None
+                return self._unavailable('incomplete or duplicated native universe at the observation date')
             latest = latest.loc[required]
             if not set(spec['indicators']).issubset(latest.columns):
-                return None
+                return self._unavailable('native technical indicators are missing')
             prices = latest.Close.to_numpy(float)
             shares = np.asarray([positions.get(s, 0.) for s in required], float)
             obs = [cash, *prices, *shares]
@@ -101,7 +111,7 @@ class StockPolicyExpert(nn.Module):
                 obs.extend(latest[col].to_numpy(float))
             if spec['kind'] == 'dapo':
                 if not {'llm_sentiment', 'llm_risk'}.issubset(latest.columns):
-                    return None
+                    return self._unavailable('native DAPO sentiment/risk fields are missing')
                 obs.extend(latest.llm_sentiment); obs.extend(latest.llm_risk)
             observations = [obs]; symbols = required; dates = [str(latest.Date.iloc[0])]
         else:
@@ -143,13 +153,17 @@ class StockPolicyExpert(nn.Module):
                 observations.append(obs); symbols.append(symbol)
                 prices.append(float(frame.Close.iloc[-1])); dates.append(str(frame.Date.iloc[-1]))
         if not symbols:
-            return None
+            return self._unavailable('insufficient completed history for the native observation window')
         obs = np.asarray(observations, np.float32)
         if obs.shape[1] != spec['observation_size'] or not np.isfinite(obs).all():
             raise ValueError('native stock observation shape or values invalid')
         return dict(observations=obs.tolist(), symbols=symbols, prices=list(prices),
             as_of=max(dates), account=account, native_features_verified=True,
             feature_schema=spec['schema'], requested_symbols=snapshot['symbols'])
+
+    def _unavailable(self,reason):
+        self.input_error=reason
+        return None
 
     @staticmethod
     def _portfolio_features(frame, indicators):

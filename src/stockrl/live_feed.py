@@ -110,6 +110,17 @@ class LiveMarketCollector:
             self.errors_path.write_text("",encoding="utf-8")
         config = json.loads(self.config_path.read_text(encoding="utf-8"))
         self.instruments = config["instruments"]
+        if config.get('include_stock_policy_universe',True):
+            from .paths import PROJECT_ROOT,EXPERT_ASSETS_DIR
+            registry_path=PROJECT_ROOT/'runtime/trading_moe/registry.json'
+            if not registry_path.is_file():registry_path=EXPERT_ASSETS_DIR/'registry.template.json'
+            if registry_path.is_file():
+                registry=json.loads(registry_path.read_text(encoding='utf-8'))
+                required={s for e in registry.get('experts',[]) if e.get('backend')=='stock_policy' for s in e.get('universe',[])}
+                known={item['symbol'] for item in self.instruments}
+                self.instruments=[*self.instruments,*[dict(symbol=s,provider_symbol=s,provider='yahoo',
+                    market='US',asset_class='equity',interval='1m',refresh_seconds=60,
+                    source='stock_policy_trained_universe') for s in sorted(required-known)]]
         configured_timeframes=tuple(config.get("decision_timeframes",TIMEFRAME_NAMES))
         if configured_timeframes!=TIMEFRAME_NAMES:
             raise ValueError(f"decision_timeframes must match the model feature order: {TIMEFRAME_NAMES}")

@@ -282,6 +282,11 @@ def run(args):
             snapshot={"as_of":stamp,"symbols":panel.symbols,"currencies":{s:"USD" for s in panel.symbols},
                 "tradable_symbols":[s for j,s in enumerate(panel.symbols) if panel.observed[pi,j]],
                 "current_weights":{s:float(pstate[j][1]) for j,s in enumerate(panel.symbols)},"expert_inputs":{}}
+            history=pd.read_csv(Path(__file__).resolve().parents[1]/'data/global_market_daily.csv')
+            history=history[pd.to_datetime(history.date)<pd.Timestamp(stamp)]
+            snapshot['stock_policy_history']=history.to_dict('records')
+            book=bridge.paper_account.snapshot()['books']['USD']
+            snapshot['policy_account']=dict(cash=book['cash'],nav=book['equity'],positions={s:p['quantity'] for s,p in book['positions'].items()})
             for key in model.controller.macro_policy_ids:snapshot["expert_inputs"][key]={**policy_data,"variant":model.experts[key].entry["variant"]}
             refresh_steps=max(1,min(assembly_recipe["refresh_seconds"][k] for k in model.controller.market_ids if k in assembly_recipe["enabled_experts"])//60) if assembly_recipe else 120
             if market_packets is None or (args.continuous and step%refresh_steps==0):

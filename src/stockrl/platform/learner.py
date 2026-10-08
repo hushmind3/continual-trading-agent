@@ -48,10 +48,10 @@ def run(settings):
     journal = Journal(settings.state_dir/"operations.sqlite3",settings.resources.journal_limit_mib,settings.resources.retained_transitions)
     checkpoints = Checkpoints(settings.state_dir/"policies",settings.resources.revisions)
     try:
-        publish(settings,"learner",status="waiting",device="cpu",message="첫 정책 버전 대기")
+        publish(settings,"learner",status="waiting_policy",device="cpu",message="정책 복원·변환 대기")
         while not stopped(settings,"learner"):
             state, manifest = checkpoints.load()
-            if state:
+            if state and state['model_spec'].get('policy_family')=='sparse-normal-v2':
                 break
             time.sleep(1)
         else:

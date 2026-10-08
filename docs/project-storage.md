@@ -9,7 +9,7 @@
 | `configs/local/provider_settings.json` | 키움 환경과 공개 연결 상태 |
 | Windows 자격 증명 저장소 | App Key·Secret |
 | `Desktop/모델/champion.pt` | frozen Expert와 학습된 MoE 원본 |
-| `runtime/finrlx/operations.sqlite3` | 계좌·미체결·경험·처리 여부·이벤트 |
+| `runtime/finrlx/operations.sqlite3` | 통화별 계좌·체결 원장·미체결·경험·처리 여부·이벤트 |
 | `runtime/finrlx/policies` | 작은 학습 상태·optimizer·checksum·복원 버전 |
 | `runtime/finrlx/live` | 실시간 tick·완료 분봉·일봉 저장소 |
 | `runtime/finrlx/workers` | 프로세스 식별·heartbeat·실행 로그 |

@@ -10,7 +10,7 @@ from .config import load_settings, CONFIG_PATH
 from .journal import Journal
 from .checkpoint import Checkpoints
 from .model_asset import load_moe_head,validate_source
-from .policy import build_policy
+from .policy import build_policy,migrate_policy
 from .weights import PortfolioStrategy
 from .environment import PortfolioEnvironment,market_view
 from .worker_state import publish,stopped,control
@@ -24,8 +24,16 @@ def run(settings):
     source_spec,original=load_moe_head(settings.resolve(settings.expert_checkpoint))
     if state:
         validate_source(state["model_spec"],source_spec)
-        spec=state["model_spec"]; actor,critic=build_policy(spec)
-        actor.load_state_dict(state["actor"]); critic.load_state_dict(state["critic"])
+        spec=state["model_spec"]
+        if spec.get('policy_family')!='sparse-normal-v2':
+            actor,critic,optimizer=migrate_policy(state,settings.learning)
+            manifest=checkpoints.save(actor,critic,optimizer,state['version']+1,state['expert_ids'],
+                                      optimizer_steps=state.get('optimizer_steps',0))
+            spec=actor.model_spec
+            journal.event('policy','비중 0을 선택할 수 있는 정책으로 전환했습니다. 기존 학습 가중치와 optimizer 상태를 이어받았습니다.')
+        else:
+            actor,critic=build_policy(spec)
+            actor.load_state_dict(state["actor"]); critic.load_state_dict(state["critic"])
     else:
         spec=source_spec
         actor,critic=build_policy(spec,original)
@@ -34,7 +42,7 @@ def run(settings):
     del original
     version=manifest["version"]
     environment=PortfolioEnvironment(settings,journal,spec)
-    contract='model-directed-portfolio-v2'
+    contract='sparse-separate-currency-portfolio-v4'
     if journal.get_state('execution_contract')!=contract:
         with journal.transaction():
             journal.db.execute('UPDATE transitions SET learned=-1 WHERE learned IS NULL')
@@ -57,6 +65,13 @@ def run(settings):
                 new,record=checkpoints.load()
                 if new["model_spec"]["expert_ids"]!=spec["expert_ids"]:
                     raise ValueError("정책과 Expert 자산 구성이 다릅니다.")
+                if new['model_spec'].get('policy_family')!='sparse-normal-v2':
+                    actor,critic,optimizer=migrate_policy(new,settings.learning)
+                    record=checkpoints.save(actor,critic,optimizer,new['version']+1,new['expert_ids'],
+                                            optimizer_steps=new.get('optimizer_steps',0))
+                    spec=actor.model_spec
+                    manifest=record;version=record['version']
+                    continue
                 actor.load_state_dict(new["actor"]); critic.load_state_dict(new["critic"])
                 manifest=record; version=record["version"]
             modes=control(settings)
@@ -104,6 +119,7 @@ def run(settings):
                     journal.set_state("decisions",latest)
                     for currency,book in environment.account.snapshot()["books"].items():
                         journal.record_nav(currency,stamp,book)
+                    journal.record_fills(fills,environment.account.state['books'])
                 last=stamp; reader.processed_through=stamp
                 atomic_json({'last_timestamp':stamp},reader.path.parent/'agent'/'live_cursor.json')
                 publish(settings,"agent",status="running" if made_decision else 'waiting',version=version,last_as_of=last_decision,market_cursor=stamp,

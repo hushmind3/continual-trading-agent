@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 import sqlite3
 import threading
@@ -53,6 +54,9 @@ class Journal:
           weights TEXT NOT NULL, PRIMARY KEY(currency,stamp));
         CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, created REAL NOT NULL,
           kind TEXT NOT NULL, detail TEXT NOT NULL, read INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS fills(identity TEXT PRIMARY KEY,currency TEXT NOT NULL,sequence INTEGER NOT NULL,
+          stamp TEXT NOT NULL,payload TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS fills_currency_sequence ON fills(currency,sequence DESC);
         """)
         self.db.commit()
 
@@ -96,6 +100,29 @@ class Journal:
             self.db.execute("INSERT OR REPLACE INTO allocations VALUES(?,?,?)", (currency,stamp,json.dumps(weights)))
             self.db.execute("DELETE FROM allocations WHERE stamp < COALESCE((SELECT stamp FROM allocations ORDER BY stamp DESC LIMIT 1 OFFSET 5000),'')")
             self.commit()
+
+    def record_fills(self, fills, books):
+        """Persist actual executions before the bounded account preview can evict them."""
+        with self.lock:
+            for currency,book in books.items():
+                items=[f for f in fills if f['currency']==currency]
+                start=int(book.get('trade_count',0))-len(items)
+                for index,fill in enumerate(items,1):
+                    sequence=int(fill.get('sequence',start+index))
+                    key=[currency,sequence,fill.get('date'),fill['symbol'],fill['action'],fill.get('decision_id'),fill['quantity'],fill['price']]
+                    identity=hashlib.sha256(json.dumps(key,separators=(',',':')).encode()).hexdigest()
+                    self.db.execute('INSERT OR IGNORE INTO fills VALUES(?,?,?,?,?)',
+                        (identity,currency,sequence,str(fill.get('date','')),json.dumps({**fill,'sequence':sequence})))
+            self.commit()
+
+    def fill_count(self,currency):
+        with self.lock:return self.db.execute('SELECT COUNT(*) FROM fills WHERE currency=?',(currency,)).fetchone()[0]
+
+    def fills(self,currency,offset=0,limit=50,before=None):
+        with self.lock:
+            return [json.loads(row[0]) for row in self.db.execute(
+                'SELECT payload FROM fills WHERE currency=? AND (? IS NULL OR sequence<?) ORDER BY sequence DESC,stamp DESC LIMIT ? OFFSET ?',
+                (currency,before,before,limit,offset))]
 
     def history(self, currency, limit=300):
         with self.lock:

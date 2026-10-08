@@ -56,6 +56,7 @@ export interface Decision {
 }
 export interface Position {
   symbol: string;
+  name?: string;
   quantity: number;
   average_cost: number;
   mark: number;
@@ -74,8 +75,11 @@ export interface Book {
   spread: number;
   sell_tax: number;
   trade_count: number;
+  recorded_fills: number;
+  missing_fills: number;
 }
 export interface Fill {
+  sequence: number;
   symbol: string;
   currency: Currency;
   action: string;

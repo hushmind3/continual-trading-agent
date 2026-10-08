@@ -1,4 +1,5 @@
 import type { Currency, Worker } from "../data/types";
+export const accountNames:Record<Currency,string>={KRW:'국내주식 · 원화 가상계좌',USD:'미국주식 · 달러 가상계좌'};
 export const number = (value: number | undefined | null, digits = 1) =>
   value == null || !Number.isFinite(value)
     ? "미수신"
@@ -45,6 +46,7 @@ const phases: Record<string, string> = {
   loading: "불러오는 중",
   waiting: "입력 대기",
   waiting_batch: "학습 경험 대기",
+  waiting_policy: "정책 복원 대기",
   running: "실행 중",
   ready: "준비됨",
   inference: "분석 중",
@@ -71,7 +73,7 @@ export function workerState(worker: Worker | undefined) {
     tone:
       worker.status === "error"
         ? "bad"
-        : ['waiting','waiting_batch','loading','starting','waiting_resources'].includes(worker.status??'')
+        : ['waiting','waiting_batch','waiting_policy','loading','starting','waiting_resources'].includes(worker.status??'')
           ? "warn"
           : "good",
   };

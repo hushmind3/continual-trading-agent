@@ -10,7 +10,7 @@ import torch
 from tensordict import TensorDict
 from strategies.base_strategy import StrategyResult
 
-from stockrl.platform.policy import build_policy,observation,decide,parameters,INPUT_KEYS,MoETrunk
+from stockrl.platform.policy import build_policy,observation,decide,parameters,INPUT_KEYS,MoETrunk,sparse_weights,migrate_policy
 from stockrl.platform.model_asset import load_moe_head,validate_source
 from stockrl.platform.config import LearningSettings,RiskSettings,Settings
 from stockrl.platform.learner import learn_batch
@@ -52,7 +52,7 @@ class MoEPolicyTests(unittest.TestCase):
             self.assertFalse(any(name.startswith('experts.') for name,_ in actor.named_parameters()))
 
     def test_torchrl_updates_real_moe_and_accepts_variable_asset_count(self):
-        actor,critic=build_policy(spec()); initial=next(actor.parameters()).detach().clone(); rows=[]
+        actor,critic=build_policy(spec());trunk=next(m for m in actor.modules() if isinstance(m,MoETrunk));initial=next(trunk.parameters()).detach().clone(); rows=[]
         for i in range(8):
             weights,td=decide(actor,critic,obs(),explore=True)
             self.assertAlmostEqual(float(weights.sum()),1,places=5)
@@ -62,7 +62,7 @@ class MoEPolicyTests(unittest.TestCase):
         optimizer=torch.optim.AdamW(parameters(actor,critic),lr=.001)
         loss,steps=learn_batch(actor,critic,optimizer,rows,LearningSettings(batch_size=8,epochs=2))
         self.assertTrue(np.isfinite(loss)); self.assertGreater(steps,0)
-        self.assertFalse(torch.equal(initial,next(actor.parameters())))
+        self.assertFalse(torch.equal(initial,next(trunk.parameters())))
         self.assertEqual(decide(actor,critic,obs(5),explore=False)[0].shape,(6,))
         self.assertEqual(len(parameters(actor,critic)),len({id(p) for p in parameters(actor,critic)}))
 
@@ -106,8 +106,45 @@ class MoEPolicyTests(unittest.TestCase):
         self.assertIsNone(quote_timestamp('20261008','250000','us'))
         self.assertIsNone(quote_timestamp('20261008',None,'us'))
 
+    def test_sparse_policy_can_choose_zero_without_position_count_cap(self):
+        self.assertEqual(sparse_weights(torch.tensor([3.,0.,-2.])).tolist(),[1.,0.,0.])
+        torch.testing.assert_close(sparse_weights(torch.zeros(20)),torch.ones(20)/20)
+        actor,critic=build_policy(spec())
+        weights,td=decide(actor,critic,obs(5),explore=True)
+        self.assertAlmostEqual(float(weights.sum()),1.,places=5)
+        torch.testing.assert_close(actor.get_dist(td).log_prob(td['action']),td['action_log_prob'])
+
+    def test_policy_migration_preserves_weights_and_adam_history(self):
+        old,old_value=build_policy(spec(),legacy=True)
+        opt=torch.optim.AdamW(parameters(old,old_value),lr=.001)
+        for p in parameters(old,old_value):p.grad=torch.ones_like(p)*.01
+        opt.step()
+        saved={'model_spec':old.model_spec,'actor':old.state_dict(),'critic':old_value.state_dict(),'optimizer':opt.state_dict()}
+        actor,critic,optimizer=migrate_policy(saved,LearningSettings())
+        old_names=dict(old.named_parameters());new_names=dict(actor.named_parameters())
+        for name,p in old_names.items():
+            torch.testing.assert_close(p,new_names[name],rtol=0,atol=0)
+            torch.testing.assert_close(opt.state[p]['exp_avg'],optimizer.state[new_names[name]]['exp_avg'])
+        self.assertEqual(actor.model_spec['policy_family'],'sparse-normal-v2')
+
 
 class DurableOperationsTests(unittest.TestCase):
+    def test_fill_ledger_keeps_both_currencies_and_pages_without_duplicates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=Journal(Path(directory)/'ops.sqlite3')
+            books={'USD':{'trade_count':1},'KRW':{'trade_count':250}}
+            old=[dict(currency='USD',symbol='A',action='BUY',price=10,quantity=1,date='2026-01-01',sequence=1)]
+            journal.record_fills(old,books)
+            newer=[dict(currency='KRW',symbol='K',action='BUY',price=100,quantity=1,date='2026-01-01',sequence=i) for i in range(1,251)]
+            journal.record_fills(newer,books);journal.record_fills(newer,books)
+            self.assertEqual(journal.fill_count('KRW'),250);self.assertEqual(journal.fill_count('USD'),1)
+            first=journal.fills('KRW',limit=50);second=journal.fills('KRW',limit=50,before=first[-1]['sequence'])
+            self.assertEqual(first[0]['sequence'],250);self.assertEqual(second[0]['sequence'],200)
+            with self.assertRaises(RuntimeError),journal.transaction():
+                journal.record_fills([{**old[0],'sequence':2}],{'USD':{'trade_count':2}})
+                raise RuntimeError('crash')
+            self.assertEqual(journal.fill_count('USD'),1)
+            journal.close()
     def test_model_file_guard_rejects_external_weights(self):
         from unittest.mock import patch
         from stockrl.platform.assets import guard_model_assets
@@ -244,6 +281,33 @@ class DurableOperationsTests(unittest.TestCase):
             from stockrl.platform.journal import decode
             reward=decode(row)['next']['reward'].item()
             self.assertLess(reward,0)
+            journal.close()
+
+    def test_subshare_target_change_does_not_force_one_share_sale(self):
+        from stockrl.paper_account import PaperAccount
+        account=PaperAccount.in_memory(.001,.0001)
+        book=account.state['books']['USD'];book['cash']=9000
+        book['positions']['A']={'quantity':10,'average_cost':100};book['marks']['A']=100
+        view=SimpleNamespace(symbols=['A'],dates=np.array(['2026-01-01'],dtype='datetime64[ns]'),
+            groups={'A':('US','equity')},observed=np.ones((1,1),bool),closes=np.array([[100.]]),features=np.zeros((1,1,8)))
+        orders=account.queue_decisions(view,0,np.array([[1.,0,0]]),True,np.array([.09995,.90005]),np.array([0]))
+        self.assertFalse(orders)
+        orders=account.queue_decisions(view,0,np.array([[1.,0,0]]),True,np.array([0.,1.]),np.array([0]))
+        self.assertTrue(orders);self.assertEqual(account.state['pending']['A']['budget'],10)
+
+    def test_currency_account_features_do_not_include_other_ledger(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=Journal(Path(directory)/'ops.sqlite3')
+            settings=SimpleNamespace(state_dir=Path(directory),risk=RiskSettings(),learning=LearningSettings(),
+                enabled_experts=[],resources=SimpleNamespace(market_refresh_seconds=300))
+            env=PortfolioEnvironment(settings,journal,spec())
+            frame=pd.DataFrame([dict(date='2026-01-01',symbol=s,market=m,asset_class='equity',open=100,high=101,low=99,close=100,volume=1000)
+                for s,m in [('A','US'),('K','KRX')]])
+            view,frame=market_view(frame)
+            before=env.observe(view,frame,0,'KRW',{})['observation']['account'].clone()
+            env.account.state['books']['USD']['cash']=123
+            after=env.observe(view,frame,0,'KRW',{})['observation']['account']
+            torch.testing.assert_close(before,after)
             journal.close()
 
 

@@ -36,6 +36,7 @@ class PortfolioEnvironment:
         saved = journal.get_state("account")
         if saved:
             self.account.state = saved
+            journal.record_fills(saved.get('fills',[]),saved['books'])
         self.pending = journal.pending()
         self.peak=journal.get_state('risk_peaks') or {c:b["equity"] for c,b in self.account.snapshot()["books"].items()}
 
@@ -53,7 +54,15 @@ class PortfolioEnvironment:
             return None
         symbols = [view.symbols[i] for i in indices]
         as_of = str(view.dates[index])
-        pstate, astate = self.account.model_inputs(view,index)
+        pstate, _ = self.account.model_inputs(view,index)
+        book=self.account.snapshot()['books'][currency]
+        equity=max(book['equity'],1e-9)
+        positions=self.account.state['books'][currency]['positions']
+        marks=self.account.state['books'][currency]['marks']
+        unreal=sum(p['quantity']*(marks.get(s,p['average_cost'])-p['average_cost']) for s,p in positions.items())
+        exposure=(equity-book['cash'])/equity
+        astate=[book['cash']/equity,exposure,unreal/equity,book['trade_count']/1000,
+                book['fees']/equity,book['slippage']/equity,book['spread']/equity,exposure]
         if self.settings.enabled_experts:
             packets={k:v for k,v in packets.items() if k in self.settings.enabled_experts}
         evidence,mask,policy_q=prepare_evidence(packets,symbols,self.model_spec,as_of,

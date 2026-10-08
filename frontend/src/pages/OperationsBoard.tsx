@@ -11,7 +11,7 @@ import {
 import { useOperations } from "../data/Operations";
 import { ControlButton } from "../ui/ControlButton";
 import { Empty, Meter, Skeleton, Status } from "../ui/Primitives";
-import { bytes, date, number, workerState } from "../ui/format";
+import {accountNames,bytes,date,money,number,workerState} from "../ui/format";
 
 const steps = [
   { role: "feed", label: "시장 입력", icon: Radio, color: "text-blue-500" },
@@ -109,6 +109,13 @@ export function OperationsBoard() {
           </div>
         )}
       </section>
+      {state.account&&<section className="grid gap-4 sm:grid-cols-2">
+        {(['KRW','USD'] as const).map(currency=>{const book=state.account!.books[currency];return <a key={currency} href="#portfolio" onClick={()=>sessionStorage.setItem('portfolio_currency',currency)} className="rounded-xl bg-white px-5 py-4 transition hover:bg-blue-50/50">
+          <h2 className="text-xs font-semibold text-slate-500">{accountNames[currency]}</h2>
+          <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3"><b className="text-xl tabular-nums">{money(book.equity,currency)}</b><span className={`text-sm ${book.pnl>=0?'text-rose-500':'text-blue-500'}`}>{money(book.pnl,currency)}</span></div>
+          <p className="mt-2 text-xs text-slate-400">{book.positions.length}종목 · 이 계좌 누적 체결 {number(book.trade_count,0)}회 · 다른 통화와 합산 없음</p>
+        </a>})}
+      </section>}
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section className="rounded-2xl bg-[#edf3ff] p-5 sm:p-6">
           <div className="flex items-center justify-between">

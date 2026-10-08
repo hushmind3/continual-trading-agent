@@ -35,6 +35,8 @@ class Runtime:
         self.config=Path(config).resolve(); self.settings=load_settings(self.config)
         self.root=self.settings.state_dir; (self.root/"workers").mkdir(exist_ok=True)
         self.journal=Journal(self.root/"operations.sqlite3",self.settings.resources.journal_limit_mib,self.settings.resources.retained_transitions)
+        account=self.journal.get_state('account')
+        if account:self.journal.record_fills(account.get('fills',[]),account['books'])
         self.checkpoints=Checkpoints(self.root/"policies",self.settings.resources.revisions)
         self.resources=ResourceMonitor(self.root)
         self.input_config=prepare(self.settings)

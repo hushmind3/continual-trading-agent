@@ -33,20 +33,23 @@ class SafeJSONResponse(JSONResponse):
         return super().render(clean(content))
 
 
-def summary(state):
+def summary(state,names=None,journal=None):
     if not state:
         return None
     result=dict(state); result["books"]={}
-    result['fills']=state.get('fills',[])[-50:]
+    result['fills']=[]
     for currency,book in state["books"].items():
         positions=[]
         for symbol,p in book.get("positions",{}).items():
             mark=book.get("marks",{}).get(symbol,p["average_cost"])
-            positions.append(dict(symbol=symbol,**p,mark=mark,value=p["quantity"]*mark,
+            positions.append(dict(symbol=symbol,name=(names or {}).get(symbol,symbol),**p,mark=mark,value=p["quantity"]*mark,
                                   pnl=p["quantity"]*(mark-p["average_cost"])))
         equity=book["cash"]+sum(p["value"] for p in positions)
         result["books"][currency]={**book,"positions":positions,"equity":equity,"pnl":equity-book["initial_cash"],
                                   "return_rate":equity/book["initial_cash"]-1}
+        if journal:
+            recorded=journal.fill_count(currency)
+            result['books'][currency].update(recorded_fills=recorded,missing_fills=max(0,book['trade_count']-recorded))
     return result
 
 
@@ -75,9 +78,21 @@ def make_app(runtime=None,config=CONFIG_PATH):
 
     @app.get("/api/state")
     def state(request:Request):
-        value=rt(request).snapshot(); value["account"]=summary(value["account"])
+        runtime=rt(request);value=runtime.snapshot()
+        names={i['symbol']:i.get('name',i['symbol']) for i in read_json(runtime.input_config).get('instruments',[])}
+        value["account"]=summary(value["account"],names,runtime.journal)
         value["equity_history"]={c:rt(request).journal.history(c) for c in ("USD","KRW")}
         return value
+
+    @app.get('/api/fills')
+    def fill_records(request:Request,currency:str='USD',offset:int=0,limit:int=50,before:int|None=None):
+        if currency not in ('KRW','USD') or offset<0 or not 1<=limit<=200:
+            raise HTTPException(400,'통화와 조회 범위를 확인하세요.')
+        runtime=rt(request);account=runtime.journal.get_state('account') or {}
+        cumulative=account.get('books',{}).get(currency,{}).get('trade_count',0)
+        recorded=runtime.journal.fill_count(currency)
+        return dict(currency=currency,fills=runtime.journal.fills(currency,offset,limit,before),recorded=recorded,
+                    cumulative=cumulative,missing=max(0,cumulative-recorded),offset=offset,limit=limit)
 
     @app.post("/api/controls/{name}")
     def command(name:str,toggle:Toggle,request:Request):

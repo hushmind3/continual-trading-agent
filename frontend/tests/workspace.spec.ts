@@ -58,8 +58,8 @@ test('paper control changes actual backend state and restores its previous setti
  const previous=initial.controls.paper;
  try{
   await page.goto('/#portfolio');
-  await page.getByRole('button',{name:previous?'가상체결 정지':'가상체결 시작',exact:true}).click();
-  await expect(page.getByRole('button',{name:previous?'가상체결 시작':'가상체결 정지',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:previous?'두 계좌 가상체결 정지':'두 계좌 가상체결 시작',exact:true}).click();
+  await expect(page.getByRole('button',{name:previous?'두 계좌 가상체결 시작':'두 계좌 가상체결 정지',exact:true})).toBeVisible();
   const changed=await (await request.get('/api/state')).json();
   expect(changed.controls.paper).toBe(!previous);
   expect(changed.controls.feed).toBe(initial.controls.feed);
@@ -68,4 +68,27 @@ test('paper control changes actual backend state and restores its previous setti
   const restored=await request.post('/api/controls/paper',{data:{enabled:previous}});
   expect(restored.ok()).toBeTruthy();
  }
+});
+
+test('portfolio keeps Korean and US ledgers distinct and exposes missing history',async({page,request})=>{
+ await page.goto('/#portfolio');
+ await page.getByRole('tab',{name:'미국주식 · USD',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'미국주식 · 달러 가상계좌',exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:'체결 원장',exact:true}).click();
+ await expect(page.getByText('미국주식 · 달러 가상계좌 체결 원장',{exact:true})).toBeVisible();
+ const usd=await (await request.get('/api/fills?currency=USD')).json();
+ expect(usd.fills.every((f:{currency:string})=>f.currency==='USD')).toBeTruthy();
+ if(usd.missing)await expect(page.getByText(/이전 체결 .*기존 공용 기록이 삭제/)).toBeVisible();
+ await page.getByRole('tab',{name:'국내주식 · KRW',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'국내주식 · 원화 가상계좌',exact:true})).toBeVisible();
+ await expect(page.getByText('국내주식 · 원화 가상계좌 체결 원장',{exact:true})).toBeVisible();
+ const krw=await (await request.get('/api/fills?currency=KRW')).json();
+ expect(krw.fills.every((f:{currency:string})=>f.currency==='KRW')).toBeTruthy();
+ if(krw.recorded>50){await expect(page.locator('tbody tr')).toHaveCount(50);await page.getByRole('button',{name:'이전 체결 더 보기'}).click();await expect(page.locator('tbody tr')).toHaveCount(100)}
+});
+
+test('position rows select the holding with keyboard',async({page})=>{
+ await page.goto('/#portfolio');await page.getByRole('tab',{name:'국내주식 · KRW',exact:true}).click();
+ const row=page.locator('tbody tr').first();await expect(row).toBeVisible();await row.focus();await page.keyboard.press('Enter');
+ await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(row).toBeFocused();
 });

@@ -309,6 +309,7 @@ class PaperAccount:
                     for key,fn in (("holding_seconds_min",min),("holding_seconds_max",max)):
                         statistics[key]=holding_seconds if statistics[key] is None else fn(statistics[key],holding_seconds)
         fill={"date": timestamp, "symbol": symbol,
+            "sequence":book['trade_count'],
             "currency": currency, "action": action, "quantity": quantity,
             "price": fill_price, "fee": fee, "sell_tax": tax,
             "realized_pnl": realized, "decision_id": decision_id,
@@ -435,7 +436,7 @@ class PaperAccount:
                 target_weight = min(current_weight, model_weight)
                 if model_weight >= current_weight:
                     target_weight = 0.0
-            target_quantity = max(0.0, equity * target_weight / price)
+            target_quantity = math.floor(max(0.0, equity * target_weight / price)+0.5)
             delta = target_quantity - current_quantity
             if delta > 0:
                 buys[currency].append((symbol, delta * price))
@@ -444,9 +445,7 @@ class PaperAccount:
                 buy_spreads[symbol]=max(0.0,float(panel.features[index,j,7]))/10_000.0
             elif delta < 0:
                 # Whole-share accounts cannot realize fractional target sizes.
-                target_whole_quantity=max(0,math.floor(target_quantity+0.5))
-                if action == 0 and current_quantity > 0:
-                    target_whole_quantity=min(target_whole_quantity,current_quantity-1)
+                target_whole_quantity=int(target_quantity)
                 self.state["pending"][symbol] = {"date": timestamp, "action": "SELL",
                                                   "budget": current_quantity-target_whole_quantity,
                                                   "decision_id": f"{timestamp}|{symbol}"}

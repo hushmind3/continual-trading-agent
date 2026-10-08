@@ -28,19 +28,12 @@ def main():
                PYTHONUTF8="1", HF_HUB_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1")
     work = [("chronos", "daily_excess"), ("timesfm", "daily_excess"),
             ("kronos", "bars"), ("exaone", "prices"), ("timemoe", "prices"),
-            ("toto", "daily_excess"), ("fincast", "prices"), ("marketgpt", "itch_probe")]
-    for regime in ("slope", "vol"):
-        for label in (1, 2, 3):
-            name = f"macrophft_{regime}_{label}"
-            data = json.loads((out / "policy_probe.json").read_text(encoding="utf-8"))
-            data["variant"] = f"{regime}/{label}"
-            (out / (name + ".input.json")).write_text(json.dumps(data), encoding="utf-8")
-            work.append((name, name + ".input"))
+            ("toto", "daily_excess"), ("fincast", "prices")]
     summary_path = out / "independent_summary.json"
     summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else []
     failures = []
     for name, input_name in work:
-        expert = "macrophft" if name.startswith("macrophft_") else name
+        expert = name
         if args.only and name not in args.only:
             continue
         python = root / ("venv-toto" if expert == "toto" else "venv") / "Scripts/python.exe"

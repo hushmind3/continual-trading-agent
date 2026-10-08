@@ -17,7 +17,6 @@ SPECS = [
     ("fincast", "FinCast 1.0B", "수치 시계열 · 분위수 예측", "FinCast", "FinCast-fts", "Apache-2.0"),
     ("exaone", "EXAONE Finance", "수치 시계열 · 장기 분위수 예측", "EXAONE-Forecast-for-Finance-1.0", "EXAONE-Forecast", "EXAONE research license"),
     ("kronos", "Kronos Base + Tokenizer", "OHLCV · 다음 봉 생성", "Kronos-base", "Kronos", "MIT"),
-    ("marketgpt", "MarketGPT", "ITCH 주문 메시지 토큰 예측", "MarketGPT-100m", "MarketGPT", "MIT"),
     ("chronos", "FinText Chronos Global", "일별 초과수익률 · 확률 예측", "Chronos_Small_2023_Global", "TSFM_Finance", "Apache-2.0"),
     ("timesfm", "FinText TimesFM Global", "일별 초과수익률 · 분위수 예측", "TimesFM_20M_2023_Global", "TSFM_Finance", "Apache-2.0"),
     ("timemoe", "Time-MoE Large", "수치 시계열 · sparse MoE 예측", "TimeMoE-200M", "Time-MoE", "Apache-2.0"),
@@ -36,9 +35,7 @@ def digest(path):
 def build(root):
     root = root.resolve()
     entries = []
-    specs = SPECS + [(f"macrophft_{r}_{n}", f"MacroHFT {r}/{n}",
-        "ETHUSDT · 현금/롱 Q 정책", None, "MacroHFT", "No LICENSE found")
-        for r in ("slope", "vol") for n in (1, 2, 3)]
+    specs = SPECS
     for key, name, role, folder, source, license_name in specs:
         profile = json.loads((root / "verification" / (key + ".json")).read_text(encoding="utf-8"))
         if not profile["frozen"] or not profile.get("native_output"):
@@ -59,15 +56,6 @@ def build(root):
                 if path.suffix in (".pth", ".pt", ".safetensors", ".bin", ".zip"):
                     files.append({"path":str(path.resolve()), "bytes":path.stat().st_size,
                         "sha256":actual, "archive":path.suffix == ".zip"})
-        if key == "marketgpt":
-            path = expert_weight_path(root / "checkpoints/MarketGPT-100m/ckpt_finetune_AAPL_v3.pt")
-            files.append({"path":str(path.resolve()), "bytes":path.stat().st_size,
-                "sha256":digest(path), "archive":False})
-        if not folder:
-            regime, label = key.removeprefix("macrophft_").split("_")
-            path = expert_weight_path(root / f"sources/MacroHFT/result/low_level/ETHUSDT/best_model/{regime}/{label}/best_model.pkl")
-            files.append({"path":str(path.resolve()), "bytes":path.stat().st_size,
-                "sha256":digest(path), "archive":False})
         source_meta = root / "sources" / source / "SOURCE_REVISION.json"
         if not source_meta.exists():
             matching = [json.loads(p.read_text(encoding="utf-8")) for p in root.glob("*.tree.json")]
@@ -78,8 +66,8 @@ def build(root):
         auxiliary = []
         if key == "timesfm":
             auxiliary.append(json.loads((root / "sources/TimesFM-legacy/SOURCE_REVISION.json").read_text(encoding="utf-8")))
-        entries.append({"id":key, "backend":"macrophft" if not folder else key,
-            "variant":f"{regime}/{label}" if not folder else None, "name":name, "role":role,
+        entries.append({"id":key, "backend":key,
+            "variant":None, "name":name, "role":role,
             "parameters":profile["parameters"], "weight_bytes":profile["parameter_bytes"],
             "dtype":"BF16" if profile["parameter_dtypes"] == ["torch.bfloat16"] else "FP32",
             "checkpoint_bytes":sum(f["bytes"] for f in files if not f["archive"]),
@@ -109,11 +97,9 @@ def report(catalog):
     rows += ["", f'합계: {sum(e["parameters"] for e in catalog["experts"]):,} parameters; 실질 가중치 {sum(e["weight_bytes"] for e in catalog["experts"])/2**30:.3f} GiB; 펼친 원본 checkpoint {sum(e["checkpoint_bytes"] for e in catalog["experts"])/2**30:.3f} GiB.',
         f'모델·zip·공식 source·격리 Python 환경 등을 포함한 artifact 디렉터리 파일 크기 합계: {catalog["artifact_directory_bytes"]/2**30:.3f} GiB (filesystem 압축/공유 블록 사용량과는 다릅니다).',
         "", "## 검사 범위와 제한", "",
-        "- MarketGPT는 실제 ITCH 체결 데이터가 없는 상태의 native vocabulary 합성 토큰 검사, MacroHFT는 합성 36+9 feature 검사입니다. 수익성 검증이 아닙니다.",
         "- 나머지는 원본 예제의 일별 초과수익률 또는 프로젝트의 실제 일봉 입력으로 형상·유한 출력·고정 가중치를 확인했습니다. 정확도 backtest가 아닙니다.",
         "- Kronos의 amount가 없는 입력은 missing 표시와 원본 허용 방식의 0값을 사용했습니다. 실제 매수금액이 관측되었다는 뜻이 아닙니다.",
         "- Kronos Base 실제 parameters 102,310,592 + tokenizer 3,958,042 = 106,268,634. Buffer/공유 tensor를 parameter에 중복 합산하지 않습니다.",
-        "- MarketGPT 원본 pt는 6,291,444,790 bytes. 5,159,780,352 bytes의 결정적 causal mask와 optimizer 등이 포함됩니다. 원본 파일은 보존하고 inference에서 mask만 재생성하여 learned parameter 94,292,736개를 사용합니다. 원본 zip 1,054,913,634 bytes는 별도 보존합니다.",
         "- Toto는 native network AST와 strict checkpoint load를 유지하고 Lightning을 불필요하게 가져오는 GluonTS bridge import/class만 실행에서 제외합니다. 원본 source/checkpoint 파일은 수정하지 않습니다.",
         "- Time-MoE의 이름 200M은 활성 parameters 규모입니다. 실제 총 parameters는 453,196,800개입니다. BF16 원본을 그대로 사용합니다.",
         "- Toto의 runtime buffer도 존재합니다. 실질 가중치 memory와 실제 VRAM peak를 구분합니다. RAM/VRAM peak는 입력 크기와 package 환경에 따라 달라집니다.",

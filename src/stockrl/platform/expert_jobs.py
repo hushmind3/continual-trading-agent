@@ -9,6 +9,7 @@ from ..paths import PROJECT_ROOT
 from ..state_io import atomic_json,read_json
 from .config import CONFIG_PATH
 from .worker_state import publish,stopped
+from .selection import selection,SlotDisabled
 
 
 def json_scalar(value):
@@ -43,6 +44,9 @@ def run_job(settings,key,batches,metrics,config=CONFIG_PATH):
                 cwd=PROJECT_ROOT,env=env,stdout=output,stderr=subprocess.STDOUT,
                 creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
             while child.poll() is None:
+                _,active=selection(settings,[key])
+                if key not in active:
+                    terminate(child);raise SlotDisabled('Expert 슬롯 제외')
                 if stopped(settings,'experts'):
                     terminate(child);raise InterruptedError('Expert 정지 요청')
                 if time.monotonic()-started>settings.resources.inference_timeout_seconds:

@@ -22,14 +22,14 @@ from stockrl.platform.environment import PortfolioEnvironment,market_view
 
 
 def spec():
-    return {"expert_ids":["chronos","macrophft_slope_1"],"config":{
-        "feature_sizes":{"chronos":4,"macrophft_slope_1":5},"stock_policy_ids":[]},"source_updates":9}
+    return {"expert_ids":["chronos","stock_test"],"config":{
+        "feature_sizes":{"chronos":4,"stock_test":5},"stock_policy_ids":["stock_test"]},"source_updates":9}
 
 
 def obs(n=2):
-    return observation({"chronos":np.ones((n,4),np.float32),"macrophft_slope_1":np.ones((n,5),np.float32)},
+    return observation({"chronos":np.ones((n,4),np.float32),"stock_test":np.ones((n,5),np.float32)},
                        np.ones((n,2),bool),np.zeros((n,16)),np.zeros((n,8)),
-                       {"macrophft_slope_1":np.array([[.1,.9]]*n,np.float32)})
+                       {"stock_test":np.array([[.1,.4,.5,.3]]*n,np.float32)})
 
 
 class MoEPolicyTests(unittest.TestCase):
@@ -71,8 +71,7 @@ class MoEPolicyTests(unittest.TestCase):
                 "layout":"symbol,horizon","horizon":1,"sampling_seconds":86400}
         _,mask,_=prepare_evidence({'chronos':[packet]},['A'],spec(),'2026-01-01')
         self.assertFalse(mask.any())
-        for key in ('marketgpt','macrophft_slope_1'):
-            with self.assertRaises(ValueError): native_input(key,pd.DataFrame(),pd.DataFrame(),'2026-01-01')
+        with self.assertRaises(ValueError): native_input('chronos',pd.DataFrame(),pd.DataFrame(),'2026-01-01')
 
     def test_resume_rejects_other_moe_assets_but_allows_machine_path_change(self):
         saved={"expert_ids":['chronos'],"config":{},"source_head_sha256":'one',"source_model_bytes":100,

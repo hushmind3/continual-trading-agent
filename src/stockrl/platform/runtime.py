@@ -17,6 +17,8 @@ from .journal import Journal
 from .checkpoint import Checkpoints
 from .resources import ResourceMonitor
 from .data_universe import prepare
+from .training_status import readiness
+from .library_operations import LibraryOperations
 
 MODULES={"experts":"stockrl.platform.expert_worker","agent":"stockrl.platform.agent_worker","learner":"stockrl.platform.learner"}
 
@@ -42,6 +44,7 @@ class Runtime:
         self.input_config=prepare(self.settings)
         self.lock=threading.RLock(); self.closing=threading.Event(); self.children={}; self.handles={}; self.retries={}
         self.controls=read_json(self.root/"control.json") or {"feed":False,"engine":False,"paper":False,"learning":True,"mode":"live"}
+        self.library=LibraryOperations(self)
         atomic_json(self.controls,self.root/"control.json")
         self.thread=threading.Thread(target=self._monitor,daemon=True,name="finrlx-supervisor"); self.thread.start()
 
@@ -117,7 +120,9 @@ class Runtime:
                     if attempt>=5 or time.time()<next_try:
                         continue
                     if role in self.children:
-                        self.journal.event("error",f"{role} 프로세스가 종료되었습니다. 재시도 {attempt+1}/5")
+                        intentional=read_json(self.root/'workers'/(role+'.json')).get('reason')=='configuration_changed'
+                        if not intentional:self.journal.event("error",f"{role} 프로세스가 종료되었습니다. 재시도 {attempt+1}/5")
+                        else:attempt=0
                     try:
                         self.spawn(role)
                         self.retries[role]=(attempt+1,time.time()+min(60,2**attempt))
@@ -125,10 +130,12 @@ class Runtime:
                         self.journal.event("error",f"{role} 시작 실패: {exc}")
                         self.retries[role]=(attempt+1,time.time()+min(60,2**attempt))
 
-    def command(self,name,enabled):
+    def command(self,name,enabled,internal=False):
         if name not in ("feed","engine","paper","learning"):
             raise ValueError("지원하지 않는 운영 명령입니다.")
         with self.lock:
+            if self.library.active and not internal and self.library.snapshot()['job'].get('kind') not in ('inspect','import','probe','compare'):
+                raise ValueError('Expert 구성을 변경 중입니다. 완료 후 조작하세요.')
             if name=="paper" and enabled and not self.controls.get("engine"):
                 raise ValueError("MoE 실행을 먼저 시작하세요.")
             self.controls[name]=bool(enabled)
@@ -150,17 +157,23 @@ class Runtime:
                            "requested":self.wanted(role),"retries":self.retries.get(role,(0,0))[0]}
         agent=workers["agent"]; expert=workers["experts"]; learner=workers["learner"]
         feed=read_json(self.root/"live"/"live_feed_metrics.json")
+        replay=self.journal.stats(agent.get("rollout_generation",agent.get("version",0)),self.settings.learning.max_policy_lag)
+        training=readiness(self.controls,workers,replay,self.settings.learning.batch_size)
+        if self.library.active and self.library.snapshot()['job'].get('kind') not in ('inspect','import','probe','compare'):
+            training.update(code='composition',label='Expert 구성 적용 중',detail=self.library.snapshot()['job'].get('detail','학습 상태를 이어받는 중'),action=None)
         return dict(architecture="finrlx-moe-ppo-v1",controls=self.controls.copy(),workers=workers,feed=feed,
                     agent=agent,experts=expert.get("experts",[]),learner=learner,
                     account=self.journal.get_state("account"),decisions=self.journal.get_state("decisions") or [],
-                    replay=self.journal.stats(agent.get("version",0),self.settings.learning.max_policy_lag),
+                    replay=replay,training=training,
                     resources=self.resources.snapshot(workers),events=self.journal.events(),provider=public_status(self.root),
                     revisions=self.checkpoints.revisions(),settings=self.settings.model_dump(),real_orders_enabled=False,
                     current_policy=read_json(self.checkpoints.root/'current.json'),
-                    time=time.time())
+                    library=self.library.snapshot(),time=time.time())
 
     def shutdown(self):
         self.closing.set(); self.thread.join(timeout=3)
+        if self.library.child and self.library.child.poll() is None:
+            terminate_tree(psutil.Process(self.library.child.pid))
         processes=[]
         for role in ("feed","experts","agent","learner"):
             process=self.process(role)

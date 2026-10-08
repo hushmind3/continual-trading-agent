@@ -8,9 +8,11 @@
 | `configs/operations.json` | 학습·위험·자원·모델·입력 설정 |
 | `configs/local/provider_settings.json` | 키움 환경과 공개 연결 상태 |
 | Windows 자격 증명 저장소 | App Key·Secret |
-| `Desktop/모델/champion.pt` | frozen Expert와 학습된 MoE 원본 |
+| `Desktop/모델/champion.pt` | 최신 Champion 학습 상태·슬롯 정의·고정 패키지 참조 |
+| `Desktop/모델/expert-packages` | 불변 frozen Expert 가중치·원본 정의·입력 계약 |
 | `runtime/finrlx/operations.sqlite3` | 통화별 계좌·체결 원장·미체결·경험·처리 여부·이벤트 |
-| `runtime/finrlx/policies` | 작은 학습 상태·optimizer·checksum·복원 버전 |
+| `runtime/finrlx/policies` | 학습 상태·optimizer·슬롯 선택·학습 세대·checksum·복원 버전 |
+| `runtime/finrlx/expert-library.json` | 패키지 목록·실제 추론 검사·현재 사용 슬롯 |
 | `runtime/finrlx/live` | 실시간 tick·완료 분봉·일봉 저장소 |
 | `runtime/finrlx/workers` | 프로세스 식별·heartbeat·실행 로그 |
 

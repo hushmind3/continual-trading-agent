@@ -12,6 +12,7 @@ import { useOperations } from "../data/Operations";
 import { ControlButton } from "../ui/ControlButton";
 import { Empty, Meter, Skeleton, Status } from "../ui/Primitives";
 import {accountNames,bytes,date,money,number,workerState} from "../ui/format";
+import {TrainingReadiness} from '../ui/TrainingReadiness';
 
 const steps = [
   { role: "feed", label: "시장 입력", icon: Radio, color: "text-blue-500" },
@@ -40,7 +41,7 @@ export function OperationsBoard() {
   if (!state) return <Skeleton />;
   const r = state.resources,
     agent = state.agent,
-    ready = state.experts.filter((e) => e.status === "ready").length;
+    ready = state.experts.filter((e) => e.enabled!==false&&e.status === "ready").length;
   const active = state.workers.experts.active_expert;
   const issues = Object.values(state.workers).filter(
     (w) => w.error && w.requested,
@@ -74,7 +75,7 @@ export function OperationsBoard() {
                 <div className="min-w-0">
                   <div className="text-sm font-semibold">{label}</div>
                   <div className="mt-2">
-                    <Status tone={status.tone}>{status.label}</Status>
+                    {role==='learner'?<TrainingReadiness compact/>:<Status tone={status.tone}>{status.label}</Status>}
                   </div>
                   <p className="mt-2 truncate text-xs text-slate-400">
                     {role === "feed"

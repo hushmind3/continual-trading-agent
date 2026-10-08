@@ -158,7 +158,7 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
     horizon = int(data.get("horizon", 1))
     if horizon < 1 or horizon > 128:
         raise ValueError("research horizon must be 1..128")
-    if expert not in ("kronos", "marketgpt", "macrophft"):
+    if expert != "kronos":
         if series.ndim != 2 or series.shape[1] < 32 or not np.isfinite(series).all():
             raise ValueError("native series must be finite [symbols,time] with >=32 observations")
     if expert in ("chronos", "timesfm") and data.get("units") != "daily_excess_return":
@@ -293,52 +293,6 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
             return np.asarray(outputs)
         layout = "symbol,horizon,OHLCV_amount"
         units = "native_OHLCV_amount"
-    elif expert == "marketgpt":
-        module = source_module("research_marketgpt", sources / "MarketGPT/equities/fast_model.py")
-        path = ckpt / "MarketGPT-100m/ckpt_finetune_AAPL_v3.pt"
-        saved = torch.load(expert_weight_path(path), map_location="cpu", weights_only=True, mmap=True)
-        args = dict(saved["model_args"])
-        tokens = np.asarray(data["itch_tokens"], dtype=np.int64)
-        if data.get("token_schema") != "MarketGPT_ITCH_Vocab_v3" or tokens.ndim != 2:
-            raise ValueError("MarketGPT requires authentic native encoded ITCH token batches")
-        if tokens.min() < 0 or tokens.max() >= args["vocab_size"]:
-            raise ValueError("MarketGPT token outside the native vocabulary")
-        args["max_seq_len"] = max(32, tokens.shape[1])
-        args["dropout"] = 0.0
-        model = module.Transformer(module.ModelArgs(**args))
-        # Original checkpoint includes >5GB repeated deterministic causal masks.
-        # Regenerate ONLY these buffers at the supplied context length; retain
-        # every learned parameter and the source artifact byte-for-byte.
-        state = {k: v for k,v in saved["model"].items() if not k.endswith(".attention.mask")}
-        loaded = model.load_state_dict(state, strict=False)
-        if loaded.unexpected_keys or any(not k.endswith(".attention.mask") for k in loaded.missing_keys):
-            raise ValueError(f"unexpected MarketGPT schema: {loaded}")
-        del saved, state
-        frozen(model)
-        def infer():
-            logits = model(torch.tensor(tokens, device=device)).float()
-            return logits.cpu().numpy()
-        layout = "batch,last_token,vocabulary"
-        units = "next_message_token_logits"
-        extra["input_authenticity"] = data.get("input_authenticity", "caller_asserted")
-    elif expert == "macrophft":
-        directory = sources / "MacroHFT"
-        module = source_module("research_macrophft", directory / "model/net.py")
-        variant = data.get("variant", "slope/1")
-        if variant not in [f"{regime}/{label}" for regime in ("slope","vol") for label in (1,2,3)]:
-            raise ValueError("unknown MacroHFT sub-agent")
-        model = module.subagent(36, 9, 2, 64)
-        model.load_state_dict(torch.load(expert_weight_path(directory / f"result/low_level/ETHUSDT/best_model/{variant}/best_model.pkl"),
-                                       map_location="cpu", weights_only=True), strict=True)
-        frozen(model)
-        def infer():
-            return model(torch.tensor(data["single_state"], device=device, dtype=torch.float32),
-                         torch.tensor(data["trend_state"], device=device, dtype=torch.float32),
-                         torch.tensor(data["previous_action"], device=device, dtype=torch.long)).float().cpu().numpy()
-        layout = "batch,Q_flat_long"
-        units = "native_ETHUSDT_policy_Q"
-        extra["variant"] = variant
-        extra["input_authenticity"] = data.get("input_authenticity", "caller_asserted")
     else:
         raise ValueError(f"no verified pretrained backend: {expert}")
 

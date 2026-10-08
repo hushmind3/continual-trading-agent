@@ -77,8 +77,6 @@ EXPERTS = (
     ExpertSpec("timesfm", "daily_excess_return", 79_237_216, 0),
     ExpertSpec("kronos", "OHLCV", 425_074_536, 1),
     ExpertSpec("toto", "multivariate", 1_250_738_432, 2),
-    ExpertSpec("macrophft", "native_ETH_policy", 182_028, 3),
-    ExpertSpec("marketgpt", "ITCH", 377_170_944, 4),
     ExpertSpec("exaone", "numeric_series", 809_278_080, 5),
     ExpertSpec("chronos", "daily_excess_return", 184_616_960, 6),
     ExpertSpec("timemoe", "numeric_series", 906_393_600, 7),

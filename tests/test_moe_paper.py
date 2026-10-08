@@ -1,7 +1,6 @@
 import tempfile
 import unittest
 import json
-import runpy
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -40,18 +39,15 @@ class PaperBridgeTests(unittest.TestCase):
         self.assertFalse(self.bridge.paper_account.state["pending"])
         self.assertEqual(self.bridge.paper_account.state["books"]["USD"]["cash"],10000)
 
-    def test_named_moe_reads_independent_operator_flags(self):
-        modes=runpy.run_path(str(Path(__file__).resolve().parents[1]/"scripts/run_native_vertical_trading.py"))["runtime_modes"]
-        state=Path(self.temp.name)/"champion_moe"
-        self.assertFalse(any(modes(state).values()))
-        for observe in (False,True):
-            for paper in (False,True):
-                for learning in (False,True):
-                    expected=dict(observe_enabled=observe,paper_enabled=paper,learning_enabled=learning)
-                    (state.parent/"autonomy.json").write_text(json.dumps(expected))
-                    self.assertEqual(modes(state),expected)
-        # The standalone MoE screen remains independent of the legacy controls.
-        self.assertTrue(all(modes(Path(self.temp.name)/"native_vertical_run").values()))
+    def test_current_worker_reads_independent_operator_flags(self):
+        from stockrl.platform.worker_state import control
+        settings=SimpleNamespace(state_dir=Path(self.temp.name))
+        self.assertEqual(control(settings),{'paper':False,'learning':True})
+        for paper in (False,True):
+            for learning in (False,True):
+                expected=dict(feed=True,engine=True,paper=paper,learning=learning,mode='live')
+                (settings.state_dir/'control.json').write_text(json.dumps(expected))
+                self.assertEqual(control(settings),expected)
 
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.bridge=TradingMoEPaper(Path(self.temp.name));self.panel=panel()

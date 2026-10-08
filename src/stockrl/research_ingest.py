@@ -27,44 +27,6 @@ class TeacherRecord:
     behavior: str
 
 
-class MacroHFTSubagent(nn.Module):
-    """Exact small Q-subagent architecture used by the public MacroHFT weights."""
-    def __init__(self, state_dim_1: int = 36, state_dim_2: int = 9,
-                 action_dim: int = 2, hidden_dim: int = 64):
-        super().__init__()
-        self.fc1 = nn.Linear(state_dim_1, hidden_dim)
-        self.fc2 = nn.Linear(state_dim_2, hidden_dim)
-        self.norm = nn.LayerNorm(hidden_dim, elementwise_affine=False, eps=1e-6)
-        self.embedding = nn.Embedding(action_dim, hidden_dim)
-        self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_dim, 2*hidden_dim))
-        self.advantage = nn.Sequential(nn.Linear(hidden_dim, hidden_dim*4),
-                                       nn.GELU(approximate="tanh"), nn.Linear(hidden_dim*4, action_dim))
-        self.value = nn.Sequential(nn.Linear(hidden_dim, hidden_dim*4),
-                                   nn.GELU(approximate="tanh"), nn.Linear(hidden_dim*4, 1))
-        self.register_buffer("max_punish", torch.tensor(1e12))
-
-    def forward(self, single_state: torch.Tensor, trend_state: torch.Tensor,
-                previous_action: torch.Tensor) -> torch.Tensor:
-        c = self.embedding(previous_action) + self.fc2(trend_state)
-        shift, scale = self.adaLN_modulation(c).chunk(2, dim=-1)
-        x = self.norm(self.fc1(single_state)) * (1 + scale) + shift
-        advantage = self.advantage(x)
-        return self.value(x) + advantage - advantage.mean(dim=-1, keepdim=True)
-
-
-def macrophft_features(frame: pd.DataFrame, feature_dir: str | Path) -> tuple[np.ndarray, np.ndarray]:
-    """Read MacroHFT's native ETHUSDT feature names in the checkpoint's order."""
-    feature_dir = Path(feature_dir)
-    single = np.load(feature_dir / "single_features.npy", allow_pickle=False).tolist()
-    trend = np.load(feature_dir / "trend_features.npy", allow_pickle=False).tolist()
-    missing = sorted(set(single + trend) - set(frame.columns))
-    if missing:
-        raise ValueError(f"MacroHFT frame missing checkpoint inputs: {missing}")
-    x1 = frame[single].to_numpy(dtype=np.float32)
-    x2 = frame[trend].to_numpy(dtype=np.float32)
-    return np.nan_to_num(x1), np.nan_to_num(x2)
-
-
 def _clip(x: float, scale: float = 1.0) -> float:
     if not np.isfinite(x):
         return 0.0

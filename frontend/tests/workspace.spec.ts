@@ -87,8 +87,10 @@ test('portfolio keeps Korean and US ledgers distinct and exposes missing history
  if(krw.recorded>50){await expect(page.locator('tbody tr')).toHaveCount(50);await page.getByRole('button',{name:'이전 체결 더 보기'}).click();await expect(page.locator('tbody tr')).toHaveCount(100)}
 });
 
-test('position rows select the holding with keyboard',async({page})=>{
+test('positions show an empty account or select a holding with keyboard',async({page})=>{
  await page.goto('/#portfolio');await page.getByRole('tab',{name:'국내주식 · KRW',exact:true}).click();
+ const state=await (await page.request.get('/api/state')).json();
+ if(!state.account?.books.KRW.positions.length){await expect(page.getByText('이 계좌의 보유 종목이 없습니다.',{exact:true})).toBeVisible();return}
  const row=page.locator('tbody tr').first();await expect(row).toBeVisible();await row.focus();await page.keyboard.press('Enter');
  await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(row).toBeFocused();
 });

@@ -16,7 +16,7 @@ from stockrl.moe_paper import TradingMoEPaper
 
 
 RUNNER = """def run_native(expert, root, data, device='cpu'):
-    models = [subagent()]
+    models = [EXAONEFinance()]
     loaded_seconds = 0.0
     return models[0](data)
 """
@@ -40,8 +40,8 @@ class NativePreparationTests(unittest.TestCase):
 
     def test_compiled_code_reused_without_reusing_model_or_input(self):
         with patch.object(moe_native.ast, 'parse', wraps=moe_native.ast.parse) as parse:
-            first = moe_native.native_call('macro', '.', 2, modules=[Shift(3)], runner_source=RUNNER)
-            second = moe_native.native_call('macro', '.', 4, modules=[Shift(7)], runner_source=RUNNER)
+            first = moe_native.native_call('exaone', '.', 2, modules=[Shift(3)], runner_source=RUNNER)
+            second = moe_native.native_call('exaone', '.', 4, modules=[Shift(7)], runner_source=RUNNER)
             self.assertEqual((first, second), (5, 11))
             self.assertEqual(parse.call_count, 1)
         self.assertEqual(moe_native._compiled_runner.cache_info().hits, 1)
@@ -49,10 +49,10 @@ class NativePreparationTests(unittest.TestCase):
     def test_load_only_and_runner_revisions_keep_separate_bindings(self):
         model = Shift(3)
         with patch.object(torch, 'load', side_effect=AssertionError('must not reopen weights')):
-            self.assertIs(moe_native.native_call('macro', '.', 2, modules=[model],
+            self.assertIs(moe_native.native_call('exaone', '.', 2, modules=[model],
                 load_only=True, runner_source=RUNNER)[0], model)
             changed = RUNNER.replace('return models[0](data)', 'return 2 * models[0](data)')
-            self.assertEqual(moe_native.native_call('macro', '.', 2, modules=[model], runner_source=changed), 10)
+            self.assertEqual(moe_native.native_call('exaone', '.', 2, modules=[model], runner_source=changed), 10)
         self.assertEqual(moe_native._compiled_runner.cache_info().misses, 2)
 
     def test_compiled_cache_has_a_fixed_bound(self):

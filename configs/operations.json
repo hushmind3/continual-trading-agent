@@ -2,7 +2,20 @@
   "runtime": "runtime/finrlx",
   "instruments": "configs/live_symbols_korea.json",
   "expert_checkpoint": "~/Desktop/모델/champion.pt",
-  "enabled_experts": [],
+  "enabled_experts": [
+    "chronos",
+    "exaone",
+    "fincast",
+    "kronos",
+    "stock_adilbai",
+    "stock_finrl_a2c",
+    "stock_finrl_ppo",
+    "stock_finrl_sac",
+    "stock_msft_ppo",
+    "timemoe",
+    "timesfm",
+    "toto"
+  ],
   "learning": {
     "batch_size": 32,
     "epochs": 4,
@@ -19,7 +32,9 @@
     "vram_reserve_gib": 1.5,
     "expert_cache_count": 3,
     "isolated_expert_parameters": 10000000,
-    "expert_devices": {"fincast": "cpu"},
+    "expert_devices": {
+      "fincast": "cpu"
+    },
     "market_refresh_seconds": 300,
     "inference_timeout_seconds": 180,
     "journal_limit_mib": 512,

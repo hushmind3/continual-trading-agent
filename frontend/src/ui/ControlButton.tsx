@@ -29,7 +29,7 @@ export function ControlButton({
       <Button
         tone={requested ? "neutral" : "primary"}
         busy={pending.has(name)}
-        disabled={!state || Boolean(serverError)}
+        disabled={!state || Boolean(serverError) || Boolean(state.library?.job.busy&&['prepare','apply','delete'].includes(state.library.job.kind??''))}
         onClick={() => void click()}
         className={compact ? "px-3 py-2" : ""}
       >

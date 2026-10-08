@@ -6,7 +6,6 @@ from ..state_io import atomic_json,read_json
 from .assets import ExpertPool,guard_model_assets
 from .config import load_settings
 from .worker_state import stopped
-from .observations import MissingInputConnection
 
 
 def run(config,request_path):
@@ -28,7 +27,7 @@ def run(config,request_path):
         pool.metrics[key]['weight_files']=sorted(weight_reads)
         atomic_json(dict(packets=packets,metrics=pool.metrics[key]),result)
     except Exception as exc:
-        status='waiting_resources' if isinstance(exc,MemoryError) else 'connection_required' if isinstance(exc,MissingInputConnection) else 'needs_input' if isinstance(exc,ValueError) else 'error'
+        status='waiting_resources' if isinstance(exc,MemoryError) else 'needs_input' if isinstance(exc,ValueError) else 'error'
         atomic_json(dict(error=f'{type(exc).__name__}: {exc}',status=status),result)
         raise
     finally:

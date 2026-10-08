@@ -5,10 +5,6 @@ import numpy as np
 import pandas as pd
 
 
-class MissingInputConnection(ValueError):
-    """No producer is configured for a required live native input."""
-
-
 def daily_history(path: Path, as_of):
     if not path.is_file():
         return pd.DataFrame()
@@ -21,10 +17,6 @@ def daily_history(path: Path, as_of):
 
 
 def native_input(key, frame, daily, as_of, max_batch=8):
-    if key.startswith("macrophft"):
-        raise MissingInputConnection("ETH 체결·호가의 원본 전처리 연결이 필요합니다.")
-    if key == "marketgpt":
-        raise MissingInputConnection("NASDAQ 주문 메시지 데이터 공급자 연결이 필요합니다.")
     source = frame
     units, seconds = "price", 60
     if key in ("timesfm", "chronos"):
@@ -74,8 +66,7 @@ def prepare_evidence(packets, symbols, spec, as_of, ttl=300):
     tokens={key:np.zeros((len(symbols),size),np.float32) for key,size in config["feature_sizes"].items()}
     mask=np.zeros((len(symbols),len(expert_ids)),bool)
     stock_ids=config.get("stock_policy_ids",[])
-    policy_ids=sorted(k for k in expert_ids if k.startswith("macrophft_"))+stock_ids
-    policy_q={key:np.zeros((len(symbols),4 if key in stock_ids else 2),np.float32) for key in policy_ids}
+    policy_q={key:np.zeros((len(symbols),4),np.float32) for key in stock_ids}
     for key, batches in packets.items():
         if key not in expert_ids:
             continue
@@ -108,7 +99,5 @@ def prepare_evidence(packets, symbols, spec, as_of, ttl=300):
                 if key in stock_ids:
                     item=packet["common_output"][row]
                     policy_q[key][n]=[float(item[k]) for k in ("sell_score","hold_score","buy_score","target_weight")]
-                elif key in policy_q:
-                    policy_q[key][n]=values
                 mask[n,e] = True
     return tokens,mask,policy_q

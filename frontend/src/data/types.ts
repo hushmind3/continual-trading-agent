@@ -139,12 +139,14 @@ export interface Event {
   read: boolean;
 }
 export interface Snapshot {
+  library?:import('./library').LibraryState;
   architecture: string;
   time: number;
   controls: Record<Control, boolean> & { mode: string };
   workers: Record<string, Worker>;
   agent: Worker;
   learner: Worker;
+  training?: {code:string;label:string;detail:string;ready:number;required:number;remaining:number;pending:number;action:Control|null};
   experts: Expert[];
   account: {
     books: Record<Currency, Book>;

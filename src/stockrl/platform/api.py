@@ -137,6 +137,15 @@ def make_app(runtime=None,config=CONFIG_PATH):
             values=catalog.get("experts",[])
         return {"experts":values,"selected":runtime.settings.enabled_experts,"model":runtime.settings.expert_checkpoint}
 
+    @app.get('/api/library')
+    def library(request:Request):
+        return rt(request).library.snapshot()
+
+    @app.post('/api/library/{kind}')
+    def library_operation(kind:str,payload:dict,request:Request):
+        try:return rt(request).library.start(kind,payload)
+        except ValueError as exc:raise HTTPException(409,str(exc)) from exc
+
     @app.get("/api/experts/{key}")
     def expert(key:str,request:Request):
         packets=rt(request).journal.evidence().get(key)
@@ -145,6 +154,10 @@ def make_app(runtime=None,config=CONFIG_PATH):
     @app.post("/api/settings")
     def save_settings(settings:Settings,request:Request):
         runtime=rt(request)
+        if runtime.library.active:raise HTTPException(409,'Expert 작업이 완료된 뒤 운영 설정을 변경하세요.')
+        library=read_json(runtime.root/'expert-library.json')
+        if library and settings.enabled_experts!=library.get('active',[]):
+            raise HTTPException(409,'Expert 선택은 MoE 슬롯 관리에서 적용하세요. 추론 검사와 체크포인트를 함께 처리합니다.')
         if runtime.controls["engine"] or any(runtime.process(k) for k in ("agent","learner","experts")):
             raise HTTPException(409,"MoE를 정지한 뒤 설정을 적용하세요.")
         if settings.state_dir!=runtime.root:
@@ -162,7 +175,18 @@ def make_app(runtime=None,config=CONFIG_PATH):
             raise HTTPException(409,"MoE와 학습을 정지한 뒤 복원하세요.")
         try:
             result=runtime.checkpoints.rollback(str(payload.get("file","")))
-            runtime.journal.event("warning",f"정책 버전 {result['version']}으로 복원했습니다.")
+            saved,_=runtime.checkpoints.load(recover=False)
+            library=read_json(runtime.root/'expert-library.json')
+            if library:
+                active=saved['model_spec'].get('active_experts',saved['expert_ids'])
+                library.update(active=active,selection_revision=library.get('selection_revision',0)+1)
+                atomic_json(library,runtime.root/'expert-library.json')
+                runtime.settings.enabled_experts=active;atomic_json(runtime.settings.model_dump(),runtime.config)
+            with runtime.journal.transaction():
+                runtime.journal.db.execute('UPDATE transitions SET learned=-1 WHERE learned IS NULL')
+                runtime.journal.db.execute('DELETE FROM pending')
+                account=runtime.journal.get_state('account')
+                if account:account['pending']={};runtime.journal.set_state('account',account)
             return result
         except ValueError as exc:
             raise HTTPException(400,str(exc)) from exc

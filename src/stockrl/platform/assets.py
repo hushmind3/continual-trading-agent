@@ -14,38 +14,53 @@ import sys
 
 from ..moe_native import NativeExpert, native_call
 from ..moe_stock_policies import StockPolicyExpert
-from .observations import MissingInputConnection
+from .expert_packages import HEADER_FORMAT,load_package,package_path
 
 
-def guard_model_assets(path):
+def guard_model_assets(path,extra_references=()):
     bank=Path(path).resolve();reads=set()
+    saved=torch.load(bank,map_location='cpu',weights_only=True,mmap=True) if bank.is_file() else {}
+    allowed={bank}
+    if saved.get('format')==HEADER_FORMAT:
+        allowed.update(package_path(bank,r) for r in saved['expert_packages'].values())
+    allowed.update(package_path(bank,r) for r in extra_references)
+    del saved
     def audit(event,args):
         if event!='open' or not args or not isinstance(args[0],str):return
         candidate=Path(args[0])
         weight=candidate.suffix in ('.pt','.pth','.ckpt','.safetensors') or candidate.name=='pytorch_model.bin'
         if not weight:return
         candidate=candidate.resolve()
-        if candidate!=bank:
-            raise RuntimeError('champion.pt 외부의 모델 가중치를 읽으려 했습니다. 원본을 포함해 다시 패키징해야 합니다: '+str(candidate))
+        if candidate not in allowed:
+            raise RuntimeError('MoE에 등록되지 않은 가중치를 읽으려 했습니다: '+str(candidate))
         reads.add(str(candidate))
     sys.addaudithook(audit)
     return reads
 
 
 class ExpertPool:
-    def __init__(self, settings):
+    def __init__(self, settings, extra_packages=None):
         self.settings = settings
         path = settings.resolve(settings.expert_checkpoint)
+        self.path=path
         self.saved = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
-        if self.saved.get("format") != "registered_vertical_trading_moe_v1":
+        if self.saved.get('format')==HEADER_FORMAT:
+            self.saved=torch.load(path,map_location='cpu',weights_only=True)
+        if self.saved.get("format") not in ("registered_vertical_trading_moe_v1",HEADER_FORMAT):
             raise ValueError("Expert 자산 패키지 형식을 확인하세요.")
         self.entries = self.saved["expert_mapping"]
+        for key,reference in (extra_packages or {}).items():
+            package=load_package(path,reference,verify=True)
+            self.entries[key]=package['entry'];self.saved['expert_packages'][key]=reference
+            self.saved['config']['feature_sizes'][key]=package['feature_size']
+            self.saved['config']['native_module_counts'][key]=package['module_count']
+        self.active=set(self.saved.get('active_experts',settings.enabled_experts or self.entries))
         missing=[]
         for key in self.entries:
             count=self.saved['config']['native_module_counts'].get(key,0)
             if not count:missing.append(key)
             for index in range(count):
-                if not any(name.startswith(f'experts.{key}.models.{index}.') for name in self.saved['state_dict']):
+                if self.saved['format']!=HEADER_FORMAT and not any(name.startswith(f'experts.{key}.models.{index}.') for name in self.saved['state_dict']):
                     missing.append(f'{key}/{index}')
         if missing:
             raise RuntimeError('champion.pt에 Expert 가중치가 누락됐습니다. 원본으로 다시 패키징해야 합니다: '+', '.join(missing))
@@ -59,6 +74,7 @@ class ExpertPool:
                     raise ValueError("Expert 정의 파일이 지나치게 큽니다.")
             archive.extractall(self.root)
         self.loaded = OrderedDict()
+        self.roots={key:self.root for key in self.entries}
         self.metrics = {}
         self.process = psutil.Process()
         self.ids = sorted(self.entries)
@@ -69,9 +85,9 @@ class ExpertPool:
                 "source_updates":int(self.saved.get("optimizer_updates",0))}
 
     def catalog(self):
-        return [dict(id=key, name=e.get("name", key), role="action" if e.get("stock_policy") or key.startswith("macrophft") else "market",
+        return [dict(id=key, name=e.get("name", key), role="action" if e.get("stock_policy") else "market",
                      frozen=True, parameters=e.get("parameters"), symbols=e.get("stock_policy", {}).get("universe"),
-                     enabled=not self.settings.enabled_experts or key in self.settings.enabled_experts,
+                     enabled=key in self.active,
                      **{**self.metrics.get(key,{}),'loaded':key in self.loaded}) for key,e in sorted(self.entries.items())]
 
     def get(self, key):
@@ -91,14 +107,28 @@ class ExpertPool:
         rss_before=self.process.memory_info().rss
         prefix = f"experts.{key}.models."
         count = self.saved["config"]["native_module_counts"][key]
-        states = [{k.removeprefix(prefix+str(i)+"."):v for k,v in self.saved["state_dict"].items()
+        metadata=self.saved['metadata']
+        if self.saved['format']==HEADER_FORMAT:
+            package=load_package(self.path,self.saved['expert_packages'][key])
+            if package['id']!=key or package['module_count']!=count:raise ValueError('Expert 패키지 구성이 다릅니다.')
+            weights=package['state_dict'];prefix='models.';metadata=package['metadata']
+            self.roots[key]=self.root/key
+            with zipfile.ZipFile(io.BytesIO(metadata['architecture_sources'])) as archive:
+                for item in archive.infolist():
+                    if not (self.roots[key]/item.filename).resolve().is_relative_to(self.roots[key].resolve()):
+                        raise ValueError('잘못된 Expert 정의 경로')
+                    if item.file_size>20*1024*1024:raise ValueError('지나치게 큰 Expert 정의')
+                archive.extractall(self.roots[key])
+        else:weights=self.saved['state_dict']
+        states = [{k.removeprefix(prefix+str(i)+"."):v for k,v in weights.items()
                    if k.startswith(prefix+str(i)+".")} for i in range(count)]
         if entry.get("stock_policy"):
             expert = StockPolicyExpert.restore(entry, states[0])
         else:
             def construct():
-                return native_call(entry['backend'],self.root,self.saved['metadata']['construction_inputs'][key],
-                                   states=states,load_only=True,runner_source=self.saved['metadata']['native_runner_source'])
+                data=metadata.get('construction_input') if self.saved['format']==HEADER_FORMAT else metadata['construction_inputs'][key]
+                return native_call(entry['backend'],self.roots[key],data,
+                                   states=states,load_only=True,runner_source=metadata['native_runner_source'])
             try:
                 with torch.device('meta'):
                     modules=construct()
@@ -106,7 +136,7 @@ class ExpertPool:
                     raise NotImplementedError('Native architecture has nonpersistent meta buffers')
             except NotImplementedError:
                 gc.collect();modules=construct()
-            expert = NativeExpert(modules, entry)
+            expert = NativeExpert(modules, entry,metadata['native_runner_source'])
         expert.requires_grad_(False).eval()
         self.loaded[key] = expert
         self.metrics.setdefault(key, {}).update(load_seconds=time.perf_counter()-started,loaded=True,
@@ -115,8 +145,6 @@ class ExpertPool:
 
     def run(self, key, data, snapshot):
         started = time.perf_counter()
-        if self.entries[key].get('stock_policy',{}).get('kind')=='dapo' and not all(k in (snapshot.get('stock_policy_history') or [{}])[0] for k in ('llm_sentiment','llm_risk')):
-            raise MissingInputConnection('뉴스 감성·위험 분석 결과를 제공하는 서버 연결이 필요합니다.')
         expert = self.get(key)
         if self.entries[key].get("stock_policy"):
             data = expert.prepare_input(snapshot)
@@ -128,7 +156,7 @@ class ExpertPool:
         device = "cpu"
         preference=self.settings.resources.expert_devices.get(key,'auto')
         large=int(self.entries[key].get('parameters',0))>=self.settings.resources.isolated_expert_parameters
-        if preference!='cpu' and large and torch.cuda.is_available():
+        if preference!='cpu' and (large or preference=='cuda:0') and torch.cuda.is_available():
             free, total = torch.cuda.mem_get_info()
             weight_bytes=sum(p.numel()*p.element_size() for p in expert.parameters())
             required = max(prior_peak*1.1,weight_bytes*1.05) if prior_peak else weight_bytes*1.35
@@ -136,7 +164,10 @@ class ExpertPool:
                 device = "cuda:0"
                 torch.cuda.reset_peak_memory_stats()
         with torch.inference_mode():
-            packet = expert(self.root, data, device)
+            floating=next((p.dtype for p in expert.parameters() if p.is_floating_point()),torch.float32)
+            reduced=floating in (torch.float16,torch.bfloat16)
+            with torch.autocast('cuda' if device.startswith('cuda') else 'cpu',dtype=floating if reduced else torch.bfloat16,enabled=reduced):
+                packet = expert(self.roots[key], data, device)
         if any(p.requires_grad or p.grad is not None for p in expert.parameters()):
             raise RuntimeError("Expert가 고정 가중치 상태를 벗어났습니다.")
         packet["expert"] = key

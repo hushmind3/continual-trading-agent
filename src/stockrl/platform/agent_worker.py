@@ -10,7 +10,8 @@ from .config import load_settings, CONFIG_PATH
 from .journal import Journal
 from .checkpoint import Checkpoints
 from .model_asset import load_moe_head,validate_source
-from .policy import build_policy,migrate_policy
+from .policy import build_policy,migrate_policy,activate_policy,parameters
+from .selection import selection
 from .weights import PortfolioStrategy
 from .environment import PortfolioEnvironment,market_view
 from .worker_state import publish,stopped,control
@@ -22,9 +23,22 @@ def run(settings):
     checkpoints=Checkpoints(settings.state_dir/"policies",settings.resources.revisions)
     state,manifest=checkpoints.load()
     source_spec,original=load_moe_head(settings.resolve(settings.expert_checkpoint))
+    if state is None and source_spec.get('source_format')=='registered_vertical_trading_moe_v2':
+        header=torch.load(settings.resolve(settings.expert_checkpoint),map_location='cpu',weights_only=True)
+        recovered=header.get('learned_policy')
+        if recovered:
+            recovered['model_spec']['source_model']=str(settings.resolve(settings.expert_checkpoint))
+            actor,critic=build_policy(recovered['model_spec']);actor.load_state_dict(recovered['actor']);critic.load_state_dict(recovered['critic'])
+            optimizer=torch.optim.AdamW(parameters(actor,critic),lr=settings.learning.learning_rate)
+            if recovered.get('optimizer'):optimizer.load_state_dict(recovered['optimizer'])
+            manifest=checkpoints.save(actor,critic,optimizer,recovered['version'],recovered['expert_ids'],
+                optimizer_steps=recovered.get('optimizer_steps',0),optimization_generation=recovered.get('optimization_generation',recovered['version']))
+            state=recovered
+        del header
     if state:
         validate_source(state["model_spec"],source_spec)
         spec=state["model_spec"]
+        spec['source_model']=str(settings.resolve(settings.expert_checkpoint))
         if spec.get('policy_family')!='sparse-normal-v2':
             actor,critic,optimizer=migrate_policy(state,settings.learning)
             manifest=checkpoints.save(actor,critic,optimizer,state['version']+1,state['expert_ids'],
@@ -38,9 +52,11 @@ def run(settings):
         spec=source_spec
         actor,critic=build_policy(spec,original)
         manifest=checkpoints.save(actor,critic,None,0,spec["expert_ids"])
-    actor.eval(); critic.eval()
+    selected_revision,selected=selection(settings,spec.get('active_experts',spec['expert_ids']))
+    activate_policy(actor,critic,selected);actor.eval(); critic.eval()
     del original
     version=manifest["version"]
+    generation=state.get('optimization_generation',version) if state else version
     environment=PortfolioEnvironment(settings,journal,spec)
     contract='sparse-separate-currency-portfolio-v4'
     if journal.get_state('execution_contract')!=contract:
@@ -58,8 +74,14 @@ def run(settings):
     latest=list(decisions.values());last_decision=None
     try:
         publish(settings,"agent",status="ready",version=version,source_updates=spec["source_updates"],
-                expert_count=len(spec["expert_ids"]),model=spec["source_model"],message="Champion MoE 학습 상태를 이어받았습니다.")
+                expert_count=len(selected),model=spec["source_model"],message="Champion MoE 학습 상태를 이어받았습니다.")
         while not stopped(settings,"agent"):
+            revision,active=selection(settings,spec.get('active_experts',spec['expert_ids']))
+            if revision!=selected_revision:
+                activate_policy(actor,critic,active)
+                decisions.clear();latest=[];last_decision=None;journal.set_state('decisions',[])
+                selected_revision=revision
+            publish(settings,'agent',selection_revision=selected_revision,rollout_generation=generation)
             current=read_json(checkpoints.root/"current.json")
             if current and current.get("file")!=manifest.get("file"):
                 new,record=checkpoints.load()
@@ -73,7 +95,7 @@ def run(settings):
                     manifest=record;version=record['version']
                     continue
                 actor.load_state_dict(new["actor"]); critic.load_state_dict(new["critic"])
-                manifest=record; version=record["version"]
+                manifest=record; version=record["version"];generation=new.get('optimization_generation',version)
             modes=control(settings)
             if not reader.path.exists():
                 publish(settings,"agent",status="waiting",version=version,message="시세 입력 대기")
@@ -90,7 +112,7 @@ def run(settings):
             else:
                 indices=[i for i,stamp in enumerate(view.dates) if last is None or stamp>np.datetime64(last)]
             started_live=True
-            packets=journal.evidence()
+            packets={k:v for k,v in journal.evidence().items() if k in active}
             for index in indices:
                 started=time.perf_counter(); stamp=str(view.dates[index])
                 made_decision=False
@@ -100,12 +122,12 @@ def run(settings):
                         data=environment.observe(view,frame,index,currency,packets)
                         if data is None:
                             continue
-                        environment.settle(data,version)
+                        environment.settle(data,generation)
                         if not data["coverage"]:
                             continue
                         data["explore"]=bool(modes.get("paper"))
                         result=strategy.generate_weights(data,target_date=stamp)
-                        orders=environment.submit(result,data,view,index,version,bool(modes.get("paper")))
+                        orders=environment.submit(result,data,view,index,generation,bool(modes.get("paper")))
                         targets=result.weights.weight.to_numpy(float)
                         journal.record_weights(currency,stamp,dict(zip(data["symbols"],targets.tolist())))
                         new_decisions=[dict(symbol=s,currency=currency,target_weight=float(target),current_weight=float(current),
@@ -124,7 +146,7 @@ def run(settings):
                 atomic_json({'last_timestamp':stamp},reader.path.parent/'agent'/'live_cursor.json')
                 publish(settings,"agent",status="running" if made_decision else 'waiting',version=version,last_as_of=last_decision,market_cursor=stamp,
                         fills=fills[-20:],decision_seconds=time.perf_counter()-started,
-                        checkpoint=manifest,source_updates=spec["source_updates"],expert_count=len(spec["expert_ids"]))
+                        checkpoint=manifest,source_updates=spec["source_updates"],expert_count=len(active))
             publish(settings,"agent",status="running" if latest else "waiting",version=version,last_as_of=last_decision,market_cursor=last,
                     message="새로운 완료 시세 대기" if not indices else None)
             time.sleep(0.5)

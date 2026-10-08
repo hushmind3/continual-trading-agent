@@ -16,10 +16,11 @@ from . import expert_backends
 
 
 class NativeExpert(nn.Module):
-    def __init__(self, models, entry):
+    def __init__(self, models, entry, runner_source=None):
         super().__init__()
         self.models = nn.ModuleList(models)
         self.entry = entry
+        self.runner_source=runner_source
         self.requires_grad_(False).eval()
 
     def forward_tensors(self,*args,module_index=0,**kwargs):
@@ -38,7 +39,7 @@ class NativeExpert(nn.Module):
         cpu_buffers=[(module,name,value) for module in self.modules() for name,value in module._buffers.items() if value is not None] if frozen else []
         try:
             return native_call(self.entry["backend"], root, data, device,
-                               modules=list(self.models))
+                               modules=list(self.models),runner_source=self.runner_source)
         finally:
             if frozen:
                 for parameter,value in cpu_parameters:parameter.data=value
@@ -52,7 +53,7 @@ def _compiled_runner(runner):
     source = runner if isinstance(runner, str) else inspect.getsource(runner)
     tree = ast.parse(source)
     constructors = {"EXAONEFinance", "PatchedTimeSeriesDecoder", "PatchedTimeSeriesDecoder_MOE",
-                    "TimeMoeForPrediction", "Toto2Model", "Transformer", "subagent"}
+                    "TimeMoeForPrediction", "Toto2Model"}
 
     class Reuse(ast.NodeTransformer):
         def visit_Call(self,node):
@@ -118,8 +119,6 @@ def native_call(backend, root, data, device="cpu", *, modules=None, states=None,
 
     def weights(kind,path,**kwargs):
         if modules is not None or states is not None:
-            if backend=="marketgpt":
-                return {"model_args":json.loads((root/"marketgpt_config.json").read_text()),"model":states[0] if states else {}}
             return states[0] if states else {}
         if kind=="load": return torch.load(path,**kwargs)
         from safetensors.torch import load_file
@@ -134,7 +133,6 @@ def native_call(backend, root, data, device="cpu", *, modules=None, states=None,
         restored+=1
         result=model.load_state_dict(state,**kwargs)
         if hasattr(model,"tie_weights"): model.tie_weights()
-        if backend=="marketgpt": model.output.weight=model.tok_embeddings.weight
         return result
 
     namespace.update(_construct=construct,_pretrained=pretrained,_weights=weights,_restore=restore,_load_only=load_only)

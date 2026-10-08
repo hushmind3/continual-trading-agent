@@ -1,7 +1,6 @@
 """One shared frozen Expert process; market execution and training never wait on it."""
 import argparse
 import time
-import numpy as np
 import pandas as pd
 import torch
 from ..market_reader import IncrementalMarketCSV
@@ -10,8 +9,11 @@ from .config import load_settings, CONFIG_PATH
 from .assets import ExpertPool,guard_model_assets
 from .expert_jobs import run_job
 from .journal import Journal
-from .observations import native_input,daily_history,MissingInputConnection
+from .observations import daily_history
+from .expert_inputs import snapshot_for
 from .worker_state import publish, stopped
+from .selection import selection,SlotDisabled
+import gc
 
 
 def run(settings,config=CONFIG_PATH):
@@ -26,6 +28,10 @@ def run(settings,config=CONFIG_PATH):
     last_run={}; cursor=0; previous_signature=None; cached_frame=None; daily_signature=None; cached_daily=pd.DataFrame()
     try:
         while not stopped(settings,"experts"):
+            _,active=selection(settings,pool.active)
+            pool.active=set(active)
+            for inactive in set(pool.loaded)-pool.active:
+                pool.loaded.pop(inactive);gc.collect()
             if not reader.path.exists():
                 publish(settings,"experts",status="waiting",experts=pool.catalog(),message="실시간 시세 대기")
                 time.sleep(1); continue
@@ -37,8 +43,9 @@ def run(settings,config=CONFIG_PATH):
                 previous_signature=signature
             frame=cached_frame
             stamp=str(frame.date.max()); reader.processed_through=stamp
-            keys=[key for key in pool.ids if not settings.enabled_experts or key in settings.enabled_experts]
+            keys=[key for key in pool.ids if key in pool.active]
             if not keys:
+                publish(settings,'experts',status='ready',active_expert=None,experts=pool.catalog(),message='사용 중인 Expert 슬롯 없음')
                 time.sleep(1); continue
             key=keys[cursor%len(keys)]; cursor+=1
             policy=bool(pool.entries[key].get("stock_policy"))
@@ -52,27 +59,9 @@ def run(settings,config=CONFIG_PATH):
             if signature!=daily_signature:
                 cached_daily=daily_history(daily_path,stamp);daily_signature=signature
             daily=cached_daily
-            if policy:
-                required=set(pool.entries[key]['stock_policy']['universe'])
-                daily=daily[daily.symbol.isin(required)] if not daily.empty else daily
-            account=journal.get_state("account") or {}
-            book=account.get("books",{}).get("USD",{})
-            nav=book.get("cash",0)+sum(p["quantity"]*book.get("marks",{}).get(s,p["average_cost"])
-                                         for s,p in book.get("positions",{}).items())
-            nav_history=[r['equity'] for r in journal.history('USD',128)]
-            drawdown=1-nav/max([nav,*nav_history],default=1) if nav else 0
-            volatility=float(np.std(np.diff(np.log(np.maximum(nav_history,1e-9))))) if len(nav_history)>1 else 0
-            snapshot={"symbols":sorted(frame.symbol.unique()),"as_of":stamp,
-                "stock_policy_history":[],
-                "policy_account":{"cash":book.get("cash",0),"nav":nav,
-                    "positions":{s:p["quantity"] for s,p in book.get("positions",{}).items()},
-                    "trades":book.get("trade_count",0),"costs":sum(book.get(k,0) for k in ("fees","slippage","spread","sell_tax"))}}
-            snapshot['policy_account'].update(drawdown=drawdown,volatility=volatility)
-            if policy and not daily.empty:
-                snapshot["stock_policy_history"]=daily.assign(date=daily.date.astype(str)).to_dict("records")
             publish(settings,"experts",status="inference",active_expert=key,active_since=time.time(),experts=pool.catalog())
             try:
-                batches=[None] if policy else native_input(key,frame,daily,stamp)
+                batches,snapshot=snapshot_for(pool.entries[key],frame,journal,daily_path,daily)
                 if int(pool.entries[key].get('parameters',0))>=settings.resources.isolated_expert_parameters:
                     packets=run_job(settings,key,batches,pool.metrics,config)
                 else:
@@ -83,6 +72,9 @@ def run(settings,config=CONFIG_PATH):
                         packets.append(pool.run(key,data,snapshot))
                     pool.metrics[key]['weight_files']=sorted(weight_reads)
                 journal.put_evidence(key,packets)
+            except SlotDisabled:
+                publish(settings,'experts',status='ready',active_expert=None,experts=pool.catalog())
+                continue
             except InterruptedError:
                 break
             except MemoryError as exc:
@@ -90,8 +82,6 @@ def run(settings,config=CONFIG_PATH):
                 if pool.metrics.get(key,{}).get("error")!=detail:
                     journal.event("warning",f"{pool.entries[key].get('name',key)}: {detail}")
                 pool.metrics.setdefault(key,{}).update(status="waiting_resources",error=detail)
-            except MissingInputConnection as exc:
-                pool.metrics.setdefault(key,{}).update(status="connection_required",error=str(exc))
             except ValueError as exc:
                 pool.metrics.setdefault(key,{}).update(status="needs_input",error=str(exc))
             except Exception as exc:

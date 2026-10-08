@@ -247,6 +247,7 @@ class SharedPaperTests(unittest.TestCase):
         from stockrl.platform.runtime import Runtime
         with TemporaryDirectory() as directory:
             supervisor=Runtime.__new__(Runtime);supervisor.lock=threading.RLock();supervisor.root=Path(directory)
+            supervisor.library=type('LibraryStub',(),{'active':False})()
             supervisor.controls={'feed':True,'engine':True,'paper':True,'learning':True,'mode':'live'}
             supervisor.retries={'feed':(5,0),'learner':(3,0)}
             result=supervisor.command('feed',False)['controls']

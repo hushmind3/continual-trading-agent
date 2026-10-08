@@ -17,6 +17,10 @@ def prepare(settings):
             continue
         for symbol in entry.get("symbols") or entry.get("universe") or []:
             requirements.setdefault(symbol,[]).append(key)
+    library=read_json(settings.state_dir/'expert-library.json')
+    for key,entry in library.get('experts',{}).items():
+        if not entry.get('input',{}).get('supported'):continue
+        for symbol in entry['input'].get('universe') or []:requirements.setdefault(symbol,[]).append(key)
     requirements.setdefault("SPY",[]).extend([k for k in ("chronos","timesfm") if not selected or k in selected])
     for symbol,required_by in sorted(requirements.items()):
         if symbol not in present:
@@ -24,5 +28,5 @@ def prepare(settings):
                                                 provider_symbol=symbol,interval="1m",required_by=required_by))
             present.add(symbol)
     destination=settings.state_dir/"feed-universe.json"
-    atomic_json(document,destination)
+    if read_json(destination)!=document:atomic_json(document,destination)
     return destination

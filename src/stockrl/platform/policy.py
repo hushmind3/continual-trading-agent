@@ -19,14 +19,18 @@ class MoETrunk(nn.Module):
         super().__init__()
         config = spec["config"]
         self.expert_ids = spec["expert_ids"]
+        self.active=set(spec.get('active_experts',self.expert_ids))
         self.adapters = nn.ModuleDict({k:EvidenceAdapter(size) for k,size in config["feature_sizes"].items()})
-        self.controller = VerticalController(config["feature_sizes"],config.get("stock_policy_ids",()))
+        self.controller = VerticalController(config["feature_sizes"],config.get("stock_policy_ids",()),
+            config.get('router_family')=='per-expert-context-v1')
         if config.get("assembly_routing"):
             self.controller.assembly_routing = config["assembly_routing"]
 
     def forward(self, evidence, mask, account, policy_q):
         unbatched = account.ndim==2
         values = {k:evidence[k]*self.adapters[k].scale+self.adapters[k].bias for k in self.expert_ids}
+        # Availability is recorded in each observation. Replay must retain the mask
+        # under which its action was taken, including Experts disabled afterwards.
         validity = {k:mask[...,i] for i,k in enumerate(self.expert_ids)}
         q = {k:policy_q[k] for k in self.controller.policy_ids}
         if unbatched:
@@ -88,6 +92,21 @@ def build_policy(model_spec, initial_state=None, *, legacy=False):
 def parameters(actor,critic):
     # Actor and critic share the real Champion trunk; each parameter is optimized once.
     return list({id(p):p for p in list(actor.parameters())+list(critic.parameters())}.values())
+
+
+def activate_policy(actor,critic,active):
+    active=set(active);ids=set(actor.model_spec['expert_ids'])
+    if not active.issubset(ids):raise ValueError('등록되지 않은 Expert 슬롯')
+    actor.model_spec['active_experts']=sorted(active)
+    for module in actor.modules():
+        if isinstance(module,MoETrunk):module.active=active
+    for name,param in actor.named_parameters():
+        parts=name.split('.');owned=set()
+        for index,part in enumerate(parts[:-1]):
+            if part in ('adapters','router','context_routers','policy_adapters','policy_router','projections') and parts[index+1] in ids:
+                owned.add(parts[index+1])
+        param.requires_grad_(not owned or bool(owned.intersection(active)))
+        if not param.requires_grad:param.grad=None
 
 
 def sparse_weights(logits):

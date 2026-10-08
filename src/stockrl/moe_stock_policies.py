@@ -18,24 +18,7 @@ INDICATORS = ['macd', 'boll_ub', 'boll_lb', 'rsi_30', 'cci_30', 'dx_30',
               'close_30_sma', 'close_60_sma']
 
 
-def original_definitions(source, names, namespace):
-    """Execute selected native definitions, excluding training/notebook side effects."""
-    tree = ast.parse(source)
-    tree.body = [node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.ClassDef))
-                 and node.name in names]
-    exec(compile(tree, '<embedded native policy source>', 'exec'), namespace)
-    return namespace
-
-
 def make_policy(spec):
-    if spec['kind'] == 'dapo':
-        from gymnasium.spaces import Box
-        scope = original_definitions(spec['architecture_source'],
-            {'mlp', 'Actor', 'MLPCategoricalActor', 'MLPGaussianActor', 'MLPActorCritic'},
-            dict(nn=nn, torch=torch, np=np, device=torch.device('cpu'), Box=Box,
-                 Normal=torch.distributions.Normal, Categorical=torch.distributions.Categorical))
-        return scope['MLPActorCritic'](Box(-np.inf, np.inf, (spec['observation_size'],)),
-            Box(-1., 1., (len(spec['universe']),)), hidden_sizes=(512, 512), activation=nn.Tanh)
     from stable_baselines3.common.policies import ActorCriticPolicy
     from stable_baselines3.sac.policies import SACPolicy
     cls = SACPolicy if spec['kind'] == 'sac' else ActorCriticPolicy
@@ -84,7 +67,7 @@ class StockPolicyExpert(nn.Module):
             return None
         positions = account.get('positions', {})
         observations, symbols, prices, dates = [], [], [], []
-        if spec['kind'] in ('dapo', 'a2c', 'ppo', 'sac'):
+        if spec['kind'] in ('a2c', 'ppo', 'sac'):
             if not set(spec['indicators']).issubset(df.columns):
                 df = self._portfolio_features(df, spec['indicators'])
             latest = df[df.Date == df.Date.max()].set_index('Ticker')
@@ -99,10 +82,6 @@ class StockPolicyExpert(nn.Module):
             obs = [cash, *prices, *shares]
             for col in spec['indicators']:
                 obs.extend(latest[col].to_numpy(float))
-            if spec['kind'] == 'dapo':
-                if not {'llm_sentiment', 'llm_risk'}.issubset(latest.columns):
-                    return None
-                obs.extend(latest.llm_sentiment); obs.extend(latest.llm_risk)
             observations = [obs]; symbols = required; dates = [str(latest.Date.iloc[0])]
         else:
             for symbol in snapshot['symbols']:
@@ -186,7 +165,7 @@ class StockPolicyExpert(nn.Module):
             raise ValueError('native stock observation must use this policy schema')
         if not all(self.applicable(s) for s in data['symbols']):
             raise ValueError('stock policy cannot apply outside its trained universe')
-        if spec['kind'] in ('dapo', 'a2c', 'ppo', 'sac') and data['symbols'] != spec['universe']:
+        if spec['kind'] in ('a2c', 'ppo', 'sac') and data['symbols'] != spec['universe']:
             raise ValueError('native portfolio observation requires the exact ordered training universe')
         policy = self.models[0]
         parameters = [(p, p.detach()) for p in policy.parameters()]
@@ -198,22 +177,17 @@ class StockPolicyExpert(nn.Module):
             transferred = time.perf_counter()
             obs = torch.as_tensor(data['observations'], dtype=torch.float32, device=device)
             with torch.no_grad():
-                if spec['kind'] == 'dapo':
-                    dist = policy.pi._distribution(obs)
-                    raw = dist.mean; std = dist.stddev
-                    action = raw.clamp(-1, 1)
+                raw = policy._predict(obs, deterministic=True)
+                if spec['kind'] == 'msft':
+                    probs = policy.get_distribution(obs).distribution.probs
+                    std = None; action = raw
+                elif spec['kind'] == 'sac':
+                    std = None; action = raw.clamp(-1, 1)
                 else:
-                    raw = policy._predict(obs, deterministic=True)
-                    if spec['kind'] == 'msft':
-                        probs = policy.get_distribution(obs).distribution.probs
-                        std = None; action = raw
-                    elif spec['kind'] == 'sac':
-                        std = None; action = raw.clamp(-1, 1)
-                    else:
-                        dist = policy.get_distribution(obs).distribution
-                        std = dist.stddev
-                        lo, hi = torch.as_tensor(policy.action_space.low, device=device), torch.as_tensor(policy.action_space.high, device=device)
-                        action = torch.maximum(lo, torch.minimum(hi, raw))
+                    dist = policy.get_distribution(obs).distribution
+                    std = dist.stddev
+                    lo, hi = torch.as_tensor(policy.action_space.low, device=device), torch.as_tensor(policy.action_space.high, device=device)
+                    action = torch.maximum(lo, torch.minimum(hi, raw))
                 if device.startswith('cuda'): torch.cuda.synchronize()
                 calculated = time.perf_counter()
                 native = raw.cpu().numpy()
@@ -239,7 +213,7 @@ class StockPolicyExpert(nn.Module):
         spec = self.entry['stock_policy']; account = data['account']
         cash, nav = float(account['cash']), float(account['nav'])
         positions = account.get('positions', {}); rows = []
-        portfolio = spec['kind'] in ('dapo', 'a2c', 'ppo', 'sac')
+        portfolio = spec['kind'] in ('a2c', 'ppo', 'sac')
         targets = {}
         if portfolio:
             actions = action.reshape(-1)

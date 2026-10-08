@@ -1,1 +1,0 @@
-nohup python -u preprocess/decomposition.py

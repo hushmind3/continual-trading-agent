@@ -16,7 +16,7 @@ from stockrl.expert_registry import read_registry, atomic_json
 
 
 def all_expert_snapshot(root):
-    """Same-as-of real stock inputs + explicitly synthetic ITCH/ETH schema probes."""
+    """Same-as-of real stock inputs for the retained market models."""
     import pandas as pd
     daily = json.loads((root / "verification/daily_excess.json").read_text(encoding="utf-8"))
     as_of = daily["as_of"]
@@ -32,19 +32,12 @@ def all_expert_snapshot(root):
         "bars":[bars[["timestamp","open","high","low","close","volume","amount"]].to_dict("records")],
         "future_timestamps":[str((pd.Timestamp(as_of)+pd.offsets.BDay()).date())], "amount_observed":False,
         "input_authenticity":"real_OHLCV_native_missing_amount_zero"}
-    itch = json.loads((root / "verification/itch_probe.json").read_text(encoding="utf-8"))
-    itch.update(as_of=as_of, sampling_seconds=1)
-    policy = json.loads((root / "verification/policy_probe.json").read_text(encoding="utf-8"))
-    policy.update(as_of=as_of, sampling_seconds=1)
     inputs = {"timesfm":daily, "chronos":daily, "toto":daily, "kronos":candles,
-        "fincast":prices, "exaone":prices, "timemoe":prices, "marketgpt":itch}
-    for regime in ("slope", "vol"):
-        for label in (1,2,3):
-            inputs[f"macrophft_{regime}_{label}"] = policy
-    symbols = ["AAPL", "MSFT", "ETHUSDT"]
+        "fincast":prices, "exaone":prices, "timemoe":prices}
+    symbols = ["AAPL", "MSFT"]
     return {"as_of":as_of, "symbols":symbols, "currencies":{s:"USD" for s in symbols},
         "current_weights":{s:0.0 for s in symbols}, "expert_inputs":inputs,
-        "input_authenticity":"mixed_real_and_synthetic_schema_probe_not_market_validation"}
+        "input_authenticity":"point_in_time_stock_history"}
 
 
 def main():

@@ -88,7 +88,7 @@ sys.meta_path.insert(0, Block())
 import stockrl.cli, stockrl.live_feed, stockrl.mock_feed
 feed_loaded_torch = 'torch' in sys.modules
 import stockrl.trading_moe
-print(json.dumps({'feed_loaded_torch': feed_loaded_torch, 'moe': hasattr(stockrl.trading_moe, 'TradingMoE'),
+print(json.dumps({'feed_loaded_torch': feed_loaded_torch, 'moe': hasattr(stockrl.trading_moe, 'VerticalController') and hasattr(stockrl.trading_moe, 'EvidenceAdapter'),
     'legacy': 'stockrl.global_transformer' in sys.modules}))
 """)
         self.assertEqual(report, {'feed_loaded_torch': False, 'moe': True, 'legacy': False})

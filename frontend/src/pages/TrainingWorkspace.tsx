@@ -11,15 +11,15 @@ import {
 import { useOperations } from "../data/Operations";
 import { request } from "../data/api";
 import { ControlButton } from "../ui/ControlButton";
+import { TrainingReadiness } from "../ui/TrainingReadiness";
 import {
   Button,
   Empty,
   ErrorMessage,
   Meter,
   Skeleton,
-  Status,
 } from "../ui/Primitives";
-import { bytes, date, number, workerState } from "../ui/format";
+import { bytes, date, number } from "../ui/format";
 
 export function TrainingWorkspace() {
   const { state, refresh } = useOperations();
@@ -32,7 +32,6 @@ export function TrainingWorkspace() {
   } | null>(null);
   if (!state) return <Skeleton />;
   const learner = state.learner,
-    status = workerState(state.workers.learner),
     batch = state.settings.learning.batch_size;
   const restore = async (file: string) => {
     setError("");
@@ -75,8 +74,8 @@ export function TrainingWorkspace() {
             </p>
           </div>
           <div className="space-y-3 text-right">
-            <Status tone={status.tone}>{status.label}</Status>
-            <ControlButton name="learning" label="학습" />
+            <TrainingReadiness />
+            {state.training?.action!=='learning'&&<ControlButton name="learning" label="학습" />}
           </div>
         </div>
         <div className="mt-6 grid gap-5 sm:grid-cols-3">

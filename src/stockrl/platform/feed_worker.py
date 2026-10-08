@@ -45,6 +45,8 @@ class MarketWriter:
 
 
 def run(settings,source):
+    from pathlib import Path
+    source=Path(source);source_signature=source.stat().st_mtime_ns;reconfigured=False
     output=settings.state_dir/'live'/'market.csv'
     writer=MarketWriter(output,settings.resources.market_queue_batches,settings)
     shared={}; initialized=threading.Event()
@@ -74,7 +76,7 @@ def run(settings,source):
             catalog=read_json(EXPERT_ASSETS_DIR/'registry.template.json')
             native_symbols=set()
             for entry in catalog.get('experts',[]):
-                if entry['id']!='stock_dapo':native_symbols.update(entry.get('universe') or [])
+                native_symbols.update(entry.get('universe') or [])
             collector.daily_instruments.sort(key=lambda i:(0 if i['symbol']=='SPY' else 1 if i['symbol']=='MSFT' else 2 if i['symbol'] in native_symbols else 3))
             collector.index.close();collector.index=writer
             shared['collector']=collector; initialized.set()
@@ -90,6 +92,10 @@ def run(settings,source):
         initialized.wait(timeout=30)
         while not shared.get('finished'):
             collector=shared.get('collector')
+            if source.stat().st_mtime_ns!=source_signature:
+                reconfigured=True
+                if collector:collector.stop.set();collector.broker_stop.set()
+                break
             if stopped(settings,'feed'):
                 if collector:collector.stop.set();collector.broker_stop.set()
                 break
@@ -120,7 +126,7 @@ def run(settings,source):
         polling.join(timeout=30)
         if shared.get('error'):raise shared['error']
     finally:
-        writer.shutdown();publish(settings,'feed',status='stopped')
+        writer.shutdown();publish(settings,'feed',status='stopped',reason='configuration_changed' if reconfigured else None)
 
 
 if __name__=='__main__':

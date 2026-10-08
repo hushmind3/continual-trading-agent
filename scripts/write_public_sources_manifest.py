@@ -15,15 +15,9 @@ FILES=[
 "data/external_sources/trademaster/order_execution_BTC/valid.csv",
 "data/external_sources/trademaster/order_execution_BTC/test.csv",
 "data/external_sources/trademaster/LSTM.pth",
-"data/external_sources/macrophft/data/df_train.feather",
-"data/external_sources/macrophft/data/df_val.feather",
-"data/external_sources/macrophft/data/df_test.feather",
-"data/external_sources/macrophft/teacher_outputs.csv",
 "runtime-global-research-pretrain/teacher_replay.pt",
 "runtime-global-research-pretrain/candidate.pt",
 ]
-for task in ("slope","vol"):
- for i in range(1,4): FILES.append(f"data/external_sources/macrophft/{task}_{i}_best_model.pkl")
 
 def digest(path):
  h=hashlib.sha256()

@@ -4,15 +4,17 @@
 
 ## 동작
 
-`실시간 시세 → 사용 가능한 frozen Expert 출력 → 학습된 MoE 결합부 / 64D latent → 시장·계좌 feature → TorchRL Allocator → target weights → 위험검사 → FinRL-X StrategyResult → 가상체결 → 비용 반영 손익 → 지속학습`
+`실시간 시세 → 사용 가능한 frozen Expert 출력 → 학습된 MoE 결합부 / 64D latent → 시장·계좌 feature → TorchRL Allocator → target weights → 잔고·가격 유효성 확인 → FinRL-X StrategyResult → 가상체결 → 비용 반영 손익 → 지속학습`
 
 - Expert 원본 가중치는 frozen입니다. `champion.pt`의 실제 Adapter·Router·Fusion·Attention·Controller를 복원하며, 새 랜덤 정책으로 대체하지 않습니다.
-- Expert 실행, MoE 판단·계좌, CPU 학습은 별도 프로세스입니다. 느린 Expert나 학습이 주문·결과 처리 루프를 붙잡지 않습니다.
+- 종목 비중·현금 비중·비중 변경·손실 대응은 모델이 결정합니다. 고정 비중·turnover 제한이나 MDD 강제 청산 규칙을 적용하지 않습니다. 현금 계좌의 잔고, 체결 비용과 실제 가격은 그대로 계산합니다.
+- Expert 실행, MoE 판단·계좌, CPU 학습은 별도 프로세스입니다. 큰 Expert는 순차적인 단기 작업 프로세스에서 실행하며 완료 후 모델 매핑과 임시 메모리를 해제합니다. 작은 정책은 CPU에서, 큰 예측모델은 설정과 측정된 자원에 맞는 장치에서 실행합니다.
 - 큰 원본 PT를 매번 다시 쓰지 않고, 학습한 결합부·Allocator·optimizer 상태를 작은 정책 버전으로 저장합니다. 운영 판단에는 발행된 최신 버전이 반영됩니다.
 - 가상체결은 다음 완료 시세에서 처리하며, 수수료·가격 미끄러짐·계좌 비용을 포함합니다. 원화와 달러 계좌는 별도로 계산합니다. 실제 주문은 연결하지 않습니다.
 - 경험 처리와 계좌·미체결 상태는 SQLite transaction으로 함께 저장합니다. 정책 checksum, 버전 복원, 프로세스 식별과 재시도로 재시작을 지원합니다.
 - MacroHFT 36+9, MarketGPT ITCH, DAPO sentiment/risk처럼 필수 원본 입력이 없는 Expert는 입력 필요 상태로 표시합니다. 과거 입력을 현재 데이터로 위장하지 않습니다.
 - 원본 MoE에는 Expert 20개가 포함됩니다. 실제 실행은 선택한 Expert의 입력·RAM·VRAM 조건에 따라 달라지며, 자원이 부족하면 실행을 보류하고 화면에 자원 대기로 표시합니다.
+- Expert 원본 가중치는 선택한 `champion.pt`에서만 읽습니다. 별도 Expert 가중치 파일 읽기는 차단하며, 패키지에서 모델이 누락됐으면 원본을 포함해 다시 패키징해야 합니다. 학습된 결합부·Allocator·optimizer는 작은 정책 버전으로 저장합니다. 시세·호가·뉴스 분석 값은 모델 가중치와 별개의 실시간 입력입니다.
 
 ## 실행
 

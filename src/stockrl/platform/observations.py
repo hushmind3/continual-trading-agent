@@ -5,6 +5,10 @@ import numpy as np
 import pandas as pd
 
 
+class MissingInputConnection(ValueError):
+    """No producer is configured for a required live native input."""
+
+
 def daily_history(path: Path, as_of):
     if not path.is_file():
         return pd.DataFrame()
@@ -18,18 +22,21 @@ def daily_history(path: Path, as_of):
 
 def native_input(key, frame, daily, as_of, max_batch=8):
     if key.startswith("macrophft"):
-        raise ValueError("검증된 MacroHFT 36+9 입력이 필요합니다. 일반 OHLCV로 대체하지 않습니다.")
+        raise MissingInputConnection("ETH 체결·호가의 원본 전처리 연결이 필요합니다.")
     if key == "marketgpt":
-        raise ValueError("실제 NASDAQ ITCH 메시지 입력이 필요합니다.")
+        raise MissingInputConnection("NASDAQ 주문 메시지 데이터 공급자 연결이 필요합니다.")
     source = frame
     units, seconds = "price", 60
     if key in ("timesfm", "chronos"):
         if daily.empty or "SPY" not in set(daily.symbol):
             raise ValueError("실제 SPY 일봉이 있어야 일별 초과수익률을 계산할 수 있습니다.")
-        prices = daily.pivot_table(index="date", columns="symbol", values="close").sort_index()
-        returns = prices.pct_change(fill_method=None)
-        excess = returns.subtract(returns["SPY"], axis=0)
-        source = excess.stack().rename("close").reset_index()
+        ordered=daily.sort_values(["symbol","date"]).drop_duplicates(["symbol","date"],keep="last").copy()
+        ordered["return"]=ordered.groupby("symbol").close.pct_change(fill_method=None)
+        benchmark=ordered.loc[ordered.symbol=='SPY',["date","return"]].dropna().rename(columns={"return":"benchmark"})
+        source=pd.merge_asof(ordered.loc[ordered.symbol!='SPY'].sort_values('date'),benchmark.sort_values('date'),
+                             on='date',direction='backward',tolerance=pd.Timedelta(days=7))
+        source["close"]=source['return']-source['benchmark']
+        source=source.dropna(subset=['close'])
         units, seconds = "daily_excess_return", 86400
     inputs = []
     candidates = [s for s,g in source.groupby("symbol") if len(g) >= 32 and (s != "SPY" or key not in ("chronos", "timesfm"))]
@@ -44,13 +51,14 @@ def native_input(key, frame, daily, as_of, max_batch=8):
             data = dict(symbols=symbols, bars=[g.to_dict("records") for g in groups],
                         future_timestamps=[str(pd.Timestamp(as_of)+pd.Timedelta(minutes=1))], amount_observed=False)
         else:
-            panel = rows.pivot_table(index="date", columns="symbol", values="close").dropna().tail(128)
-            if len(panel) < 32:
-                continue
+            histories=[rows[rows.symbol==s].dropna(subset=['close']).tail(128) for s in symbols]
+            length=min(len(h) for h in histories)
             if key=='toto':
-                panel=panel.tail((len(panel)//32)*32)
-            data = dict(symbols=list(panel.columns), series=panel.to_numpy(np.float32).T.tolist(),
-                        observation_timestamps=[panel.index.astype(str).tolist()]*len(panel.columns))
+                length=(length//32)*32
+            if length<32:continue
+            histories=[h.tail(length) for h in histories]
+            data = dict(symbols=symbols,series=[h.close.to_numpy(np.float32).tolist() for h in histories],
+                        observation_timestamps=[h.date.astype(str).tolist() for h in histories])
         data.update(as_of=str(rows.date.max()), horizon=1, sampling_seconds=seconds,
                     frequency_id=1 if seconds==86400 else 0, units=units, native_features_verified=True,
                     input_authenticity="point_in_time_market_feed")
@@ -85,6 +93,8 @@ def prepare_evidence(packets, symbols, spec, as_of, ttl=300):
             for row,symbol in enumerate(packet["symbols"]):
                 if symbol not in symbols:
                     continue
+                symbol_age=(pd.Timestamp(as_of)-pd.Timestamp(packet.get('symbol_as_of',{}).get(symbol,packet['as_of']))).total_seconds()
+                if symbol_age<0 or symbol_age>permitted_age:continue
                 n = symbols.index(symbol)
                 values = native[row]
                 if not np.isfinite(values).all():

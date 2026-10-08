@@ -44,6 +44,7 @@ const phases: Record<string, string> = {
   polling:'시세 갱신 중',
   loading: "불러오는 중",
   waiting: "입력 대기",
+  waiting_batch: "학습 경험 대기",
   running: "실행 중",
   ready: "준비됨",
   inference: "분석 중",
@@ -52,6 +53,7 @@ const phases: Record<string, string> = {
   stopped: "정지",
   error: "오류",
   needs_input: "입력 필요",
+  connection_required: "연결 필요",
   waiting_resources: "자원 대기",
 };
 export function workerState(worker: Worker | undefined) {
@@ -69,7 +71,7 @@ export function workerState(worker: Worker | undefined) {
     tone:
       worker.status === "error"
         ? "bad"
-        : ['waiting','loading','starting','waiting_resources'].includes(worker.status??'')
+        : ['waiting','waiting_batch','loading','starting','waiting_resources'].includes(worker.status??'')
           ? "warn"
           : "good",
   };

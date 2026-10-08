@@ -76,8 +76,10 @@ class PortfolioEnvironment:
         obs=observation(evidence,mask,np.nan_to_num(context),np.nan_to_num(market),policy_q)
         book = self.account.snapshot()["books"][currency]
         self.peak[currency] = max(self.peak[currency],book["equity"])
+        drawdown=1-book['equity']/max(self.peak[currency],1e-9)
+        obs['market'][:,7]=float(drawdown)
         return {"observation":obs,"symbols":symbols,"current_weights":current,"fresh":fresh,
-                "currency":currency,"drawdown":1-book["equity"]/max(self.peak[currency],1e-9),
+                "currency":currency,"drawdown":drawdown,
                 "as_of":as_of,"coverage":int(mask.any(1).sum()),"indices":indices,"equity":book["equity"]}
 
     def settle(self, data, version):

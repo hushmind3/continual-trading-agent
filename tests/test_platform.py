@@ -16,7 +16,7 @@ from stockrl.platform.config import LearningSettings,RiskSettings,Settings
 from stockrl.platform.learner import learn_batch
 from stockrl.platform.journal import Journal
 from stockrl.platform.checkpoint import Checkpoints
-from stockrl.platform.weights import risk_overlay,evaluate_recorded_weights
+from stockrl.platform.weights import executable_weights,evaluate_recorded_weights
 from stockrl.platform.observations import prepare_evidence,native_input
 from stockrl.platform.environment import PortfolioEnvironment,market_view
 
@@ -81,8 +81,63 @@ class MoEPolicyTests(unittest.TestCase):
         validate_source(saved,selected)
         with self.assertRaises(ValueError):validate_source(saved,{**selected,'source_head_sha256':'another'})
 
+    def test_daily_excess_returns_keep_independent_market_timestamps(self):
+        rows=[]
+        for i,day in enumerate(pd.bdate_range('2026-01-01',periods=42)):
+            for symbol,hour,growth in [('SPY',13,.002),('A',13,.004),('B',0,.006)]:
+                rows.append(dict(symbol=symbol,date=day+pd.Timedelta(hours=hour),close=100*(1+growth)**i))
+        data=native_input('chronos',pd.DataFrame(),pd.DataFrame(rows),'2026-03-01')
+        self.assertEqual(set(data[0]['symbols']),{'A','B'})
+        self.assertGreaterEqual(len(data[0]['series'][0]),32)
+        self.assertTrue(np.allclose(data[0]['series'][data[0]['symbols'].index('A')],.002,atol=1e-6))
+        self.assertNotEqual(data[0]['observation_timestamps'][0],data[0]['observation_timestamps'][1])
+
+    def test_evidence_uses_each_symbols_actual_observation_time(self):
+        packet={'expert':'chronos','as_of':'2026-01-01T00:01:00','symbols':['A'],
+                'symbol_as_of':{'A':'2025-12-31T00:00:00'},'native_output':[[.1]],
+                'layout':'symbol,horizon','horizon':1,'sampling_seconds':60}
+        _,mask,_=prepare_evidence({'chronos':[packet]},['A'],spec(),'2026-01-01T00:01:00')
+        self.assertFalse(mask.any())
+
+    def test_broker_timestamp_extensions_do_not_disconnect_stream(self):
+        from stockrl.platform.kiwoom_data import quote_timestamp
+        self.assertEqual(str(quote_timestamp('2026100800','14053000','us')),'2026-10-08 18:05:30+00:00')
+        self.assertEqual(str(quote_timestamp('20261008','14:05:30','kr')),'2026-10-08 05:05:30+00:00')
+        self.assertIsNone(quote_timestamp('20261008','250000','us'))
+        self.assertIsNone(quote_timestamp('20261008',None,'us'))
+
 
 class DurableOperationsTests(unittest.TestCase):
+    def test_model_file_guard_rejects_external_weights(self):
+        from unittest.mock import patch
+        from stockrl.platform.assets import guard_model_assets
+        with tempfile.TemporaryDirectory() as directory,patch('stockrl.platform.assets.sys.addaudithook') as install:
+            bank=Path(directory)/'champion.pt';reads=guard_model_assets(bank)
+            audit=install.call_args[0][0]
+            audit('open',(str(bank),'rb',0))
+            self.assertEqual(reads,{str(bank.resolve())})
+            with self.assertRaises(RuntimeError):audit('open',(str(Path(directory)/'expert.pth'),'rb',0))
+            audit('open',(str(Path(directory)/'state.json'),'w',0))
+
+    def test_native_job_serializes_observed_timestamps_and_numpy_scalars(self):
+        from stockrl.platform.expert_jobs import json_scalar
+        import json
+        encoded=json.dumps({'date':pd.Timestamp('2026-01-01T00:01:00'),'volume':np.int64(10)},default=json_scalar)
+        self.assertEqual(json.loads(encoded)['date'],'2026-01-01T00:01:00')
+        self.assertEqual(json.loads(encoded)['volume'],10)
+        with self.assertRaises(TypeError):json_scalar(object())
+
+    def test_waiting_batch_is_not_sum_of_different_asset_sets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=Journal(Path(directory)/'ops.sqlite3')
+            for topology in ('["A"]','["A"]','["B"]'):
+                journal.settle('USD',topology,1,{'x':torch.ones(1)})
+            counts=journal.stats(1)
+            self.assertEqual(counts['ready'],3)
+            self.assertEqual(counts['batch_ready'],2)
+            self.assertEqual(journal.batch(1,2,3),([],[]))
+            journal.close()
+
     def test_requested_stop_is_not_reported_as_a_process_failure(self):
         from unittest.mock import Mock
         from stockrl.platform.runtime import Runtime
@@ -154,19 +209,20 @@ class DurableOperationsTests(unittest.TestCase):
             self.assertEqual(recovered['version'],2)
             self.assertEqual(record['recovered_from'],first['file'])
 
-    def test_risk_caps_and_unobserved_holdings(self):
-        risk=RiskSettings(max_asset_weight=.3,max_exposure=.9,max_turnover=.2)
-        weights,_=risk_overlay([.8,.8],[.7,0],[False,True],risk)
+    def test_model_allocation_has_no_concentration_turnover_or_drawdown_cap(self):
+        weights,_=executable_weights([.8,.8],[.7,0],[False,True])
         self.assertAlmostEqual(weights[0],.7)
-        self.assertLessEqual(weights.sum(),.900001)
-        self.assertLessEqual(abs(weights-np.array([.7,0])).sum(),.200001)
-        weights,info=risk_overlay([.2],[.3],[True],risk,drawdown=.2)
-        self.assertEqual(weights[0],0); self.assertTrue(info['blocked_reason'])
+        self.assertAlmostEqual(weights.sum(),1.)
+        self.assertAlmostEqual(weights[1],.3)
+        weights,_=executable_weights([1.],[0.],[True])
+        self.assertEqual(weights[0],1.)
+        for proposed in ([float('nan')],[-.1],[1.1]):
+            with self.assertRaises(ValueError):executable_weights(proposed,[0],[True])
 
     def test_next_bar_fill_and_costs_enter_portfolio_reward(self):
         with tempfile.TemporaryDirectory() as directory:
             journal=Journal(Path(directory)/'ops.sqlite3')
-            settings=SimpleNamespace(state_dir=Path(directory),risk=RiskSettings(max_asset_weight=.5,max_turnover=.5),
+            settings=SimpleNamespace(state_dir=Path(directory),risk=RiskSettings(),
                                      learning=LearningSettings(),enabled_experts=[],resources=SimpleNamespace(market_refresh_seconds=300))
             env=PortfolioEnvironment(settings,journal,spec())
             frame=pd.DataFrame([{'date':f'2026-01-01T00:0{i}:00','symbol':'A','market':'US','asset_class':'equity',

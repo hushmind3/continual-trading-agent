@@ -110,6 +110,7 @@ function ExpertInspector({
             <summary className="cursor-pointer text-sm font-medium text-slate-500">
               출력 · 진단
             </summary>
+            {expert.weight_files?.length ? <p className="mt-3 break-all text-xs text-slate-500">실제로 읽은 모델 파일: {expert.weight_files.join(', ')}</p> : null}
             {output ? (
               <pre className="mt-3 max-h-96 overflow-auto rounded-xl bg-slate-950 p-4 text-[11px] leading-5 text-slate-300">
                 {JSON.stringify(output, null, 2)}
@@ -325,7 +326,7 @@ export function ModelWorkspace() {
                               {expertName(expert)}
                             </div>
                             <div className="mt-1 text-[11px] text-slate-400">
-                              {["needs_input","waiting_resources"].includes(expert.status ?? "")
+                              {["needs_input","connection_required","waiting_resources"].includes(expert.status ?? "")
                                 ? expert.error
                                 : expert.inference_seconds != null
                                   ? `${number(expert.inference_seconds, 2)}s · ${expert.device}`
@@ -341,7 +342,7 @@ export function ModelWorkspace() {
                                 ? "bad"
                                 : expert.status === "ready"
                                   ? "good"
-                                  : ["needs_input","waiting_resources"].includes(expert.status ?? "")
+                                  : ["needs_input","connection_required","waiting_resources"].includes(expert.status ?? "")
                                     ? "warn"
                                     : "idle"
                           }
@@ -356,6 +357,8 @@ export function ModelWorkspace() {
                                   ? "자원 대기"
                                   : expert.status === "needs_input"
                                   ? "입력 필요"
+                                  : expert.status === "connection_required"
+                                    ? "연결 필요"
                                   : "대기"}
                         </Status>
                       </button>
@@ -366,7 +369,7 @@ export function ModelWorkspace() {
           ))}
         </div>
       </section>
-      <ExpertInspector expert={inspect} close={close} />
+      <ExpertInspector expert={inspect ? list.find(e=>e.id===inspect.id) ?? inspect : null} close={close} />
     </div>
   );
 }

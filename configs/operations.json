@@ -18,6 +18,8 @@
     "ram_reserve_gib": 4.0,
     "vram_reserve_gib": 1.5,
     "expert_cache_count": 3,
+    "isolated_expert_parameters": 10000000,
+    "expert_devices": {"fincast": "cpu"},
     "market_refresh_seconds": 300,
     "inference_timeout_seconds": 180,
     "journal_limit_mib": 512,
@@ -27,10 +29,6 @@
     "market_queue_batches": 64
   },
   "risk": {
-    "max_asset_weight": 0.25,
-    "max_exposure": 0.9,
-    "max_turnover": 0.25,
-    "max_drawdown": 0.15,
     "freshness_seconds": 300,
     "fee": 0.001,
     "slippage": 0.0001

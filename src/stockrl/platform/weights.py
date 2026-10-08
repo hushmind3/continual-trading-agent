@@ -1,4 +1,4 @@
-"""FinRL-X weight strategy, timing and currency-specific portfolio risk overlay."""
+"""FinRL-X model-selected weights, cash accounting and recorded-weight evaluation."""
 from __future__ import annotations
 
 import numpy as np
@@ -6,42 +6,35 @@ import pandas as pd
 from strategies.base_strategy import BaseStrategy, StrategyConfig, StrategyResult
 
 
-def risk_overlay(proposed, current, fresh, settings, *, drawdown=0.0):
+def executable_weights(proposed, current, fresh):
     proposed = np.asarray(proposed, float)
     current = np.asarray(current, float)
     fresh = np.asarray(fresh, bool)
     if not np.isfinite(proposed).all() or not np.isfinite(current).all():
         raise ValueError("비중에 유효하지 않은 수치가 있습니다.")
-    result = np.where(fresh, np.clip(proposed, 0, settings.max_asset_weight), current)
-    reason = None
-    if drawdown >= settings.max_drawdown:
-        result[fresh] = 0
-        reason = "최대 손실폭 제한"
+    if (proposed<0).any() or (proposed>1).any():
+        raise ValueError("현금 계좌의 목표 비중은 0과 1 사이여야 합니다.")
+    result = np.where(fresh, proposed, current)
     locked = result[~fresh].sum()
-    budget = max(0., settings.max_exposure-locked)
+    budget = max(0., 1-locked)
     active_total = result[fresh].sum()
     if active_total > budget:
         result[fresh] *= budget/active_total
-    delta = result-current
-    turnover = np.abs(delta).sum()
-    if turnover > settings.max_turnover and drawdown < settings.max_drawdown:
-        result = current + delta*(settings.max_turnover/turnover)
     if (result < -1e-9).any() or result.sum() > 1+1e-6:
         raise ValueError("통화별 현금 포함 비중이 완전하지 않습니다.")
     return result, {"turnover": float(np.abs(result-current).sum()), "cash_weight": float(1-result.sum()),
-                    "frozen_assets": int((~fresh).sum()), "blocked_reason": reason}
+                    "frozen_assets": int((~fresh).sum())}
 
 
 class PortfolioStrategy(BaseStrategy):
-    def __init__(self, actor, critic, risk):
+    def __init__(self, actor, critic):
         super().__init__(StrategyConfig(name="Frozen Expert / PPO allocation"))
-        self.actor, self.critic, self.risk = actor, critic, risk
+        self.actor, self.critic = actor, critic
 
     def generate_weights(self, data, target_date=None):
         from .policy import decide
         weights, transition = decide(self.actor, self.critic, data["observation"], explore=data.get("explore",False))
-        target, risk = risk_overlay(weights[:-1], data["current_weights"], data["fresh"], self.risk,
-                                   drawdown=data.get("drawdown",0))
+        target, risk = executable_weights(weights[:-1], data["current_weights"], data["fresh"])
         frame = pd.DataFrame({"gvkey": data["symbols"], "weight": target})
         return StrategyResult(self.config.name, frame, {"as_of": target_date, "risk": risk,
                                                        "transition": transition, "currency": data["currency"]})

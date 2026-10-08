@@ -34,7 +34,15 @@ def run(settings):
     del original
     version=manifest["version"]
     environment=PortfolioEnvironment(settings,journal,spec)
-    strategy=PortfolioStrategy(actor,critic,settings.risk)
+    contract='model-directed-portfolio-v2'
+    if journal.get_state('execution_contract')!=contract:
+        with journal.transaction():
+            journal.db.execute('UPDATE transitions SET learned=-1 WHERE learned IS NULL')
+            journal.db.execute('DELETE FROM pending')
+            environment.pending.clear();environment.account.state['pending'].clear()
+            journal.set_state('account',environment.account.state)
+            journal.set_state('execution_contract',contract)
+    strategy=PortfolioStrategy(actor,critic)
     reader=IncrementalMarketCSV(settings.state_dir/"live"/"market.csv",retain_timestamps=256)
     last=environment.account.state.get("last_timestamp")
     started_live=False

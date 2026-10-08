@@ -177,9 +177,17 @@ class Journal:
             total, completed, outdated = self.db.execute("SELECT COUNT(*),SUM(learned>=0),"
                 "SUM(learned=-1 OR (learned IS NULL AND version<?)) FROM transitions", (max(0, version-lag),)).fetchone()
             pending = self.db.execute("SELECT COUNT(*) FROM pending").fetchone()[0]
+            groups=[]
+            for topology,count in self.db.execute(
+                'SELECT topology,COUNT(*) FROM transitions WHERE learned IS NULL AND version BETWEEN ? AND ? GROUP BY topology',
+                (max(0,version-lag),version)):
+                try:assets=len(json.loads(topology))
+                except (ValueError,TypeError):assets=None
+                groups.append(dict(assets=assets,ready=count))
         size = sum(p.stat().st_size for p in [self.path, Path(str(self.path)+'-wal')] if p.exists())
         return dict(total=total, completed=completed or 0, outdated=outdated or 0, pending=pending,
-                    ready=total-(completed or 0)-(outdated or 0), bytes=size)
+                    ready=total-(completed or 0)-(outdated or 0),batch_ready=max((g['ready'] for g in groups),default=0),
+                    groups=groups,bytes=size)
 
     def close(self):
         self.db.close()

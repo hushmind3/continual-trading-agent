@@ -14,18 +14,27 @@ class ResourceMonitor:
     def snapshot(self, workers):
         memory=psutil.virtual_memory()
         rows=[]
+        alive=set()
         for role,record in workers.items():
             pid=record.get("pid")
             if not pid or not record.get("alive"):
                 continue
             try:
                 process=self.processes.setdefault(pid,psutil.Process(pid))
-                io=process.io_counters(); mem=process.memory_info()
-                rows.append(dict(role=role,pid=pid,rss_bytes=mem.rss,cpu_percent=process.cpu_percent(None),
-                                 threads=process.num_threads(),read_bytes=io.read_bytes,write_bytes=io.write_bytes))
+                group=[process,*process.children(recursive=True)]
+                row=dict(role=role,pid=pid,rss_bytes=0,cpu_percent=0.,threads=0,read_bytes=0,write_bytes=0,child_pids=[])
+                for member in group:
+                    try:
+                        member=self.processes.setdefault(member.pid,member);alive.add(member.pid)
+                        io=member.io_counters();mem=member.memory_info()
+                        row['rss_bytes']+=mem.rss;row['cpu_percent']+=member.cpu_percent(None)
+                        row['threads']+=member.num_threads();row['read_bytes']+=io.read_bytes;row['write_bytes']+=io.write_bytes
+                        if member.pid!=pid:row['child_pids'].append(member.pid)
+                    except psutil.Error:pass
+                rows.append(row)
             except psutil.Error:
                 pass
-        alive={r["pid"] for r in rows}; self.processes={k:p for k,p in self.processes.items() if k in alive}
+        self.processes={k:p for k,p in self.processes.items() if k in alive}
         if time.monotonic()-self.gpu_sample>5:
             command=shutil.which("nvidia-smi")
             if not command:

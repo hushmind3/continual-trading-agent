@@ -10,9 +10,26 @@ import zipfile
 from pathlib import Path
 import psutil
 import torch
+import sys
 
 from ..moe_native import NativeExpert, native_call
 from ..moe_stock_policies import StockPolicyExpert
+from .observations import MissingInputConnection
+
+
+def guard_model_assets(path):
+    bank=Path(path).resolve();reads=set()
+    def audit(event,args):
+        if event!='open' or not args or not isinstance(args[0],str):return
+        candidate=Path(args[0])
+        weight=candidate.suffix in ('.pt','.pth','.ckpt','.safetensors') or candidate.name=='pytorch_model.bin'
+        if not weight:return
+        candidate=candidate.resolve()
+        if candidate!=bank:
+            raise RuntimeError('champion.pt 외부의 모델 가중치를 읽으려 했습니다. 원본을 포함해 다시 패키징해야 합니다: '+str(candidate))
+        reads.add(str(candidate))
+    sys.addaudithook(audit)
+    return reads
 
 
 class ExpertPool:
@@ -23,6 +40,15 @@ class ExpertPool:
         if self.saved.get("format") != "registered_vertical_trading_moe_v1":
             raise ValueError("Expert 자산 패키지 형식을 확인하세요.")
         self.entries = self.saved["expert_mapping"]
+        missing=[]
+        for key in self.entries:
+            count=self.saved['config']['native_module_counts'].get(key,0)
+            if not count:missing.append(key)
+            for index in range(count):
+                if not any(name.startswith(f'experts.{key}.models.{index}.') for name in self.saved['state_dict']):
+                    missing.append(f'{key}/{index}')
+        if missing:
+            raise RuntimeError('champion.pt에 Expert 가중치가 누락됐습니다. 원본으로 다시 패키징해야 합니다: '+', '.join(missing))
         self.temp = tempfile.TemporaryDirectory(prefix="finrlx-expert-definitions-")
         self.root = Path(self.temp.name)
         with zipfile.ZipFile(io.BytesIO(self.saved["metadata"]["architecture_sources"])) as archive:
@@ -90,7 +116,7 @@ class ExpertPool:
     def run(self, key, data, snapshot):
         started = time.perf_counter()
         if self.entries[key].get('stock_policy',{}).get('kind')=='dapo' and not all(k in (snapshot.get('stock_policy_history') or [{}])[0] for k in ('llm_sentiment','llm_risk')):
-            raise ValueError('원본 DAPO 정책에는 실제 LLM sentiment/risk 입력이 필요합니다.')
+            raise MissingInputConnection('뉴스 감성·위험 분석 결과를 제공하는 서버 연결이 필요합니다.')
         expert = self.get(key)
         if self.entries[key].get("stock_policy"):
             data = expert.prepare_input(snapshot)
@@ -100,9 +126,12 @@ class ExpertPool:
             raise ValueError("현재 시세에서 이 Expert의 원본 입력을 만들 수 없습니다.")
         prior_peak = self.metrics.get(key, {}).get("peak_vram_bytes", 0)
         device = "cpu"
-        if torch.cuda.is_available():
+        preference=self.settings.resources.expert_devices.get(key,'auto')
+        large=int(self.entries[key].get('parameters',0))>=self.settings.resources.isolated_expert_parameters
+        if preference!='cpu' and large and torch.cuda.is_available():
             free, total = torch.cuda.mem_get_info()
-            required = max(prior_peak, sum(p.numel()*p.element_size() for p in expert.parameters())*1.35)
+            weight_bytes=sum(p.numel()*p.element_size() for p in expert.parameters())
+            required = max(prior_peak*1.1,weight_bytes*1.05) if prior_peak else weight_bytes*1.35
             if free - required > self.settings.resources.vram_reserve_gib * 2**30:
                 device = "cuda:0"
                 torch.cuda.reset_peak_memory_stats()
@@ -111,6 +140,8 @@ class ExpertPool:
         if any(p.requires_grad or p.grad is not None for p in expert.parameters()):
             raise RuntimeError("Expert가 고정 가중치 상태를 벗어났습니다.")
         packet["expert"] = key
+        if data.get("observation_timestamps"):
+            packet['symbol_as_of']={symbol:stamps[-1] for symbol,stamps in zip(data['symbols'],data['observation_timestamps'])}
         packet["native_features_verified"] = True
         metrics = self.metrics.setdefault(key, {})
         metrics.update(status="ready", device=device, inference_seconds=time.perf_counter()-started,

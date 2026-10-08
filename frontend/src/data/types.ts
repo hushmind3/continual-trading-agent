@@ -42,6 +42,8 @@ export interface Expert {
   peak_vram_bytes?: number;
   peak_ram_bytes?: number;
   last_as_of?: string;
+  weight_files?: string[];
+  job_seconds?: number;
 }
 export interface Decision {
   symbol: string;
@@ -109,17 +111,17 @@ export interface OpsSettings {
     ram_reserve_gib: number;
     vram_reserve_gib: number;
     expert_cache_count: number;
+    isolated_expert_parameters: number;
+    expert_devices: Record<string,"cpu"|"auto"|"cuda:0">;
     market_refresh_seconds: number;
     inference_timeout_seconds: number;
     journal_limit_mib: number;
     retained_transitions: number;
     revisions: number;
+    disk_reserve_gib: number;
+    market_queue_batches: number;
   };
   risk: {
-    max_asset_weight: number;
-    max_exposure: number;
-    max_turnover: number;
-    max_drawdown: number;
     freshness_seconds: number;
     fee: number;
     slippage: number;
@@ -152,6 +154,8 @@ export interface Snapshot {
     completed: number;
     outdated: number;
     ready: number;
+    batch_ready: number;
+    groups: {assets: number | null;ready: number}[];
     pending: number;
     bytes: number;
   };

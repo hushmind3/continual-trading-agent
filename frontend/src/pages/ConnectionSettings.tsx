@@ -148,7 +148,7 @@ export function ConnectionSettings() {
       </section>
       <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/50">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-bold">운영 기준</h2>
+          <h2 className="text-base font-bold">모델 · 학습 · 체결</h2>
           {running && <ControlButton name="engine" label="MoE" compact />}
         </div>
         <div className="space-y-4">
@@ -163,43 +163,8 @@ export function ConnectionSettings() {
               }
             />
           </label>
+          <p className="text-xs leading-5 text-slate-500">종목 비중·현금 비중·비중 변경·손실 대응은 모델이 결정합니다. 고정 비중 제한과 MDD 강제 청산은 적용하지 않습니다.</p>
           <div className="grid grid-cols-2 gap-4">
-            <Field
-              label="종목 최대 비중"
-              value={settings.risk.max_asset_weight * 100}
-              suffix="%"
-              disabled={running}
-              change={(v) =>
-                setSettings({
-                  ...settings,
-                  risk: { ...settings.risk, max_asset_weight: v / 100 },
-                })
-              }
-            />
-            <Field
-              label="전체 최대 투자"
-              value={settings.risk.max_exposure * 100}
-              suffix="%"
-              disabled={running}
-              change={(v) =>
-                setSettings({
-                  ...settings,
-                  risk: { ...settings.risk, max_exposure: v / 100 },
-                })
-              }
-            />
-            <Field
-              label="최대 손실폭"
-              value={settings.risk.max_drawdown * 100}
-              suffix="%"
-              disabled={running}
-              change={(v) =>
-                setSettings({
-                  ...settings,
-                  risk: { ...settings.risk, max_drawdown: v / 100 },
-                })
-              }
-            />
             <Field
               label="학습 배치"
               value={settings.learning.batch_size}

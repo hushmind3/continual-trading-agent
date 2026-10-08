@@ -12,6 +12,19 @@ from ..provider_credentials import get_credentials,read_settings
 from ..state_io import atomic_json,read_json
 
 
+def quote_timestamp(day,clock,region):
+    zone=ZoneInfo('America/New_York' if region=='us' else 'Asia/Seoul')
+    day=str(day or datetime.now(zone).strftime('%Y%m%d')).strip()[:8]
+    clock=str(clock or '').strip().replace(':','')
+    if not clock:return None
+    clock=clock.zfill(6)[:6]
+    if len(day)!=8 or not (day+clock).isdigit():return None
+    try:
+        return datetime.strptime(day+clock,'%Y%m%d%H%M%S').replace(tzinfo=zone).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
 class DomesticQuotes(KiwoomRealtimeStream):
     def _flush(self,symbol,bar):
         if not hasattr(self,'first_buckets'):self.first_buckets={}
@@ -33,11 +46,9 @@ class USQuotes(DomesticQuotes):
             instrument=self.by_code.get(code); values=event.get('values',{})
             if not instrument:continue
             price=_number(values.get('10'),absolute=True)
-            clock=str(values.get('51020') or '').zfill(6)
-            day=str(values.get('22') or datetime.now(ZoneInfo('America/New_York')).strftime('%Y%m%d'))
-            if not price or len(day)!=8 or len(clock)!=6 or not (day+clock).isdigit():continue
-            local=datetime.strptime(day+clock,'%Y%m%d%H%M%S').replace(tzinfo=ZoneInfo('America/New_York'))
-            bucket=local.astimezone(timezone.utc).replace(second=0,microsecond=0)
+            moment=quote_timestamp(values.get('22'),values.get('51020'),'us')
+            if not price or moment is None:continue
+            bucket=moment.replace(second=0,microsecond=0)
             symbol=instrument['symbol']; old=self.bars.get(symbol)
             if old and bucket<old['_bucket']:continue
             if old and bucket>old['_bucket']:
@@ -122,11 +133,9 @@ class BrokerStreams:
                             values=event.get('values',{})
                             if not instrument:continue
                             price=_number(values.get('10'),absolute=True)
-                            clock=str(values.get('51020') if region=='us' else values.get('20') or '').zfill(6)
-                            zone=ZoneInfo('America/New_York' if region=='us' else 'Asia/Seoul')
-                            day=str(values.get('22') or datetime.now(zone).strftime('%Y%m%d')) if region=='us' else datetime.now(zone).strftime('%Y%m%d')
-                            if price and len(clock)==6 and (day+clock).isdigit():
-                                moment=datetime.strptime(day+clock,'%Y%m%d%H%M%S').replace(tzinfo=zone).astimezone(timezone.utc)
+                            clock=values.get('51020') if region=='us' else values.get('20')
+                            moment=quote_timestamp(values.get('22') if region=='us' else None,clock,region)
+                            if price and moment is not None:
                                 self.collector.latest_quotes[instrument['symbol']]={'date':moment.isoformat(),'price':price,'provider':'kiwoom'}
                     now=datetime.now(timezone.utc).replace(second=0,microsecond=0)
                     for symbol,bar in list(parser.bars.items()):

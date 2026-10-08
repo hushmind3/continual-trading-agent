@@ -71,7 +71,8 @@ def run(settings):
         last_update = 0.
         while not stopped(settings,"learner"):
             counts = journal.stats(version,settings.learning.max_policy_lag)
-            publish(settings,"learner",status="waiting",version=version,optimizer_steps=steps,replay=counts,device="cpu")
+            publish(settings,"learner",status="waiting_batch",version=version,optimizer_steps=steps,replay=counts,device="cpu",
+                    message=f"같은 종목 구성의 학습 경험 {counts['batch_ready']}/{settings.learning.batch_size}개")
             if not control(settings).get("learning",True) or time.monotonic()-last_update < settings.learning.checkpoint_seconds:
                 time.sleep(1)
                 continue

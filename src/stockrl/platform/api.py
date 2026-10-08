@@ -59,7 +59,7 @@ def make_app(runtime=None,config=CONFIG_PATH):
             app.state.runtime.shutdown()
 
     app=FastAPI(title="FinRL-X MoE Operations",lifespan=lifespan,docs_url=None,redoc_url=None,default_response_class=SafeJSONResponse)
-    cache={"reader":None}; cache_lock=threading.RLock()
+    cache={"reader":None,"signature":None,"rows":{},"history":{}}; cache_lock=threading.RLock()
 
     def rt(request):
         return request.app.state.runtime
@@ -100,12 +100,14 @@ def make_app(runtime=None,config=CONFIG_PATH):
             if path.exists():
                 if cache["reader"] is None:
                     cache["reader"]=IncrementalMarketCSV(path,retain_timestamps=128)
-                frame,_=cache["reader"].refresh()
-                if frame is not None and len(frame):
+                frame,signature=cache["reader"].refresh()
+                if frame is not None and len(frame) and signature!=cache['signature']:
                     cache["reader"].processed_through=frame.date.max()
                     for symbol,group in frame.groupby("symbol"):
                         last=group.tail(2).to_dict("records"); rows[symbol]=last[-1]
                         recent[symbol]=[{"time":str(p["date"]),"close":float(p["close"])} for p in group.tail(32).to_dict("records")]
+                    cache.update(signature=signature,rows=rows,history=recent)
+                rows=cache['rows'];recent=cache['history']
         decisions={d["symbol"]:d for d in runtime.journal.get_state("decisions") or []}
         ticks=read_json(runtime.root/'live'/'quotes.json')
         return {"instruments":[{**item,"quote":rows.get(item["symbol"]),"decision":decisions.get(item["symbol"]),

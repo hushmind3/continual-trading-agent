@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from ..paths import PROJECT_ROOT, DEFAULT_MODEL_DIR
 
@@ -22,6 +23,8 @@ class ResourceSettings(BaseModel):
     ram_reserve_gib: float = Field(4, ge=1)
     vram_reserve_gib: float = Field(1.5, ge=0.5)
     expert_cache_count: int = Field(3, ge=1, le=20)
+    isolated_expert_parameters: int = Field(10000000, ge=1)
+    expert_devices: dict[str,Literal['cpu','auto','cuda:0']] = Field(default_factory=lambda:{'fincast':'cpu'})
     market_refresh_seconds: int = Field(300, ge=30)
     inference_timeout_seconds: int = Field(180, ge=10)
     journal_limit_mib: int = Field(512, ge=32)
@@ -37,10 +40,6 @@ class DataSettings(BaseModel):
 
 
 class RiskSettings(BaseModel):
-    max_asset_weight: float = Field(0.25, gt=0, le=1)
-    max_exposure: float = Field(0.9, ge=0, le=1)
-    max_turnover: float = Field(0.25, gt=0, le=1)
-    max_drawdown: float = Field(0.15, gt=0, le=1)
     freshness_seconds: int = Field(300, ge=60)
     fee: float = Field(0.001, ge=0, lt=0.1)
     slippage: float = Field(0.0001, ge=0, lt=0.1)

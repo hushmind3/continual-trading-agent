@@ -146,9 +146,9 @@ export function TrainingWorkspace() {
         </div>
         <div className="mt-6 border-t border-slate-100 pt-4">
           <Meter
-            value={(state.replay.ready / batch) * 100}
+            value={(state.replay.batch_ready / batch) * 100}
             label="다음 학습 배치"
-            detail={`${Math.min(state.replay.ready, batch)} / ${batch}`}
+            detail={`${Math.min(state.replay.batch_ready, batch)} / ${batch} · 같은 종목 구성 기준`}
             color="bg-violet-500"
           />
         </div>
@@ -200,7 +200,7 @@ export function TrainingWorkspace() {
               },
               { label: "경험 저장 크기", value: bytes(state.replay.bytes) },
               {
-                label: "정책 지연으로 학습 제외",
+                label: "이전 정책 · 체결 조건으로 제외",
                 value: `${number(state.replay.outdated, 0)}개`,
               },
             ].map((v) => (

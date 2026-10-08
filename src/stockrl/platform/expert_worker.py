@@ -7,17 +7,20 @@ import torch
 from ..market_reader import IncrementalMarketCSV
 from ..state_io import atomic_json
 from .config import load_settings, CONFIG_PATH
-from .assets import ExpertPool
+from .assets import ExpertPool,guard_model_assets
+from .expert_jobs import run_job
 from .journal import Journal
-from .observations import native_input, daily_history
+from .observations import native_input,daily_history,MissingInputConnection
 from .worker_state import publish, stopped
 
 
-def run(settings):
+def run(settings,config=CONFIG_PATH):
     torch.set_num_threads(settings.learning.cpu_threads)
+    weight_reads=guard_model_assets(settings.resolve(settings.expert_checkpoint))
     journal = Journal(settings.state_dir/"operations.sqlite3",settings.resources.journal_limit_mib,settings.resources.retained_transitions)
     publish(settings,"experts",status="loading",message="Expert 자산 목록을 읽는 중")
     pool = ExpertPool(settings)
+    pool.metrics=journal.get_state('expert_metrics') or {}
     atomic_json({"model_spec":pool.model_spec(),"experts":pool.catalog()},settings.state_dir/"expert_catalog.json")
     reader=IncrementalMarketCSV(settings.state_dir/"live"/"market.csv",retain_timestamps=256)
     last_run={}; cursor=0; previous_signature=None; cached_frame=None; daily_signature=None; cached_daily=pd.DataFrame()
@@ -65,22 +68,30 @@ def run(settings):
                     "positions":{s:p["quantity"] for s,p in book.get("positions",{}).items()},
                     "trades":book.get("trade_count",0),"costs":sum(book.get(k,0) for k in ("fees","slippage","spread","sell_tax"))}}
             snapshot['policy_account'].update(drawdown=drawdown,volatility=volatility)
-            if not daily.empty:
+            if policy and not daily.empty:
                 snapshot["stock_policy_history"]=daily.assign(date=daily.date.astype(str)).to_dict("records")
             publish(settings,"experts",status="inference",active_expert=key,active_since=time.time(),experts=pool.catalog())
             try:
                 batches=[None] if policy else native_input(key,frame,daily,stamp)
-                packets=[]
-                for batch_index,data in enumerate(batches):
-                    if stopped(settings,'experts'):break
-                    publish(settings,'experts',status='inference',active_expert=key,active_since=time.time(),batch=batch_index+1,batches=len(batches))
-                    packets.append(pool.run(key,data,snapshot))
+                if int(pool.entries[key].get('parameters',0))>=settings.resources.isolated_expert_parameters:
+                    packets=run_job(settings,key,batches,pool.metrics,config)
+                else:
+                    packets=[]
+                    for batch_index,data in enumerate(batches):
+                        if stopped(settings,'experts'):break
+                        publish(settings,'experts',status='inference',active_expert=key,active_since=time.time(),batch=batch_index+1,batches=len(batches))
+                        packets.append(pool.run(key,data,snapshot))
+                    pool.metrics[key]['weight_files']=sorted(weight_reads)
                 journal.put_evidence(key,packets)
+            except InterruptedError:
+                break
             except MemoryError as exc:
                 detail=str(exc)
                 if pool.metrics.get(key,{}).get("error")!=detail:
                     journal.event("warning",f"{pool.entries[key].get('name',key)}: {detail}")
                 pool.metrics.setdefault(key,{}).update(status="waiting_resources",error=detail)
+            except MissingInputConnection as exc:
+                pool.metrics.setdefault(key,{}).update(status="connection_required",error=str(exc))
             except ValueError as exc:
                 pool.metrics.setdefault(key,{}).update(status="needs_input",error=str(exc))
             except Exception as exc:
@@ -89,6 +100,7 @@ def run(settings):
                     journal.event("error",f"{pool.entries[key].get('name',key)}: {detail}")
                 pool.metrics.setdefault(key,{}).update(status="error",error=detail)
             publish(settings,"experts",status="ready",active_expert=None,experts=pool.catalog(),last_as_of=stamp)
+            journal.set_state('expert_metrics',pool.metrics)
     finally:
         pool.close(); journal.close(); publish(settings,"experts",status="stopped")
 
@@ -97,7 +109,7 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser(); parser.add_argument("--config",default=str(CONFIG_PATH)); args=parser.parse_args()
     settings=load_settings(args.config)
     try:
-        run(settings)
+        run(settings,args.config)
     except Exception as exc:
         publish(settings,"experts",status="error",error=f"{type(exc).__name__}: {exc}")
         raise

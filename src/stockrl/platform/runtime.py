@@ -21,6 +21,15 @@ from .data_universe import prepare
 MODULES={"experts":"stockrl.platform.expert_worker","agent":"stockrl.platform.agent_worker","learner":"stockrl.platform.learner"}
 
 
+def terminate_tree(process):
+    try:
+        for child in reversed(process.children(recursive=True)):
+            try:child.terminate()
+            except psutil.NoSuchProcess:pass
+        process.terminate()
+    except psutil.NoSuchProcess:pass
+
+
 class Runtime:
     def __init__(self,config=CONFIG_PATH):
         self.config=Path(config).resolve(); self.settings=load_settings(self.config)
@@ -100,7 +109,7 @@ class Runtime:
                         state=read_json(self.root/"workers"/(role+".json"))
                         if role=="experts" and state.get("status")=="inference" and time.time()-state.get("active_since",time.time())>self.settings.resources.inference_timeout_seconds:
                             self.journal.event("error","Expert 추론 시간 제한을 넘었습니다. 프로세스를 복구합니다.")
-                            process.terminate()
+                            terminate_tree(process)
                         continue
                     attempt,next_try=self.retries.get(role,(0,0))
                     if attempt>=5 or time.time()<next_try:
@@ -157,6 +166,6 @@ class Runtime:
                 (self.root/"workers"/(role+".stop")).touch(); processes.append(process)
         _,alive=psutil.wait_procs(processes,timeout=30)
         for process in alive:
-            process.terminate()
+            terminate_tree(process)
         for handle in self.handles.values(): handle.close()
         self.journal.close()

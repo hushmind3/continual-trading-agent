@@ -2,7 +2,7 @@
 $root = Split-Path -Parent $PSScriptRoot
 $frontend = Join-Path $root 'frontend'
 $vite = Join-Path $frontend 'node_modules\vite\bin\vite.js'
-$runtime = Join-Path $root 'runtime\markets\korea'
+$runtime = Join-Path $root 'runtime\finrlx'
 $pidFile = Join-Path $runtime 'frontend-vite.pid'
 $pythonLauncher = Join-Path $root 'start_stockrl.py'
 
@@ -13,7 +13,7 @@ if (-not (Test-Path -LiteralPath $vite)) {
     throw '프론트엔드 의존성이 없습니다. frontend 폴더에서 npm ci를 한 번 실행하세요.'
 }
 
-$pythonEnv = Join-Path $root 'artifacts\experts\venv\Scripts\python.exe'
+$pythonEnv = Join-Path $root '.venv\Scripts\python.exe'
 if (Test-Path -LiteralPath $pythonEnv) {
     & $pythonEnv $pythonLauncher --no-browser
 } else {
@@ -24,7 +24,7 @@ if (Test-Path -LiteralPath $pythonEnv) {
 if ($LASTEXITCODE -ne 0) { throw 'Python API 서버가 시작되지 않았습니다.' }
 
 $node = (Get-Command node.exe).Source
-$viteArgs = @($vite, '--host', '127.0.0.1', '--port', '5173', '--strictPort')
+$viteArgs = @(('"' + $vite + '"'), '--host', '127.0.0.1', '--port', '5173', '--strictPort')
 $viteProcess = $null
 if (Test-Path -LiteralPath $pidFile) {
     $savedId = 0

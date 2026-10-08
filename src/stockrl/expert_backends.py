@@ -77,6 +77,9 @@ def toto_native_module(directory):
     """
     with _source_lock:
         directory = Path(directory)
+        unit_source=directory.parents[1]/'dd_unit_scaling'
+        if unit_source.is_dir() and str(unit_source) not in sys.path:
+            sys.path.insert(0,str(unit_source))
         path = directory / "model.py"
         signature = (_source_signature(path), _source_signature(directory / "configuration.py"))
         module = sys.modules.get("research_toto.model")

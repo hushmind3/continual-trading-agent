@@ -1,21 +1,31 @@
-"""Python-only static UI delivery; no model load or Node server required."""
+"""The deployed FastAPI serves only the current frontend build, without caching."""
+from types import SimpleNamespace
 import unittest
-from stockrl.web.resources import DASHBOARD_PATH, ASSET_NAMES, dashboard_asset
+from fastapi.testclient import TestClient
+from stockrl.platform.api import make_app
+from stockrl.paths import PROJECT_ROOT
+
 
 class ReactAssetChecks(unittest.TestCase):
-    def test_built_entrypoint(self):
-        page = DASHBOARD_PATH.read_text(encoding="utf-8")
-        self.assertIn('id="root"', page)
-        self.assertIn('/assets/index-', page)
-        self.assertNotIn('web_dashboard.html', page)
+    def test_built_entrypoint_and_asset_delivery(self):
+        with TestClient(make_app(SimpleNamespace())) as client:
+            response=client.get('/')
+            self.assertEqual(response.status_code,200)
+            self.assertIn('id="root"',response.text)
+            self.assertEqual(response.headers['cache-control'],'no-store')
+            import re
+            names=re.findall(r'/assets/([^"\s]+)',response.text)
+            self.assertTrue(names)
+            for name in names:
+                asset=client.get('/assets/'+name)
+                self.assertEqual(asset.status_code,200)
+                self.assertTrue(asset.content)
+                self.assertEqual(asset.headers['cache-control'],'no-store')
 
-    def test_assets_and_traversal(self):
-        self.assertTrue(ASSET_NAMES)
-        for name in ASSET_NAMES:
-            body, mime = dashboard_asset('/assets/' + name)
-            self.assertIsInstance(body, bytes)
-            self.assertTrue(body)
-            self.assertTrue(mime.startswith('text/'))
-        self.assertIsNone(dashboard_asset('/assets/../resources.py'))
-        self.assertIsNone(dashboard_asset('/assets/missing.js'))
-        self.assertIsNone(dashboard_asset('/assets/C:/Windows/win.ini'))
+    def test_traversal_and_project_identity(self):
+        with TestClient(make_app(SimpleNamespace())) as client:
+            for path in ['missing.js','%2e%2e/config.py','C:/Windows/win.ini']:
+                self.assertEqual(client.get('/assets/'+path).status_code,404)
+            health=client.get('/api/health').json()
+            self.assertEqual(health['architecture'],'finrlx-moe-ppo-v1')
+            self.assertEqual(health['project'],str(PROJECT_ROOT))

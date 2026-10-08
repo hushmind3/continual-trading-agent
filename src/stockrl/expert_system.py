@@ -552,7 +552,14 @@ def build_fusion_head(expert_feature_sizes, market_features=16, width=64):
             if not self.trained and not allow_untrained:
                 raise RuntimeError("fusion head has no trained checkpoint; execution is disabled")
             query = self.market_projection(market_state)
-            tokens = torch.stack([self.projections[name](features) for name,features in expert_features.items()],dim=-2)
+            projected=[]
+            for index,(name,features) in enumerate(expert_features.items()):
+                if key_padding_mask is not None and bool(key_padding_mask[...,index].all()):
+                    # A masked source contributes nothing. Avoid the large dormant ITCH projection.
+                    projected.append(query.new_zeros(*features.shape[:-1],width))
+                else:
+                    projected.append(self.projections[name](features))
+            tokens=torch.stack(projected,dim=-2)
             if expert_gates is not None:
                 tokens = tokens * expert_gates.unsqueeze(-1)
             batch,symbols,experts,dim = tokens.shape

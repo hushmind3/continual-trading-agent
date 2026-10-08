@@ -15,7 +15,6 @@ import webbrowser
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
-from stockrl.paths import default_runtime_dir
 PORT = 8766
 URL = f"http://127.0.0.1:{PORT}/"
 
@@ -25,7 +24,8 @@ def ready() -> bool:
         with urlopen(URL + "api/health", timeout=2) as response:
             payload = json.load(response)
             if (response.status == 200 and payload.get("service") == "stockrl"
-                    and payload.get("port") == PORT):
+                    and payload.get("port") == PORT and payload.get('architecture')=='finrlx-moe-ppo-v1'
+                    and Path(payload.get('project','')).resolve()==ROOT.resolve()):
                 return True
     except (OSError, URLError, ValueError):
         return False
@@ -42,7 +42,7 @@ def port_in_use() -> bool:
 
 def main() -> int:
     open_browser = "--no-browser" not in sys.argv[1:]
-    log_dir = default_runtime_dir()
+    log_dir = ROOT/'runtime'/'finrlx'
     log_dir.mkdir(parents=True, exist_ok=True)
     if ready():
         print(f"StockRL is already running: {URL}")
@@ -59,7 +59,7 @@ def main() -> int:
     env["STOCKRL_WEB_PORT"] = str(PORT)
     env["PYTHONPATH"] = str(ROOT / "src") + os.pathsep + env.get("PYTHONPATH", "")
     env["PYTHONUTF8"] = "1"
-    command = [sys.executable, "-m", "stockrl.launch_web", "--server-only", "--dashboard-only"]
+    command = [sys.executable, "-m", "stockrl.launch_web", "--server-only"]
     for log_name in ("web.stdout.log", "web.stderr.log"):
         log_file=log_dir/log_name
         if log_file.exists() and log_file.stat().st_size >= 2*1024*1024:

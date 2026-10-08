@@ -244,20 +244,23 @@ class SharedPaperTests(unittest.TestCase):
             self.assertFalse(path.with_name("account.json.tmp").exists())
 
     def test_controls_are_independent(self):
-        from stockrl.web_app import Supervisor
-        supervisor=Supervisor.__new__(Supervisor)
-        supervisor.lock=threading.RLock()
-        supervisor.autonomy_enabled=True;supervisor.observe_enabled=True
-        supervisor.learning_enabled=True;supervisor._write_autonomy=MagicMock()
-        result=supervisor.set_modes(observe_enabled=False)
-        self.assertFalse(result["observe_enabled"])
-        self.assertTrue(result["paper_enabled"])
-        self.assertTrue(result["learning_enabled"])
-        supervisor.set_modes(paper_enabled=False,learning_enabled=False)
-        result=supervisor.set_modes(paper_enabled=True)
-        self.assertFalse(result["observe_enabled"])
-        self.assertFalse(result["learning_enabled"])
-        self.assertTrue(result["paper_enabled"])
+        from stockrl.platform.runtime import Runtime
+        with TemporaryDirectory() as directory:
+            supervisor=Runtime.__new__(Runtime);supervisor.lock=threading.RLock();supervisor.root=Path(directory)
+            supervisor.controls={'feed':True,'engine':True,'paper':True,'learning':True,'mode':'live'}
+            supervisor.retries={'feed':(5,0),'learner':(3,0)}
+            result=supervisor.command('feed',False)['controls']
+            self.assertFalse(result['feed']);self.assertTrue(result['paper']);self.assertTrue(result['learning'])
+            supervisor.command('paper',False);supervisor.command('learning',False)
+            result=supervisor.command('paper',True)['controls']
+            self.assertFalse(result['feed']);self.assertFalse(result['learning']);self.assertTrue(result['paper'])
+            self.assertEqual(supervisor.retries['feed'][0],5)
+            self.assertEqual(supervisor.retries['learner'][0],3)
+            supervisor.command('learning',True)
+            self.assertNotIn('learner',supervisor.retries)
+            self.assertIn('feed',supervisor.retries)
+            result=supervisor.command('engine',False)['controls']
+            self.assertFalse(result['paper'])
 
     def test_preopen_learning_overtakes_waiting_inference_without_removing_it(self):
         from datetime import datetime,timezone

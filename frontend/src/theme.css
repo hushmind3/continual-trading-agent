@@ -4,13 +4,13 @@
 }
 @layer base {
   body {
-    @apply m-0 bg-slate-950 font-sans text-slate-100 antialiased;
+    @apply m-0 bg-slate-50 font-sans text-slate-900 antialiased;
   }
   button {
     @apply cursor-pointer;
   }
   button:focus-visible {
-    @apply outline-2 outline-offset-4 outline-sky-400;
+    @apply outline-2 outline-offset-2 outline-blue-400;
   }
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -18,5 +18,15 @@
     ::after {
       transition-duration: 0s !important;
     }
+  }
+}
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

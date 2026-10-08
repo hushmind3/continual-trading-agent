@@ -39,6 +39,10 @@ def _market_session_open(item: dict, now_utc: datetime) -> bool:
         return True
     if market == "CRYPTO" or item.get("asset_class") == "crypto":
         return True
+    from .platform.sessions import session_open
+    scheduled=session_open(market,now_utc)
+    if scheduled is not None:
+        return scheduled
     zone = {
         "KRX": "Asia/Seoul", "KOSDAQ": "Asia/Seoul", "Japan": "Asia/Tokyo",
         "HongKong": "Asia/Hong_Kong", "Germany": "Europe/Berlin",
@@ -360,7 +364,8 @@ class LiveMarketCollector:
                    "broker_krx_last_message_utc": self.broker_status.get("krx_last_message_utc"),
                    "broker_krx_ticks": self.broker_status.get("krx_ticks", 0),
                    "broker_error": self.broker_status.get("last_error", "")}
-        self.metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+        from .state_io import atomic_json
+        atomic_json(metrics,self.metrics_path)
         logging.info("polled=%d fetched=%d appended=%d failures=%d", len(due), len(rows), added,
                      metrics["retrying_symbols"])
         return added

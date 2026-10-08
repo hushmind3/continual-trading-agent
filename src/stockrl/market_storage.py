@@ -56,14 +56,24 @@ class AppendOnlyMarketCSV:
     def append(self, rows: list[dict[str, Any]]) -> int:
         unique: list[dict[str, Any]] = []
         batch: set[tuple[str, int]] = set()
-        for row in rows:
+        if not rows:return 0
+        stamps=pd.to_datetime([r.get('date') for r in rows],utc=True,errors='coerce',format='mixed')
+        valid=[s.value for s in stamps if not pd.isna(s)]
+        if not valid:return 0
+        symbols=sorted({str(r.get('symbol')) for r in rows if r.get('symbol')})
+        existing=set()
+        for start in range(0,len(symbols),400):
+            group=symbols[start:start+400]
+            placeholders=','.join('?' for _ in group)
+            existing.update(self.db.execute(f'SELECT symbol,stamp_ns FROM seen WHERE stamp_ns BETWEEN ? AND ? AND symbol IN ({placeholders})',
+                                            (min(valid),max(valid),*group)).fetchall())
+        for row,stamp in zip(rows,stamps):
             row = {key: row.get(key) for key in FEED_COLUMNS}
-            stamp = pd.to_datetime(row["date"], utc=True, errors="coerce")
             if pd.isna(stamp) or not row["symbol"]:
                 continue
             row["date"] = stamp.isoformat()
             key = (str(row["symbol"]), int(stamp.value))
-            if key in batch or self.db.execute("SELECT 1 FROM seen WHERE symbol=? AND stamp_ns=?", key).fetchone():
+            if key in batch or key in existing:
                 continue
             batch.add(key)
             unique.append(row)

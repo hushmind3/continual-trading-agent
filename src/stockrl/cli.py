@@ -40,21 +40,14 @@ def main() -> None:
         result=replay_market_csv(args.source,args.output,args.bars,args.interval_seconds,args.start_offset,args.max_cycles,args.stop_file)
         print(json.dumps(result,indent=2))
     mf.set_defaults(func=run_mock_feed)
-    web=sub.add_parser("web",help="open the dashboard and start the shared market feed")
-    web.add_argument("--host",default="127.0.0.1",help="bind address; localhost by default")
-    web.add_argument("--port",type=int,default=8766); web.add_argument("--runtime",default=str(default_runtime_dir()))
-    web.add_argument("--model-dir",default=None,help="directory for Champion/Candidate checkpoints")
-    web.add_argument("--fee",type=float,default=.001)
-    web.add_argument("--horizon",default="1m",help="paper outcome horizon: 30s, 1m, or 5m")
-    web.add_argument("--config",default="configs/live_symbols.json",help="market universe/provider config")
-    web.add_argument("--no-auto-start",action="store_true",help="open dashboard without starting feed/model")
-    web.add_argument("--no-browser",action="store_true",help=argparse.SUPPRESS)
+    web=sub.add_parser("web",help="serve FinRL-X operations and the built React UI")
+    web.add_argument("--host",default="127.0.0.1")
+    web.add_argument("--port",type=int,default=8766)
+    web.add_argument("--config",default="configs/operations.json")
+    web.add_argument("--no-browser",action="store_true")
     def run_web(args):
-        from .web_app import serve
-        model_dir=args.model_dir or os.environ.get("STOCKRL_MODEL_DIR") or str(Path.home()/"Desktop"/"모델")
-        serve(host=args.host,port=args.port,runtime=args.runtime,fee=args.fee,
-              auto_start=not args.no_auto_start,open_browser=not args.no_browser,
-              horizon=args.horizon,config=args.config,model_dir=model_dir)
+        from .platform.api import serve
+        serve(host=args.host,port=args.port,config=args.config,open_browser=not args.no_browser)
     web.set_defaults(func=run_web)
     args=p.parse_args(); args.func(args)
 

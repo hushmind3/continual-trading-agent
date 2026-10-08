@@ -1,0 +1,14 @@
+-r moe.txt
+torchrl==0.14.0
+tensordict==0.14.2
+bt==1.1.2
+pandas-market-calendars==5.3.1
+fastapi==0.115.9
+uvicorn==0.34.2
+unit-scaling==0.3.5
+jaxtyping==0.3.11
+websockets==15.0.1
+
+# The installer separately installs the selected APIs of these pinned frameworks with --no-deps.
+# FinRL-Trading: 4409abe925c904e570be78ebfb5e77ac3491dff8
+# Official Kiwoom SDK: 953e5dbff123f437ab4d11a78a95191a685eb51f

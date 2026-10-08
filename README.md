@@ -1,52 +1,52 @@
-# Continual Trading Agent
+# FinRL-X MoE Operations
 
-TradingMoE를 중심으로 금융 시계열 전문가를 실행하고, 가상계좌의 체결 결과로 정책을 업데이트하는 로컬 운영 도구입니다. Python이 API와 실행 관리를 맡고, React 화면은 Python 서버가 정적 파일로 제공합니다.
+실시간 시장 데이터와 기존 `champion.pt` MoE를 연결하는 금융 운영 도구입니다. FinRL-X의 목표 비중 중심 구조를 기준으로 데이터·전략·위험검사·가상계좌를 연결하고, TorchRL PPO가 실제 시장 결과로 의사결정부를 학습합니다.
 
-## 현재 동작 구조
+## 동작
 
-- 시장 Feed, Champion, Candidate, 전용 TradingMoE 실행은 각각 제어됩니다. 서버를 켜는 것만으로 모델이나 Feed를 시작하지 않습니다.
-- Champion과 Candidate는 독립된 실행 상태와 가상계좌·학습 상태를 유지합니다. Candidate 등록은 `MoE 생성`에서 만든 TradingMoE 구성을 `candidate.pt`로 교체하는 방식으로 진행합니다.
-- TradingMoE는 선택된 시장 분석 전문가와 매매 판단 전문가를 Router·Fusion·Attention·Controller로 연결합니다. 원본 전문가 가중치는 고정하고, paper 결과와 replay를 사용해 adapter·controller를 업데이트합니다.
-- 가상 주문은 체결 비용과 계좌 손익을 반영합니다. 현재 서버 상태에서 실제 주문 실행은 비활성화되어 있습니다.
-- 전용 TradingMoE 연속 실행은 프로젝트에 포함된 MacroHFT 공식 ETHUSDT 과거 입력을 사용합니다. 이는 실시간 ETH 매매나 수익성 검증을 뜻하지 않습니다. 주식 정책은 필요한 종목·기간 입력이 있을 때만 적용됩니다.
+`실시간 시세 → frozen Expert 20개 → 학습된 MoE 결합부 / 64D latent → 시장·계좌 feature → TorchRL Allocator → target weights → FinRL-X StrategyResult → 위험검사 → 가상체결 → 비용 반영 손익 → 지속학습`
 
-화면은 `운영`에서 전체 실행 상태·계좌·학습·자원을 확인하고, `자동매매`에서 Champion·Candidate·TradingMoE의 실행 제어와 가상계좌를 확인하도록 나뉩니다. `MoE 생성`에서는 시장 분석 Expert와 매매 판단 Expert를 선택해 독립 TradingMoE 파일을 만들고 Candidate로 등록합니다. `승급전`은 등록된 Candidate와 Champion의 평가를 담당합니다.
+- Expert 원본 가중치는 frozen입니다. `champion.pt`의 실제 Adapter·Router·Fusion·Attention·Controller를 복원하며, 새 랜덤 정책으로 대체하지 않습니다.
+- Expert 실행, MoE 판단·계좌, CPU 학습은 별도 프로세스입니다. 느린 Expert나 학습이 주문·결과 처리 루프를 붙잡지 않습니다.
+- 큰 원본 PT를 매번 다시 쓰지 않고, 학습한 결합부·Allocator·optimizer 상태를 작은 정책 버전으로 저장합니다. 운영 판단에는 발행된 최신 버전이 반영됩니다.
+- 가상체결은 다음 완료 시세에서 처리하며, 수수료·가격 미끄러짐·계좌 비용을 포함합니다. 원화와 달러 계좌는 별도로 계산합니다. 실제 주문은 연결하지 않습니다.
+- 경험 처리와 계좌·미체결 상태는 SQLite transaction으로 함께 저장합니다. 정책 checksum, 버전 복원, 프로세스 식별과 재시도로 재시작을 지원합니다.
+- MacroHFT 36+9, MarketGPT ITCH, DAPO sentiment/risk처럼 필수 원본 입력이 없는 Expert는 입력 필요 상태로 표시합니다. 과거 입력을 현재 데이터로 위장하지 않습니다.
 
-## Windows 설치 및 실행
+## 실행
 
-새 PC 설치 절차는 [Windows 설치 안내](docs/windows-install.md)를 따릅니다. `설치.cmd`는 Python 3.13을 사용하고 전문가 실행 환경을 준비합니다. CUDA 의존성 설치에 많은 디스크 공간과 시간이 필요할 수 있습니다. NVIDIA GPU 사용에는 호환되는 드라이버가 필요합니다. 통합 실행 파일은 Node.js LTS와 프론트엔드 의존성 설치도 필요로 합니다.
+Windows에서는 Python 3.13, Node.js LTS, NVIDIA GPU에 맞는 드라이버를 준비한 뒤 `설치.cmd`를 실행합니다. 모델 파일은 바탕화면 `모델/champion.pt`를 사용하며 GitHub에 포함되지 않습니다.
 
-1. 저장소를 clone하거나 GitHub에서 내려받습니다.
-2. Node.js LTS를 설치한 뒤 `설치.cmd`를 실행합니다.
-3. `frontend` 폴더에서 `npm ci`를 한 번 실행합니다.
-4. 모델을 실행하려면 기존 PC의 바탕화면 `모델` 폴더를 새 PC 바탕화면으로 복사하거나 필요한 Expert 가중치를 다시 다운로드합니다. 체크포인트와 원본 전문가 가중치는 GitHub에 포함되지 않습니다.
-5. `서버켜기.cmd`를 실행합니다. Python API `http://127.0.0.1:8766`과 React/Vite 화면 `http://127.0.0.1:5173`을 함께 켜고 브라우저를 엽니다.
-6. 화면에서 Feed와 실행할 모델을 각각 시작합니다.
+`서버켜기.cmd`는 기본 프로젝트에서 Python API와 Vite를 함께 시작합니다.
 
-`프론트개발서버끄기.cmd`는 Vite만 종료하며 Python API 서버는 계속 실행합니다. 운영용 정적 화면은 Python 서버의 `http://127.0.0.1:8766`에서 제공됩니다.
+- 운영 UI / API: <http://127.0.0.1:8766>
+- 개발 UI: <http://127.0.0.1:5173>
 
-## 개발
+시세·MoE·가상체결·자동학습은 화면에서 제어합니다. 키움 App Key와 Secret은 연결 화면에서 확인하며 운영체제 보안 저장소를 사용합니다. 국내 체결가와 미국 FE 시세는 공식 키움 SDK를 통해 수신합니다.
 
-Python 패키지 메타데이터와 기본 의존성은 `pyproject.toml`, Windows 전문가 환경은 `requirements/moe.txt`와 `requirements/moe-toto.txt`에 정의되어 있습니다. 설치 스크립트는 전문가 의존성을 별도 환경으로 나눠 설치합니다.
+## 설정과 저장
+
+- 운영 설정: `configs/operations.json`
+- 원본 모델: `Desktop/모델/champion.pt`
+- 계좌·경험·시세·프로세스 상태: `runtime/finrlx`
+- 정책·optimizer 버전: `runtime/finrlx/policies`
+- React / Tailwind CSS / Vite: `frontend`
+- 운영 API·Expert 서비스·TorchRL 학습: `src/stockrl/platform`
+
+`runtime`, `.venv`, `node_modules`, 키움 로컬 설정과 가중치는 Git에서 제외합니다. 다른 PC에서 이어서 운영하려면 정상 정지 후 원본 모델과 `runtime/finrlx`를 함께 옮깁니다.
+
+## 개발 확인
 
 ```powershell
+$env:PYTHONPATH="src"
+$env:PYTHONUTF8="1"
+.\.venv\Scripts\python.exe -m unittest discover -s tests -q
 cd frontend
-npm ci
-npm run dev       # 개발 UI: http://127.0.0.1:5173, /api는 8766으로 전달
 npm run typecheck
-npm run build     # 결과: frontend/dist
+npm test
+npm run build
 ```
 
-Python 서버는 `frontend/dist`를 제공합니다. 프론트엔드를 수정한 뒤 운영 화면에 반영하려면 빌드를 다시 실행해야 합니다.
+브라우저 테스트는 실행 중인 8766 서버와 설치된 Microsoft Edge를 사용합니다. 빌드 결과 `frontend/dist`를 Python 서버가 직접 제공하며 `no-store`로 응답합니다.
 
-계좌와 학습 상태는 각 PC의 로컬 저장소에 남고 GitHub에는 올라가지 않습니다. 다른 PC에서 계좌와 학습을 이어가려면 모델을 정상 정지한 뒤 실행 상태 자료를 별도로 옮겨야 합니다. 저장 위치와 이동 범위는 [저장 위치 안내](docs/project-storage.md)를 참고하세요. 비밀번호·API 키를 저장소에 넣지 마십시오.
-
-## 문서
-
-- [문서 안내](docs/README.md)
-- [Champion/Candidate 실행 제어](docs/model-lifecycle.md)
-- [TradingMoE 학습·가상매매](docs/trading-moe-learning.md)
-- [MoE 생성과 후보 평가](docs/assembly.md)
-- [전문가와 모델 파일 배치](docs/project-storage.md)
-- [주식 정책 전문가](docs/stock_policy_experts.md)
-- `docs/reports/`의 수치와 측정 결과는 해당 기록 시점의 자료입니다. 현재 실행 상태나 계좌 값은 로컬 대시보드/API에서 확인합니다.
+상세 구조는 [운영 architecture](docs/architecture.md), 설치는 [Windows 설치](docs/windows-install.md), 저장 위치는 [저장 안내](docs/project-storage.md)를 참고하세요.

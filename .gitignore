@@ -1,4 +1,4 @@
-# Model weights are stored separately on Hugging Face.
+# Original model weights are stored outside the repository.
 *.pt
 *.pth
 *.ckpt
@@ -33,7 +33,6 @@ __pycache__/
 /artifacts/experts/stock-policies/**/*.ipynb
 /runtime/gpu-owner.lock
 
-# Recoverable local cleanup; never upload archived datasets/source ZIPs.
 # Process-local locks and SQLite shared-memory files are recreated at runtime.
 *.sqlite3-shm
 *.sqlite3-wal
@@ -47,7 +46,10 @@ __pycache__/
 # Frontend development dependencies; built UI is shipped for Python-only use.
 /frontend/node_modules/
 /frontend/coverage/
+/frontend/test-results/
+/frontend/playwright-report/
 *.tsbuildinfo
+/.venv/
 
 # Generated UI proof images are not model inputs or source assets.
 /artifacts/experts/verification/*.png

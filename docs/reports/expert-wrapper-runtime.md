@@ -1,6 +1,6 @@
 # 초기 expert wrapper · 원본 보존 통합 추론
 
-이 문서는 14개 expert 독립 검증 당시의 진단 경로 기록입니다. 현재 TradingMoE.pt 운용은 [실행·학습 안내](../trading-moe-learning.md)를 따릅니다.
+이 문서는 14개 expert 독립 검증 당시의 진단 경로 기록입니다. 현재 운영 구조는 [운영 architecture](../architecture.md)를 따릅니다.
 
 ## 현재 구성
 

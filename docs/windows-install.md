@@ -1,25 +1,11 @@
-# 다른 Windows 컴퓨터에 설치
+# Windows 설치
 
-1. Node.js LTS, Python 3.13, CUDA 13.2를 지원하는 NVIDIA 드라이버를 설치한다.
-2. GitHub 프로젝트를 다운로드하거나 clone한 뒤 `설치.cmd`를 실행한다.
-3. `frontend` 폴더에서 `npm ci`를 한 번 실행한다.
-4. 기존 바탕화면 `모델` 폴더를 새 컴퓨터의 바탕화면으로 복사한다. 모델 가중치는 GitHub에 포함하지 않는다.
-5. `서버켜기.cmd` 한 번으로 Python API와 React/Vite 화면을 함께 시작한다. Feed와 모델은 화면의 시작 버튼으로 켠다.
+1. Python 3.13과 Node.js LTS를 설치합니다. GPU 추론에는 사용 중인 PyTorch CUDA 환경과 호환되는 NVIDIA 드라이버가 필요합니다.
+2. 프로젝트를 다운로드한 폴더에서 `설치.cmd`를 실행합니다. 하나의 `.venv`에 운영·Expert·TorchRL 의존성을 설치하고 프론트엔드를 빌드합니다.
+3. 바탕화면 `모델` 폴더에 기존 `champion.pt`를 둡니다. 이 파일은 Expert 20개의 frozen 가중치와 실제 MoE 결합부를 포함합니다.
+4. `서버켜기.cmd`를 실행합니다. 8766은 운영 화면과 API, 5173은 Vite 개발 화면입니다.
+5. 연결 화면에서 키움 인증과 운영 기준을 확인하고 시세와 MoE를 시작합니다. 가상체결은 별도로 허용합니다.
 
-설치 프로그램은 프로젝트 위치와 새 사용자 홈을 기준으로 경로를 생성한다. 사용자 이름이나 예전 컴퓨터의 절대 경로를 입력할 필요가 없다. 원본 모델 파일·가상계좌를 초기화하거나 자동 거래를 시작하지 않는다.
+실제 사용하는 FinRL-Trading와 공식 키움 SDK API는 commit을 고정해 설치합니다. 선택하지 않은 Alpaca·LLM·외부 UI 의존성까지 통째로 설치하지 않습니다. 설치된 원본 모델은 재학습하거나 변환하지 않습니다.
 
-## 전달되는 설정
-
-- `configs/web_settings.default.json`: 처음 실행할 때 사용할 모드 설정. 모델 시작은 기본 OFF.
-- `configs/online_learning.json`: optimizer·replay·보상 관련 운영 설정.
-- `src/stockrl/replay_store.py`: SQLite 스키마와 migration. 새 replay 사용 시 자동 생성.
-- `src/stockrl/paper_account.py`, `moe_paper.py`: 새 가상계좌와 별도 MoE replay 생성.
-- `artifacts/experts/registry.template.json`: 20개 expert의 경로 독립 메타데이터. 첫 사용 시 runtime registry를 생성.
-- 공식 ETHUSDT `df_val.feather`: 현재 과거 가상매매 경로에 필요한 원본 입력. DB/replay와 구분해서 프로젝트에 포함.
-- `artifacts/experts/sources/TSFM_Finance/data/two_stocks_excess_returns.csv`: TimesFM·Chronos의 현재 실행 경로가 읽는 원본 참조 입력. 설치 후 별도 다운로드 없이 사용할 수 있도록 포함.
-
-## 전달하지 않는 실행 데이터
-
-`runtime`, 컴퓨터별 `configs/local`, Python 환경, replay·DB·로그·프로세스 PID·캐시, 모델 가중치, 휴지통은 GitHub에서 제외한다. 새 컴퓨터에서는 빈 실행 상태로 시작한다. 누적 계좌·경험을 이어가려면 모델을 정상 정지한 뒤 별도로 runtime을 복사한다.
-
-현재 worker는 공식 ETHUSDT 과거 구간을 사용한다. Feed 수집 종목 수를 실시간 MoE 매매 종목 수로 해석하지 않는다. 새로운 컴퓨터에서 전체 CUDA 설치와 expert 추론은 해당 장치에서 확인해야 한다.
+새 컴퓨터에는 로컬 실행 데이터가 없습니다. 운영을 이어가려면 정상 정지 후 원본 모델과 `runtime/finrlx`를 옮깁니다. 키움 키는 새 PC의 운영체제 보안 저장소에 등록합니다.

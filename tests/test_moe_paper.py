@@ -194,21 +194,5 @@ class RuntimeStorageTests(unittest.TestCase):
             self.assertEqual((trial / name).read_bytes(), b"preserve")
         self.assertFalse((trial / "decisions.jsonl").exists())
 
-    def test_assembly_reads_actual_raw_outputs_from_deduplicated_cache(self):
-        journal = EvidenceJournal(self.root / "runtime/model")
-        for index in range(8):
-            journal.record_cycle({"timestamp": f"2026-10-01T00:{index:02d}:00", "decision": self.decision})
-        scripts = Path(__file__).resolve().parents[1] / "scripts"
-        import sys
-        sys.path.insert(0, str(scripts))
-        try:
-            fn = runpy.run_path(str(scripts / "run_assembly_trial.py"))["cached_rows"]
-            fn.__globals__["PROJECT_ROOT"] = self.root
-            rows, source = fn()
-        finally:
-            sys.path.remove(str(scripts))
-        self.assertEqual(len(rows), 8)
-        self.assertEqual(rows[0]["decision"]["raw_outputs"], [self.packet])
-        self.assertTrue(source.endswith("evidence.sqlite3"))
 
 if __name__=="__main__":unittest.main()

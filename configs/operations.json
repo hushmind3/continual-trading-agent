@@ -1,0 +1,42 @@
+{
+  "runtime": "runtime/finrlx",
+  "instruments": "configs/live_symbols_korea.json",
+  "expert_checkpoint": "~/Desktop/모델/champion.pt",
+  "enabled_experts": [],
+  "learning": {
+    "batch_size": 32,
+    "epochs": 4,
+    "learning_rate": 0.0003,
+    "discount": 0.99,
+    "clip_epsilon": 0.2,
+    "entropy_coefficient": 0.002,
+    "max_policy_lag": 2,
+    "checkpoint_seconds": 60,
+    "cpu_threads": 2
+  },
+  "resources": {
+    "ram_reserve_gib": 4.0,
+    "vram_reserve_gib": 1.5,
+    "expert_cache_count": 3,
+    "market_refresh_seconds": 300,
+    "inference_timeout_seconds": 180,
+    "journal_limit_mib": 512,
+    "retained_transitions": 10000,
+    "revisions": 5,
+    "disk_reserve_gib": 2.0,
+    "market_queue_batches": 64
+  },
+  "risk": {
+    "max_asset_weight": 0.25,
+    "max_exposure": 0.9,
+    "max_turnover": 0.25,
+    "max_drawdown": 0.15,
+    "freshness_seconds": 300,
+    "fee": 0.001,
+    "slippage": 0.0001
+  },
+  "data": {
+    "poll_seconds": 15.0,
+    "timeout_seconds": 10.0
+  }
+}

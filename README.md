@@ -4,7 +4,7 @@
 
 ## 동작
 
-`실시간 시세 → frozen Expert 20개 → 학습된 MoE 결합부 / 64D latent → 시장·계좌 feature → TorchRL Allocator → target weights → FinRL-X StrategyResult → 위험검사 → 가상체결 → 비용 반영 손익 → 지속학습`
+`실시간 시세 → 사용 가능한 frozen Expert 출력 → 학습된 MoE 결합부 / 64D latent → 시장·계좌 feature → TorchRL Allocator → target weights → 위험검사 → FinRL-X StrategyResult → 가상체결 → 비용 반영 손익 → 지속학습`
 
 - Expert 원본 가중치는 frozen입니다. `champion.pt`의 실제 Adapter·Router·Fusion·Attention·Controller를 복원하며, 새 랜덤 정책으로 대체하지 않습니다.
 - Expert 실행, MoE 판단·계좌, CPU 학습은 별도 프로세스입니다. 느린 Expert나 학습이 주문·결과 처리 루프를 붙잡지 않습니다.
@@ -12,6 +12,7 @@
 - 가상체결은 다음 완료 시세에서 처리하며, 수수료·가격 미끄러짐·계좌 비용을 포함합니다. 원화와 달러 계좌는 별도로 계산합니다. 실제 주문은 연결하지 않습니다.
 - 경험 처리와 계좌·미체결 상태는 SQLite transaction으로 함께 저장합니다. 정책 checksum, 버전 복원, 프로세스 식별과 재시도로 재시작을 지원합니다.
 - MacroHFT 36+9, MarketGPT ITCH, DAPO sentiment/risk처럼 필수 원본 입력이 없는 Expert는 입력 필요 상태로 표시합니다. 과거 입력을 현재 데이터로 위장하지 않습니다.
+- 원본 MoE에는 Expert 20개가 포함됩니다. 실제 실행은 선택한 Expert의 입력·RAM·VRAM 조건에 따라 달라지며, 자원이 부족하면 실행을 보류하고 화면에 자원 대기로 표시합니다.
 
 ## 실행
 
@@ -23,6 +24,8 @@ Windows에서는 Python 3.13, Node.js LTS, NVIDIA GPU에 맞는 드라이버를 
 - 개발 UI: <http://127.0.0.1:5173>
 
 시세·MoE·가상체결·자동학습은 화면에서 제어합니다. 키움 App Key와 Secret은 연결 화면에서 확인하며 운영체제 보안 저장소를 사용합니다. 국내 체결가와 미국 FE 시세는 공식 키움 SDK를 통해 수신합니다.
+
+실행 여부, 시세 연결, 정책 버전, 학습 횟수와 계좌 수치는 운영 화면과 `/api/state`에서 확인합니다. 이 문서는 구조와 사용 방법을 설명하며 실시간 상태 수치를 보관하지 않습니다.
 
 ## 설정과 저장
 

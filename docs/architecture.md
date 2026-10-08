@@ -1,6 +1,6 @@
 # FinRL-X 운영 구조
 
-목표 비중은 전략·위험검사·가상체결·평가가 공유하는 계약이다. FinRL-X/FinRL-Trading은 이 운영 구조의 기준이다. `champion.pt`의 기존 MoE 결합부와 allocation head를 이어받고, 64D latent와 실제 시장·계좌 상태를 TorchRL Allocator에 전달한다.
+목표 비중은 전략·위험검사·가상체결·평가가 공유하는 계약이다. FinRL-X/FinRL-Trading의 `BaseStrategy`와 `StrategyResult` API를 사용하고, 실제 시세 수집·가상계좌·프로세스 관리·복구는 `src/stockrl/platform`과 프로젝트의 시세·계좌 모듈이 담당한다. `champion.pt`의 기존 MoE 결합부와 allocation head를 이어받고, 64D latent와 실제 시장·계좌 상태를 TorchRL Allocator에 전달한다.
 
 ```mermaid
 flowchart LR
@@ -9,7 +9,8 @@ flowchart LR
   Expert --> MoE[Champion MoE 결합부 / 64D latent]
   MoE --> Policy[TorchRL Allocator + 실제 시장 feature]
   Policy --> Risk[통화별 위험검사]
-  Risk --> Paper[다음 관측에서 가상체결]
+  Risk --> Result[FinRL-X StrategyResult]
+  Result --> Paper[다음 관측에서 가상체결]
   Paper --> Reward[비용 반영 순자산 변화]
   Reward --> Journal[SQLite 경험 기록]
   Journal --> Learner[TorchRL PPO / 별도 CPU 프로세스]
@@ -18,6 +19,8 @@ flowchart LR
 ```
 
 Expert 20개의 원본 가중치는 frozen이다. `champion.pt` 안에서 이미 학습된 Adapter·Router·Fusion·Attention·Controller를 정확히 복원한다. 추가 Allocator 보정층의 출력은 0으로 초기화하고, 원래 allocation head를 출발점으로 결합부와 Allocator를 함께 학습한다. 기존 3개 모델 실행·승급 시험·수작업 학습 runner는 운영 경로에서 제외한다. MacroHFT 36+9 입력이나 MarketGPT ITCH 입력이 없는 경우 입력 부족을 명시하며 과거 데이터를 현재 입력으로 바꾸지 않는다.
+
+20개는 원본 자산 수이며 동시 실행 수를 뜻하지 않는다. 선택한 Expert 중 원본 입력과 자원 조건이 맞는 모델을 순회 실행한다. RAM·VRAM 조건이 부족하면 자원 대기로 표시하고 다음 실행 기회에 다시 확인한다.
 
 종목 수는 정책 파라미터 크기와 독립적이다. 통화마다 자산 집합과 현금을 함께 판단하고, 미수신 자산은 비중을 바꾸지 않는다. 학습 경험은 종목 집합과 정책 버전이 맞는 그룹으로 처리한다.
 

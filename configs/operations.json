@@ -5,7 +5,7 @@
   "enabled_experts": [
     "chronos",
     "exaone",
-    "fincast",
+    "fincast_fp16",
     "kronos",
     "stock_adilbai",
     "stock_finrl_a2c",
@@ -18,6 +18,8 @@
   ],
   "learning": {
     "batch_size": 32,
+    "minimum_batch_size": 4,
+    "batch_wait_seconds": 300,
     "epochs": 4,
     "learning_rate": 0.0003,
     "discount": 0.99,

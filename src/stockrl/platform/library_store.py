@@ -21,19 +21,20 @@ def save_catalog(settings,header,catalog=None):
         previous=catalog['experts'].get(key,{})
         if previous.get('package',{}).get('sha256')==reference['sha256']:
             value['check']=previous.get('check',value['check'])
+            if value.get('conversion'):value['conversion']=previous.get('conversion',value['conversion'])
         catalog['experts'][key]=value
     catalog.update(active=catalog.get('active',header.get('active_experts',sorted(header['expert_mapping']))),
                    installed={k:r['sha256'] for k,r in header['expert_packages'].items()},updated=time.time())
     atomic_json(catalog,path);return catalog
 
 
-def fetch_source(settings,source,progress):
+def fetch_source(settings,source,progress,root=None):
     if not source:raise ValueError('Expert 패키지 파일 경로나 다운로드 주소를 입력하세요.')
     if not str(source).startswith(('http://','https://')):
         path=Path(source).expanduser().resolve()
         if not path.is_file():raise ValueError('파일이 없습니다.')
         return path
-    root=settings.resolve(settings.expert_checkpoint).parent/'expert-packages'/'incoming';root.mkdir(parents=True,exist_ok=True)
+    root=Path(root) if root is not None else settings.resolve(settings.expert_checkpoint).parent/'expert-packages'/'incoming';root.mkdir(parents=True,exist_ok=True)
     partial=root/'download.partial'
     try:
         with requests.get(source,stream=True,timeout=(10,30)) as response:
@@ -84,6 +85,10 @@ def import_package(settings,path,key,slot,progress,template=None):
                 native_runner_source=saved['metadata']['native_runner_source'],construction_input=saved['metadata']['construction_inputs'].get(key)))
     elif template:package=upgrade_from_template(settings,path,template)
     else:raise ValueError('지원하지 않는 패키지 형식')
+    return register_package(settings,package,slot,progress)
+
+
+def register_package(settings,package,slot,progress):
     contract=input_contract(package['entry'])
     if not contract['supported']:raise ValueError(contract['reason'])
     if not 3<package['feature_size']<=32768:raise ValueError('출력 크기가 지원 범위를 벗어났습니다.')

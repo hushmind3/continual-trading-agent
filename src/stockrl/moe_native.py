@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import torch
 from torch import nn
 from . import expert_backends
+from .expert_device import host_state,finish_device
 
 
 class NativeExpert(nn.Module):
@@ -35,15 +36,13 @@ class NativeExpert(nn.Module):
         # Frozen CPU tensors are views into the single mmap PT. Retain those
         # views rather than copying every expert GPU -> newly allocated RAM.
         frozen=all(not p.requires_grad for p in self.parameters())
-        cpu_parameters=[(p,p.detach()) for p in self.parameters()] if frozen else []
-        cpu_buffers=[(module,name,value) for module in self.modules() for name,value in module._buffers.items() if value is not None] if frozen else []
+        home=host_state(self) if frozen else None
         try:
             return native_call(self.entry["backend"], root, data, device,
                                modules=list(self.models),runner_source=self.runner_source)
         finally:
             if frozen:
-                for parameter,value in cpu_parameters:parameter.data=value
-                for module,name,value in cpu_buffers:module._buffers[name]=value
+                finish_device(self,home,device)
             else:self.cpu()
 
 
@@ -82,7 +81,7 @@ def _compiled_runner(runner):
 
 
 def native_call(backend, root, data, device="cpu", *, modules=None, states=None,
-                load_only=False, runner_source=None):
+                load_only=False, runner_source=None, quantization=None):
     """Use exactly the baseline native data preparation and native forward."""
     code = _compiled_runner(runner_source or expert_backends.run_native)
     namespace=dict(vars(expert_backends))
@@ -130,8 +129,11 @@ def native_call(backend, root, data, device="cpu", *, modules=None, states=None,
         if states is not None:
             state=states[restored]
             kwargs["assign"]=True
-        restored+=1
-        result=model.load_state_dict(state,**kwargs)
+        index=restored;restored+=1
+        if quantization:
+            from .platform.quantized_linear import restore_packed
+            result=restore_packed(model,state,quantization,prefix=f'models.{index}')
+        else:result=model.load_state_dict(state,**kwargs)
         if hasattr(model,"tie_weights"): model.tie_weights()
         return result
 

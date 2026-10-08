@@ -13,6 +13,7 @@ from .journal import Journal
 from .checkpoint import Checkpoints
 from .worker_state import publish, stopped, control
 from .selection import selection,acknowledge
+from .batch_readiness import batch_plan
 from ..state_io import read_json
 
 
@@ -70,10 +71,10 @@ def run(settings):
         version, steps = state["version"], state.get("optimizer_steps",0)
         generation=state.get('optimization_generation',version)
         selected_revision=state.get('model_spec',{}).get('selection_revision',0)
-        journal.acknowledge(state.get("applied_ids",[]),version)
+        journal.acknowledge(state.get("applied_ids",[]),generation)
         metrics=journal.get_state("learning_metrics") or {}
         if metrics.get("version")==version:
-            publish(settings,"learner",**metrics)
+            publish(settings,"learner",**metrics,last_update=metrics)
         last_update = 0.;next_update_at=0.
         while not stopped(settings,"learner"):
             revision,active=selection(settings,state['model_spec'].get('active_experts',state['expert_ids']))
@@ -84,12 +85,14 @@ def run(settings):
                 version+=1;checkpoints.save(actor,critic,optimizer,version,state['expert_ids'],optimizer_steps=steps,optimization_generation=generation)
                 selected_revision=revision;acknowledge(settings,revision)
             counts = journal.stats(generation,settings.learning.max_policy_lag)
+            plan=batch_plan(counts,settings.learning)
             publish(settings,"learner",status="waiting_batch",version=version,optimizer_steps=steps,replay=counts,device="cpu",
-                    message=f"같은 종목 구성의 학습 경험 {counts['batch_ready']}/{settings.learning.batch_size}개",next_update_at=next_update_at)
+                    message=f"같은 종목 구성의 학습 경험 {plan['ready']}/{plan['required']}개",next_update_at=next_update_at,
+                    batch_plan=plan)
             if not control(settings).get("learning",True) or time.monotonic()-last_update < settings.learning.checkpoint_seconds:
                 time.sleep(1)
                 continue
-            ids, rows = journal.batch(generation,settings.learning.max_policy_lag,settings.learning.batch_size)
+            ids, rows = journal.batch(generation,settings.learning.max_policy_lag,plan['required'])
             if not ids:
                 time.sleep(1)
                 continue
@@ -100,10 +103,10 @@ def run(settings):
             record = checkpoints.save(actor,critic,optimizer,version,state["expert_ids"],ids,optimizer_steps=steps,optimization_generation=generation)
             journal.acknowledge(ids,generation)
             seconds = time.perf_counter()-started
-            metrics=dict(version=version,optimizer_steps=steps,loss=loss,seconds=seconds,
+            metrics=dict(version=version,optimizer_steps=steps,loss=loss,seconds=seconds,updated_at=time.time(),
                          samples=len(rows),samples_per_second=len(rows)/max(seconds,1e-9),checkpoint=record)
             journal.set_state("learning_metrics",metrics)
-            publish(settings,"learner",status="updated",**metrics)
+            publish(settings,"learner",status="updated",**metrics,last_update=metrics)
             journal.event("learning",f"정책 버전 {version} · 경험 {len(rows)}개 학습 완료")
             last_update = time.monotonic()
             next_update_at=time.time()+settings.learning.checkpoint_seconds

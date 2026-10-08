@@ -1,0 +1,33 @@
+import {useState} from 'react';
+import {Gauge} from 'lucide-react';
+import {useOperations} from '../../data/Operations';
+import {request} from '../../data/api';
+import type {LibraryExpert} from '../../data/library';
+import {Button,Drawer,ErrorMessage} from '../../ui/Primitives';
+import {bytes} from '../../ui/format';
+import {PrecisionTolerance,defaultTolerance} from './PrecisionTolerance';
+
+const field='w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+export function ExpertConversion({item,onClose}:{item:LibraryExpert;onClose:()=>void}){
+ const {state,refresh}=useOperations();const [precision,setPrecision]=useState('fp16'),[device,setDevice]=useState('auto'),[error,setError]=useState('');
+ const nextSlot=(p:string)=>{let value=item.id+'_'+p,n=2;while(state?.library?.catalog.experts?.[value])value=item.id+'_'+p+'_'+n++;return value};
+ const [slot,setSlot]=useState(()=>nextSlot('fp16'));const job=state?.library?.job,busy=Boolean(job?.busy);
+ const [tolerance,setTolerance]=useState(defaultTolerance);
+ const convert=async()=>{setError('');try{await request('library/convert',{id:item.id,slot,precision,device,repeats:3,max_relative_rmse:tolerance.error/100,min_action_agreement:tolerance.agreement/100});await refresh()}catch(e){setError(e instanceof Error?e.message:'변환 실패')}};
+ return <Drawer title="정밀도 변환 · 같은 입력 비교" open onClose={onClose}>
+  <div className="space-y-5">
+   <div className="rounded-xl bg-blue-50 p-4"><p className="flex items-center gap-2 font-semibold text-blue-900"><Gauge size={17}/>{item.name}</p><p className="mt-2 text-sm text-blue-700">{item.representation} · {bytes(item.package.bytes)}</p></div>
+   <div className="grid grid-cols-4 gap-2" role="group" aria-label="변환 정밀도">{['fp16','bf16','int8','int4'].map(p=><Button key={p} disabled={busy} aria-pressed={p===precision} tone={p===precision?'primary':'neutral'} onClick={()=>{setPrecision(p);setSlot(nextSlot(p))}}>{p.toUpperCase()}</Button>)}</div>
+   <p className="text-sm leading-6 text-slate-600">{precision.startsWith('int')?'일반 Linear의 고정 가중치를 저비트로 압축합니다. 임베딩·공유 가중치·지원하지 않는 계층은 원래 정밀도를 유지합니다. 압축 가중치를 구간별로 복원해 계산하므로 속도 개선은 측정 결과로 확인합니다.':'부동소수점 가중치를 선택한 정밀도로 변환합니다. 정수 버퍼와 원본 구조·입력 규칙은 유지합니다.'}</p>
+   <label className="block space-y-2 text-sm"><span>변환 후보 슬롯</span><input className={field} value={slot} disabled={busy} onChange={e=>setSlot(e.target.value)}/></label>
+   <label className="block space-y-2 text-sm"><span>변환 · 검사 · 비교 장치</span><select className={field} disabled={busy} value={device} onChange={e=>setDevice(e.target.value)}><option value="auto">자동 · RAM/VRAM 여유에 맞춰 CUDA 활용</option><option value="cuda:0">CUDA 지정 · VRAM 부족 시 중단</option><option value="cpu">CPU 지정</option></select></label>
+   <p className="text-xs leading-5 text-slate-500">변환 → 실제 추론 검사 → 원본과 3회 비교를 자동으로 진행합니다. 원본과 사용 구성을 유지하며, 측정 후 목록에서 ‘원본과 교체’를 선택할 수 있습니다. 기존 슬롯의 학습 연결도 이어받습니다.</p>
+   <PrecisionTolerance value={tolerance} onChange={setTolerance} disabled={busy}/>
+   <Button tone="primary" disabled={busy||!slot||Boolean(item.conversion)} busy={busy&&job?.kind==='convert'} onClick={()=>void convert()}>변환 · 검사 · 비교 시작</Button>
+   {item.conversion&&<p className="text-xs text-amber-700">다시 변환할 때는 최초 원본 Expert를 선택하세요.</p>}
+   {busy&&job?.kind==='convert'&&<p className="text-sm text-blue-700" aria-live="polite">{job.detail}</p>}
+   {!busy&&job?.kind==='convert'&&job.stage==='complete'&&(job.result?.check?.status==='passed'?<p className="text-sm leading-6 text-emerald-700" role="status">실제 추론 검사와 비교가 완료됐습니다. 목록의 후보와 비교 결과를 확인한 후 적용하세요.</p>:<ErrorMessage message={job.result?.check?.detail??'변환 후보 검사를 확인하세요.'}/>)}
+   {(error||job?.error)&&<ErrorMessage message={error||job?.error||''}/>}
+  </div>
+ </Drawer>;
+}

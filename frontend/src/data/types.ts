@@ -19,6 +19,7 @@ export interface Worker {
   inference_seconds?: number;
   loss?: number;
   samples?: number;
+  last_update?: {version:number;samples:number;optimizer_steps?:number;updated_at?:number};
   samples_per_second?: number;
   seconds?: number;
   expert_count?: number;
@@ -103,6 +104,8 @@ export interface OpsSettings {
   enabled_experts: string[];
   learning: {
     batch_size: number;
+    minimum_batch_size: number;
+    batch_wait_seconds: number;
     epochs: number;
     learning_rate: number;
     discount: number;

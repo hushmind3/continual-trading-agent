@@ -17,7 +17,7 @@ def run(config,request_path):
     result=request_path.with_suffix('.result.json')
     pool=None
     try:
-        pool=ExpertPool(settings)
+        pool=ExpertPool(settings,keep_device=True)
         pool.metrics[key]=request.get('metrics',{})
         packets=[]
         for index,data in enumerate(request['batches']):

@@ -17,16 +17,37 @@ def read_native(path):
     except RuntimeError:return torch.load(path,map_location='cpu',weights_only=True)
 
 
+def weight_signature(package):
+    if package['module_count']!=1 or package.get('quantization'):return None
+    values={k.removeprefix('models.0.'):v for k,v in package['state_dict'].items()}
+    aliases={};groups={}
+    for key,value in values.items():
+        identity=(value.untyped_storage()._cdata,value.storage_offset(),tuple(value.shape),tuple(value.stride()))
+        groups.setdefault(identity,[]).append(key)
+    for keys in groups.values():
+        for key in keys:aliases[key]=keys
+    return dict(shapes={k:list(v.shape) for k,v in values.items()},aliases=aliases)
+
+
+def match_signature(shapes,signature):
+    if not signature:return False
+    expected=signature['shapes']
+    return (set(shapes).issubset(expected) and all(list(shape)==expected[k] for k,shape in shapes.items())
+        and all(k in shapes or any(a in shapes for a in signature['aliases'][k]) for k in expected))
+
+
 def match_weights(saved,package):
     if package['module_count']!=1:return None
-    expected={k.removeprefix('models.0.'):v for k,v in package['state_dict'].items()}
+    signature=weight_signature(package)
+    if not signature:return None
     candidates=[saved,*[saved.get(k) for k in ('state_dict','model_state_dict','model','policy')]] if isinstance(saved,dict) else []
     for values in candidates:
         if not isinstance(values,dict) or not values or not all(torch.is_tensor(v) for v in values.values()):continue
         for prefix in ('','module.','_orig_mod.'):
             candidate={k.removeprefix(prefix):v for k,v in values.items()}
-            if set(candidate)==set(expected) and all(candidate[k].shape==expected[k].shape for k in expected):
-                return {'models.0.'+k:v for k,v in candidate.items()}
+            if match_signature({k:list(v.shape) for k,v in candidate.items()},signature):
+                complete={k:candidate[k] if k in candidate else candidate[next(a for a in signature['aliases'][k] if a in candidate)] for k in signature['shapes']}
+                return {'models.0.'+k:v for k,v in complete.items()}
     return None
 
 

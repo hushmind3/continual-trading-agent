@@ -2,6 +2,7 @@ import { Activity, CircuitBoard, FileText } from "lucide-react";
 import { useOperations } from "../data/Operations";
 import { Empty, Skeleton, Status } from "../ui/Primitives";
 import { bytes, date, number, workerState } from "../ui/format";
+import { TrainingReadiness } from "../ui/TrainingReadiness";
 
 const roles: Record<string, string> = {
   feed: "시세 수집",
@@ -46,7 +47,7 @@ export function Diagnostics() {
                     {roles[role] ?? role}
                   </td>
                   <td className="px-5 py-4">
-                    <Status tone={status.tone}>{status.label}</Status>
+                    {role==='learner'?<TrainingReadiness compact/>:<Status tone={status.tone}>{status.label}</Status>}
                   </td>
                   <td className="px-5 py-4 font-mono text-xs text-slate-400">
                     {worker.pid ?? "정지"}

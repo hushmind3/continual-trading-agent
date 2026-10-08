@@ -15,6 +15,8 @@ import sys
 from ..moe_native import NativeExpert, native_call
 from ..moe_stock_policies import StockPolicyExpert
 from .expert_packages import HEADER_FORMAT,load_package,package_path
+from ..expert_device import restore_host
+
 
 
 def guard_model_assets(path,extra_references=()):
@@ -39,8 +41,9 @@ def guard_model_assets(path,extra_references=()):
 
 
 class ExpertPool:
-    def __init__(self, settings, extra_packages=None):
+    def __init__(self, settings, extra_packages=None,keep_device=False):
         self.settings = settings
+        self.keep_device=keep_device
         path = settings.resolve(settings.expert_checkpoint)
         self.path=path
         self.saved = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
@@ -90,7 +93,7 @@ class ExpertPool:
                      enabled=key in self.active,
                      **{**self.metrics.get(key,{}),'loaded':key in self.loaded}) for key,e in sorted(self.entries.items())]
 
-    def get(self, key):
+    def get(self, key, *, structure_only=False):
         if key in self.loaded:
             self.loaded.move_to_end(key)
             return self.loaded[key]
@@ -108,10 +111,12 @@ class ExpertPool:
         prefix = f"experts.{key}.models."
         count = self.saved["config"]["native_module_counts"][key]
         metadata=self.saved['metadata']
+        quantization=None
         if self.saved['format']==HEADER_FORMAT:
             package=load_package(self.path,self.saved['expert_packages'][key])
             if package['id']!=key or package['module_count']!=count:raise ValueError('Expert 패키지 구성이 다릅니다.')
             weights=package['state_dict'];prefix='models.';metadata=package['metadata']
+            quantization=package.get('quantization')
             self.roots[key]=self.root/key
             with zipfile.ZipFile(io.BytesIO(metadata['architecture_sources'])) as archive:
                 for item in archive.infolist():
@@ -122,22 +127,26 @@ class ExpertPool:
         else:weights=self.saved['state_dict']
         states = [{k.removeprefix(prefix+str(i)+"."):v for k,v in weights.items()
                    if k.startswith(prefix+str(i)+".")} for i in range(count)]
-        if entry.get("stock_policy"):
-            expert = StockPolicyExpert.restore(entry, states[0])
+        if self.saved['format']==HEADER_FORMAT and package.get('executor')=='hf_forecast':
+            from .hf_forecast import HfForecastExpert
+            expert=HfForecastExpert.restore(package)
+        elif entry.get("stock_policy"):
+            expert = StockPolicyExpert.restore(entry, states[0],quantization)
         else:
             def construct():
                 data=metadata.get('construction_input') if self.saved['format']==HEADER_FORMAT else metadata['construction_inputs'][key]
                 return native_call(entry['backend'],self.roots[key],data,
-                                   states=states,load_only=True,runner_source=metadata['native_runner_source'])
+                                   states=states,load_only=True,runner_source=metadata['native_runner_source'],quantization=quantization)
             try:
                 with torch.device('meta'):
                     modules=construct()
-                if any(t.is_meta for m in modules for t in list(m.parameters())+list(m.buffers())):
+                if not structure_only and any(t.is_meta for m in modules for t in list(m.parameters())+list(m.buffers())):
                     raise NotImplementedError('Native architecture has nonpersistent meta buffers')
             except NotImplementedError:
                 gc.collect();modules=construct()
             expert = NativeExpert(modules, entry,metadata['native_runner_source'])
         expert.requires_grad_(False).eval()
+        expert.keep_device=self.keep_device
         self.loaded[key] = expert
         self.metrics.setdefault(key, {}).update(load_seconds=time.perf_counter()-started,loaded=True,
             peak_ram_increment=max(0,self.process.memory_info().rss-rss_before))
@@ -158,11 +167,14 @@ class ExpertPool:
         large=int(self.entries[key].get('parameters',0))>=self.settings.resources.isolated_expert_parameters
         if preference!='cpu' and (large or preference=='cuda:0') and torch.cuda.is_available():
             free, total = torch.cuda.mem_get_info()
-            weight_bytes=sum(p.numel()*p.element_size() for p in expert.parameters())
-            required = max(prior_peak*1.1,weight_bytes*1.05) if prior_peak else weight_bytes*1.35
+            weight_bytes=sum(p.numel()*p.element_size() for p in list(expert.parameters())+list(expert.buffers()))
+            resident=any(p.is_cuda for p in list(expert.parameters())+list(expert.buffers()))
+            required = max(64*2**20,prior_peak*1.1-weight_bytes) if resident else max(prior_peak*1.1,weight_bytes*1.05) if prior_peak else weight_bytes*1.35
             if free - required > self.settings.resources.vram_reserve_gib * 2**30:
                 device = "cuda:0"
                 torch.cuda.reset_peak_memory_stats()
+        if device=='cpu':restore_host(expert)
+        if preference=='cuda:0' and device=='cpu':raise MemoryError('CUDA 지정 실행에 필요한 VRAM 여유가 부족합니다.')
         with torch.inference_mode():
             floating=next((p.dtype for p in expert.parameters() if p.is_floating_point()),torch.float32)
             reduced=floating in (torch.float16,torch.bfloat16)
@@ -180,11 +192,12 @@ class ExpertPool:
                        peak_ram_bytes=getattr(self.process.memory_info(), "peak_wset", self.process.memory_info().rss),
                        peak_vram_bytes=max(prior_peak,torch.cuda.max_memory_allocated() if device.startswith("cuda") else 0),
                        last_as_of=packet.get("as_of"), error=None)
-        if device.startswith("cuda"):
+        if device.startswith("cuda") and not self.keep_device:
             torch.cuda.empty_cache()
         return packet
 
     def close(self):
+        for expert in self.loaded.values():restore_host(expert)
         self.loaded.clear()
         self.saved = None
         gc.collect()

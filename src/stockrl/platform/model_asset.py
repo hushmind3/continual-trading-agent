@@ -6,6 +6,7 @@ from .expert_packages import HEADER_FORMAT
 
 def load_moe_head(path):
     saved=torch.load(path,map_location="cpu",weights_only=True,mmap=True)
+    if saved.get('format')==HEADER_FORMAT:saved=torch.load(path,map_location='cpu',weights_only=True)
     if saved.get("format") not in ("registered_vertical_trading_moe_v1",HEADER_FORMAT):
         raise ValueError("선택한 파일은 기존 Champion MoE 형식이 아닙니다.")
     config={k:saved["config"][k] for k in ("feature_sizes","stock_policy_ids","assembly_routing","router_family") if k in saved["config"]}

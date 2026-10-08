@@ -9,6 +9,8 @@ from ..paths import PROJECT_ROOT, DEFAULT_MODEL_DIR
 
 class LearningSettings(BaseModel):
     batch_size: int = Field(32, ge=4, le=1024)
+    minimum_batch_size: int = Field(4, ge=4, le=1024)
+    batch_wait_seconds: int = Field(300, ge=30, le=3600)
     epochs: int = Field(4, ge=1, le=20)
     learning_rate: float = Field(0.0003, gt=0, le=0.01)
     discount: float = Field(0.99, ge=0, le=1)

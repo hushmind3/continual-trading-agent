@@ -156,10 +156,10 @@ export function Drawer({
     >
       <button
         aria-label="닫기"
-        className="absolute inset-0 bg-slate-950/30 backdrop-blur-sm"
+        className="absolute inset-0 z-0 bg-slate-950/30 backdrop-blur-sm"
         onClick={onClose}
       />
-      <section ref={panel} className="relative max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl animate-[reveal_.2s_ease-out] sm:max-h-none sm:max-w-lg sm:rounded-none">
+      <section ref={panel} className="relative z-10 max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl animate-[reveal_.2s_ease-out] sm:max-h-none sm:max-w-lg sm:rounded-none">
         <div className="mb-6 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold">{title}</h2>
           <Button

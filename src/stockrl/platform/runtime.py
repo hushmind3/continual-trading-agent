@@ -18,7 +18,7 @@ from .checkpoint import Checkpoints
 from .resources import ResourceMonitor
 from .data_universe import prepare
 from .training_status import readiness
-from .library_operations import LibraryOperations
+from .library_operations import LibraryOperations,ONLINE_LIBRARY_JOBS
 
 MODULES={"experts":"stockrl.platform.expert_worker","agent":"stockrl.platform.agent_worker","learner":"stockrl.platform.learner"}
 
@@ -134,7 +134,7 @@ class Runtime:
         if name not in ("feed","engine","paper","learning"):
             raise ValueError("지원하지 않는 운영 명령입니다.")
         with self.lock:
-            if self.library.active and not internal and self.library.snapshot()['job'].get('kind') not in ('inspect','import','probe','compare'):
+            if self.library.active and not internal and self.library.snapshot()['job'].get('kind') not in ONLINE_LIBRARY_JOBS:
                 raise ValueError('Expert 구성을 변경 중입니다. 완료 후 조작하세요.')
             if name=="paper" and enabled and not self.controls.get("engine"):
                 raise ValueError("MoE 실행을 먼저 시작하세요.")
@@ -158,8 +158,8 @@ class Runtime:
         agent=workers["agent"]; expert=workers["experts"]; learner=workers["learner"]
         feed=read_json(self.root/"live"/"live_feed_metrics.json")
         replay=self.journal.stats(agent.get("rollout_generation",agent.get("version",0)),self.settings.learning.max_policy_lag)
-        training=readiness(self.controls,workers,replay,self.settings.learning.batch_size)
-        if self.library.active and self.library.snapshot()['job'].get('kind') not in ('inspect','import','probe','compare'):
+        training=readiness(self.controls,workers,replay,self.settings.learning)
+        if self.library.active and self.library.snapshot()['job'].get('kind') not in ONLINE_LIBRARY_JOBS:
             training.update(code='composition',label='Expert 구성 적용 중',detail=self.library.snapshot()['job'].get('detail','학습 상태를 이어받는 중'),action=None)
         return dict(architecture="finrlx-moe-ppo-v1",controls=self.controls.copy(),workers=workers,feed=feed,
                     agent=agent,experts=expert.get("experts",[]),learner=learner,

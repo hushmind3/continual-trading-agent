@@ -22,3 +22,18 @@ def snapshot_for(entry,frame,journal,daily_path,daily=None):
             volatility=float(np.std(np.diff(np.log(np.maximum(history,1e-9))))) if len(history)>1 else 0))
     batches=[None] if policy else native_input(entry['backend'],frame,daily,stamp)
     return batches,snapshot
+
+
+def admission_input(batches,snapshot,ttl=300):
+    """Use a live batch, rather than whichever closed-market symbols sort first."""
+    if batches==[None]:return None
+    def score(batch):
+        allowed=4*86400 if batch.get('sampling_seconds')==86400 else ttl
+        stamps=[rows[-1] for rows in batch.get('observation_timestamps',[]) if rows]
+        if not stamps:stamps=[rows[-1]['timestamp'] for rows in batch.get('bars',[]) if rows]
+        if not stamps:stamps=[batch['as_of']]
+        ages=[(pd.Timestamp(snapshot['as_of'])-pd.Timestamp(stamp)).total_seconds() for stamp in stamps]
+        return sum(0<=age<=allowed for age in ages),-min(ages)
+    selected=max(batches,key=score)
+    if not score(selected)[0]:raise ValueError('현재 사용 가능한 완료 시세가 없습니다. 해당 시장의 새 시세를 기다리세요.')
+    return selected

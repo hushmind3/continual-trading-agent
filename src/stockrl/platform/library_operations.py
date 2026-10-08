@@ -8,6 +8,8 @@ from pathlib import Path
 from ..paths import PROJECT_ROOT
 from ..state_io import atomic_json,read_json
 
+ONLINE_LIBRARY_JOBS=('inspect','import','probe','compare','convert','search','acquire','optimize')
+
 
 class LibraryOperations:
     def __init__(self,runtime):
@@ -19,7 +21,7 @@ class LibraryOperations:
         return dict(catalog=read_json(self.catalog_path),job={**read_json(self.status_path),'busy':self.active})
 
     def start(self,kind,payload):
-        if kind not in ('prepare','inspect','import','probe','compare','apply','delete'):raise ValueError('지원하지 않는 라이브러리 작업')
+        if kind not in ('prepare','apply','delete',*ONLINE_LIBRARY_JOBS):raise ValueError('지원하지 않는 라이브러리 작업')
         if kind=='apply' and (not isinstance(payload.get('active'),list) or not all(isinstance(k,str) for k in payload['active'])):
             raise ValueError('사용할 Expert 슬롯 목록을 지정하세요.')
         with self.lock:
@@ -41,7 +43,7 @@ class LibraryOperations:
             catalog=read_json(self.catalog_path);active=sorted(set(payload.get('active',[])))
             for key in active:
                 item=catalog['experts'][key]
-                if item['check'].get('status')!='passed' or item['check'].get('package_sha256')!=item['package']['sha256']:
+                if item['check'].get('status')!='passed' or item['check'].get('package_sha256')!=item['package']['sha256'] or (item.get('conversion') and item['conversion'].get('validation',{}).get('passed') is not True):
                     raise ValueError('실제 추론 검사를 먼저 통과해야 합니다: '+item['name'])
             revision=catalog.get('selection_revision',0)+1
             atomic_json(dict(stage='checkpoint_requested',kind=kind,selection_revision=revision,
@@ -57,27 +59,34 @@ class LibraryOperations:
             atomic_json(dict(stage='error',kind=kind,error=str(exc)),self.status_path)
         finally:self.active=False
 
+    def _pause(self,kind):
+        rt=self.runtime;rt.command('engine',False,internal=True)
+        atomic_json(dict(stage='pausing',kind=kind,detail='학습 상태를 저장하고 구성 변경 준비'),self.status_path)
+        deadline=time.monotonic()+30
+        while any(rt.process(role) for role in ('agent','learner','experts')):
+            if time.monotonic()>deadline:raise TimeoutError('추론·학습 정지가 완료되지 않았습니다.')
+            time.sleep(.25)
+
+    def _execute(self,kind,payload,request):
+        rt=self.runtime;atomic_json(dict(kind=kind,payload=payload),request)
+        env=os.environ.copy();env.update(PYTHONPATH=str(PROJECT_ROOT/'src'),PYTHONUTF8='1')
+        self.child=subprocess.Popen([sys.executable,'-m','stockrl.platform.library_worker','--config',str(rt.config),
+            '--request',str(request)],cwd=PROJECT_ROOT,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        self.child.wait(timeout=1800)
+        if self.child.returncode:raise RuntimeError(read_json(self.status_path).get('error','Expert 작업 프로세스가 종료됐습니다.'))
+        return read_json(self.status_path).get('result')
+
     def _run(self,kind,payload):
         rt=self.runtime;before=rt.controls.copy()
-        paused=kind not in ('inspect','import','probe','compare') or not read_json(self.catalog_path).get('installed')
+        paused=kind not in ONLINE_LIBRARY_JOBS or not read_json(self.catalog_path).get('installed')
         request=rt.root/'library-request.json'
         try:
-            if paused:
-                rt.command('engine',False,internal=True)
-                atomic_json(dict(stage='pausing',kind=kind,detail='학습 상태를 저장하고 구성 변경 준비'),self.status_path)
-                deadline=time.monotonic()+30
-                while any(rt.process(role) for role in ('agent','learner','experts')):
-                    if time.monotonic()>deadline:raise TimeoutError('추론·학습 정지가 완료되지 않았습니다.')
-                    time.sleep(.25)
-            atomic_json(dict(kind=kind,payload=payload),request)
-            env=os.environ.copy();env.update(PYTHONPATH=str(PROJECT_ROOT/'src'),PYTHONUTF8='1')
-            self.child=subprocess.Popen([sys.executable,'-m','stockrl.platform.library_worker','--config',str(rt.config),
-                '--request',str(request)],cwd=PROJECT_ROOT,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
-                creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-            self.child.wait(timeout=1800)
-            if self.child.returncode:
-                value=read_json(self.status_path)
-                raise RuntimeError(value.get('error','Expert 작업 프로세스가 종료됐습니다.'))
+            if paused:self._pause(kind)
+            result=self._execute(kind,payload,request)
+            if kind=='optimize' and result and result.get('target_active'):
+                before=rt.controls.copy();paused=True;self._pause('apply')
+                self._execute('apply',dict(active=result['target_active'],optimizer_base=result['base']),request)
             rt.settings=__import__('stockrl.platform.config',fromlist=['load_settings']).load_settings(rt.config)
             from .data_universe import prepare
             rt.input_config=prepare(rt.settings)

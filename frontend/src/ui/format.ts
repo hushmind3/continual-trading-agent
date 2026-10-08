@@ -45,7 +45,7 @@ const phases: Record<string, string> = {
   polling:'시세 갱신 중',
   loading: "불러오는 중",
   waiting: "입력 대기",
-  waiting_batch: "학습 경험 대기",
+  waiting_batch: "다음 학습 배치 수집",
   waiting_policy: "정책 복원 대기",
   running: "실행 중",
   ready: "준비됨",

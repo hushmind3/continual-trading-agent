@@ -3,10 +3,11 @@ from pathlib import Path
 import torch
 from ..state_io import atomic_json,read_json
 from .model_asset import load_moe_head
-from .model_composition import split_context,compose_policy,atomic_torch_save
+from .model_composition import split_context,compose_policy,atomic_torch_save,inherit_slots
 from .policy import MoETrunk
 from .checkpoint import Checkpoints
 from .journal import Journal
+from .experience_schema import can_extend,prepare_extension
 
 
 def publish_header(settings,header,active,progress):
@@ -15,6 +16,12 @@ def publish_header(settings,header,active,progress):
     layout_changed=(previous['config'].get('feature_sizes')!=header['config'].get('feature_sizes') or
                     previous['config'].get('stock_policy_ids')!=header['config'].get('stock_policy_ids') or
                     previous['config'].get('router_family')!='per-expert-context-v1')
+    preserve=layout_changed and can_extend(previous,header)
+    extension=None
+    if preserve:
+        staging=Journal(settings.state_dir/'operations.sqlite3')
+        try:extension=prepare_extension(staging,previous,header)
+        finally:staging.close()
     del previous
     ids=sorted(header['expert_mapping']);active=sorted(set(active))
     if not set(active).issubset(ids):raise ValueError('구성에 없는 Expert')
@@ -23,6 +30,7 @@ def publish_header(settings,header,active,progress):
     markets=sorted(k for k in ids if k not in config.get('stock_policy_ids',()))
     old_markets=sorted({k.split('.')[2] for k in header['state_dict'] if k.startswith('controller.router.')})
     original=split_context(header['state_dict'],old_markets)
+    original=inherit_slots(original,header.get('slot_sources',{}),sorted({n.split('.')[1] for n in original if n.startswith('adapters.')}))
     spec=dict(expert_ids=ids,config={k:config[k] for k in ('feature_sizes','stock_policy_ids','assembly_routing','router_family') if k in config})
     with torch.random.fork_rng(devices=[]):
         torch.manual_seed(0);trunk=MoETrunk(spec)
@@ -34,6 +42,7 @@ def publish_header(settings,header,active,progress):
     header['state_dict']=template
     partial=atomic_torch_save(header,path)
     selected,initial=load_moe_head(partial);selected['source_model']=str(path)
+    selected['slot_sources']=header.get('slot_sources',{})
     checkpoints=Checkpoints(settings.state_dir/'policies',settings.resources.revisions)
     current=read_json(checkpoints.root/'current.json');records=list(checkpoints.revisions())
     prepared=[]
@@ -59,12 +68,17 @@ def publish_header(settings,header,active,progress):
     try:
         with journal.transaction():
             if layout_changed:
-                journal.db.execute('UPDATE transitions SET learned=-1 WHERE learned IS NULL')
-                journal.db.execute('DELETE FROM pending')
+                if preserve:
+                    rows,pending=extension
+                    journal.db.executemany('UPDATE transitions SET payload=? WHERE id=?',rows)
+                    for currency,value in pending.items():journal.replace_pending(currency,value)
+                else:
+                    journal.db.execute('UPDATE transitions SET learned=-1 WHERE learned IS NULL')
+                    journal.db.execute('DELETE FROM pending')
             for key, in journal.db.execute('SELECT expert FROM evidence').fetchall():
                 if key not in active:journal.db.execute('DELETE FROM evidence WHERE expert=?',(key,))
             account=journal.get_state('account')
-            if account and layout_changed:account['pending']={};journal.set_state('account',account)
+            if account and layout_changed and not preserve:account['pending']={};journal.set_state('account',account)
             journal.set_state('decisions',[])
             metrics=journal.get_state('expert_metrics') or {}
             journal.set_state('expert_metrics',{k:v for k,v in metrics.items() if k in ids})

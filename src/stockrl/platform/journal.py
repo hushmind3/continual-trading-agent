@@ -205,12 +205,12 @@ class Journal:
                 "SUM(learned=-1 OR (learned IS NULL AND version<?)) FROM transitions", (max(0, version-lag),)).fetchone()
             pending = self.db.execute("SELECT COUNT(*) FROM pending").fetchone()[0]
             groups=[]
-            for topology,count in self.db.execute(
-                'SELECT topology,COUNT(*) FROM transitions WHERE learned IS NULL AND version BETWEEN ? AND ? GROUP BY topology',
+            for topology,count,oldest in self.db.execute(
+                'SELECT topology,COUNT(*),MIN(created) FROM transitions WHERE learned IS NULL AND version BETWEEN ? AND ? GROUP BY topology',
                 (max(0,version-lag),version)):
                 try:assets=len(json.loads(topology))
                 except (ValueError,TypeError):assets=None
-                groups.append(dict(assets=assets,ready=count))
+                groups.append(dict(assets=assets,ready=count,oldest_created=oldest))
         size = sum(p.stat().st_size for p in [self.path, Path(str(self.path)+'-wal')] if p.exists())
         return dict(total=total, completed=completed or 0, outdated=outdated or 0, pending=pending,
                     ready=total-(completed or 0)-(outdated or 0),batch_ready=max((g['ready'] for g in groups),default=0),

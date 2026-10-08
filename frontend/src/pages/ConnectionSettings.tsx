@@ -183,6 +183,8 @@ export function ConnectionSettings() {
               학습 · 자원 설정
             </summary>
             <div className="mt-4 grid grid-cols-2 gap-4">
+              <Field label="대기 후 최소 배치" value={settings.learning.minimum_batch_size} suffix="개" disabled={running} change={v=>setSettings({...settings,learning:{...settings.learning,minimum_batch_size:v}})}/>
+              <Field label="작은 배치 허용까지 수집 시간" value={settings.learning.batch_wait_seconds} suffix="초" disabled={running} change={v=>setSettings({...settings,learning:{...settings.learning,batch_wait_seconds:v}})}/>
               <Field
                 label="학습률"
                 value={settings.learning.learning_rate}

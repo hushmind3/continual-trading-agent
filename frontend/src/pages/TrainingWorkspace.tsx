@@ -32,7 +32,7 @@ export function TrainingWorkspace() {
   } | null>(null);
   if (!state) return <Skeleton />;
   const learner = state.learner,
-    batch = state.settings.learning.batch_size;
+    batch = state.training?.required ?? state.settings.learning.batch_size;
   const restore = async (file: string) => {
     setError("");
     setBusy(file);
@@ -115,7 +115,7 @@ export function TrainingWorkspace() {
             {
               title: "학습 대기",
               value: state.replay.ready,
-              note: `동일 구성 ${batch}개 단위`,
+              note: `동일 구성 ${batch}개 · 수집 시간에 맞춰 조절`,
               icon: Workflow,
             },
             {
@@ -216,7 +216,7 @@ export function TrainingWorkspace() {
             <dl className="mt-4 space-y-2 text-xs text-slate-400">
               <div>Learning rate {state.settings.learning.learning_rate}</div>
               <div>
-                배치 {batch} · Epoch {state.settings.learning.epochs}
+                목표 배치 {state.settings.learning.batch_size} · 최소 {state.settings.learning.minimum_batch_size}개 · 수집 {state.settings.learning.batch_wait_seconds}초 후 작은 배치 허용 · Epoch {state.settings.learning.epochs}
               </div>
               <div>PPO clip {state.settings.learning.clip_epsilon}</div>
               <div>CPU {state.settings.learning.cpu_threads} threads</div>

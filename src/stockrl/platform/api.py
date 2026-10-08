@@ -148,8 +148,10 @@ def make_app(runtime=None,config=CONFIG_PATH):
 
     @app.get("/api/experts/{key}")
     def expert(key:str,request:Request):
-        packets=rt(request).journal.evidence().get(key)
-        return {"id":key,"output":packets}
+        runtime=rt(request);packets=runtime.journal.evidence().get(key)
+        item=runtime.library.snapshot()['catalog'].get('experts',{}).get(key,{})
+        sample=item.get('check',{}).get('sample_output')
+        return {"id":key,"output":packets or sample,'origin':'운영 출력' if packets else '추가 전 검사 출력' if sample else None}
 
     @app.post("/api/settings")
     def save_settings(settings:Settings,request:Request):

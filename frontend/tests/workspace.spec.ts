@@ -1,5 +1,44 @@
 import {test,expect} from '@playwright/test';
 
+test('diagnostics shows the backend learning cause instead of a generic wait',async({page,request})=>{
+ await page.goto('/#system');
+ const state=await (await request.get('/api/state')).json();
+ const row=page.getByRole('row').filter({hasText:'TorchRL 학습'});
+ await expect(row).toBeVisible();await expect(row.getByText('학습 경험 대기',{exact:true})).toHaveCount(0);
+ await expect(row.getByText(state.training.label,{exact:true})).toBeVisible();
+});
+
+test('expert conversion exposes four precisions without starting a job',async({page})=>{
+ await page.goto('/#moe');await page.getByRole('button',{name:'FinCast 1.0B 정밀도 변환',exact:true}).click();
+ const drawer=page.getByRole('dialog');await expect(drawer).toBeVisible();
+ for(const precision of ['FP16','BF16','INT8','INT4'])await expect(drawer.getByRole('button',{name:precision,exact:true})).toBeVisible();
+ await drawer.getByRole('button',{name:'INT4',exact:true}).click();
+ await expect(drawer.getByRole('button',{name:'INT4',exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect(drawer.getByText(/속도 개선은 측정 결과로 확인/)).toBeVisible();
+ await page.keyboard.press('Escape');await expect(drawer).toHaveCount(0);
+});
+
+test('precision variants stay beside their original Expert',async({page,request})=>{
+ await page.goto('/#moe');
+ const family=page.getByRole('button',{name:'FinCast 1.0B 상세',exact:true});await expect(family).toBeVisible();
+ const state=await (await request.get('/api/state')).json();
+ if(state.library.catalog.experts.fincast_fp16){
+  await expect(family.getByRole('group',{name:'Expert 정밀도 버전'}).getByRole('button',{name:/FP16/})).toBeVisible();
+  await expect(page.getByRole('button',{name:'FinCast 1.0B · FP16 상세',exact:true})).toHaveCount(0);
+ }
+ await expect(family.getByRole('button',{name:'자동 최적화',exact:true})).toBeVisible();
+});
+
+test('public expert discovery displays persisted compatibility and actionable downloads',async({page})=>{
+ await page.goto('/#moe');await page.getByRole('button',{name:'공개 Expert 찾기',exact:true}).click();
+ const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
+ await expect(dialog.getByRole('textbox',{name:'공개 모델 검색어'})).toHaveValue('chronos');
+ await expect(dialog.getByRole('button',{name:'검색',exact:true})).toBeVisible();
+ const state=await (await page.request.get('/api/state')).json();
+ if(state.library.catalog.discovery?.models.length)await expect(dialog.getByRole('link',{name:state.library.catalog.discovery.models[0].repository,exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+});
+
 test('all operating routes, history and direct refresh use the served application',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/#control');await expect(page.getByText('실시간 운영',{exact:true})).toBeVisible();

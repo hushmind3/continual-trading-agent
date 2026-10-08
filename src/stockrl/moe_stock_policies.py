@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
+from .expert_device import host_state,finish_device
 
 
 INDICATORS = ['macd', 'boll_ub', 'boll_lb', 'rsi_30', 'cci_30', 'dx_30',
@@ -46,9 +47,12 @@ class StockPolicyExpert(nn.Module):
         self.requires_grad_(False).eval()
 
     @classmethod
-    def restore(cls, entry, state):
+    def restore(cls, entry, state, quantization=None):
         policy = make_policy(entry['stock_policy'])
-        policy.load_state_dict(state, strict=True, assign=True)
+        if quantization:
+            from .platform.quantized_linear import restore_packed
+            restore_packed(policy,state,quantization,prefix='models.0')
+        else:policy.load_state_dict(state, strict=True, assign=True)
         return cls(policy, entry)
 
     def applicable(self, symbol):
@@ -168,8 +172,7 @@ class StockPolicyExpert(nn.Module):
         if spec['kind'] in ('a2c', 'ppo', 'sac') and data['symbols'] != spec['universe']:
             raise ValueError('native portfolio observation requires the exact ordered training universe')
         policy = self.models[0]
-        parameters = [(p, p.detach()) for p in policy.parameters()]
-        buffers = [(m, k, v) for m in policy.modules() for k, v in m._buffers.items() if v is not None]
+        home=host_state(self)
         started = time.perf_counter()
         try:
             policy.to(device)
@@ -190,13 +193,12 @@ class StockPolicyExpert(nn.Module):
                     action = torch.maximum(lo, torch.minimum(hi, raw))
                 if device.startswith('cuda'): torch.cuda.synchronize()
                 calculated = time.perf_counter()
-                native = raw.cpu().numpy()
-                rows = self._adapt(action.cpu().numpy(), data,
-                    probs.cpu().numpy() if spec['kind'] == 'msft' else None,
-                    std.cpu().numpy() if std is not None else None,native)
+                native = raw.float().cpu().numpy()
+                rows = self._adapt(action.float().cpu().numpy(), data,
+                    probs.float().cpu().numpy() if spec['kind'] == 'msft' else None,
+                    std.float().cpu().numpy() if std is not None else None,native)
         finally:
-            for p, value in parameters: p.data = value
-            for m, k, value in buffers: m._buffers[k] = value
+            finish_device(self,home,device)
         # Native portfolio output is retained intact, common evidence is per symbol.
         requested = set(data.get('requested_symbols', data['symbols']))
         rows = [r for r in rows if r['symbol_id'] in requested]

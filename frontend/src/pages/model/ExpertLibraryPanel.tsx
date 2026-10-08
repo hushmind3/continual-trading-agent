@@ -1,15 +1,22 @@
 import {useState} from 'react';
-import {FlaskConical,PackagePlus,Plus,Trash2} from 'lucide-react';
+import {FlaskConical,PackagePlus,Plus,Trash2,Gauge,Search,WandSparkles} from 'lucide-react';
 import {useOperations} from '../../data/Operations';
 import {request} from '../../data/api';
 import {Button,Drawer,Empty,ErrorMessage,Meter,Status} from '../../ui/Primitives';
 import {bytes,date,number} from '../../ui/format';
 import type {LibraryState} from '../../data/library';
+import {ExpertConversion} from './ExpertConversion';
+import {ExpertDiscovery} from './ExpertDiscovery';
+import {ExpertVariants} from './ExpertVariants';
+import {expertFamilies} from './expertFamilies';
 
 const field='w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
  const {state,refresh}=useOperations();const lib:LibraryState|undefined=state?.library;
  const [open,setOpen]=useState(false),[source,setSource]=useState(''),[key,setKey]=useState(''),[slot,setSlot]=useState(''),[error,setError]=useState(''),[deleteId,setDeleteId]=useState('');
+ const [conversionId,setConversionId]=useState('');
+ const [discoveryOpen,setDiscoveryOpen]=useState(false);
+ const [selectedVersions,setSelectedVersions]=useState<Record<string,string>>({}),[goal,setGoal]=useState('balanced');
  const catalog=lib?.catalog,job=lib?.job,busy=Boolean(job?.busy),items=Object.values(catalog?.experts??{});
  const candidate=job?.result?.experts?.find(e=>e.id===key);
  const operation=async(kind:string,payload:unknown)=>{
@@ -17,9 +24,10 @@ export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
  };
  return <section className="space-y-4">
   <header className="flex flex-wrap items-center justify-between gap-3">
-   <div><h3 className="text-sm font-bold">Expert 패키지 · 추가 전 검사</h3><p className="mt-1 text-xs text-slate-500">입력 규격과 실제 추론을 확인한 패키지만 MoE에 적용합니다.</p></div>
-   <Button disabled={busy} onClick={()=>setOpen(true)}><PackagePlus size={16}/>패키지 가져오기</Button>
+   <div><h3 className="text-sm font-bold">Expert · 정밀도 버전</h3><p className="mt-1 text-xs text-slate-500">같은 Expert의 버전을 모아 비교하고, 자동 최적화로 검사·측정·교체합니다.</p></div>
+   <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={()=>setDiscoveryOpen(true)}><Search size={16}/>공개 Expert 찾기</Button><Button disabled={busy} onClick={()=>setOpen(true)}><PackagePlus size={16}/>패키지 가져오기</Button></div>
   </header>
+  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500"><span>자동 최적화 목표</span><select aria-label="자동 최적화 목표" value={goal} onChange={e=>setGoal(e.target.value)} className="rounded-lg bg-white px-3 py-2"><option value="balanced">균형 · 속도 60% / 메모리 40%</option><option value="speed">추론 속도 우선</option><option value="memory">메모리 우선</option></select><span>정확도 기준 통과 · 5% 이상 개선 시 교체</span></div>
   {busy&&<div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800" aria-live="polite">
    <p>{job?.detail??'Expert 작업 진행 중'}</p>
    {!!job?.total&&<div className="mt-3"><Meter value={(job.completed??0)/job.total*100}/></div>}
@@ -27,19 +35,26 @@ export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
   {!busy&&job?.stage==='complete'&&job.kind==='apply'&&<p className="text-xs text-emerald-700" role="status">슬롯 선택 · 학습 체크포인트 저장 완료</p>}
   {(error||job?.error)&&<ErrorMessage message={error||job?.error||''}/>}
   {!items.length?<Empty title="슬롯 관리 준비" detail="고정 가중치를 독립 패키지로 한 번만 나누고 학습 상태를 이어받습니다." action={<Button busy={busy} onClick={()=>void operation('prepare',{})}>슬롯 관리 준비</Button>}/>:<div className="space-y-2">
-   {items.map(item=>{const included=catalog?.active?.includes(item.id),passed=item.check.status==='passed';return <div key={item.id} role="button" tabIndex={0} aria-label={`${item.name} 상세`} onClick={()=>onInspect(item.id)} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==='Enter'||e.key===' ')){e.preventDefault();onInspect(item.id)}}} className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 transition hover:bg-blue-50/60 focus-visible:outline-2 focus-visible:outline-blue-500">
-    <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b className="text-sm">{item.name}</b><span className="text-xs text-slate-400">{item.id}</span><Status tone={passed?'good':'warn'}>{included?'사용 중':passed?'검사 통과 · 보관':'검사 필요'}</Status></div>
+   {expertFamilies(items).map(family=>{const activeVersion=family.variants.find(v=>catalog?.active?.includes(v.id));const item=family.variants.find(v=>v.id===selectedVersions[family.id])??activeVersion??family.base;const included=catalog?.active?.includes(item.id),passed=item.check.status==='passed'&&(!item.conversion||item.conversion.validation?.passed===true);return <div key={family.id} role="button" tabIndex={0} aria-label={`${family.base.name} 상세`} onClick={()=>onInspect(item.id)} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==='Enter'||e.key===' ')){e.preventDefault();onInspect(item.id)}}} className="grid cursor-pointer gap-4 rounded-xl bg-white px-4 py-4 transition hover:bg-blue-50/60 focus-visible:outline-2 focus-visible:outline-blue-500 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_auto] xl:items-center">
+    <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="text-sm">{family.base.name}</b><Status tone={passed?'good':'warn'}>{included?'선택 버전 사용 중':passed?'검사 통과 · 보관':item.check.status==='quality_warning'?'출력 차이 큼 · 교체 차단':'검사 필요'}</Status></div>
      <p className="mt-1 text-xs text-slate-500">{item.input.requires?.join(' · ')??item.input.reason} · 출력 {item.feature_size-3}D · {item.representation??'원본 정밀도'} · {bytes(item.package.bytes)}</p>
+     <p className="mt-1 text-xs text-slate-500">{item.input.universe?.length?`원본 학습 ${item.input.universe.length}종목 전용`:'시계열이 확보된 관찰 종목에 공통 적용'}{item.check.metrics?.device?` · 검사 ${item.check.metrics.device}`:''}</p>
      <p className="mt-1 text-xs text-slate-400">{item.check.detail}{item.check.tested?` · ${date(item.check.tested)}`:''}{item.check.seconds!=null?` · ${number(item.check.seconds,2)}s`:''}</p>
+     {catalog?.optimizations?.[family.id]&&<p className="mt-2 text-xs text-blue-700">{catalog.optimizations[family.id].stage==='complete'?`자동 판단 · ${catalog.optimizations[family.id].applied?'교체 완료':'현재 버전 유지 / 최적 후보 보관'}`:catalog.optimizations[family.id].stage==='error'?catalog.optimizations[family.id].error:'같은 실제 입력으로 정밀도 버전을 비교하는 중'}</p>}
     </div>
-    <div className="flex items-center gap-2" onClick={e=>e.stopPropagation()}>
+    <ExpertVariants variants={family.variants} selected={item.id} active={catalog?.active??[]} onSelect={id=>setSelectedVersions({...selectedVersions,[family.id]:id})}/>
+    <div className="flex flex-wrap items-center gap-2" onClick={e=>e.stopPropagation()}>
+     <Button disabled={busy||!family.base.input.supported||Boolean(family.base.conversion)} onClick={()=>void operation('optimize',{id:family.id,goal,device:'auto'})}><WandSparkles size={14}/>자동 최적화</Button>
      <Button disabled={busy||!item.input.supported} onClick={()=>void operation('probe',{id:item.id})}><FlaskConical size={14}/>검사</Button>
-     {!included&&<Button tone="primary" disabled={busy||!passed} onClick={()=>void operation('apply',{active:[...catalog?.active??[],item.id]})}><Plus size={14}/>사용</Button>}
+     <Button disabled={busy||!family.base.input.supported||Boolean(family.base.conversion)} aria-label={`${family.base.name} 정밀도 변환`} onClick={()=>setConversionId(family.base.id)}><Gauge size={14}/>변환</Button>
+     {!included&&<Button tone="primary" disabled={busy||!passed} onClick={()=>void operation('apply',{active:[...(catalog?.active??[]).filter(k=>!family.variants.some(v=>v.id===k)),item.id]})}><Plus size={14}/>{activeVersion?'이 버전으로 교체':'사용'}</Button>}
      {included&&<Button disabled={busy} onClick={()=>void operation('apply',{active:catalog?.active?.filter(k=>k!==item.id)})}>제외</Button>}
      <Button disabled={busy} aria-label={`${item.name} 패키지 삭제`} onClick={()=>setDeleteId(item.id)}><Trash2 size={14}/></Button>
     </div>
    </div>})}
   </div>}
+  {conversionId&&catalog?.experts?.[conversionId]&&<ExpertConversion key={conversionId} item={catalog.experts[conversionId]} onClose={()=>setConversionId('')}/>}
+  {discoveryOpen&&<ExpertDiscovery onClose={()=>setDiscoveryOpen(false)}/>}
   <Drawer title="Frozen Expert 가져오기" open={open} onClose={()=>setOpen(false)}>
    <div className="space-y-4">
     <p className="text-sm leading-6 text-slate-500">Expert 패키지 또는 호환 MoE 파일의 로컬 경로·다운로드 주소를 입력하세요. 입력 생성기가 없는 모델은 구성에 넣기 전에 거릅니다.</p>

@@ -16,7 +16,7 @@ _,parameters,timesteps=sac_example()
 with st.expander('적용된 공식 설정과 구조',expanded=True):
     st.write('FinRL-X 원본 train_sac()를 호출합니다. 예제 설정을 변경하지 않습니다.')
     st.json(parameters)
-    st.write('학습 환경: FinRL 원본 NumPy StockTradingEnv · 중앙 네트워크: SB3 기본 256/256 · 이전 중앙 가중치·optimizer·Replay 승계 없음')
+    st.write('학습 환경: FinRL 원본 StockPortfolioEnv · 중앙 네트워크: SB3 기본 256/256 · 이전 중앙 가중치·optimizer·Replay 승계 없음')
 left,right=st.columns(2)
 with left:
     currency=st.selectbox('데이터 통화',['USD','KRW'])

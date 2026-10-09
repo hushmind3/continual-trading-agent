@@ -7,8 +7,8 @@ FinRL-X와 FinRL, Stable-Baselines3의 원본 모듈을 호출합니다. 학습 
 | 영역 | 사용하는 원본 |
 | --- | --- |
 | 가격 저장·조회 | FinRL-X `DataStore` |
-| 기술 지표·turbulence·환경 배열 | FinRL `YahooFinanceProcessor` |
-| 가상 체결·비용·보상 | FinRL NumPy `StockTradingEnv` |
+| 기술 지표 | FinRL `FeatureEngineer` |
+| 가상 체결·비용·보상 | FinRL `StockPortfolioEnv` |
 | Actor·Twin Critic·Target Critic | SB3 기본 `SACPolicy / MlpPolicy` |
 | SAC·Adam·Loss·Replay | SB3 `SAC` 기본 구현 |
 | 저장·복원 | SB3 `save/load`, `save_replay_buffer/load_replay_buffer` |
@@ -31,7 +31,8 @@ ent_coef = "auto_0.1"
 
 나머지는 SB3 기본값입니다. 중앙 신경망은 기본 `[256, 256]` 구조이고 `device="auto"`가 현재 PC에서 CUDA를 선택합니다. 기존 중앙 신경망·Optimizer·Replay는 승계하지 않습니다. 새 정책과 Replay는 `runtime/official`에 저장합니다. 같은 종목 구성에서는 해당 정책을 공식 `load()`로 이어 학습할 수 있습니다. 실행 단계 수는 원본 예제의 50,000단계입니다. 원본 예제에 없는 1,000단계 주기 체크포인트와 자체 logger 설정을 제거했습니다. 모델과 Replay는 실행 종료 시 저장합니다. 기존 다른 설정으로 만든 정책은 이어 학습하지 않습니다.
 
-환경은 원본 NumPy `StockTradingEnv`입니다. 초기 자본 1,000,000, 최대 거래 수량 100, 매수·매도 비용 0.001, reward scaling `2**-11`, turbulence threshold 99 등 원본 기본값을 변경하지 않습니다. Actor 행동은 원본 환경의 종목별 매수·매도 수량 신호입니다. 별도 목표비중 정책을 강제로 적용하지 않습니다.
+환경은 설치된 원본 `finrl/meta/env_portfolio_allocation/env_portfolio.py`의 `StockPortfolioEnv`입니다. 환경 설정과 252일 공분산 입력은 [공식 PortfolioAllocation 예제](https://github.com/AI4Finance-Foundation/FinRL-Tutorials/blob/master/1-Introduction/FinRL_PortfolioAllocation_NeurIPS_2020.py)를 따릅니다. 초기 자본 1,000,000, hmax 100, transaction_cost_pct 0.001, reward_scaling 1e-4이며 state_space와 action_space는 종목 수입니다. 행동 정규화·환경 보상은 원본 구현을 호출합니다. 기존 NumPy 환경에서 저장한 정책은 이어 학습하지 않습니다. GGUF 컨텍스트와 CPU 스레드는 옵션을 전달하지 않고 llama.cpp 기본값을 사용합니다.
+
 
 ## 동결 Expert
 

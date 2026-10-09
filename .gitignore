@@ -24,3 +24,5 @@ configs/local/
 *.sqlite3-wal
 *.lock
 .env
+
+results/

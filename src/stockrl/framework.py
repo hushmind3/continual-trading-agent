@@ -36,17 +36,29 @@ def sac_example():
 
 
 def training_environment(frame,registry,training=True):
+    import numpy as np
+    import pandas as pd
+    from finrl import config
+    from finrl.meta.preprocessor.preprocessors import FeatureEngineer
+    from finrl.meta.env_portfolio_allocation.env_portfolio import StockPortfolioEnv
     from .expert_observation import ExpertObservation
-    processor=finrl_file('meta/data_processors/processor_yahoofinance.py').YahooFinanceProcessor()
-    config=finrl_file('config.py')
-    if frame.date.nunique()<252:raise ValueError('FinRL 원본 turbulence 기본 기간 252개 이상의 실제 날짜가 필요합니다.')
-    data=frame.rename(columns={'symbol':'tic','date':'timestamp'}).copy()
-    data=processor.add_technical_indicator(data,config.INDICATORS)
-    data=processor.add_turbulence(data)
-    data['date']=data.timestamp
-    prices,technical,turbulence=processor.df_to_array(data,config.INDICATORS,False)
-    env_type=finrl_file('meta/env_stock_trading/env_stocktrading_np.py').StockTradingEnv
-    env=env_type({'price_array':prices,'tech_array':technical,'turbulence_array':turbulence,'if_train':training})
+    data=FeatureEngineer().preprocess_data(frame.rename(columns={'symbol':'tic'}).copy())
+    data=data.sort_values(['date','tic'],ignore_index=True)
+    data.index=data.date.factorize()[0]
+    cov_list=[];return_list=[];lookback=252
+    for i in range(lookback,len(data.index.unique())):
+        prices=data.loc[i-lookback:i].pivot_table(index='date',columns='tic',values='close')
+        returns=prices.pct_change().dropna()
+        return_list.append(returns);cov_list.append(returns.cov().values)
+    covariance=pd.DataFrame({'date':data.date.unique()[lookback:],'cov_list':cov_list,'return_list':return_list})
+    data=data.merge(covariance,on='date').sort_values(['date','tic']).reset_index(drop=True)
+    if data.empty:raise ValueError('원본 Portfolio 환경의 252일 공분산 입력을 만들 가격이 부족합니다.')
+    data.index=data.date.factorize()[0]
+    count=len(data.tic.unique())
+    env=StockPortfolioEnv(df=data,stock_dim=count,hmax=100,initial_amount=1000000,
+        transaction_cost_pct=0.001,reward_scaling=1e-4,state_space=count,
+        action_space=count,tech_indicator_list=config.INDICATORS)
+    (ROOT/'results').mkdir(exist_ok=True)
     wrapped=ExpertObservation(env,registry,frame,sorted(data.tic.unique()))
     wrapped.currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in wrapped.symbols) else 'USD'
     return wrapped
@@ -59,7 +71,7 @@ def train(frame,registry,resume=False):
     example,parameters,steps=sac_example()
     root=ROOT/'runtime/official';root.mkdir(parents=True,exist_ok=True)
     from .state_io import read_json,atomic_json
-    identity={'currency':env.currency,'symbols':env.symbols,'sac_example':parameters}
+    identity={'currency':env.currency,'symbols':env.symbols,'sac_example':parameters,'environment':'finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv'}
     try:
         if resume and read_json(root/'dataset.json')!=identity:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다. 새 학습으로 시작하세요.')
         agent=DRLAgent(env=env)
@@ -107,7 +119,7 @@ def backtest(frame,registry):
             action,_=model.predict(observation,deterministic=True)
             observation,_,terminated,truncated,_=env.step(action)
             base=env.unwrapped
-            records.append([pd.Timestamp(env.dates[base.day]),*(base.stocks*base.price_ary[base.day]/base.total_asset)])
+            records.append([pd.Timestamp(base.date_memory[-1]),*base.actions_memory[-1]])
             if terminated or truncated:break
         weights=pd.DataFrame(records,columns=['date',*env.symbols]).set_index('date')
         result=finrlx('strategies.base_strategy').StrategyResult('Official SAC',weights)

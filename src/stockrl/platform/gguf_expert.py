@@ -34,7 +34,7 @@ class GGUFExpert(nn.Module):
         self.url=f'http://127.0.0.1:{port}';self.device=device
         self.log=tempfile.TemporaryFile(mode='w+b')
         self.log_dir=tempfile.TemporaryDirectory(prefix='stockrl-llama-');self.log_path=Path(self.log_dir.name)/'engine.log'
-        args=[str(engine),'-m',str(self.path),'--host','127.0.0.1','--port',str(port),'-c','4096','-t','2',
+        args=[str(engine),'-m',str(self.path),'--host','127.0.0.1','--port',str(port),
             '-ngl','auto' if device!='cpu' else '0','--fit','on','--fit-target',str(int(self.settings.resources.vram_reserve_gib*1024)),
             '--parallel','1','--cache-ram',str(self.settings.resources.gguf_prompt_cache_mib),
             '--no-webui','--log-file',str(self.log_path),'--verbosity','4']

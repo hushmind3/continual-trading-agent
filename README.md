@@ -12,7 +12,6 @@ FinRL-X와 FinRL, Stable-Baselines3의 원본 모듈을 호출합니다. 학습 
 | Actor·Twin Critic·Target Critic | SB3 기본 `SACPolicy / MlpPolicy` |
 | SAC·Adam·Loss·Replay | SB3 `SAC` 기본 구현 |
 | 저장·복원 | SB3 `save/load`, `save_replay_buffer/load_replay_buffer` |
-| 중간 체크포인트 | SB3 `CheckpointCallback` |
 | 전략 출력·백테스트 | FinRL-X `StrategyResult / BacktestEngine` |
 | 화면 | Streamlit 기본 위젯 |
 
@@ -20,17 +19,17 @@ FinRL-X와 FinRL, Stable-Baselines3의 원본 모듈을 호출합니다. 학습 
 
 ## 학습 설정
 
-FinRL `config.SAC_PARAMS` 예제를 변경 없이 전달합니다.
+FinRL-X `src/strategies/rl_model.py`의 원본 `train_sac(agent)`를 직접 호출합니다.
 
 ```python
-batch_size = 64
+batch_size = 128
 buffer_size = 100000
-learning_rate = 0.0001
+learning_rate = 0.0003
 learning_starts = 100
 ent_coef = "auto_0.1"
 ```
 
-나머지는 SB3 기본값입니다. 중앙 신경망은 기본 `[256, 256]` 구조이고 `device="auto"`가 현재 PC에서 CUDA를 선택합니다. 기존 중앙 신경망·Optimizer·Replay는 승계하지 않습니다. 새 정책과 Replay는 `runtime/official`에 저장합니다. 같은 종목 구성에서는 해당 정책을 공식 `load()`로 이어 학습할 수 있습니다. 실행 단계 수와 체크포인트 간격 1,000단계는 실행·저장 스케줄입니다.
+나머지는 SB3 기본값입니다. 중앙 신경망은 기본 `[256, 256]` 구조이고 `device="auto"`가 현재 PC에서 CUDA를 선택합니다. 기존 중앙 신경망·Optimizer·Replay는 승계하지 않습니다. 새 정책과 Replay는 `runtime/official`에 저장합니다. 같은 종목 구성에서는 해당 정책을 공식 `load()`로 이어 학습할 수 있습니다. 실행 단계 수는 원본 예제의 50,000단계입니다. 원본 예제에 없는 1,000단계 주기 체크포인트와 자체 logger 설정을 제거했습니다. 모델과 Replay는 실행 종료 시 저장합니다. 기존 다른 설정으로 만든 정책은 이어 학습하지 않습니다.
 
 환경은 원본 NumPy `StockTradingEnv`입니다. 초기 자본 1,000,000, 최대 거래 수량 100, 매수·매도 비용 0.001, reward scaling `2**-11`, turbulence threshold 99 등 원본 기본값을 변경하지 않습니다. Actor 행동은 원본 환경의 종목별 매수·매도 수량 신호입니다. 별도 목표비중 정책을 강제로 적용하지 않습니다.
 
@@ -47,13 +46,13 @@ ent_coef = "auto_0.1"
 1. Git 서브모듈을 포함해 내려받습니다: `git clone --recurse-submodules <저장소 주소>`.
 2. `설치.cmd`는 빠진 패키지를 설치합니다. 이미 설치된 배포판은 재설치·업그레이드하지 않습니다.
 3. `서버켜기.cmd`를 실행하고 <http://127.0.0.1:8766>을 엽니다.
-4. 통화·종목·실행 단계 수와 Expert를 선택해 공식 SAC 학습을 시작합니다.
+4. 통화·종목과 Expert를 선택해 공식 SAC 학습을 시작합니다.
 
 ```powershell
 $env:PYTHONPATH="src"
 $env:PYTHONUTF8="1"
-.\.venv\Scripts\python.exe -m stockrl train --currency USD --symbols AAPL MSFT --timesteps 5000
-.\.venv\Scripts\python.exe -m stockrl train --currency USD --symbols AAPL MSFT --timesteps 5000 --resume
+.\.venv\Scripts\python.exe -m stockrl train --currency USD --symbols AAPL MSFT
+.\.venv\Scripts\python.exe -m stockrl train --currency USD --symbols AAPL MSFT --resume
 .\.venv\Scripts\python.exe -m stockrl backtest --currency USD --symbols AAPL MSFT
 ```
 

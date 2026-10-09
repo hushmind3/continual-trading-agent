@@ -11,7 +11,6 @@ def main():
     parser.add_argument('--currency',choices=['USD','KRW'],default='USD')
     parser.add_argument('--symbols',nargs='+')
     parser.add_argument('--resume',action='store_true',help='이번 공식 SAC 실행에서 생성한 정책과 Replay만 복원')
-    parser.add_argument('--timesteps',type=int,default=5000,help='Execution duration, not a replacement algorithm configuration')
     args=parser.parse_args();registry=ExpertRegistry()
     if args.command=='experts':
         for key,item in registry.catalog()['experts'].items():print(key,item['name'],'active' if key in registry.catalog()['active'] else 'stored')
@@ -22,7 +21,7 @@ def main():
     if args.command=='backtest':
         result=backtest(frame,registry);print(result.to_metrics_dataframe().to_string())
         result.portfolio_values.to_csv(ROOT/'runtime/official/backtest.csv');return
-    model=train(frame,registry,args.timesteps,args.resume)
+    model=train(frame,registry,args.resume)
     print('Saved official SAC:',ROOT/'runtime/official/sac.zip')
 
 

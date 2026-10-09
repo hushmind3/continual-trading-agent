@@ -26,6 +26,15 @@ def finrl_file(relative):
     return module
 
 
+def sac_example():
+    import ast,inspect
+    function=finrlx('strategies.rl_model').train_sac
+    tree=ast.parse(inspect.getsource(function))
+    parameters=next(ast.literal_eval(n.value) for n in ast.walk(tree) if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='SAC_PARAMS' for t in n.targets))
+    steps=next(ast.literal_eval(k.value) for n in ast.walk(tree) if isinstance(n,ast.Call) for k in n.keywords if k.arg=='total_timesteps')
+    return function,parameters,steps
+
+
 def training_environment(frame,registry,training=True):
     from .expert_observation import ExpertObservation
     processor=finrl_file('meta/data_processors/processor_yahoofinance.py').YahooFinanceProcessor()
@@ -43,25 +52,22 @@ def training_environment(frame,registry,training=True):
     return wrapped
 
 
-def train(frame,registry,total_timesteps,resume=False):
+def train(frame,registry,resume=False):
     from stable_baselines3 import SAC
-    from stable_baselines3.common.logger import configure
-    from stable_baselines3.common.callbacks import CheckpointCallback
+    from finrl.agents.stablebaselines3.models import DRLAgent
     env=training_environment(frame,registry)
-    # Select the official FinRL SAC configuration verbatim; all remaining SB3
-    # settings and the original MlpPolicy/Actor/Critic/Adam/Replay are defaults.
-    config=finrl_file('config.py')
+    example,parameters,steps=sac_example()
     root=ROOT/'runtime/official';root.mkdir(parents=True,exist_ok=True)
     from .state_io import read_json,atomic_json
-    identity={'currency':env.currency,'symbols':env.symbols}
+    identity={'currency':env.currency,'symbols':env.symbols,'sac_example':parameters}
     try:
         if resume and read_json(root/'dataset.json')!=identity:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다. 새 학습으로 시작하세요.')
-        model=SAC.load(root/'sac.zip',env=env) if resume else SAC('MlpPolicy',env,**config.SAC_PARAMS)
-        if resume:model.load_replay_buffer(root/'replay.pkl')
-        model.set_logger(configure(str(root),['stdout','csv']))
-        print('공식 SAC 시작:',model.policy.net_arch,config.SAC_PARAMS,flush=True)
-        model.learn(total_timesteps=total_timesteps,reset_num_timesteps=not resume,
-            callback=CheckpointCallback(save_freq=1000,save_path=str(root/'checkpoints'),name_prefix='sac',save_replay_buffer=True),progress_bar=True)
+        agent=DRLAgent(env=env)
+        print('FinRL-X 원본 SAC 예제:',parameters,'단계:',steps,flush=True)
+        if resume:
+            model=SAC.load(root/'sac.zip',env=env);model.load_replay_buffer(root/'replay.pkl')
+            model=agent.train_model(model=model,tb_log_name='sac',total_timesteps=steps)
+        else:model=example(agent)
         model.save(root/'sac')
         model.save_replay_buffer(root/'replay.pkl')
         atomic_json(identity,root/'dataset.json')
@@ -93,7 +99,8 @@ def backtest(frame,registry):
     env=training_environment(frame,registry,training=False)
     try:
         from .state_io import read_json
-        if read_json(ROOT/'runtime/official/dataset.json')!={'currency':env.currency,'symbols':env.symbols}:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다.')
+        identity=read_json(ROOT/'runtime/official/dataset.json')
+        if identity.get('currency')!=env.currency or identity.get('symbols')!=env.symbols:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다.')
         model=SAC.load(ROOT/'runtime/official/sac.zip',env=env)
         observation,_=env.reset();records=[]
         while True:

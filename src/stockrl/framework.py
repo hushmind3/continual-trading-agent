@@ -54,6 +54,13 @@ def training_environment(frame,registry,training=True):
     data=data.merge(covariance,on='date').sort_values(['date','tic']).reset_index(drop=True)
     if data.empty:raise ValueError('원본 Portfolio 환경의 252일 공분산 입력을 만들 가격이 부족합니다.')
     data.index=data.date.factorize()[0]
+    example=finrlx('strategies.rl_model')
+    trade_date=frame.date.max()+pd.Timedelta(days=1)
+    if training:
+        data=example.prepare_rolling_train(data,'date',pd.Timedelta(days=365),pd.Timedelta(days=1095),trade_date)
+    else:
+        data=example.prepare_rolling_test(data,'date',pd.Timedelta(days=365),pd.Timedelta(days=1095),trade_date)
+    if data.empty:raise ValueError('원본 rolling 예제의 학습·평가 구간에 데이터가 없습니다.')
     count=len(data.tic.unique())
     env=StockPortfolioEnv(df=data,stock_dim=count,hmax=100,initial_amount=1000000,
         transaction_cost_pct=0.001,reward_scaling=1e-4,state_space=count,
@@ -71,7 +78,7 @@ def train(frame,registry,resume=False):
     example,parameters,steps=sac_example()
     root=ROOT/'runtime/official';root.mkdir(parents=True,exist_ok=True)
     from .state_io import read_json,atomic_json
-    identity={'currency':env.currency,'symbols':env.symbols,'sac_example':parameters,'environment':'finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv'}
+    identity={'currency':env.currency,'symbols':env.symbols,'sac_example':parameters,'environment':'finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv','rolling_days':[1095,365]}
     try:
         if resume and read_json(root/'dataset.json')!=identity:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다. 새 학습으로 시작하세요.')
         agent=DRLAgent(env=env)

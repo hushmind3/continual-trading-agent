@@ -35,9 +35,7 @@ class GGUFExpert(nn.Module):
         self.log=tempfile.TemporaryFile(mode='w+b')
         self.log_dir=tempfile.TemporaryDirectory(prefix='stockrl-llama-');self.log_path=Path(self.log_dir.name)/'engine.log'
         args=[str(engine),'-m',str(self.path),'--host','127.0.0.1','--port',str(port),
-            '-ngl','auto' if device!='cpu' else '0','--fit','on','--fit-target',str(int(self.settings.resources.vram_reserve_gib*1024)),
-            '--parallel','1','--cache-ram',str(self.settings.resources.gguf_prompt_cache_mib),
-            '--no-webui','--log-file',str(self.log_path),'--verbosity','4']
+            '--log-file',str(self.log_path)]
         self.child=subprocess.Popen(args,stdout=self.log,stderr=self.log,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         deadline=time.monotonic()+self.settings.resources.inference_timeout_seconds
         while time.monotonic()<deadline:
@@ -68,9 +66,7 @@ class GGUFExpert(nn.Module):
             response=self.query(dict(messages=[
                 dict(role='system',content='You are a frozen market analyst. Use only the observed prices. Return JSON: direction (-1 bearish to 1 bullish), confidence (0 to 1), risk (0 to 1). No future observations are given.'),
                 dict(role='user',content=json.dumps(dict(symbol=symbol,relative_prices=relative,sampling_seconds=data['sampling_seconds'])))],
-                temperature=0,seed=0,max_tokens=192,response_format={'type':'json_schema','json_schema':{'name':'market_opinion','schema':SCHEMA}},
-                cache_prompt=self.settings.resources.gguf_prompt_cache_mib>0,
-                chat_template_kwargs={'enable_thinking':False}))
+                response_format={'type':'json_schema','json_schema':{'name':'market_opinion','schema':SCHEMA}}))
             response.raise_for_status();value=json.loads(response.json()['choices'][0]['message']['content'])
             row=[float(value[k]) for k in ('direction','confidence','risk')]
             if not np.isfinite(row).all() or not -1<=row[0]<=1 or not all(0<=v<=1 for v in row[1:]):raise ValueError('GGUF 의견 출력이 입력 계약을 벗어났습니다.')

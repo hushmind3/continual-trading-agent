@@ -31,7 +31,7 @@ ent_coef = "auto_0.1"
 
 나머지는 SB3 기본값입니다. 중앙 신경망은 기본 `[256, 256]` 구조이고 `device="auto"`가 현재 PC에서 CUDA를 선택합니다. 기존 중앙 신경망·Optimizer·Replay는 승계하지 않습니다. 새 정책과 Replay는 `runtime/official`에 저장합니다. 같은 종목 구성에서는 해당 정책을 공식 `load()`로 이어 학습할 수 있습니다. 실행 단계 수는 원본 예제의 50,000단계입니다. 원본 예제에 없는 1,000단계 주기 체크포인트와 자체 logger 설정을 제거했습니다. 모델과 Replay는 실행 종료 시 저장합니다. 기존 다른 설정으로 만든 정책은 이어 학습하지 않습니다.
 
-환경은 설치된 원본 `finrl/meta/env_portfolio_allocation/env_portfolio.py`의 `StockPortfolioEnv`입니다. 환경 설정과 252일 공분산 입력은 [공식 PortfolioAllocation 예제](https://github.com/AI4Finance-Foundation/FinRL-Tutorials/blob/master/1-Introduction/FinRL_PortfolioAllocation_NeurIPS_2020.py)를 따릅니다. 초기 자본 1,000,000, hmax 100, transaction_cost_pct 0.001, reward_scaling 1e-4이며 state_space와 action_space는 종목 수입니다. 행동 정규화·환경 보상은 원본 구현을 호출합니다. 기존 NumPy 환경에서 저장한 정책은 이어 학습하지 않습니다. GGUF 컨텍스트와 CPU 스레드는 옵션을 전달하지 않고 llama.cpp 기본값을 사용합니다.
+환경은 설치된 원본 `finrl/meta/env_portfolio_allocation/env_portfolio.py`의 `StockPortfolioEnv`입니다. 환경 설정과 252일 공분산 입력은 [공식 PortfolioAllocation 예제](https://github.com/AI4Finance-Foundation/FinRL-Tutorials/blob/master/1-Introduction/FinRL_PortfolioAllocation_NeurIPS_2020.py)를 따릅니다. 초기 자본 1,000,000, hmax 100, transaction_cost_pct 0.001, reward_scaling 1e-4이며 state_space와 action_space는 종목 수입니다. 행동 정규화·환경 보상은 원본 구현을 호출합니다. 기존 NumPy 환경에서 저장한 정책은 이어 학습하지 않습니다. GGUF 컨텍스트·CPU 스레드·GPU 레이어·메모리 맞춤·RAM 캐시·동시 슬롯·temperature·seed·생성 길이·thinking은 강제 지정하지 않고 llama.cpp와 모델 기본값을 사용합니다.
 
 
 ## 동결 Expert
@@ -71,6 +71,6 @@ $env:PYTHONUTF8="1"
 
 GitHub에는 모델 가중치·가격 캐시·가상환경·실행 상태를 올리지 않습니다. 다른 PC에는 필요한 Expert와 가격 데이터를 별도로 준비합니다.
 
-백테스트는 원본 `BacktestEngine`의 투자 비중 100% 정규화·수수료·성과 계산을 그대로 사용합니다. 따라서 환경이 보유한 현금 비중을 그대로 재현하는 평가가 아닙니다. 학습에 사용한 가격으로 다시 평가한 결과는 독립 검증 성적으로 보지 않습니다.
+백테스트는 원본 `BacktestEngine`의 투자 비중 100% 정규화·수수료·성과 계산을 그대로 사용합니다. 따라서 환경이 보유한 현금 비중을 그대로 재현하는 평가가 아닙니다. 기간 분리는 FinRL-X 원본 prepare_rolling_train / prepare_rolling_test를 호출합니다. 원본 예제처럼 전체 1,095일 구간에서 최근 365일을 평가용으로 분리합니다.
 
 현재 제공하는 실행 경로는 실제 저장 가격의 학습·가상 체결·백테스트입니다. 키움 실시간 수신과 실제 주문은 이 새 경로에 연결하지 않았습니다. 공식 FinRL-X 실행부는 Alpaca용이며 키움과 동일한 기능으로 표시하지 않습니다. 공식 대시보드의 고정 예제 금액·임의 차트도 실제 상태처럼 표시하지 않습니다.

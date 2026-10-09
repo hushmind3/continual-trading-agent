@@ -109,8 +109,6 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
     import torch
     from safetensors.torch import load_file
 
-    torch.set_num_threads(4)
-    torch.manual_seed(2026)
     # Compatibility workaround confined to this disposable research process.
     if expert in ("exaone", "chronos", "timemoe"):
         import transformers.utils.import_utils as iu
@@ -172,7 +170,7 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
         )
         frozen(pipeline.model.model)
         def infer():
-            samples = pipeline.predict(torch.tensor(series), prediction_length=horizon, num_samples=8)
+            samples = pipeline.predict(torch.tensor(series), prediction_length=horizon)
             return samples.float().cpu().numpy()
         layout = "symbol,sample,horizon"
         units = "daily_excess_return"
@@ -225,7 +223,7 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
         forecaster.quantiles = [round(float(q), 4) for q in model.quantiles.cpu().tolist()]
         forecaster.max_horizon = forecaster._patch * forecaster._max_op
         def infer():
-            return forecaster.predict(series, horizon=horizon, batch_size=len(series))
+            return forecaster.predict(series, horizon=horizon)
         layout = "symbol,21_quantiles,horizon"
         units = data.get("units", "native_series")
     elif expert == "timemoe":
@@ -248,8 +246,7 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
             # generation-cache helper. This does not change model parameters.
             predictions = []
             for _ in range(horizon):
-                forecast = model(input_ids=normalized[..., None], use_cache=False,
-                    max_horizon_length=1, return_dict=True).logits[:, -1, 0]
+                forecast = model(input_ids=normalized[..., None]).logits[:, -1, 0]
                 predictions.append(forecast)
                 normalized = torch.cat([normalized, forecast[:, None]], dim=-1)
             return torch.stack(predictions, dim=-1).float().cpu().numpy() * scale + mean
@@ -276,7 +273,7 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
         model = load_native_pretrained(Kronos, str(ckpt / "Kronos-base"), local_files_only=True)
         tokenizer = load_native_pretrained(KronosTokenizer, str(ckpt / "Kronos-Tokenizer-base"), local_files_only=True)
         frozen(model); frozen(tokenizer)
-        predictor = KronosPredictor(model, tokenizer, device=device, max_context=512)
+        predictor = KronosPredictor(model, tokenizer, device=device)
         def infer():
             outputs = []
             for bars in data["bars"]:
@@ -288,7 +285,7 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
                     raise ValueError("Kronos OHLCV/amount must be finite")
                 stamps = pd.to_datetime(frame.timestamp)
                 future = pd.Series(pd.to_datetime(data["future_timestamps"]))
-                forecast = predictor.predict(frame[required], stamps, future, horizon, sample_count=1, verbose=False)
+                forecast = predictor.predict(frame[required], stamps, future, horizon)
                 outputs.append(forecast[required].to_numpy(float))
             return np.asarray(outputs)
         layout = "symbol,horizon,OHLCV_amount"

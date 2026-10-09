@@ -58,12 +58,14 @@ Expert는 동결 자산이며 등록·선택·로딩·해제는 프로젝트 연
 | Expert 결과 캐시 상한 | 128 | Expert 실행 계층 |
 | 메모리 여유 예약 | RAM 4 GiB, VRAM 1.5 GiB | Expert 상주 계층 |
 | Expert 요청 제한 시간 | 180초 | 프로세스/요청 복구 계약 |
-| Native Expert Torch CPU threads | 4 | Expert 실행기 전용 설정 |
-| Native Expert seed | 2026 | 기존 Expert 재현성 계약 |
-| Chronos 샘플 수 | 8 | 해당 모델 adapter 인자 |
+| Native Expert Torch CPU threads | PyTorch 기본값 | 별도 전역 재설정 제거 |
+| Native Expert seed | 라이브러리 난수 기본 상태 | 별도 전역 seed 재설정 제거 |
+| Chronos 샘플 수 | Chronos API 기본값 | `num_samples` 인자 생략 |
+| EXAONE 예측 batch 크기 | EXAONE API 기본값 | `batch_size` 인자 생략 |
+| Kronos context / sample count / verbosity | Kronos API 기본값 | 선택 인자 생략 |
 | GGUF 포트·로그 경로 | 동적 포트·전용 로그 파일 | 여러 Expert 프로세스 연결 |
 
-이 값들은 FinRL-X나 SB3 공식 설정이 아니다. Expert 패키지와 기존 입력·출력 호환 경로에 속한다. 이번 문서화에서는 이 값들을 프레임워크 기본값으로 바꾸거나 Expert 입출력 규격을 바꾸지 않았다. 모델별 라이브러리 기본 인자를 명시하지 않은 경우 해당 모델 adapter의 기존 호출을 유지한다.
+메모리 예약·캐시 상한·요청 제한은 프로젝트 운영 설정이며 FinRL-X 기본값이 아니다. Expert 입출력 계약은 유지하면서, 라이브러리가 자체 기본값을 제공하는 선택 인자는 생략한다. horizon, 장치, 모델 가중치 형식, 입출력 tensor dtype처럼 패키지 호환에 필요한 인자는 유지한다.
 
 공식 설정과 프로젝트 연결 설정을 적용할 때의 기준은 다음과 같다.
 

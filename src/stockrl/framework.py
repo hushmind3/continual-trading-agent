@@ -101,11 +101,13 @@ def prices(currency='USD',symbols=None):
     import sqlite3
     with sqlite3.connect(store.db_path) as connection:
         available=pd.read_sql_query('SELECT DISTINCT ticker FROM price_data',connection).ticker.tolist()
+        start,end=connection.execute('SELECT MIN(date),MAX(date) FROM price_data').fetchone()
     import json
     market=json.loads((ROOT/'configs/instruments.json').read_text(encoding='utf8'))
     allowed={i['symbol'] for i in market['instruments'] if i.get('market') in (('KRX','KOSDAQ') if currency=='KRW' else ('US','NASDAQ','NYSE','NYSEARCA','AMEX')) and i.get('asset_class') in ('equity','etf')}
     names=symbols or [s for s in available if s in allowed]
-    data=store.get_price_data(names,'1900-01-01','2100-01-01')
+    if start is None:return pd.DataFrame()
+    data=store.get_price_data(names,start,end)
     data=data.rename(columns={'tic':'symbol','datadate':'date','prcod':'open','prchd':'high','prcld':'low','prccd':'close','cshtrd':'volume'})
     data['date']=pd.to_datetime(data.date,utc=True).dt.tz_localize(None)
     return data
@@ -121,18 +123,13 @@ def backtest(frame,registry):
         identity=read_json(ROOT/'runtime/official/dataset.json')
         if identity.get('currency')!=env.currency or identity.get('symbols')!=env.symbols:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다.')
         model=SAC.load(ROOT/'runtime/official/sac.zip',env=env)
-        observation,_=env.reset();records=[]
-        while True:
-            action,_=model.predict(observation,deterministic=True)
-            observation,_,terminated,truncated,_=env.step(action)
-            base=env.unwrapped
-            records.append([pd.Timestamp(base.date_memory[-1]),*base.actions_memory[-1]])
-            if terminated or truncated:break
-        weights=pd.DataFrame(records,columns=['date',*env.symbols]).set_index('date')
+        from finrl.agents.stablebaselines3.models import DRLAgent
+        _,weights=DRLAgent.DRL_prediction(model=model,environment=env)
         result=finrlx('strategies.base_strategy').StrategyResult('Official SAC',weights)
         module=finrlx('backtest.backtest_engine')
         config=module.BacktestConfig(str(frame.date.min().date()),str(frame.date.max().date()))
-        prices_wide=frame.pivot(index='date',columns='symbol',values='close')
+        selected=env.unwrapped.df.rename(columns={'tic':'symbol'})
+        prices_wide=selected.pivot(index='date',columns='symbol',values='close')
         evaluated=module.BacktestEngine(config).run_backtest(result.strategy_name,prices_wide,result.weights)
         return evaluated
     finally:env.close()

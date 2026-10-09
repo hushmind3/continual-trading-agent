@@ -26,3 +26,11 @@ class ExpertObservation(gym.ObservationWrapper):
 
     def reset(self,**kwargs):self.assets=[];return super().reset(**kwargs)
     def close(self):self.registry.close();return super().close()
+
+    @property
+    def df(self):return self.unwrapped.df
+
+    def get_sb_env(self):
+        from stable_baselines3.common.vec_env import DummyVecEnv
+        env=DummyVecEnv([lambda:self])
+        return env,env.reset()

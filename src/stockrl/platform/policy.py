@@ -81,6 +81,8 @@ class RegisteredCritic(nn.Module):
 
 def build_policy(model_spec,initial_state=None):
     actor=RegisteredActor(model_spec);critic=RegisteredCritic(actor)
+    import weakref
+    actor._critic_ref=weakref.ref(critic)
     actor.backend.critic_target.requires_grad_(False)
     if initial_state is not None:
         from .policy_transfer import transfer_state

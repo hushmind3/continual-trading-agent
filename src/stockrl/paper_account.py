@@ -257,6 +257,10 @@ class PaperAccount:
         class BrokerAdapter:
             accounts={key:None for key in SEED_CASH}
             def set_account(self,name):self.currency=name
+            def _get_account(self,name):return name
+            def _api_request(self,method,path,account):
+                symbol=path.split("/")[-2]
+                return {"askprice":book_price(symbol,account)}
             def get_portfolio_value(self,name):return account._equity(name)
             def get_account_info(self,name):
                 return {'cash':account.state['books'][name]['cash'],'equity':self.get_portfolio_value(name),'portfolio_value':self.get_portfolio_value(name)}
@@ -279,8 +283,7 @@ class PaperAccount:
             if not math.isfinite(price) or price<=0:raise ValueError('유효한 실제 가격이 없습니다: '+symbol)
             return price
         broker=BrokerAdapter();config=ExecutionConfig(min_order_size=0,risk_checks_enabled=False,execution_timeout=0,log_orders=False)
-        executor=TradeExecutor(broker,config);executor._gvkey_to_ticker=lambda symbol:symbol
-        executor._get_current_price=book_price
+        executor=TradeExecutor(broker,config)
         for currency in SEED_CASH:
             rows=[{'gvkey':s,'weight':float(allocation[j])} for j,s in enumerate(panel.symbols)
                 if _currency(*panel.groups[s])==currency and panel.observed[index,j]]

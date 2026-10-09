@@ -41,7 +41,7 @@ class PortfolioStrategy(BaseStrategy):
 
 
 def evaluate_recorded_weights(prices: pd.DataFrame, weights: pd.DataFrame, fee: float, initial_capital=10000):
-    """Official FinRL-X engine; cash is a zero-return security to preserve its weight."""
+    """Official FinRL-X engine and its native weight normalization."""
     from .finrl_modules import BacktestEngine,BacktestConfig
     if prices.empty or weights.empty:
         raise ValueError("평가할 실제 가격과 비중 기록이 필요합니다.")
@@ -50,10 +50,6 @@ def evaluate_recorded_weights(prices: pd.DataFrame, weights: pd.DataFrame, fee: 
     config=BacktestConfig(str(prices.index.min().date()),str(prices.index.max().date()),
         initial_capital=initial_capital,transaction_cost=fee,integer_positions=False,benchmark_tickers=[])
     engine=BacktestEngine(config)
-    # FinRL-X exposes a strategy-construction hook; leave unallocated weight as cash.
-    # Its default normalization would otherwise turn 10% investment into 100%.
-    import bt
-    engine._create_bt_strategy=lambda name,_:bt.Strategy(name,[bt.algos.WeighTarget(signals),bt.algos.Rebalance()])
     result=engine.run_backtest('FinRL-X SAC',prices,signals)
     values=result.portfolio_values
     return {'first':str(values.index[0]),'last':str(values.index[-1]),'observations':len(values),

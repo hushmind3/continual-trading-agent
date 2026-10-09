@@ -17,19 +17,21 @@ def register(actor,settings,device,saved=None):
     space=actor.backend.observation_space
     row_bytes=sum(np.prod(s.shape)*8 for s in space.spaces.values())+32
     capacity=min(settings.buffer_size,max(256,int(settings.replay_memory_mib*2**20/row_bytes)))
-    engine=SAC('MultiInputPolicy',None,learning_rate=settings.learning_rate,buffer_size=capacity,
+    import gymnasium as gym
+    env=gym.Env()
+    env.observation_space=space;env.action_space=actor.backend.action_space
+    engine=SAC('MultiInputPolicy',env,learning_rate=settings.learning_rate,buffer_size=capacity,
         learning_starts=settings.minimum_batch_size,batch_size=settings.batch_size,
         tau=settings.tau,gamma=settings.discount,ent_coef=settings.entropy_coefficient,
-        target_entropy=-2.,target_update_interval=settings.target_update_interval,
-        device=device,_init_setup_model=False)
-    engine.observation_space=space;engine.action_space=actor.backend.action_space;engine.n_envs=1
-    engine.policy_kwargs={'net_arch':{'pi':[],'qf':[256,256]},'features_extractor_class':actor.backend.features_extractor_class,
-        'features_extractor_kwargs':actor.backend.features_extractor_kwargs,'share_features_extractor':True,'normalize_images':False}
-    engine._setup_model()
-    engine.policy=actor.backend;engine._create_aliases()
-    from stable_baselines3.common.utils import get_parameters_by_name
-    engine.batch_norm_stats=get_parameters_by_name(engine.critic,['running_'])
-    engine.batch_norm_stats_target=get_parameters_by_name(engine.critic_target,['running_'])
+        target_entropy='auto',target_update_interval=settings.target_update_interval,device=device,
+        policy_kwargs={'net_arch':{'pi':[],'qf':[256,256]},'features_extractor_class':actor.backend.features_extractor_class,
+            'features_extractor_kwargs':actor.backend.features_extractor_kwargs,'share_features_extractor':True,'normalize_images':False})
+    engine.set_parameters({'policy':actor.backend.state_dict()},exact_match=False,device=device)
+    actor.backend=engine.policy
+    critic=actor._critic_ref() if hasattr(actor,'_critic_ref') else None
+    if critic is not None:critic.network=engine.critic
+    from .policy import activate_policy
+    activate_policy(actor,critic or actor,actor.model_spec.get('active_experts',actor.model_spec['expert_ids']))
     engine.set_logger(configure(folder=None,format_strings=[]))
     if saved:
         restore_optimizers(engine,saved)

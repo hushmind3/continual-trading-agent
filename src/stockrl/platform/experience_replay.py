@@ -24,5 +24,5 @@ def compatible_transition(row,spec):
     for key in ('loc','scale'):
         if key in row:result[key]=row[key]
     result['next']={**compatible_observation(row['next'],spec),**{k:row['next'][k] for k in ['reward','done','discount'] if k in row['next']}}
-    
+
     return result

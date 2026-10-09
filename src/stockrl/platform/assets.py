@@ -14,78 +14,28 @@ import sys
 
 from ..moe_native import NativeExpert, native_call
 from ..moe_stock_policies import StockPolicyExpert
-from .expert_packages import HEADER_FORMAT,load_package,package_path
+from .expert_packages import load_package
 from ..expert_device import restore_host
 
 
 
-def guard_model_assets(path,extra_references=(),trainable_root=None):
-    bank=Path(path).resolve();reads=set()
-    saved=torch.load(bank,map_location='cpu',weights_only=True,mmap=True) if bank.is_file() else {}
-    allowed={bank}
-    if saved.get('format')==HEADER_FORMAT:
-        if not saved.get('integrated_experts'):allowed.update(package_path(bank,r) for r in saved['expert_packages'].values())
-    allowed.update(package_path(bank,r) for r in extra_references)
-    if saved.get('integrated_experts'):
-        for key,body in saved.get('frozen_experts',{}).items():
-            if body.get('executor')=='llama_cpp' and trainable_root:
-                ref=body['weight_asset'];allowed.add((Path(trainable_root).parent/'engines'/(key+'-'+ref['sha256'][:16]+'.gguf')).resolve())
-    from ..state_io import read_json
-    for manifest in list(allowed):
-        if manifest.suffix=='.json':
-            weight=read_json(manifest).get('weight_asset')
-            if weight:allowed.add(package_path(bank,weight))
-    del saved
-    def audit(event,args):
-        if event!='open' or not args or not isinstance(args[0],str):return
-        candidate=Path(args[0])
-        weight=candidate.suffix in ('.pt','.pth','.ckpt','.safetensors','.gguf') or candidate.name=='pytorch_model.bin'
-        if not weight:return
-        candidate=candidate.resolve()
-        learned=trainable_root and candidate.is_relative_to(Path(trainable_root).resolve()) and candidate.name.startswith('policy-')
-        if candidate not in allowed and not learned:
-            raise RuntimeError('MoE에 등록되지 않은 가중치를 읽으려 했습니다: '+str(candidate))
-        reads.add(str(candidate))
-    sys.addaudithook(audit)
-    return reads
-
-
 class ExpertPool:
-    def __init__(self, settings, extra_packages=None,keep_device=False,live=False):
+    def __init__(self, settings,keep_device=False,live=False):
         self.settings = settings
         self.keep_device=keep_device
         self.live=live
-        path = settings.resolve(settings.expert_checkpoint)
-        self.path=path
-        self.saved = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
-        self.embedded=self.saved.get('frozen_experts',{})
-        if self.saved.get("format") not in ("registered_vertical_trading_moe_v1",HEADER_FORMAT):
-            raise ValueError("Expert 자산 패키지 형식을 확인하세요.")
-        self.entries = self.saved["expert_mapping"]
-        for key,reference in (extra_packages or {}).items():
-            package=load_package(path,reference,verify=True)
-            self.entries[key]=package['entry'];self.saved['expert_packages'][key]=reference
-            self.saved['config']['feature_sizes'][key]=package['feature_size']
-            self.saved['config']['native_module_counts'][key]=package['module_count']
-        self.active=set(self.saved.get('active_experts',settings.enabled_experts or self.entries))
-        missing=[]
-        for key in self.entries:
-            count=self.saved['config']['native_module_counts'].get(key,0)
-            if not count:missing.append(key)
-            for index in range(count):
-                if self.saved['format']!=HEADER_FORMAT and not any(name.startswith(f'experts.{key}.models.{index}.') for name in self.saved['state_dict']):
-                    missing.append(f'{key}/{index}')
-        if missing:
-            raise RuntimeError('champion.pt에 Expert 가중치가 누락됐습니다. 원본으로 다시 패키징해야 합니다: '+', '.join(missing))
-        self.temp = tempfile.TemporaryDirectory(prefix="finrlx-expert-definitions-")
-        self.root = Path(self.temp.name)
-        with zipfile.ZipFile(io.BytesIO(self.saved["metadata"]["architecture_sources"])) as archive:
-            for item in archive.infolist():
-                if not (self.root/item.filename).resolve().is_relative_to(self.root.resolve()):
-                    raise ValueError("잘못된 Expert 정의 경로")
-                if item.file_size > 20*1024*1024:
-                    raise ValueError("Expert 정의 파일이 지나치게 큽니다.")
-            archive.extractall(self.root)
+        from ..state_io import read_json
+        catalog=read_json(settings.registry_file)
+        self.path=settings.model_dir/'expert_registry.json'
+        self.entries={};references={};sizes={};counts={}
+        for key,item in catalog.get('experts',{}).items():
+            package=load_package(self.path,item['package'])
+            self.entries[key]={**package['entry'],'id':key};references[key]=item['package']
+            sizes[key]=package['feature_size'];counts[key]=package['module_count']
+        self.references=references;self.counts=counts
+        self.active=set(catalog.get('active',[]))
+        self.temp=tempfile.TemporaryDirectory(prefix='frozen-expert-definitions-')
+        self.root=Path(self.temp.name)
         self.loaded = OrderedDict()
         self.roots={key:self.root for key in self.entries}
         self.metrics = {}
@@ -93,11 +43,6 @@ class ExpertPool:
         self.ids = sorted(self.entries)
         from .expert_residency import Residency
         self.residency=Residency(self)
-
-    def model_spec(self):
-        config={k:self.saved["config"][k] for k in ("feature_sizes","stock_policy_ids","assembly_routing") if k in self.saved["config"]}
-        return {"config":config,"expert_ids":self.ids,
-                "source_updates":int(self.saved.get("optimizer_updates",0))}
 
     def catalog(self):
         return [dict(id=key, name=e.get("name", key), role="action" if e.get("stock_policy") else "market",
@@ -119,46 +64,35 @@ class ExpertPool:
             raise MemoryError("사용 가능한 RAM이 운영 여유 공간보다 적습니다.")
         started = time.perf_counter()
         rss_before=self.process.memory_info().rss
-        prefix = f"experts.{key}.models."
-        count = self.saved["config"]["native_module_counts"][key]
-        metadata=self.saved['metadata']
-        quantization=None
-        if self.saved['format']==HEADER_FORMAT:
-            if self.live and self.saved.get('integrated_experts'):
-                if key not in self.embedded:raise ValueError('Champion 내부에 선택한 Expert가 없습니다. 구성을 적용하세요: '+key)
-                package=self.embedded[key]
-            else:package=load_package(self.path,self.saved['expert_packages'][key])
-            if package['id']!=key or package['module_count']!=count:raise ValueError('Expert 패키지 구성이 다릅니다.')
-            if package.get('executor')=='llama_cpp':
-                from .gguf_expert import GGUFExpert
-                if package.get('embedded_weight') is not None:
-                    from .integrated_asset import materialize_gguf
-                    package={**package,'embedded_path':materialize_gguf(self.settings,key,package)}
-                expert=GGUFExpert(self.settings,package);expert.keep_device=self.keep_device
-                expert.cancelled=getattr(self,'cancelled',lambda:False)
-                self.loaded[key]=expert
-                self.metrics.setdefault(key,{}).update(load_seconds=time.perf_counter()-started,loaded=True,engine='llama.cpp',weight_bytes=package['weight_asset']['bytes'])
-                return expert
-            weights=package['state_dict'];prefix='models.';metadata=package['metadata']
-            quantization=package.get('quantization')
-            self.roots[key]=self.root/key
-            with zipfile.ZipFile(io.BytesIO(metadata['architecture_sources'])) as archive:
-                for item in archive.infolist():
-                    if not (self.roots[key]/item.filename).resolve().is_relative_to(self.roots[key].resolve()):
-                        raise ValueError('잘못된 Expert 정의 경로')
-                    if item.file_size>20*1024*1024:raise ValueError('지나치게 큰 Expert 정의')
-                archive.extractall(self.roots[key])
-        else:weights=self.saved['state_dict']
+        count = self.counts[key]
+        package=load_package(self.path,self.references[key],verify=True)
+        if package['module_count']!=count:raise ValueError('Expert 패키지 구성이 다릅니다.')
+        if package.get('executor')=='llama_cpp':
+            from .gguf_expert import GGUFExpert
+            expert=GGUFExpert(self.settings,package);expert.keep_device=self.keep_device
+            expert.cancelled=getattr(self,'cancelled',lambda:False)
+            self.loaded[key]=expert
+            self.metrics.setdefault(key,{}).update(load_seconds=time.perf_counter()-started,loaded=True,engine='llama.cpp',weight_bytes=package['weight_asset']['bytes'])
+            return expert
+        weights=package['state_dict'];prefix='models.';metadata=package['metadata']
+        quantization=package.get('quantization')
+        self.roots[key]=self.root/key
+        with zipfile.ZipFile(io.BytesIO(metadata['architecture_sources'])) as archive:
+            for item in archive.infolist():
+                if not (self.roots[key]/item.filename).resolve().is_relative_to(self.roots[key].resolve()):
+                    raise ValueError('잘못된 Expert 정의 경로')
+                if item.file_size>20*1024*1024:raise ValueError('지나치게 큰 Expert 정의')
+            archive.extractall(self.roots[key])
         states = [{k.removeprefix(prefix+str(i)+"."):v for k,v in weights.items()
                    if k.startswith(prefix+str(i)+".")} for i in range(count)]
-        if self.saved['format']==HEADER_FORMAT and package.get('executor')=='hf_forecast':
+        if package.get('executor')=='hf_forecast':
             from .hf_forecast import HfForecastExpert
             expert=HfForecastExpert.restore(package)
         elif entry.get("stock_policy"):
             expert = StockPolicyExpert.restore(entry, states[0],quantization)
         else:
             def construct():
-                data=metadata.get('construction_input') if self.saved['format']==HEADER_FORMAT else metadata['construction_inputs'][key]
+                data=metadata.get('construction_input')
                 return native_call(entry['backend'],self.roots[key],data,
                                    states=states,load_only=True,runner_source=metadata['native_runner_source'],quantization=quantization)
             try:
@@ -241,6 +175,6 @@ class ExpertPool:
 
     def close(self):
         for key in list(self.loaded):self.release(key)
-        self.saved = None;self.embedded=None
+        self.references={}
         gc.collect()
         self.temp.cleanup()

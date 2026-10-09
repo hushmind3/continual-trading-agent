@@ -23,7 +23,7 @@ SCHEMA=dict(type='object',properties={
 class GGUFExpert(nn.Module):
     def __init__(self,settings,package):
         super().__init__();self.settings=settings;self.entry=package['entry'];self.reference=package['weight_asset']
-        self.path=package.get('embedded_path') or package_path(settings.resolve(settings.expert_checkpoint),self.reference)
+        self.path=package_path(settings.model_dir/'expert_registry.json',self.reference)
         if digest(self.path)!=self.reference['sha256']:raise ValueError('GGUF 고정 가중치 checksum이 다릅니다.')
         self.child=None;self.device=None;self.log=None;self.log_dir=None;self.details={}
 
@@ -34,7 +34,7 @@ class GGUFExpert(nn.Module):
         self.url=f'http://127.0.0.1:{port}';self.device=device
         self.log=tempfile.TemporaryFile(mode='w+b')
         self.log_dir=tempfile.TemporaryDirectory(prefix='stockrl-llama-');self.log_path=Path(self.log_dir.name)/'engine.log'
-        args=[str(engine),'-m',str(self.path),'--host','127.0.0.1','--port',str(port),'-c','4096','-t',str(self.settings.learning.cpu_threads),
+        args=[str(engine),'-m',str(self.path),'--host','127.0.0.1','--port',str(port),'-c','4096','-t','2',
             '-ngl','auto' if device!='cpu' else '0','--fit','on','--fit-target',str(int(self.settings.resources.vram_reserve_gib*1024)),
             '--parallel','1','--cache-ram',str(self.settings.resources.gguf_prompt_cache_mib),
             '--no-webui','--log-file',str(self.log_path),'--verbosity','4']

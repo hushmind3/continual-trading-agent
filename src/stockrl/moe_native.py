@@ -24,14 +24,6 @@ class NativeExpert(nn.Module):
         self.runner_source=runner_source
         self.requires_grad_(False).eval()
 
-    def forward_tensors(self,*args,module_index=0,**kwargs):
-        """Differentiable native entrypoint for a selected expert parameter group.
-
-        Diagnostic JSON evidence detaches outputs. Native fine tuning instead
-        calls this registered module with that architecture's native tensors.
-        """
-        return self.models[module_index](*args,**kwargs)
-
     def forward(self, root, data, device="cpu"):
         # Frozen CPU tensors are views into the single mmap PT. Retain those
         # views rather than copying every expert GPU -> newly allocated RAM.

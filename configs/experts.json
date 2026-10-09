@@ -1,0 +1,939 @@
+{
+  "active": [
+    "chronos_nf4",
+    "exaone_nf4",
+    "fincast_nf4",
+    "kronos_nf4",
+    "qwen35_08b_gguf",
+    "stock_adilbai_nf4",
+    "stock_finrl_a2c_int4",
+    "stock_finrl_ppo_int4",
+    "stock_finrl_sac_nf4",
+    "stock_msft_ppo_int4",
+    "timemoe_int4",
+    "timesfm_nf4"
+  ],
+  "experts": {
+    "fincast": {
+      "id": "fincast",
+      "name": "FinCast 1.0B",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/fincast-cdc1221200feb8eb.pt",
+        "sha256": "cdc1221200feb8ebac5da475ec0ca0c4532deedf9165ce9a54bae42f3fe7504c",
+        "bytes": 3967438630
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "fincast",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "exaone": {
+      "id": "exaone",
+      "name": "EXAONE Finance",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/exaone-0122382b6b1dd8e6.pt",
+        "sha256": "0122382b6b1dd8e687b8408aa56489318344e99bb75b6ff9d1ad15a0fb05d477",
+        "bytes": 810421803
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "exaone",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "kronos": {
+      "id": "kronos",
+      "name": "Kronos Base + Tokenizer",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/kronos-62a5ad9890e2549a.pt",
+        "sha256": "62a5ad9890e2549aacb78a62366abe457f50d3ef1aeee3aa4104f784118218db",
+        "bytes": 426270079
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "kronos",
+        "requires": [
+          "완료 OHLCV"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "chronos": {
+      "id": "chronos",
+      "name": "FinText Chronos Global",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/chronos-64fd88caaa089a56.pt",
+        "sha256": "64fd88caaa089a56e270d2f7028c41af980cb8044ca93f68194de6ff1f104c9b",
+        "bytes": 185750521
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "chronos",
+        "requires": [
+          "완료 일봉",
+          "SPY 초과수익률"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "timesfm": {
+      "id": "timesfm",
+      "name": "FinText TimesFM Global",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/timesfm-a4c32dac95bf954c.pt",
+        "sha256": "a4c32dac95bf954ccc4f9c0dd806a94505191f92bf2c719e3b886f811d72defd",
+        "bytes": 80366797
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "timesfm",
+        "requires": [
+          "완료 일봉",
+          "SPY 초과수익률"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "timemoe": {
+      "id": "timemoe",
+      "name": "Time-MoE Large",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/timemoe-4ec4e3971beab2d7.pt",
+        "sha256": "4ec4e3971beab2d7c627aa90dd4da70808035bf50bfbd6c627e786b67679ae0c",
+        "bytes": 907637729
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "timemoe",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "toto": {
+      "id": "toto",
+      "name": "Toto 2.0",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/toto-91cc293807852d60.pt",
+        "sha256": "91cc293807852d60ab735da0022aa229bf340169414377650108ace967bf113a",
+        "bytes": 1251901047
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "toto",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "stock_adilbai": {
+      "id": "stock_adilbai",
+      "name": "Adilbai Stock Trading RL Agent",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_adilbai-93c906bd709d960e.pt",
+        "sha256": "93c906bd709d960e176af58fd652cc559b87e2bd436ef4aad499ce640ab858e7",
+        "bytes": 2726204
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMZN",
+          "GOOGL",
+          "MSFT",
+          "TSLA"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_msft_ppo": {
+      "id": "stock_msft_ppo",
+      "name": "RLTradingAgent MSFT PPO",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_msft_ppo-55a86efa74b6c104.pt",
+        "sha256": "55a86efa74b6c1047ef6419c1e6d48dce76f7ae8a2f763cc86931f465bacce5c",
+        "bytes": 1173439
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "MSFT"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_finrl_a2c": {
+      "id": "stock_finrl_a2c",
+      "name": "FinRL trading bot A2C",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_finrl_a2c-2ec0c21cdbb1d6e9.pt",
+        "sha256": "2ec0c21cdbb1d6e9a9642a595b8dfcfcf27c2d43e4ac52325b1789af36715733",
+        "bytes": 1220476
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_finrl_ppo": {
+      "id": "stock_finrl_ppo",
+      "name": "FinRL trading bot PPO",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_finrl_ppo-abe1fcfa3bdc19b6.pt",
+        "sha256": "abe1fcfa3bdc19b6ccbff79575fbabad3aac33f6b9db7d6aef01feaf24bf93ca",
+        "bytes": 1220412
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_finrl_sac": {
+      "id": "stock_finrl_sac",
+      "name": "FinRL trading bot SAC",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_finrl_sac-cf0ee778769f4eb1.pt",
+        "sha256": "cf0ee778769f4eb1ed8da23e6181c2ea9a9a9e9b4fe2116c74d5506302ee4444",
+        "bytes": 3405571
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_finrl_a2c_int8": {
+      "id": "stock_finrl_a2c_int8",
+      "name": "FinRL trading bot A2C · INT8",
+      "role": "action",
+      "package": {
+        "file": "expert-packages/stock_finrl_a2c_int8-5504c244a1b6b216.pt",
+        "sha256": "5504c244a1b6b216d93c7a0d14de59dfeacdc8e540e5c23e389384931ea950d1",
+        "bytes": 1134250
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_finrl_a2c_int4": {
+      "id": "stock_finrl_a2c_int4",
+      "name": "FinRL trading bot A2C · INT4",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_finrl_a2c_int4-82f3474bf7d0a2b5.pt",
+        "sha256": "82f3474bf7d0a2b5f5fa69511a2d5500db6432e71368f6ff0a831cbfc76fa02f",
+        "bytes": 1117226
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_finrl_a2c_fp16": {
+      "id": "stock_finrl_a2c_fp16",
+      "name": "FinRL trading bot A2C · FP16",
+      "role": "action",
+      "package": {
+        "file": "expert-packages/stock_finrl_a2c_fp16-ca4a394536469c41.pt",
+        "sha256": "ca4a394536469c41433702855fdb16ede0dc3c6358cedef6748fdc0ec4374840",
+        "bytes": 1157756
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_finrl_a2c_bf16": {
+      "id": "stock_finrl_a2c_bf16",
+      "name": "FinRL trading bot A2C · BF16",
+      "role": "action",
+      "package": {
+        "file": "expert-packages/stock_finrl_a2c_bf16-bf7da47791215408.pt",
+        "sha256": "bf7da477912154087ae65ad13d1fa8f6dffcec49e0f00f937e577b105bce996d",
+        "bytes": 1157756
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "fincast_fp16": {
+      "id": "fincast_fp16",
+      "name": "FinCast 1.0B · FP16",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/fincast_fp16-00c00adf2650b3de.pt",
+        "sha256": "00c00adf2650b3de7e4974079e38fa1c30faf044c6ff3a0654004e50fa0387f5",
+        "bytes": 1984563494
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "fincast",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "amazon_chronos_t5_small_a971ba21": {
+      "id": "amazon_chronos_t5_small_a971ba21",
+      "name": "amazon/chronos-t5-small",
+      "role": "market",
+      "package": {
+        "file": "expert-packages/amazon_chronos_t5_small_a971ba21-efe1894915dc2653.pt",
+        "sha256": "efe1894915dc26536bc40cc4baaa4f82591c8bbb95035b41e4cdeb1ade17abcd",
+        "bytes": 185750841
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "chronos",
+        "requires": [
+          "완료 일봉",
+          "SPY 초과수익률"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "amazon_chronos_bolt_tiny_a0e552de": {
+      "id": "amazon_chronos_bolt_tiny_a0e552de",
+      "name": "amazon/chronos-bolt-tiny",
+      "role": "market",
+      "package": {
+        "file": "expert-packages/amazon_chronos_bolt_tiny_a0e552de-871cc928dcb8e7e2.pt",
+        "sha256": "871cc928dcb8e7e2ba899a4d1a2252d380dfac35e784363a2b194cc90231e7f4",
+        "bytes": 34646517
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "price_forecast",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "autogluon_chronos_2_small_ddec0131": {
+      "id": "autogluon_chronos_2_small_ddec0131",
+      "name": "autogluon/chronos-2-small",
+      "role": "market",
+      "package": {
+        "file": "expert-packages/autogluon_chronos_2_small_ddec0131-57a74b01d6882016.pt",
+        "sha256": "57a74b01d6882016a555607d067910e26f3232c1ae6afd12fc241601dae434bd",
+        "bytes": 111770895
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "price_forecast",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "toto_fp16": {
+      "id": "toto_fp16",
+      "name": "Toto 2.0 · FP16",
+      "role": "market",
+      "package": {
+        "file": "expert-packages/toto_fp16-bbe3b18dd52fef5d.pt",
+        "sha256": "bbe3b18dd52fef5d054a2fea8110211ce462e388b9de125ec4aa499f957d4a84",
+        "bytes": 626532599
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "toto",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "toto_bf16": {
+      "id": "toto_bf16",
+      "name": "Toto 2.0 · BF16",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/toto_bf16-aad4f21a9b4eaa63.pt",
+        "sha256": "aad4f21a9b4eaa6387350869a4ea5793e916bb1b67878e86c68bcd48a5ff4745",
+        "bytes": 626532599
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "toto",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "fincast_int8": {
+      "id": "fincast_int8",
+      "name": "FinCast 1.0B · INT8",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/fincast_int8-4e835ae4a1c96926.pt",
+        "sha256": "4e835ae4a1c96926e49e08d7e3201f7be6278d0feb82f1d96eed42ea3fdfdedb",
+        "bytes": 1059540090
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "fincast",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "qwen35_08b_gguf": {
+      "id": "qwen35_08b_gguf",
+      "name": "unsloth/Qwen3.5-0.8B-GGUF",
+      "role": "market",
+      "category": "interpretation",
+      "package": {
+        "file": "expert-packages/qwen35_08b_gguf.json",
+        "sha256": "710f9016b07b843f0da147c39d84b62113c94a7e11dccfb8c9ace444d7d455cc",
+        "bytes": 763
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "gguf_market",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "stock_finrl_a2c_nf4": {
+      "id": "stock_finrl_a2c_nf4",
+      "name": "FinRL trading bot A2C · NF4",
+      "role": "action",
+      "package": {
+        "file": "expert-packages/stock_finrl_a2c_nf4-703059aecc674135.pt",
+        "sha256": "703059aecc67413565b68c0b5a044838273248760a443e3610d42e6ba431b932",
+        "bytes": 1129762
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "chronos_nf4": {
+      "id": "chronos_nf4",
+      "name": "FinText Chronos Global · NF4",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/chronos_nf4-944ae28ed51610f8.pt",
+        "sha256": "944ae28ed51610f8fa8744045f4764bd4ca4af8170c6f80249bb4d1394da85dc",
+        "bytes": 32599801
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "chronos",
+        "requires": [
+          "완료 일봉",
+          "SPY 초과수익률"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "exaone_nf4": {
+      "id": "exaone_nf4",
+      "name": "EXAONE Finance · NF4",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/exaone_nf4-e7a6f4b615f609ae.pt",
+        "sha256": "e7a6f4b615f609ae5c0b0fecbf0d92e3e963c4bd430a33124850089876fa5767",
+        "bytes": 358020111
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "exaone",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "fincast_nf4": {
+      "id": "fincast_nf4",
+      "name": "FinCast 1.0B · NF4",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/fincast_nf4-58a98655e4151bf7.pt",
+        "sha256": "58a98655e4151bf7a9da4fd1ace3752ae4f1cd3f41b2fb2b5c95e9f440a9d5d9",
+        "bytes": 519845066
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "fincast",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "kronos_nf4": {
+      "id": "kronos_nf4",
+      "name": "Kronos Base + Tokenizer · NF4",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/kronos_nf4-91540dfcc419fa94.pt",
+        "sha256": "91540dfcc419fa94e03c42807673ffc7ba9c1479a8c7a7397a1d7d29046f36f8",
+        "bytes": 63018651
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "kronos",
+        "requires": [
+          "완료 OHLCV"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "stock_adilbai_nf4": {
+      "id": "stock_adilbai_nf4",
+      "name": "Adilbai Stock Trading RL Agent · NF4",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_adilbai_nf4-b9791a6ee6f1538a.pt",
+        "sha256": "b9791a6ee6f1538ac2556b5d8bb284d833e806a6d469db5b5876482f70c7f87e",
+        "bytes": 1373794
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMZN",
+          "GOOGL",
+          "MSFT",
+          "TSLA"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_finrl_ppo_int4": {
+      "id": "stock_finrl_ppo_int4",
+      "name": "FinRL trading bot PPO · INT4",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_finrl_ppo_int4-2b310eaf3d6ccd86.pt",
+        "sha256": "2b310eaf3d6ccd8698c7b00c65ed2a6e5177102a3fab1b60ffe21ac790e86687",
+        "bytes": 1117546
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_finrl_sac_nf4": {
+      "id": "stock_finrl_sac_nf4",
+      "name": "FinRL trading bot SAC · NF4",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_finrl_sac_nf4-ac810d2245e56c53.pt",
+        "sha256": "ac810d2245e56c53ad892b6aaaff43718f0ea6a6cfaff12ff7cffef571af41b6",
+        "bytes": 1453151
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "AAPL",
+          "AMD",
+          "AMZN",
+          "CAT",
+          "CRWD",
+          "GOOGL",
+          "GS",
+          "HD",
+          "IBM",
+          "INTC",
+          "META",
+          "MSFT",
+          "NVDA",
+          "PYPL",
+          "T",
+          "TSLA",
+          "V"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "stock_msft_ppo_int4": {
+      "id": "stock_msft_ppo_int4",
+      "name": "RLTradingAgent MSFT PPO · INT4",
+      "role": "action",
+      "category": "trading",
+      "package": {
+        "file": "expert-packages/stock_msft_ppo_int4-25a47ac1f0cdb626.pt",
+        "sha256": "25a47ac1f0cdb6263a2e7be6f00700a03a18fe2b2f7e110425debfa7794ce5b3",
+        "bytes": 1110381
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "stock",
+        "requires": [
+          "완료 일봉",
+          "기술 지표",
+          "USD 계좌"
+        ],
+        "universe": [
+          "MSFT"
+        ],
+        "minimum_history": 128
+      }
+    },
+    "timemoe_int4": {
+      "id": "timemoe_int4",
+      "name": "Time-MoE Large · INT4",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/timemoe_int4-7942cbcce4311017.pt",
+        "sha256": "7942cbcce43110177547c3e81a57a6a0f3d1d71f6b59abe58aa7b4ed3370d864",
+        "bytes": 256465533
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "timemoe",
+        "requires": [
+          "완료 가격 시계열"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    },
+    "timesfm_nf4": {
+      "id": "timesfm_nf4",
+      "name": "FinText TimesFM Global · NF4",
+      "role": "market",
+      "category": "forecast",
+      "package": {
+        "file": "expert-packages/timesfm_nf4-37060e4ac4862ff6.pt",
+        "sha256": "37060e4ac4862ff6fb902e8f5621afad24054970b5d4ad95ad3aec8e0eb186dc",
+        "bytes": 11649897
+      },
+      "input": {
+        "supported": true,
+        "pipeline": "timesfm",
+        "requires": [
+          "완료 일봉",
+          "SPY 초과수익률"
+        ],
+        "minimum_history": 32,
+        "universe": null
+      }
+    }
+  }
+}

@@ -2,9 +2,6 @@
 setlocal
 cd /d "%~dp0"
 set "PYTHONUTF8=1"
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_local.ps1"
-if errorlevel 1 (
-  echo Startup failed. Read the message above and check Node.js, frontend dependencies, and ports 8766/5173.
-  pause
-  exit /b 1
-)
+set "PYTHONPATH=%~dp0src"
+"%~dp0.venv\Scripts\python.exe" -m streamlit run "%~dp0ui.py" --server.address 127.0.0.1 --server.port 8766 --browser.gatherUsageStats false --server.fileWatcherType none
+if errorlevel 1 pause

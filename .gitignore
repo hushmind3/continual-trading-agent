@@ -18,6 +18,7 @@ frontend/playwright-report/
 
 # Active machine state and credentials.
 runtime/
+data/
 configs/local/
 *.sqlite3-shm
 *.sqlite3-wal

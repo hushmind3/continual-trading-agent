@@ -29,6 +29,26 @@ test('precision variants stay beside their original Expert',async({page,request}
  await expect(family.getByRole('button',{name:'자동 최적화',exact:true})).toBeVisible();
 });
 
+test('all precision outcomes expose rejected, failed and absent versions',async({page})=>{
+ const state=await (await page.request.get('/api/state')).json();state.library.job={busy:false};
+ const base=state.library.catalog.experts.fincast;
+ state.library.catalog.optimizations.fincast={stage:'complete',goal:'balanced',previous:'fincast',selected:'fincast',reports:[
+  {id:'fincast',precision:'FP32',passed:true,eligible:true,score:1,detail:'원본 비교 기준'},
+  {id:'removed_int4',precision:'INT4',passed:false,eligible:false,detail:'상대 RMSE 5% > 1% · 적용 차단',bytes:100,score:.7,measurement:{warm_median_seconds:.1,metrics:{device:'cuda:0'}}}
+ ],failures:[{precision:'bf16',detail:'변환 지원 계층 없음'}]};
+ for(const [id,item] of Object.entries(state.library.catalog.experts))if((item as any).conversion?.source_id==='fincast'&&['int4','bf16'].includes((item as any).conversion.precision))delete state.library.catalog.experts[id];
+ await page.route('**/api/state',route=>route.fulfill({json:state}));
+ await page.goto('/#moe');const family=page.getByRole('button',{name:base.name+' 상세',exact:true});
+ const versions=family.getByRole('group',{name:'Expert 정밀도 버전'});await expect(versions.locator(':scope > div')).toHaveCount(5);
+ await expect(versions.getByText('출력 기준 탈락',{exact:true})).toBeVisible();await expect(versions.getByText('최적화 실패',{exact:true})).toBeVisible();
+ await versions.locator(':scope > div').last().getByRole('button',{name:'판단 근거',exact:true}).click();
+ const dialog=page.getByRole('dialog');await expect(dialog.getByText('상대 RMSE 5% > 1% · 적용 차단',{exact:true})).toBeVisible();
+ await expect(dialog.getByText(/현재 사용할 가중치 파일이 없습니다/)).toBeVisible();await expect(dialog.getByText('0.1s',{exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+ await versions.locator(':scope > div').nth(2).getByRole('button',{name:'판단 근거',exact:true}).click();
+ await expect(page.getByRole('dialog').getByText('변환 지원 계층 없음',{exact:true})).toBeVisible();
+});
+
 test('public expert discovery displays persisted compatibility and actionable downloads',async({page})=>{
  await page.goto('/#moe');await page.getByRole('button',{name:'금융 Expert 찾기',exact:true}).click();
  const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();

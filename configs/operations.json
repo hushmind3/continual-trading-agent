@@ -5,7 +5,7 @@
   "enabled_experts": [
     "chronos",
     "exaone",
-    "fincast_fp16",
+    "fincast_int8",
     "kronos",
     "stock_adilbai",
     "stock_finrl_a2c",

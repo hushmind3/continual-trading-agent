@@ -28,8 +28,21 @@ def best_precision(reports,current,goal,ram_total,vram_total):
         # Preserve quality even when returning to FP32 costs more time than a rejected current variant.
         eligible=[r for r in reports if r['passed']]
     chosen=min(eligible,key=lambda r:(r['score'],r['bytes']))
-    if reference['passed'] and chosen['score']>.95:return reference
+    if reference['passed'] and chosen['score']>.95:chosen=reference
+    for row in reports:
+        row['decision']='selected' if row is chosen else 'rejected' if not row['eligible'] else 'not_selected'
+        if row is chosen:
+            row['reason']=('기존 버전이 출력 기준을 넘어서 통과한 버전으로 복귀 · 정확도를 우선' if not reference['passed'] else
+                '허용 기준을 통과한 최적 후보' if row['id']!=current else '5% 이상 개선되는 적격 후보가 없어 현재 버전 유지')
+        elif not row['passed']:row['reason']=row.get('detail','출력 허용 기준 초과')
+        elif not row['eligible']:row['reason']=f"현재 버전 대비 추론 시간이 {'50' if goal=='memory' else '15'}% 넘게 증가해 제외"
+        elif row['score']>.95 and chosen is reference:row['reason']='현재 버전 대비 목표 점수 개선이 5% 미만'
+        else:row['reason']='선택된 버전보다 목표 점수가 높아 미선택 · 낮을수록 유리'
     return chosen
+
+
+def measurement_summary(value):
+    return {key:v for key,v in value.items() if key not in ('packet','outputs','weight_files')}
 
 
 def optimize(settings,config,catalog,payload,progress):
@@ -39,7 +52,8 @@ def optimize(settings,config,catalog,payload,progress):
     if base not in catalog['experts']:raise ValueError('정밀도 자동 비교에는 원본 Expert 패키지가 필요합니다.')
     ids=family_ids(catalog,base);active=[k for k in ids if k in catalog.get('active',[])];current=active[0] if active else base
     fixture=capture_input(settings,catalog,base);reports=[];created=[];baseline=None
-    record=dict(stage='measuring',goal=goal,input_as_of=fixture['snapshot']['as_of'],reports=[])
+    record=dict(stage='measuring',goal=goal,input_as_of=fixture['snapshot']['as_of'],reports=[],started=time.time(),
+        previous=current,attempts={p:dict(status='pending',detail='아직 검사하지 않음') for p in ('fp16','bf16','int8','int4')})
     catalog.setdefault('optimizations',{})[base]=record
     def save():atomic_json(catalog,catalog_path(settings))
     def measure(key):
@@ -48,24 +62,28 @@ def optimize(settings,config,catalog,payload,progress):
             fixture=fixture,baseline_result=baseline)
         baseline=result['baseline'];catalog['comparison']=result
         item=catalog['experts'][key]
-        if item.get('conversion'):
-            item['check']=dict(status='passed',detail='실제 추론·출력 크기·고정 가중치 검사 통과',tested=time.time(),
-                package_sha256=item['package']['sha256'],sample_output=result['variant']['packet'],metrics=result['variant']['metrics'])
-            quality_check(item,result,payload)
         measurement=result['baseline'] if key==base else result['variant']
+        item['check']=dict(status='passed',detail='실제 추론·출력 크기·고정 가중치 검사 통과',tested=time.time(),
+            package_sha256=item['package']['sha256'],sample_output=measurement['packet'],metrics=measurement['metrics'],seconds=measurement['warm_median_seconds'])
+        if item.get('conversion'):quality_check(item,result,payload)
         row=dict(id=key,precision=item['representation'],passed=key==base or item['check']['status']=='passed',
-            detail=item['check']['detail'],bytes=item['package']['bytes'],measurement=measurement,
+            detail=item['check']['detail'],bytes=item['package']['bytes'],measurement=measurement_summary(measurement),
             relative_rmse=result['relative_rmse'],direction_agreement=result.get('direction_agreement'),action_agreement=result['action_agreement'])
+        precision=(item.get('conversion') or {}).get('precision')
+        if precision:record['attempts'][precision]=dict(status='measured',id=key,detail=row['detail'])
         reports.append(row);record['reports']=reports;save()
     try:
         measure(current)
         if current!=base:
             item=catalog['experts'][base]
-            reports.append(dict(id=base,precision=item['representation'],passed=True,detail='원본 비교 기준',bytes=item['package']['bytes'],measurement=baseline))
+            reports.append(dict(id=base,precision=item['representation'],passed=True,detail='원본 비교 기준',bytes=item['package']['bytes'],measurement=measurement_summary(baseline)))
         for precision in ('fp16','bf16','int8','int4'):
+            if catalog['experts'][base]['representation'].split(' · ')[0].lower()==precision:
+                record['attempts'][precision]=dict(status='native',id=base,detail='원본과 동일한 정밀도 · 별도 변환 불필요');save();continue
             found=next((k for k in ids if (catalog['experts'][k].get('conversion') or {}).get('precision')==precision),None)
             if found==current:continue
             progress(stage='optimizing',detail=precision.upper()+' 후보 생성·검사·측정',expert=base)
+            record['attempts'][precision]=dict(status='running',detail='변환·추론·비교 중');save()
             try:
                 if found is None:
                     slot=base+'_'+precision;n=2
@@ -74,6 +92,9 @@ def optimize(settings,config,catalog,payload,progress):
                     found=item['id'];created.append(found);catalog['experts'][found]=item;save()
                 measure(found)
             except Exception as exc:
+                record['attempts'][precision]=dict(status='failed',id=found,detail=str(exc))
+                if found and found in catalog['experts']:
+                    catalog['experts'][found]['check']=dict(status='failed',detail=str(exc),tested=time.time())
                 record.setdefault('failures',[]).append(dict(precision=precision,detail=str(exc)));save()
         from .resources import ResourceMonitor
         resources=ResourceMonitor(settings.state_dir).snapshot({})
@@ -88,6 +109,7 @@ def optimize(settings,config,catalog,payload,progress):
             if key==selected['id']:continue
             recycle(package_path(settings.resolve(settings.expert_checkpoint),catalog['experts'][key]['package']))
             catalog['experts'].pop(key)
+        for row in reports:row['package_available']=row['id'] in catalog['experts']
         record.update(stage='deploying' if record.get('target_active') else 'complete',applied=False,finished=time.time(),base=base)
         save();return record
     except Exception as exc:

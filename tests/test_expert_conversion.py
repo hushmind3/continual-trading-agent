@@ -46,6 +46,14 @@ class PrecisionTests(unittest.TestCase):
         self.assertEqual(best_precision(reports,'original','balanced',1000,1000)['id'],'fp16')
         reports=[row('original',1,400),row('fp16',.98,395)]
         self.assertEqual(best_precision(reports,'original','balanced',1000,1000)['id'],'original')
+        self.assertEqual(reports[1]['decision'],'not_selected')
+        self.assertIn('5% 미만',reports[1]['reason'])
+        reports=[row('original',1,400),row('fp16',2,200),row('int4',.1,100,False)]
+        best_precision(reports,'original','balanced',1000,1000)
+        self.assertIn('15%',reports[1]['reason']);self.assertEqual(reports[2]['decision'],'rejected')
+        reports=[row('original',1,400),row('current',.5,200,False)]
+        self.assertEqual(best_precision(reports,'current','balanced',1000,1000)['id'],'original')
+        self.assertIn('정확도를 우선',reports[0]['reason'])
     def test_mutable_header_is_replaceable_while_a_reader_keeps_loaded_state(self):
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'champion.pt';initial={'format':HEADER_FORMAT,'state_dict':{'weight':torch.ones(4)}}

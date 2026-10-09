@@ -26,34 +26,52 @@ class Checkpoints:
         state['optimizer_names']=[n for n,_ in parameter_names(actor,critic)]
         from .learner import training_state
         state['sac']=training_state(actor)
-        copies={}
-        def portable(value):
-            if torch.is_tensor(value):
-                key=(value.untyped_storage().data_ptr(),value.storage_offset(),tuple(value.shape),tuple(value.stride()),value.dtype,value.device)
-                if key not in copies:copies[key]=value.detach().cpu().clone()
-                return copies[key]
-            if isinstance(value,dict):return {k:portable(v) for k,v in value.items()}
-            if isinstance(value,list):return [portable(v) for v in value]
-            if isinstance(value,tuple):return tuple(portable(v) for v in value)
-            return value
-        if any(p.is_cuda for p in actor.parameters()):state['cuda_rng']=torch.cuda.get_rng_state_all()
-        state=portable(state)
-        with temp.open("wb") as stream:
-            torch.save(state, stream)
-            stream.flush()
-            os.fsync(stream.fileno())
+        from stable_baselines3.common.save_util import save_to_zip_file
+        sac=state.pop('sac')
+        state.pop('actor');state.pop('critic');old_optimizer=state.pop('optimizer')
+        params={'policy':actor.backend.state_dict()}
+        variables={'torch_rng':state.pop('torch_rng')}
+        if sac:
+            params.update(sac['optimizers'])
+            variables.update(log_ent_coef=sac.get('log_ent_coef'),ent_coef_tensor=sac.get('ent_coef_tensor'))
+            state['sac_meta']={k:v for k,v in sac.items() if k not in ('optimizers','log_ent_coef','ent_coef_tensor')}
+        if old_optimizer is not None:params['bridge.optimizer']=old_optimizer
+        with temp.open('wb') as stream:
+            save_to_zip_file(stream,data={'stockrl':state},params=params,pytorch_variables=variables)
+            stream.flush();os.fsync(stream.fileno())
         os.replace(temp, path)
         manifest = {"file": name, "version": version, "bytes": path.stat().st_size,
-                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "time": time.time()}
+                    "sha256": self.digest(path), "time": time.time()}
         atomic_json(manifest, path.with_suffix(".json"))
         if publish:
-            self.mirror(state)
+            if not getattr(self,'defer_mirror',False):self.mirror(self.read(path))
             atomic_json(manifest, self.root / "current.json")
         revisions = sorted(self.root.glob("policy-*.json"), key=lambda p:p.stat().st_mtime, reverse=True)
         for record in revisions[self.retain:]:
             record.with_suffix(".pt").unlink(missing_ok=True)
             record.unlink()
         return manifest
+
+    @staticmethod
+    def digest(path):
+        with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+
+    @staticmethod
+    def read(path):
+        from stable_baselines3.common.save_util import load_from_zip_file
+        import zipfile,torch
+        with zipfile.ZipFile(path) as archive:is_official='data' in archive.namelist()
+        if not is_official:return torch.load(path,map_location='cpu',weights_only=True)
+        data,params,variables=load_from_zip_file(path,device='cpu')
+        state=data['stockrl'];policy=params['policy']
+        state['actor']={'backend.'+name:value for name,value in policy.items()}
+        state['critic']={'network.'+name.removeprefix('critic.'):value for name,value in policy.items() if name.startswith('critic.')}
+        state['optimizer']=params.get('bridge.optimizer')
+        state['torch_rng']=variables.get('torch_rng')
+        meta=state.pop('sac_meta',None)
+        state['sac']={**meta,'optimizers':{k:v for k,v in params.items() if k not in ('policy','bridge.optimizer')},
+            'log_ent_coef':variables.get('log_ent_coef'),'ent_coef_tensor':variables.get('ent_coef_tensor')} if meta else None
+        return state
 
     def mirror(self,state):
         """Publish the learned central state; resident mmap bodies are sealed on clean stop."""
@@ -76,7 +94,7 @@ class Checkpoints:
 
     def publish(self,manifest):
         import torch
-        state=torch.load(self.root/manifest['file'],map_location='cpu',weights_only=True)
+        state=self.read(self.root/manifest['file'])
         self.mirror(state);atomic_json(manifest,self.root/'current.json')
 
     def load(self, recover=True):
@@ -88,9 +106,9 @@ class Checkpoints:
         for record in candidates:
             try:
                 path=self.root/Path(record['file']).name
-                if hashlib.sha256(path.read_bytes()).hexdigest()!=record['sha256']:
+                if self.digest(path)!=record['sha256']:
                     continue
-                state=torch.load(path,map_location='cpu',weights_only=True)
+                state=self.read(path)
                 if state.get('format') not in ('finrlx-portfolio-sac-v1','finrlx-portfolio-ppo-v1'):
                     continue
                 if record is not manifest:
@@ -111,7 +129,7 @@ class Checkpoints:
         if not manifest:
             raise ValueError("해당 정책 버전이 없습니다.")
         path = self.root / manifest["file"]
-        if hashlib.sha256(path.read_bytes()).hexdigest() != manifest["sha256"]:
+        if self.digest(path) != manifest["sha256"]:
             raise ValueError("해당 버전의 checksum이 맞지 않습니다.")
         self.publish(manifest)
         return manifest

@@ -8,7 +8,7 @@ flowchart LR
  Market[시장·통화별 계좌 상태] --> MoE
  MoE --> Actor[공식 SAC Actor]
  Actor --> Strategy[FinRL-X StrategyResult · 목표 비중]
- Strategy --> Paper[가상계좌 도메인 어댑터]
+ Strategy --> Paper[TradeExecutor + StockTradingEnv]
  Paper --> Replay[공식 DictReplayBuffer]
  Replay --> SAC[공식 SAC.train · Twin Q / Target Q]
  SAC --> MoE
@@ -31,6 +31,8 @@ MoE는 512차원, Attention heads 8, KV heads 4, head dimension 64, SwiGLU 1,792
 
 API와 시세는 별도 프로세스다. Expert, 판단, 학습은 하나의 GPU 소유 프로세스에서 별도로 진행한다. 판단 모델은 마지막 발행된 가중치로 추론하며 학습 종료를 기다리지 않는다. Expert는 GPU 우선 상주하고 VRAM 초과분만 오프로드한다.
 
-SAC 가중치·optimizer는 FP32, 운영 추론은 CUDA BF16이다. 통합 champion.pt는 동결 Expert와 중앙 상태를 포함한다. 중앙 버전·Actor optimizer·Critic optimizer·엔트로피·Target Q를 저장하고 정상 정지 때 전체 모델에 반영한다. 부품 추가·제거는 이름을 기준으로 남은 가중치·Adam 상태를 승계한다.
+SAC 가중치·optimizer는 FP32, 운영 추론은 CUDA BF16이다. 통합 champion.pt는 동결 Expert와 중앙 상태를 포함한다. 공식 SB3 save_util로 중앙 버전·Actor optimizer·Critic optimizer·엔트로피·Target Q를 저장하고 정상 정지 때 전체 모델에 반영한다. 부품 추가·제거는 이름을 기준으로 남은 가중치·Adam 상태를 승계한다.
 
-키움 연결, KRW/USD 분리 계좌, 체결 및 reward의 도메인 규칙은 별도 어댑터다. FinRL-X의 Alpaca 전용 실행기를 키움 구현으로 표시하지 않는다. 실제 주문은 꺼져 있다.
+FinRL-X TradeExecutor에 가상계좌 어댑터를 등록한다. 키움 연결, KRW/USD 분리 계좌, 체결은 공식 StockTradingEnv.step을, 보상 수익 계산은 공식 performance_analyzer.calculate_returns를 사용한다. 로그 수익률 단위·통화별 비용 표시만 연결부에서 맞춘다. FinRL-X의 Alpaca 전용 실행기를 키움 구현으로 표시하지 않는다. 실제 주문은 꺼져 있다.
+
+Windows 프로세스 점검은 APScheduler BackgroundScheduler가 예약한다. FinRL-X에 프로세스 supervisor가 있다는 식으로 표시하지 않는다. 일봉도 공식 DataStore 스키마를 쓰고 Expert 기간 설정은 market_context.json에서 읽는다.

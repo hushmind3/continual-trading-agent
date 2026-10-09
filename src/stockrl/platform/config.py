@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from ..paths import PROJECT_ROOT, DEFAULT_MODEL_DIR
+from .finrl_modules import module
+FinRLDataSettings=module("config.settings").DataSettings
 
 
 class LearningSettings(BaseModel):
@@ -40,7 +42,11 @@ class ResourceSettings(BaseModel):
     market_queue_batches: int = Field(64, ge=4, le=1024)
 
 
-class DataSettings(BaseModel):
+class DataSettings(FinRLDataSettings):
+    base_dir: str = "runtime/finrlx/live/data"
+    cache_dir: str = "runtime/finrlx/live/data/cache"
+    processed_dir: str = "runtime/finrlx/live/data/processed"
+    raw_dir: str = "runtime/finrlx/live/data/raw"
     poll_seconds: float = Field(15, ge=1)
     timeout_seconds: float = Field(10, ge=1, le=60)
 

@@ -9,6 +9,7 @@ import venv
 
 ROOT=Path(__file__).resolve().parents[1]
 FRAMEWORKS=[
+    'finrl @ git+https://github.com/AI4Finance-Foundation/FinRL.git@00f3596facd01cced5217d875d8c1fc413a31665',
     'finrl-trading @ git+https://github.com/AI4Finance-Foundation/FinRL-Trading.git@4409abe925c904e570be78ebfb5e77ac3491dff8',
     'kwcli @ git+https://github.com/Kiwoom-Securities/Kiwoom-REST-API.git@953e5dbff123f437ab4d11a78a95191a685eb51f',
 ]

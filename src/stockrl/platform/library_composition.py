@@ -49,7 +49,7 @@ def publish_header(settings,header,active,progress):
     prepared=[]
     # Validate migrations before changing the selected model or policy pointer.
     for index,record in enumerate(records):
-        saved=torch.load(checkpoints.root/record['file'],map_location='cpu',weights_only=True)
+        saved=checkpoints.read(checkpoints.root/record['file'])
         chosen={**selected,'active_experts':active if record['file']==current['file'] else
                 [k for k in saved['model_spec'].get('active_experts',saved['expert_ids']) if k in ids]}
         actor,critic,optimizer=compose_policy(saved,chosen,settings.learning,initial)

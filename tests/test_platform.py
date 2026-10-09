@@ -172,11 +172,10 @@ class DurableOperationsTests(unittest.TestCase):
             runtime.controls={"feed":False,"engine":False,"paper":False,"learning":False}
             runtime.children={'feed':object()};runtime.retries={'feed':(1,0)};runtime.journal=Mock()
             runtime.process=lambda role:None
-            runtime.closing=Mock();runtime.closing.wait.side_effect=[False,True]
+            runtime.closing=Mock();runtime.closing.is_set.return_value=False
             runtime._monitor()
             self.assertFalse(runtime.children);self.assertFalse(runtime.retries)
             runtime.controls['feed']=True;runtime.spawn=Mock()
-            runtime.closing.wait.side_effect=[False,True]
             runtime._monitor()
             runtime.spawn.assert_called_once_with('feed')
             runtime.journal.event.assert_not_called()

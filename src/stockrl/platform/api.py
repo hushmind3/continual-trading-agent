@@ -7,7 +7,7 @@ import threading
 from fastapi import FastAPI,HTTPException,Request
 from fastapi.responses import FileResponse,JSONResponse
 from pydantic import BaseModel
-from ..paths import PROJECT_ROOT,EXPERT_ASSETS_DIR
+from ..paths import PROJECT_ROOT
 from ..state_io import atomic_json,read_json
 from ..provider_credentials import public_status,connect_credentials,test_connection,clear_credentials
 from .config import CONFIG_PATH,Settings

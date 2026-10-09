@@ -80,8 +80,10 @@ def run(settings,source):
         try:
             collector=Collector(source,output,settings.data.poll_seconds,settings.data.timeout_seconds,
                                 stop_file=settings.state_dir/'workers'/'feed.stop')
-            from ..paths import EXPERT_ASSETS_DIR
-            catalog=read_json(EXPERT_ASSETS_DIR/'registry.template.json')
+            from .integrated_asset import read_header
+            model=settings.resolve(settings.expert_checkpoint)
+            header=read_header(model) if model.is_file() else {}
+            catalog={'experts':[{**e,'universe':e.get('stock_policy',{}).get('universe')} for k,e in header.get('expert_mapping',{}).items() if k in settings.enabled_experts]}
             native_symbols=set()
             for entry in catalog.get('experts',[]):
                 native_symbols.update(entry.get('universe') or [])

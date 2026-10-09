@@ -20,7 +20,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 from .paths import ensure_project_path
 from .market_storage import AppendOnlyMarketCSV, FEED_COLUMNS
-from .multiscale import DailyBarStore, TIMEFRAME_NAMES
+from .multiscale import DailyBarStore
 
 import pandas as pd
 import requests
@@ -114,9 +114,6 @@ class LiveMarketCollector:
             self.errors_path.write_text("",encoding="utf-8")
         config = json.loads(self.config_path.read_text(encoding="utf-8"))
         self.instruments = config["instruments"]
-        configured_timeframes=tuple(config.get("decision_timeframes",TIMEFRAME_NAMES))
-        if configured_timeframes!=TIMEFRAME_NAMES:
-            raise ValueError(f"decision_timeframes must match the model feature order: {TIMEFRAME_NAMES}")
         self.daily_store=DailyBarStore(self.output.with_name("timeframes.sqlite3"))
         history_counts=dict(self.daily_store.db.execute(
             "SELECT symbol,COUNT(*) FROM daily_bars GROUP BY symbol"))
@@ -345,7 +342,6 @@ class LiveMarketCollector:
                    "fresh_symbols_5m": fresh_symbols,
                    "fetched_rows": len(rows), "appended_unique_rows": added,
                    "provider_failures": self.failures, "retrying_symbols": sum(v > 0 for v in self.failures.values()),
-                   "decision_timeframes": list(TIMEFRAME_NAMES),
                    "daily_history_symbols": self.daily_store.symbol_count(),
                    "daily_history_rows_fetched": daily_fetched,
                    "daily_history_failures": self.daily_failures,

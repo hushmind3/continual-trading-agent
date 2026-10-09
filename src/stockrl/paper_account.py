@@ -1,4 +1,4 @@
-"""Persistent broker-free paper account driven by completed market bars.
+"""Currency and UI adapter for official FinRL-X execution and FinRL StockTradingEnv.
 
 The model's cash-inclusive allocation head determines order budgets. Fills are
 next-bar paper fills and rewards include every configured trading cost.
@@ -71,80 +71,14 @@ class PaperAccount:
 
     def reset(self) -> None:
         """Reset a dedicated simulation ledger to the shared starting cash."""
-        goal=self.state.get("goal")
-        self.state = self._empty_state()
-        if goal:
-            self.configure_goal(goal["target_multiple"],goal["win_bonus_points"])
+        self.state=self._empty_state()
         self.save()
-
-    def configure_goal(self, target_multiple=10.0, win_bonus_points=100.0):
-        """Attach a shared task without changing cash, positions or past returns."""
-        target_multiple=float(target_multiple);win_bonus_points=float(win_bonus_points)
-        if not math.isfinite(target_multiple) or target_multiple<=1 or not math.isfinite(win_bonus_points) or win_bonus_points<=0:
-            raise ValueError("goal target must exceed one; WIN points must be positive")
-        self.state.setdefault("episode_id",uuid.uuid4().hex)
-        goal=self.state.setdefault("goal",{"target_multiple":target_multiple,
-            "win_bonus_points":win_bonus_points,"wins":{}})
-        if goal["target_multiple"]!=target_multiple or goal["win_bonus_points"]!=win_bonus_points:
-            raise ValueError("changing an active account goal requires an explicit new episode")
-
-    def observe_goal(self, timestamp):
-        goal=self.state.get("goal")
-        if not goal:
-            return
-        for currency,book in self.state["books"].items():
-            multiple=self._equity(currency)/float(book["initial_cash"])
-            if currency not in goal["wins"] and multiple>=goal["target_multiple"]:
-                goal["wins"][currency]={"timestamp":str(timestamp),"multiple":multiple,
-                    "bonus_points":goal["win_bonus_points"]}
-
-    def goal_points(self):
-        return {c:float(self.state.get("goal",{}).get("wins",{}).get(c,{}).get("bonus_points",0.0))
-                for c in SEED_CASH}
-
-    def goal_inputs(self):
-        goal=self.state.get("goal")
-        if not goal:
-            return None
-        ratios=[self._equity(c)/float(self.state["books"][c]["initial_cash"]) for c in SEED_CASH]
-        target=float(goal["target_multiple"])
-        return [*ratios,target,*[max(0.0,1.0-r/target) for r in ratios],
-                float(len(goal["wins"])<len(SEED_CASH))]
-
-    def goal_summary(self):
-        goal=self.state.get("goal")
-        if not goal:
-            return {"enabled":False}
-        target=float(goal["target_multiple"])
-        return {"enabled":True,"episode_id":self.state["episode_id"],
-            "target_multiple":target,"win_bonus_points":goal["win_bonus_points"],
-            "status":"WIN" if len(goal["wins"])==len(SEED_CASH) else "IN_PROGRESS",
-            "win_condition":"each_currency_reaches_target_once_in_this_episode",
-            "books":{c:{"initial_cash":float(b["initial_cash"]),"equity":self._equity(c),
-                "multiple":self._equity(c)/float(b["initial_cash"]),
-                "target_equity":float(b["initial_cash"])*target,
-                "target_asset_ratio":self._equity(c)/(float(b["initial_cash"])*target),
-                "net_return_rate":self._equity(c)/float(b["initial_cash"])-1,
-                "progress":min(1.0,max(0.0,(self._equity(c)/float(b["initial_cash"])-1)/(target-1))),
-                "win":goal["wins"].get(c)} for c,b in self.state["books"].items()}}
 
     def _equity(self, currency: str) -> float:
         book = self.state["books"][currency]
         return float(book["cash"] + sum(
             float(position["quantity"]) * float(book["marks"].get(symbol, position["average_cost"]))
             for symbol, position in book["positions"].items()))
-
-    def total_equity(self) -> float:
-        return float(sum(self._equity(currency) for currency in SEED_CASH))
-
-    def normalized_equity(self) -> float:
-        return float(sum(self._equity(c) / max(float(self.state["books"][c]["initial_cash"]), 1e-9)
-                          for c in SEED_CASH))
-
-    def reward_points(self) -> dict:
-        """One net-return percentage point equals one point, per currency."""
-        return {c:100.0*(self._equity(c)/float(self.state["books"][c]["initial_cash"])-1.0)
-                for c in SEED_CASH}
 
     def symbol_net_pnl(self, symbol: str) -> float:
         """Realized plus open-position PnL for one symbol, normalized by seed cash."""
@@ -192,36 +126,7 @@ class PaperAccount:
                          float(book["trade_count"]) / 1000.0,
                          float(book["fees"]) / max(equity, 1.0),
                          float(book["sell_tax"]) / max(equity, 1.0)]
-        # KRW and USD are separate paper ledgers. Express each amount in its
-        # own book's seed-cash units before combining account features.
-        normalized_equity = max(self.normalized_equity(), 1e-9)
-        normalized_cash = normalized_positions = normalized_unreal = 0.0
-        normalized_fees = normalized_slippage = normalized_spread = 0.0
-        trade_count = 0.0
-        for book in self.state["books"].values():
-            seed = max(float(book["initial_cash"]), 1e-9)
-            normalized_cash += float(book["cash"]) / seed
-            normalized_positions += sum(
-                float(position["quantity"]) * float(book["marks"].get(symbol, position["average_cost"]))
-                for symbol, position in book["positions"].items()) / seed
-            normalized_unreal += sum(
-                float(position["quantity"]) * (
-                    float(book["marks"].get(symbol, position["average_cost"]))
-                    - float(position["average_cost"]))
-                for symbol, position in book["positions"].items()) / seed
-            normalized_fees += float(book["fees"]) / seed
-            normalized_slippage += float(book["slippage"]) / seed
-            normalized_spread += float(book["spread"]) / seed
-            trade_count += float(book["trade_count"])
-        account = [normalized_cash / normalized_equity,
-                   normalized_positions / normalized_equity,
-                   normalized_unreal / normalized_equity,
-                   trade_count / 1000.0,
-                   normalized_fees / normalized_equity,
-                   normalized_slippage / normalized_equity,
-                   normalized_spread / normalized_equity,
-                   normalized_positions / normalized_equity]
-        return pstate, account
+        return pstate, None
 
     def _fill(self, symbol: str, currency: str, action: str, price: float,
               spread_rate: float, budget: float, timestamp: str,
@@ -231,54 +136,38 @@ class PaperAccount:
         book = self.state["books"][currency]
         half_spread = max(0.0, min(float(spread_rate) / 2.0, 0.025))
         execution_cost = half_spread + self.slippage
-        position = book["positions"].get(symbol)
-        if action == "BUY":
-            if budget <= 0 and requested_quantity is None:
-                return None
-            unit_cost=price*(1.0+execution_cost)*(1.0+self.fee)
-            affordable=math.floor(float(book["cash"])/unit_cost)
-            quantity=(min(max(0,int(requested_quantity)),affordable)
-                      if requested_quantity is not None else
-                      math.floor(min(float(budget),float(book["cash"]))/unit_cost))
-            if quantity < 1:
-                return None
-            fill_price = price * (1.0 + execution_cost)
-            notional = quantity * fill_price
-            fee = notional * self.fee
-            if notional + fee > book["cash"] + 1e-8:
-                return None
-            book["cash"] -= notional + fee
-            if position:
-                old_quantity = int(position["quantity"])
-                old_cost = old_quantity * float(position["average_cost"])
-                position["quantity"] = old_quantity + quantity
-                position["average_cost"] = (old_cost + notional + fee) / (old_quantity + quantity)
-            else:
-                book["positions"][symbol] = {"quantity": quantity,
-                    "average_cost": (notional + fee) / quantity,"opened_timestamp":timestamp}
-            tax = 0.0
-            realized = 0.0
-        elif action == "SELL":
-            if not position:
-                return None  # cash-only: no naked short sale
-            requested = int(budget) if budget > 0 else int(position["quantity"])
-            quantity = min(int(position["quantity"]), requested)
-            if quantity <= 0:
-                return None
-            fill_price = price * max(0.0, 1.0 - execution_cost)
-            notional = quantity * fill_price
-            fee = notional * self.fee
-            tax = notional * KR_SELL_TAX_ASSUMPTION if currency == "KRW" else 0.0
-            realized = notional - fee - tax - quantity * float(position["average_cost"])
-            book["cash"] += notional - fee - tax
-            book["realized_pnl"] += realized
-            symbol_realized = book.setdefault("symbol_realized_pnl", {})
-            symbol_realized[symbol] = float(symbol_realized.get(symbol, 0.0)) + realized
-            position["quantity"] = int(position["quantity"]) - quantity
-            if position["quantity"] <= 0:
-                del book["positions"][symbol]
+        position = book['positions'].get(symbol)
+        old_quantity=int(position['quantity']) if position else 0
+        old_average=float(position['average_cost']) if position else 0.
+        requested=(max(0,int(requested_quantity)) if requested_quantity is not None else
+            math.floor(budget/(price*(1+execution_cost)*(1+self.fee))) if action=='BUY' else
+            min(old_quantity,int(budget) if budget>0 else old_quantity))
+        if action not in ('BUY','SELL') or requested<1:return None
+        from .platform.finrl_modules import StockTradingEnv
+        import numpy as np
+        import pandas as pd
+        fill_price=price*(1+execution_cost if action=='BUY' else max(0,1-execution_cost))
+        frame=pd.DataFrame({'date':[timestamp,timestamp],'tic':[symbol,symbol],
+            'close':[fill_price,price],'tradable':[False,False]})
+        tax_rate=KR_SELL_TAX_ASSUMPTION if currency=='KRW' else 0.
+        env=StockTradingEnv(frame,1,requested,book['cash'],[old_quantity],
+            [self.fee],[self.fee+tax_rate],1.,4,1,['tradable'],print_verbosity=10**9)
+        env.step(np.array([1. if action=='BUY' else -1.]))
+        new_quantity=int(env.state[2]);quantity=abs(new_quantity-old_quantity)
+        if not quantity:return None
+        book['cash']=float(env.state[0])
+        notional=quantity*fill_price;fee=notional*self.fee
+        tax=notional*tax_rate if action=='SELL' else 0.
+        realized=notional-fee-tax-quantity*old_average if action=='SELL' else 0.
+        if action=='BUY':
+            book['positions'][symbol]={'quantity':new_quantity,'average_cost':(old_quantity*old_average+notional+fee)/new_quantity,
+                'opened_timestamp':position.get('opened_timestamp',timestamp) if position else timestamp}
         else:
-            return None
+            book['realized_pnl']+=realized
+            symbol_realized=book.setdefault('symbol_realized_pnl',{})
+            symbol_realized[symbol]=symbol_realized.get(symbol,0.)+realized
+            if new_quantity:position['quantity']=new_quantity
+            else:book['positions'].pop(symbol,None)
         book["trade_count"] += 1
         book["fees"] += fee
         book["sell_tax"] += tax
@@ -358,150 +247,45 @@ class PaperAccount:
         self.state["last_timestamp"] = timestamp
         return filled
 
-    def queue_decisions(self, panel, index: int, probabilities, enabled: bool,
-                        allocation=None, actions=None) -> set[str]:
-        if not enabled:
-            return set()
-        timestamp = str(panel.dates[index])
-        queued_decisions=set()
-        buys: dict[str, list[tuple[str, float]]] = {key: [] for key in SEED_CASH}
-        buy_quantities: dict[str,float] = {}
-        buy_prices: dict[str,float] = {}
-        buy_spreads: dict[str,float] = {}
-        full_weights = None
-        if allocation is not None:
-            candidate_weights = [float(value) for value in allocation]
-            if (len(candidate_weights) == len(panel.symbols) + 1
-                    and all(math.isfinite(value) and value >= 0 for value in candidate_weights)):
-                weight_total = sum(candidate_weights)
-                if weight_total > 0:
-                    # The final entry is the model's explicit cash allocation.
-                    # Normalize only numerical drift; never renormalize the BUY
-                    # subset, since that would silently spend the cash weight.
-                    full_weights = [value / weight_total for value in candidate_weights]
-        currency_weights=None
-        if full_weights is not None:
-            currency_indices={key:[] for key in SEED_CASH}
-            for j,symbol in enumerate(panel.symbols):
-                if not panel.observed[index,j] or symbol not in panel.groups:
-                    continue
-                market,asset=panel.groups[symbol]
-                currency=_currency(market,asset)
-                price=float(panel.closes[index,j])
-                if currency is not None and math.isfinite(price) and price>0:
-                    currency_indices[currency].append(j)
-            cash_weight=full_weights[-1]
-            currency_weights=[0.0]*len(panel.symbols)
-            for currency,indices in currency_indices.items():
-                # Each paper ledger has its own seed cash. Remove weight assigned
-                # to other currencies and non-tradable assets before converting
-                # the model's ranking into this ledger's target weights.
-                denominator=cash_weight+sum(full_weights[j] for j in indices)
-                if denominator>0:
-                    for j in indices:
-                        currency_weights[j]=full_weights[j]/denominator
-        for j, symbol in enumerate(panel.symbols):
-            if (not panel.observed[index,j] or symbol not in panel.groups
-                    or symbol in self.state["pending"]):
-                continue
-            market, asset = panel.groups[symbol]
-            currency = _currency(market, asset)
-            if currency is None:
-                continue
-            action = int(actions[j]) if actions is not None else int(probabilities[j].argmax())
-            book = self.state["books"][currency]
-            position = book["positions"].get(symbol)
-            current_quantity = int(position["quantity"]) if position else 0
-            if full_weights is None:
-                if action == 0 and current_quantity:
-                    decision_id=f"{timestamp}|{symbol}"
-                    self.state["pending"][symbol] = {"date": timestamp, "action": "SELL",
-                                                     "decision_id": decision_id}
-                    queued_decisions.add(decision_id)
-                elif action == 2:
-                    buys[currency].append((symbol, max(float(probabilities[j, 2]), 0.0)))
-                continue
-            if action == 1:
-                continue
-            price = float(panel.closes[index, j])
-            equity = max(0.0, self._equity(currency))
-            current_weight = current_quantity * price / equity if equity > 0 else 0.0
-            model_weight = currency_weights[j]
-            if action == 2:
-                target_weight = max(current_weight, model_weight)
-            else:
-                # SELL must reduce an existing position. When the allocation
-                # head contradicts SELL by asking to keep/increase its weight,
-                # the explicit exit signal takes precedence.
-                target_weight = min(current_weight, model_weight)
-                if model_weight >= current_weight:
-                    target_weight = 0.0
-            target_quantity = math.floor(max(0.0, equity * target_weight / price)+0.5)
-            delta = target_quantity - current_quantity
-            if delta > 0:
-                buys[currency].append((symbol, delta * price))
-                buy_quantities[symbol]=delta
-                buy_prices[symbol]=price
-                buy_spreads[symbol]=max(0.0,float(panel.features[index,j,7]))/10_000.0
-            elif delta < 0:
-                # Whole-share accounts cannot realize fractional target sizes.
-                target_whole_quantity=int(target_quantity)
-                self.state["pending"][symbol] = {"date": timestamp, "action": "SELL",
-                                                  "budget": current_quantity-target_whole_quantity,
-                                                  "decision_id": f"{timestamp}|{symbol}"}
-                queued_decisions.add(f"{timestamp}|{symbol}")
-        for currency, signals in buys.items():
-            cash = float(self.state["books"][currency]["cash"])
-            if cash <= 0:
-                continue
-            valid_signals=[(symbol,score) for symbol,score in signals if score>0]
-            if not valid_signals:
-                continue
-            if full_weights is None:
-                total=sum(score for _,score in valid_signals)
-                targets=[(symbol,cash*score/total,None) for symbol,score in valid_signals]
-            else:
-                # Preserve the model's BUY allocation pool, then round it to
-                # whole shares against estimated spread, slippage, and fees.
-                # Largest fractional shares get first claim on available cash.
-                unit_costs={}
-                for symbol,_ in valid_signals:
-                    spread=max(0.0,min(buy_spreads[symbol]/2.0,0.025))
-                    unit_costs[symbol]=buy_prices[symbol]*(1.0+spread+self.slippage)*(1.0+self.fee)
-                target_cost=sum(buy_quantities[symbol]*unit_costs[symbol]
-                                for symbol,_ in valid_signals)
-                scale=min(1.0,cash/target_cost) if target_cost>0 else 0.0
-                base=[]; remaining_cash=cash; remaining_target_cost=target_cost*scale
-                for symbol,budget in sorted(valid_signals,key=lambda item:(-item[1],item[0])):
-                    unit_cost=unit_costs[symbol]
-                    exact=buy_quantities[symbol]*scale
-                    wanted=math.floor(exact+1e-12)
-                    units=min(wanted,math.floor(remaining_cash/unit_cost))
-                    if units:
-                        spent=units*unit_cost
-                        remaining_cash-=spent
-                        remaining_target_cost-=spent
-                    base.append([symbol,budget*scale,units,wanted,
-                                 exact-math.floor(exact+1e-12),unit_cost])
-                for row in sorted(base,key=lambda item:(-item[4],-item[1],item[0])):
-                    symbol,scaled_budget,units,wanted,remainder,unit_cost=row
-                    if (remainder>1e-12 and units<wanted+1
-                            and remaining_cash+1e-8>=unit_cost
-                            and remaining_target_cost+1e-8>=unit_cost):
-                        row[2]+=1; remaining_cash-=unit_cost; remaining_target_cost-=unit_cost
-                targets=[(symbol,scaled_budget,units if units>0 else None)
-                         for symbol,scaled_budget,units,_,_,_ in base if units>0]
-            for symbol,budget,requested_quantity in targets:
-                existing=self.state["pending"].get(symbol)
-                if existing and existing.get("date")==timestamp and existing.get("action")=="SELL":
-                    continue
-                order={"date":timestamp,"action":"BUY","budget":budget}
-                order["decision_id"]=f"{timestamp}|{symbol}"
-                if requested_quantity is not None:
-                    order["requested_quantity"]=requested_quantity
-                self.state["pending"][symbol]=order
-                queued_decisions.add(order["decision_id"])
-        return queued_decisions
+    def queue_decisions(self,panel,index,probabilities,enabled,allocation=None,actions=None):
+        if not enabled:return set()
+        if allocation is None:raise ValueError('목표 비중과 현금 비중이 필요합니다.')
+        import pandas as pd
+        from .platform.finrl_modules import TradeExecutor,ExecutionConfig,OrderResponse
+        from strategies.base_strategy import BaseStrategy,StrategyConfig,StrategyResult
+        stamp=str(panel.dates[index]);account=self;queued=set()
+        class BrokerAdapter:
+            accounts={key:None for key in SEED_CASH}
+            def set_account(self,name):self.currency=name
+            def get_portfolio_value(self,name):return account._equity(name)
+            def get_account_info(self,name):
+                return {'cash':account.state['books'][name]['cash'],'equity':self.get_portfolio_value(name),'portfolio_value':self.get_portfolio_value(name)}
+            def get_positions(self,name):
+                book=account.state['books'][name]
+                return [{'symbol':s,'market_value':p['quantity']*book['marks'].get(s,p['average_cost'])} for s,p in book['positions'].items()]
+            def place_order(self,order,name):
+                quantity=math.floor(order.quantity+1e-9)
+                if quantity<1:raise ValueError('정수 수량이 1 미만입니다.')
+                identity=uuid.uuid4().hex;symbol=order.symbol
+                account.state['pending'][symbol]={'date':stamp,'action':order.side.upper(),'requested_quantity':quantity,
+                    'budget':quantity if order.side=='sell' else quantity*book_price(symbol,name),'decision_id':identity,'currency':name}
+                queued.add(identity)
+                return OrderResponse(identity,'accepted',symbol,quantity,0,order.side,'market',datetime.now(timezone.utc))
+        class TargetStrategy(BaseStrategy):
+            def __init__(self,weights):super().__init__(StrategyConfig(name='Champion'));self.weights=weights
+            def generate_weights(self,data,target_date=None):return StrategyResult('Champion',self.weights,{})
+        def book_price(symbol,currency):
+            price=account.state['books'][currency]['marks'].get(symbol,0)
+            if not math.isfinite(price) or price<=0:raise ValueError('유효한 실제 가격이 없습니다: '+symbol)
+            return price
+        broker=BrokerAdapter();config=ExecutionConfig(min_order_size=0,risk_checks_enabled=False,execution_timeout=0,log_orders=False)
+        executor=TradeExecutor(broker,config);executor._gvkey_to_ticker=lambda symbol:symbol
+        executor._get_current_price=book_price
+        for currency in SEED_CASH:
+            rows=[{'gvkey':s,'weight':float(allocation[j])} for j,s in enumerate(panel.symbols)
+                if _currency(*panel.groups[s])==currency and panel.observed[index,j]]
+            if rows:executor.execute_strategy(TargetStrategy(pd.DataFrame(rows)),{},currency,stamp)
+        self.save();return queued
 
     def snapshot(self) -> dict:
         books = {}

@@ -1,16 +1,6 @@
 {
   "description": "관찰 종목: 한국 주식 105개, 미국 주식 89개, 문맥 입력 28개. 등록 수와 실제 수신 수는 별도로 표시합니다.",
   "universe_source": "Existing universe plus 25 Korean and 25 US equities. Korean names verified against bundled KRX listing; every added symbol/currency verified against provider chart metadata. Existing model IDs are retained; unseen Korean identities are appended without reuse.",
-  "decision_timeframes": [
-    "1m",
-    "3m",
-    "5m",
-    "15m",
-    "60m",
-    "1d",
-    "1w",
-    "1mo"
-  ],
   "instruments": [
     {
       "symbol": "005930.KS",

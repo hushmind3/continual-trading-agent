@@ -112,7 +112,9 @@ class PortfolioEnvironment:
             self.account.state['pending']={s:o for s,o in self.account.state['pending'].items() if o.get('decision_id') not in unfilled}
             self.journal.event('warning',f"{currency}: 관측 지연으로 미체결 주문 {len(unfilled)}개를 취소했습니다.")
         terminal = pending["symbols"] != data["symbols"] or elapsed>self.settings.risk.freshness_seconds
-        reward = float(np.log(max(data["equity"],1e-9)/max(pending["equity"],1e-9)))
+        from .finrl_modules import calculate_returns
+        percent=calculate_returns(pd.DataFrame({"equity":[max(pending["equity"],1e-9),max(data["equity"],1e-9)]}),"equity")
+        reward=float(np.log1p(percent/100))
         td = pending["transition"]
         following=None if terminal else data['observation'].to('cpu')
         td["next"] = {k:td[k] if terminal else following[k] for k in INPUT_KEYS}

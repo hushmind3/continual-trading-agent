@@ -342,24 +342,3 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
         "peak_allocated_bytes":int(torch.cuda.max_memory_allocated()) if device.startswith("cuda") else None,
         "peak_reserved_bytes":int(torch.cuda.max_memory_reserved()) if device.startswith("cuda") else None,
         **extra}
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("expert")
-    parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument("--input", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--device", default="cpu")
-    parser.add_argument("--status", type=Path)
-    parser.add_argument("--expert-id")
-    args = parser.parse_args()
-    result = run_native(args.expert, args.root, json.loads(args.input.read_text(encoding="utf-8")), args.device,
-                        args.status, args.expert_id)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")
-    print(json.dumps({k:v for k,v in result.items() if k != "native_output"}))
-
-
-if __name__ == "__main__":
-    main()

@@ -1,11 +1,9 @@
-# Python 의존성
+# 의존성
 
-| 파일 | 사용 |
+| 파일 | 역할 |
 | --- | --- |
-| `base.txt` | 기본 프로젝트·공개 정책 adapter |
-| `moe.txt` | Windows CUDA TradingMoE 기본 expert 환경 |
-| `moe-toto.txt` | 별도 Toto 환경. 다른 transformers 버전 |
+| `operations.txt` | 설치 진입점: FinRL-X 운영, SAC, API, APScheduler |
+| `moe.txt` | 같은 환경의 CUDA·동결 Expert 라이브러리 |
+| `base.txt` | 공통 Python·공개 정책 의존성 |
 
-`설치.cmd` → `scripts/install_windows.py`가 `moe.txt`와 `moe-toto.txt`를 각각 설치합니다. 두 목록은 같은 폴더의 `base.txt`를 포함합니다. 현재 실행 중인 환경을 이 정리 작업에서 재설치하지 않았습니다.
-
-React 의존성은 `frontend/package.json`과 `package-lock.json`에 별도로 있습니다.
+`설치.cmd`는 `operations.txt`를 설치합니다. FinRL-X·FinRL·키움 공식 SDK는 `scripts/install_windows.py`의 고정 commit으로 설치합니다. Python 환경은 `.venv` 하나입니다. React는 `frontend/package.json`과 `package-lock.json`을 사용합니다.

@@ -28,7 +28,7 @@ class SharedInfrastructureTests(unittest.TestCase):
         report = self.child("""
 import json, sys
 from stockrl import cli
-sys.argv = ['stockrl', 'live-feed', '--help']
+sys.argv = ['stockrl', 'web', '--help']
 try: cli.main()
 except SystemExit as error: assert error.code == 0
 sys.argv = ['stockrl', 'train']
@@ -47,7 +47,7 @@ class Block(importlib.abc.MetaPathFinder):
         if fullname in {'stockrl.global_transformer', 'stockrl.global_online', 'stockrl.market_training'}:
             raise RuntimeError('unexpected legacy import: ' + fullname)
 sys.meta_path.insert(0, Block())
-import stockrl.cli, stockrl.live_feed, stockrl.mock_feed
+import stockrl.cli, stockrl.live_feed
 feed_loaded_torch = 'torch' in sys.modules
 import stockrl.trading_moe
 print(json.dumps({'feed_loaded_torch': feed_loaded_torch, 'moe':  hasattr(stockrl.trading_moe, 'EvidenceAdapter'),

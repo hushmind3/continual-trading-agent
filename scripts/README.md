@@ -1,17 +1,8 @@
-# 스크립트 찾기
+# 실행 도구
 
-프로젝트 루트에서 실행합니다. 일반 운영은 루트 `설치.cmd`와 `서버켜기.cmd`를 사용합니다.
-
-| 용도 | 파일 |
+| 파일 | 역할 |
 | --- | --- |
-| Windows 설치 | `install_windows.py` |
-| Python API / Vite 시작 | `start_local.ps1` |
-| 단독 추론·가상매매 도구 | `run_trading_moe.py`, `run_trading_moe_paper.py` |
-| 원본 전문가 검증·보고서 | `audit_frozen_experts.py`, `verify_frozen_experts.py`, `verify_trading_moe_integration.py` |
-| 데이터 수집·변환 | `download_*`, `ingest_*`, `fetch_fi2010.py` |
-| 실행 상태 보존 | `snapshot_runtime.py` |
+| `install_windows.py` | 하나의 Python 환경과 공식 프레임워크 설치·React 빌드 |
+| `start_local.ps1` | API 8766과 Vite 5173 실행 |
 
-실시간 운영은 `src/stockrl/platform`을 사용합니다. 단독 추론·과거 데이터 도구는 운영 프로세스와 별도로 실행합니다.
-
-
-Expert 추가·검사·사용·제외·삭제는 MoE 화면의 슬롯 관리에서 처리합니다. 수동으로 전체 PT를 다시 만드는 스크립트는 사용하지 않습니다.
+일반 실행은 루트 `설치.cmd`와 `서버켜기.cmd`를 사용합니다. Expert 검색·검사·변환·추가·제외는 MoE 화면에서 처리합니다.

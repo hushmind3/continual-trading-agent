@@ -9,6 +9,7 @@ import threading
 import time
 from pathlib import Path
 import psutil
+from apscheduler.schedulers.background import BackgroundScheduler
 from ..paths import PROJECT_ROOT
 from ..state_io import atomic_json,read_json
 from ..provider_credentials import public_status
@@ -48,7 +49,9 @@ class Runtime:
         from .progress_status import ProgressTracker
         self.progress=ProgressTracker()
         atomic_json(self.controls,self.root/"control.json")
-        self.thread=threading.Thread(target=self._monitor,daemon=True,name="finrlx-supervisor"); self.thread.start()
+        self.scheduler=BackgroundScheduler(job_defaults={"max_instances":1,"coalesce":True})
+        self.scheduler.add_job(self._monitor,"interval",seconds=1,misfire_grace_time=10,id="workers")
+        self.scheduler.start()
 
     def wanted(self,role):
         return bool(self.controls["feed"] if role=="feed" else self.controls["engine"] and (role!="learner" or self.controls["learning"]))
@@ -101,40 +104,40 @@ class Runtime:
         atomic_json(dict(pid=child.pid,created_at=process.create_time()),self.root/"workers"/(role+".pid.json"))
 
     def _monitor(self):
-        while not self.closing.wait(1):
-            with self.lock:
-                if shutil.disk_usage(self.root).free < self.settings.resources.disk_reserve_gib*2**30:
-                    if self.controls.get('paper') or self.controls.get('feed'):
-                        self.journal.event('error','디스크 여유 공간이 운영 기준보다 작습니다. 시세·체결·학습을 정지했습니다.')
-                        self.controls.update(feed=False,paper=False,learning=False)
-                        atomic_json(self.controls,self.root/'control.json')
-                for role in ("feed","agent"):
-                    process=self.process(role)
-                    if not self.wanted(role):
-                        if process: (self.root/"workers"/(role+".stop")).touch()
-                        self.children.pop(role,None)
-                        self.retries.pop(role,None)
-                        continue
-                    if process:
-                        state=read_json(self.root/"workers"/(role+".json"))
-                        expert_state=read_json(self.root/'workers'/'experts.json') if role=='agent' else {}
-                        if expert_state.get("status")=="inference" and time.time()-expert_state.get("active_since",time.time())>self.settings.resources.inference_timeout_seconds:
-                            self.journal.event("error","Expert 추론 시간 제한을 넘었습니다. 프로세스를 복구합니다.")
-                            terminate_tree(process)
-                        continue
-                    attempt,next_try=self.retries.get(role,(0,0))
-                    if attempt>=5 or time.time()<next_try:
-                        continue
-                    if role in self.children:
-                        intentional=read_json(self.root/'workers'/(role+'.json')).get('reason')=='configuration_changed'
-                        if not intentional:self.journal.event("error",f"{role} 프로세스가 종료되었습니다. 재시도 {attempt+1}/5")
-                        else:attempt=0
-                    try:
-                        self.spawn(role)
-                        self.retries[role]=(attempt+1,time.time()+min(60,2**attempt))
-                    except Exception as exc:
-                        self.journal.event("error",f"{role} 시작 실패: {exc}")
-                        self.retries[role]=(attempt+1,time.time()+min(60,2**attempt))
+        if self.closing.is_set():return
+        with self.lock:
+            if shutil.disk_usage(self.root).free < self.settings.resources.disk_reserve_gib*2**30:
+                if self.controls.get('paper') or self.controls.get('feed'):
+                    self.journal.event('error','디스크 여유 공간이 운영 기준보다 작습니다. 시세·체결·학습을 정지했습니다.')
+                    self.controls.update(feed=False,paper=False,learning=False)
+                    atomic_json(self.controls,self.root/'control.json')
+            for role in ("feed","agent"):
+                process=self.process(role)
+                if not self.wanted(role):
+                    if process: (self.root/"workers"/(role+".stop")).touch()
+                    self.children.pop(role,None)
+                    self.retries.pop(role,None)
+                    continue
+                if process:
+                    state=read_json(self.root/"workers"/(role+".json"))
+                    expert_state=read_json(self.root/'workers'/'experts.json') if role=='agent' else {}
+                    if expert_state.get("status")=="inference" and time.time()-expert_state.get("active_since",time.time())>self.settings.resources.inference_timeout_seconds:
+                        self.journal.event("error","Expert 추론 시간 제한을 넘었습니다. 프로세스를 복구합니다.")
+                        terminate_tree(process)
+                    continue
+                attempt,next_try=self.retries.get(role,(0,0))
+                if attempt>=5 or time.time()<next_try:
+                    continue
+                if role in self.children:
+                    intentional=read_json(self.root/'workers'/(role+'.json')).get('reason')=='configuration_changed'
+                    if not intentional:self.journal.event("error",f"{role} 프로세스가 종료되었습니다. 재시도 {attempt+1}/5")
+                    else:attempt=0
+                try:
+                    self.spawn(role)
+                    self.retries[role]=(attempt+1,time.time()+min(60,2**attempt))
+                except Exception as exc:
+                    self.journal.event("error",f"{role} 시작 실패: {exc}")
+                    self.retries[role]=(attempt+1,time.time()+min(60,2**attempt))
 
     def command(self,name,enabled,internal=False):
         if name not in ("feed","engine","paper","learning"):
@@ -182,7 +185,7 @@ class Runtime:
         return result
 
     def shutdown(self):
-        self.closing.set(); self.thread.join(timeout=3)
+        self.closing.set(); self.scheduler.shutdown(wait=True)
         if self.library.child and self.library.child.poll() is None:
             terminate_tree(psutil.Process(self.library.child.pid))
         processes=[]

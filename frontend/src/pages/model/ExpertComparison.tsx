@@ -3,7 +3,7 @@ import {FlaskConical} from 'lucide-react';
 import {useOperations} from '../../data/Operations';
 import {request} from '../../data/api';
 import {Button,ErrorMessage} from '../../ui/Primitives';
-import {bytes,number,percent} from '../../ui/format';
+import {bytes,number,percent,inferenceChange} from '../../ui/format';
 import {PrecisionTolerance,defaultTolerance} from './PrecisionTolerance';
 
 interface Measurement {id:string;cold_seconds:number;warm_median_seconds:number;warm_min_seconds:number;warm_max_seconds:number;metrics:{device:string;device_reason?:string;peak_ram_bytes:number;peak_vram_bytes:number}}
@@ -43,7 +43,7 @@ export function ExpertComparison(){
      ['peak VRAM',bytes(result.baseline.metrics.peak_vram_bytes),bytes(result.variant.metrics.peak_vram_bytes)]
     ].map(row=><tr key={row[0]} className="border-t border-violet-100"><td className="py-2 text-slate-500">{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td></tr>)}
    </tbody></table></div>
-   <p className="text-sm text-violet-900">출력 평균 절대오차 {number(result.mean_absolute_error,6)} · 최대오차 {number(result.max_absolute_error,6)} · 상대 RMSE {percent(result.relative_rmse)}{result.action_agreement!=null?` · 판단 일치 ${percent(result.action_agreement)}`:''}{result.direction_agreement!=null?` · 예측방향 일치 ${percent(result.direction_agreement)}`:''} · 속도 {number(result.speed_ratio,2)}배</p>
+   <p className="text-sm text-violet-900">출력 평균 절대오차 {number(result.mean_absolute_error,6)} · 최대오차 {number(result.max_absolute_error,6)} · 상대 RMSE {percent(result.relative_rmse)}{result.action_agreement!=null?` · 판단 일치 ${percent(result.action_agreement)}`:''}{result.direction_agreement!=null?` · 예측방향 일치 ${percent(result.direction_agreement)}`:''} · {inferenceChange(result.speed_ratio)}</p>
    <p className="text-xs leading-5 text-slate-500">{result.scope} OS 파일 캐시와 운영 부하는 측정값에 영향을 줄 수 있습니다.</p>
   </div>}
  </section>;

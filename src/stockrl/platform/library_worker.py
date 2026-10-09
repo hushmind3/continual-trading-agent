@@ -122,6 +122,9 @@ def run(config,request_path):
         try:item['check']=probe(settings,item)
         except Exception as exc:item['check']=dict(status='failed',detail=str(exc),tested=time.time())
         result=item
+    elif kind=='probe_all':
+        from .expert_inspection import inspect_all
+        result=inspect_all(settings,config,catalog,payload,progress)
     elif kind=='probe':
         key=payload.get('id','')
         if key not in catalog['experts']:raise ValueError('등록되지 않은 패키지')

@@ -2,6 +2,8 @@
 import argparse
 import time
 import statistics
+import random
+import numpy as np
 import torch
 from ..state_io import atomic_json,read_json
 from .config import load_settings
@@ -13,6 +15,7 @@ from .work_devices import choose_device
 def run(config,input_path,output_path,key,device,repeats):
     settings=load_settings(config)
     torch.set_num_threads(settings.learning.cpu_threads)
+    random.seed(0);np.random.seed(0);torch.manual_seed(0)
     request=read_json(input_path);item=request['items'][key]
     choice=choose_device(settings,device,item['package']['bytes'],item.get('check',{}).get('metrics',{}).get('peak_vram_bytes',0))
     settings.resources.expert_devices[key]=choice['device']

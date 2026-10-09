@@ -8,7 +8,7 @@ from pathlib import Path
 from ..paths import PROJECT_ROOT
 from ..state_io import atomic_json,read_json
 
-ONLINE_LIBRARY_JOBS=('inspect','import','probe','compare','convert','search','acquire','optimize')
+ONLINE_LIBRARY_JOBS=('inspect','import','probe','probe_all','compare','convert','search','acquire','optimize')
 
 
 class LibraryOperations:

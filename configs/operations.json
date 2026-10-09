@@ -14,7 +14,7 @@
     "stock_msft_ppo",
     "timemoe",
     "timesfm",
-    "toto"
+    "toto_bf16"
   ],
   "learning": {
     "batch_size": 32,

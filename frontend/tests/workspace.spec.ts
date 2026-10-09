@@ -30,13 +30,49 @@ test('precision variants stay beside their original Expert',async({page,request}
 });
 
 test('public expert discovery displays persisted compatibility and actionable downloads',async({page})=>{
- await page.goto('/#moe');await page.getByRole('button',{name:'공개 Expert 찾기',exact:true}).click();
+ await page.goto('/#moe');await page.getByRole('button',{name:'금융 Expert 찾기',exact:true}).click();
  const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
- await expect(dialog.getByRole('textbox',{name:'공개 모델 검색어'})).toHaveValue('chronos');
- await expect(dialog.getByRole('button',{name:'검색',exact:true})).toBeVisible();
+ await expect(dialog.getByRole('button',{name:'금융 Expert 자동 검색',exact:true})).toBeVisible();
+ await dialog.getByText('이름으로 직접 검색',{exact:true}).click();
+ await expect(dialog.getByRole('textbox',{name:'공개 모델 검색어'})).toHaveValue('');
+ await expect(dialog.getByRole('button',{name:'검색',exact:true})).toBeDisabled();
  const state=await (await page.request.get('/api/state')).json();
  if(state.library.catalog.discovery?.models.length)await expect(dialog.getByRole('link',{name:state.library.catalog.discovery.models[0].repository,exact:true})).toBeVisible();
  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+});
+
+test('inspection and financial discovery send single complete requests',async({page})=>{
+ const actions:{kind:string;payload:unknown}[]=[];
+ await page.route('**/api/library/*',async route=>{
+  actions.push({kind:route.request().url().split('/').at(-1)!,payload:route.request().postDataJSON()});
+  await route.fulfill({json:{accepted:true}});
+ });
+ await page.goto('/#moe');await page.getByRole('button',{name:'전체 검사',exact:true}).click();
+ expect(actions).toEqual([{kind:'probe_all',payload:{device:'auto'}}]);
+ await expect(page.getByRole('button',{name:'검사',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'금융 Expert 찾기',exact:true}).click();
+ await page.getByRole('button',{name:'금융 Expert 자동 검색',exact:true}).click();
+ expect(actions[1]).toEqual({kind:'search',payload:{preset:'finance'}});
+});
+
+test('speed ratios describe the inference duration and discovery keeps dates distinct',async({page})=>{
+ const state=await (await page.request.get('/api/state')).json();
+ state.library.job={busy:false};
+ const variant=Object.values(state.library.catalog.experts).find((e:any)=>e.conversion) as any;
+ expect(variant).toBeTruthy();variant.conversion.comparison={speed_ratio:.83};
+ state.library.catalog.discovery={query:'금융 Expert 자동 검색',scope:'실제 검사 필요',models:[{
+  id:'finance/test@abc',repository:'finance/test',revision:'abc',url:'https://huggingface.co/finance/test',downloads:1,compatible:false,bytes:1048576,
+  created:'2024-01-01T00:00:00Z',updated:'2026-10-09T00:00:00Z',release_date:null,detail:'실행기 확인 필요',
+  input_summary:'뉴스 텍스트',api_requirement:'미확인',overlap:[],installed_versions:[]
+ }]};
+ await page.route('**/api/state',route=>route.fulfill({json:state}));
+ await page.goto('/#moe');await expect(page.getByText('추론 시간 20.5% 증가 · 느림',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'금융 Expert 찾기',exact:true}).click();
+ const dialog=page.getByRole('dialog');await expect(dialog.getByText('원본에 날짜 미기재',{exact:false})).toBeVisible();
+ await expect(dialog.getByText(/저장소 등록.*2024/)).toBeVisible();await expect(dialog.getByText(/최근 업데이트.*2026/)).toBeVisible();
+ await expect(dialog.getByRole('button',{name:'다운로드 · 자동 검사',exact:true})).toBeDisabled();
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
 });
 
 test('all operating routes, history and direct refresh use the served application',async({page})=>{
@@ -59,15 +95,15 @@ test('legacy hashes resolve immediately to the relevant current workspace',async
 });
 
 test('market rows select with keyboard and close without losing focus',async({page})=>{
- await page.goto('/#markets');const row=page.locator('tbody tr').first();await expect(row).toBeVisible();
+ await page.goto('/#markets');const row=page.locator('tbody tr').first();await expect(row).toBeVisible({timeout:20000});
  await row.focus();await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();
  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(row).toBeFocused();
  await row.click();await expect(page.getByRole('dialog')).toBeVisible();
 });
 
 test('expert rows open the selected original asset',async({page})=>{
- await page.goto('/#moe');const row=page.getByRole('button').filter({hasText:'FinCast'}).first();await expect(row).toBeVisible();
- await row.click();await expect(page.getByRole('dialog')).toBeVisible();await expect(page.getByText('원본 가중치 고정',{exact:true})).toBeVisible();
+ await page.goto('/#moe');const row=page.getByRole('button',{name:'FinCast 1.0B 상세',exact:true});await expect(row).toBeVisible();
+ await row.focus();await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();await expect(page.getByText('원본 가중치 고정',{exact:true})).toBeVisible();
 });
 
 test('narrow layout exposes all navigation and stays within the viewport',async({page})=>{

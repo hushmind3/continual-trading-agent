@@ -13,6 +13,19 @@ export const money = (value: number, currency: Currency) =>
     maximumFractionDigits: currency === "KRW" ? 0 : 2,
   }).format(value);
 export const percent = (value: number, digits = 2) => `${number(value * 100, digits)}%`;
+export function inferenceChange(ratio:number|undefined){
+  if(ratio==null||!Number.isFinite(ratio)||ratio<=0)return '추론 시간 미측정';
+  const delta=(1/ratio-1)*100;
+  return Math.abs(delta)<.5?'추론 시간 거의 동일':`추론 시간 ${number(Math.abs(delta),1)}% ${delta>0?'증가 · 느림':'감소 · 빠름'}`;
+}
+export function calendarDate(value:string|undefined|null){
+  if(!value)return '공개 정보 없음';
+  const d=new Date(value);return Number.isNaN(d.valueOf())?'공개 정보 없음':new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+}
+export function inspectionDetail(value:string){
+  if(value.includes('expert returned nonfinite values'))return '추론 출력에 NaN/Inf 발생 · 이 정밀도 버전은 사용 차단';
+  return value.includes('Traceback')?value.trim().split('\n').at(-1)??value:value;
+}
 export const bytes = (value: number | undefined) =>
   value == null
     ? "미측정"

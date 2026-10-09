@@ -26,18 +26,15 @@ class Checkpoints:
         state['optimizer_names']=[n for n,_ in parameter_names(actor,critic)]
         from .learner import training_state
         state['sac']=training_state(actor)
-        from stable_baselines3.common.save_util import save_to_zip_file
-        sac=state.pop('sac')
-        state.pop('actor');state.pop('critic');old_optimizer=state.pop('optimizer')
-        params={'policy':actor.backend.state_dict()}
-        variables={'torch_rng':state.pop('torch_rng')}
-        if sac:
-            params.update(sac['optimizers'])
-            variables.update(log_ent_coef=sac.get('log_ent_coef'),ent_coef_tensor=sac.get('ent_coef_tensor'))
-            state['sac_meta']={k:v for k,v in sac.items() if k not in ('optimizers','log_ent_coef','ent_coef_tensor')}
-        if old_optimizer is not None:params['bridge.optimizer']=old_optimizer
+        engine=actor.engine
+        if engine is None:
+            from .learner import register
+            from .config import load_settings
+            engine=register(actor,load_settings().learning,next(actor.parameters()).device,state['sac'])
+        engine.stockrl_meta={k:v for k,v in state.items() if k not in ('actor','critic','optimizer','sac','torch_rng')}
+        engine.stockrl_meta['sac_meta']={k:v for k,v in state['sac'].items() if k not in ('optimizers','log_ent_coef','ent_coef_tensor')} if state['sac'] else None
         with temp.open('wb') as stream:
-            save_to_zip_file(stream,data={'stockrl':state},params=params,pytorch_variables=variables)
+            engine.save(stream)
             stream.flush();os.fsync(stream.fileno())
         os.replace(temp, path)
         manifest = {"file": name, "version": version, "bytes": path.stat().st_size,
@@ -63,7 +60,13 @@ class Checkpoints:
         with zipfile.ZipFile(path) as archive:is_official='data' in archive.namelist()
         if not is_official:return torch.load(path,map_location='cpu',weights_only=True)
         data,params,variables=load_from_zip_file(path,device='cpu')
-        state=data['stockrl'];policy=params['policy']
+        if 'stockrl_meta' in data:
+            from stable_baselines3 import SAC
+            engine=SAC.load(path,device='cpu')
+            state=engine.stockrl_meta;params=engine.get_parameters()
+            variables={'log_ent_coef':engine.log_ent_coef,'ent_coef_tensor':getattr(engine,'ent_coef_tensor',None)}
+        else:state=data['stockrl']
+        policy=params['policy']
         state['actor']={'backend.'+name:value for name,value in policy.items()}
         state['critic']={'network.'+name.removeprefix('critic.'):value for name,value in policy.items() if name.startswith('critic.')}
         state['optimizer']=params.get('bridge.optimizer')

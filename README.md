@@ -13,7 +13,7 @@
 | 목표 비중 → 주문 | FinRL-X `TradeExecutor.execute_strategy` |
 | 모의 체결·현금·보유 수량 | FinRL `StockTradingEnv.step` |
 | 보상 수익 계산 | FinRL-X `performance_analyzer.calculate_returns` |
-| 모델 저장·복원 | SB3 `save_to_zip_file / load_from_zip_file` |
+| 모델 저장·복원 | SB3 `SAC.save / SAC.load` |
 | 실행 점검 예약 | APScheduler `BackgroundScheduler` |
 | 중앙 학습 | Stable-Baselines3 `SAC.train` |
 | Actor·Twin Critic·Target Critic | Stable-Baselines3 `SACPolicy` 기본 클래스 |
@@ -41,7 +41,7 @@ MoE는 공식 정책의 `BaseFeaturesExtractor`로 등록합니다. 종목별로
 - 시세 수집과 API는 별도 프로세스입니다. Expert·판단·학습은 통합 GPU 프로세스의 별도 작업이며 판단은 마지막 발행 가중치를 사용합니다.
 - `champion.pt`는 선택된 동결 Expert 몸체와 중앙 학습 상태를 포함합니다. 정상 정지·구성 변경 때 최신 중앙 상태를 봉합합니다.
 - Replay는 최대 개수와 RAM 예산 중 작은 값으로 제한합니다. 샘플은 RAM에 두고 선택 배치만 GPU로 옮깁니다.
-- 공식 SB3 ZIP 저장·복원 모듈로 Actor·Critic·Target Q·각 optimizer·엔트로피 상태를 저장합니다. 부품 교체 시 남은 슬롯과 optimizer 상태를 이어받습니다.
+- 공식 SAC.save / SAC.load로 Actor·Critic·Target Q·각 optimizer·엔트로피 상태를 저장합니다. 부품 교체 시 남은 슬롯과 optimizer 상태를 이어받습니다.
 - KRW·USD 계좌와 비용·체결 기록은 분리합니다.
 - FinRL-X에 없는 Windows 프로세스 예약은 APScheduler에 맡기며, 현재 작업 상태·재시도 조건만 연결부에서 처리합니다.
 - 일봉과 분봉 모두 공식 FinRL-X DataStore로 저장합니다. `configs/market_context.json`은 동결 Expert 입력용 기간 설정입니다.

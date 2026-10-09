@@ -6,7 +6,7 @@ from .llama_engine import ensure_engine
 SIZES={0:1,1:1,2:2,3:2,4:4,5:4,6:4,7:1,10:8,11:8,12:8}
 
 
-def file_type(path):
+def describe(path):
     with path.open('rb') as stream:
         def read(fmt):return struct.unpack(fmt,stream.read(struct.calcsize(fmt)))[0]
         def string():
@@ -25,13 +25,25 @@ def file_type(path):
             else:raise ValueError('알 수 없는 GGUF metadata 형식')
         if stream.read(4)!=b'GGUF':raise ValueError('GGUF 파일 magic이 다릅니다.')
         if read('<I') not in (2,3):raise ValueError('지원하지 않는 GGUF 버전')
-        read('<Q');count=read('<Q')
+        tensors=read('<Q');count=read('<Q');file_kind=None
         if count>10000:raise ValueError('GGUF metadata 개수가 너무 큽니다.')
         for _ in range(count):
             key=string();kind=read('<I')
-            if key=='general.file_type' and kind==4:return read('<I')
-            skip(kind)
-    raise ValueError('GGUF에 가중치 형식 정보가 없습니다.')
+            if key=='general.file_type' and kind==4:file_kind=read('<I')
+            else:skip(kind)
+        if file_kind is None:raise ValueError('GGUF에 가중치 형식 정보가 없습니다.')
+        if tensors>100000:raise ValueError('GGUF tensor 개수가 너무 큽니다.')
+        parameters=0
+        import math
+        for _ in range(tensors):
+            string();dimensions=read('<I')
+            if not 1<=dimensions<=8:raise ValueError('GGUF tensor 차원이 유효하지 않습니다.')
+            sizes=[read('<Q') for _ in range(dimensions)];read('<I');read('<Q')
+            parameters+=math.prod(sizes)
+        return dict(file_type=file_kind,parameters=parameters)
+
+
+def file_type(path):return describe(path)['file_type']
 
 
 def quantize_if_needed(settings,path,progress):

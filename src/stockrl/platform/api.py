@@ -74,7 +74,7 @@ def make_app(runtime=None,config=CONFIG_PATH):
 
     @app.get("/api/health")
     def health():
-        return {"service":"stockrl","port":8766,"architecture":"finrlx-moe-ppo-v1","project":str(PROJECT_ROOT)}
+        return {"service":"stockrl","port":8766,"architecture":"finrlx-unified-gpu-moe-v1","project":str(PROJECT_ROOT)}
 
     @app.get("/api/state")
     def state(request:Request):

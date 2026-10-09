@@ -27,7 +27,7 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
     const current = ++sequence.current;
     try {
       const next = await request<Snapshot>("state");
-      if (next.architecture !== "finrlx-moe-ppo-v1")
+      if (!["finrlx-moe-ppo-v1","finrlx-unified-gpu-moe-v1"].includes(next.architecture))
         throw new Error("연결된 서버가 새 FinRL-X 운영 서버가 아닙니다.");
       if (current < applied.current) return;
       applied.current = current;

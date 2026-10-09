@@ -10,9 +10,11 @@ import {
 } from "lucide-react";
 import { useOperations } from "../data/Operations";
 import { ControlButton } from "../ui/ControlButton";
-import { Empty, Meter, Skeleton, Status } from "../ui/Primitives";
-import {accountNames,bytes,date,money,number,workerState} from "../ui/format";
+import { Empty, Meter, Skeleton } from "../ui/Primitives";
+import {accountNames,bytes,date,money,number} from "../ui/format";
 import {TrainingReadiness} from '../ui/TrainingReadiness';
+import {ServiceProgress} from '../ui/ServiceProgress';
+import {HelpDisclosure} from '../ui/HelpDisclosure';
 
 const steps = [
   { role: "feed", label: "시장 입력", icon: Radio, color: "text-blue-500" },
@@ -64,8 +66,6 @@ export function OperationsBoard() {
         </div>
         <div className="grid grid-cols-2 gap-0 lg:grid-cols-4">
           {steps.map(({ role, label, icon: Icon, color }, i) => {
-            const worker = state.workers[role],
-              status = workerState(worker);
             return (
               <div
                 key={role}
@@ -75,7 +75,7 @@ export function OperationsBoard() {
                 <div className="min-w-0">
                   <div className="text-sm font-semibold">{label}</div>
                   <div className="mt-2">
-                    {role==='learner'?<TrainingReadiness compact/>:<Status tone={status.tone}>{status.label}</Status>}
+                    {role==='learner'&&<TrainingReadiness compact/>}<ServiceProgress role={role} showState={role!=='learner'}/>
                   </div>
                   <p className="mt-2 truncate text-xs text-slate-400">
                     {role === "feed"
@@ -206,15 +206,15 @@ export function OperationsBoard() {
           <div className="flex items-end gap-3">
             <span className="text-4xl font-bold tabular-nums tracking-tight">
               {number(
-                (agent.source_updates ?? 0) +
-                  (state.learner.optimizer_steps ?? 0),
+                (state.learner.optimizer_steps ?? 0),
                 0,
               )}
             </span>
             <span className="pb-1.5 text-sm text-slate-400">
-              누적 가중치 업데이트
+              중앙 모델 누적 학습 조정
             </span>
           </div>
+          <div className="mt-3"><HelpDisclosure title="누적 학습과 지금 진행의 차이"><p>이 숫자는 실제 optimizer 가중치 조정의 누적값입니다. 지금 학습 중인지는 상단의 최근 증가량·마지막 완료 시각으로 확인합니다. 저장 버전 증가는 학습 횟수가 아닙니다.</p></HelpDisclosure></div>
           <div className="mt-5 space-y-3">
             {[
               {

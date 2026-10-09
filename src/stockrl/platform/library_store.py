@@ -81,7 +81,12 @@ def import_package(settings,path,key,slot,progress,template=None):
         package=saved;key=saved['id']
     elif saved.get('format')==HEADER_FORMAT:
         if key not in saved['expert_mapping']:raise ValueError('이 파일에 해당 Expert가 없습니다.')
-        package=load_package(path,saved['expert_packages'][key],verify=True)
+        package=saved.get('frozen_experts',{}).get(key) or load_package(path,saved['expert_packages'][key],verify=True)
+        if package.get('embedded_weight') is not None:
+            # A GGUF export is registered with its native file using the existing importer.
+            from .integrated_asset import materialize_gguf
+            from .gguf_registration import register_gguf
+            return register_gguf(settings,materialize_gguf(settings,key,package),slot,progress)
     elif saved.get('format')=='registered_vertical_trading_moe_v1':
         if key not in saved['expert_mapping']:raise ValueError('추가할 Expert를 선택하세요.')
         package=dict(format=PACKAGE_FORMAT,id=key,entry=saved['expert_mapping'][key],

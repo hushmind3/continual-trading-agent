@@ -28,42 +28,13 @@ class LibraryOperations:
             if self.active:raise ValueError('진행 중인 Expert 작업이 있습니다.')
             self.active=True
             atomic_json(dict(stage='queued',kind=kind,started=time.time()),self.status_path)
-            operation=self._hot_apply if kind=='apply' and self._can_hot_apply(payload) else self._run
-            threading.Thread(target=operation,args=(kind,payload),name='expert-library-operation',daemon=True).start()
+            threading.Thread(target=self._run,args=(kind,payload),name='expert-library-operation',daemon=True).start()
         return self.snapshot()
-
-    def _can_hot_apply(self,payload):
-        rt=self.runtime;catalog=read_json(self.catalog_path);installed=catalog.get('installed',{})
-        return (rt.controls['engine'] and rt.controls['learning'] and rt.process('agent') and rt.process('learner')
-            and all(k in installed and catalog.get('experts',{}).get(k,{}).get('package',{}).get('sha256')==installed[k]
-                    for k in payload.get('active',[])))
-
-    def _hot_apply(self,kind,payload):
-        try:
-            catalog=read_json(self.catalog_path);active=sorted(set(payload.get('active',[])))
-            for key in active:
-                item=catalog['experts'][key]
-                if not item.get('quantized') and (item.get('conversion') or {}).get('precision') not in ('nf4','int4','int8') and item.get('executor')!='llama_cpp':raise ValueError('양자화 Expert만 운영 구성에 사용할 수 있습니다: '+item['name'])
-                if item['check'].get('status')!='passed' or item['check'].get('package_sha256')!=item['package']['sha256'] or (item.get('conversion') and item['conversion'].get('validation',{}).get('passed') is not True):
-                    raise ValueError('실제 추론 검사를 먼저 통과해야 합니다: '+item['name'])
-            revision=catalog.get('selection_revision',0)+1
-            atomic_json(dict(stage='checkpoint_requested',kind=kind,selection_revision=revision,
-                detail='실행은 유지하며 슬롯 선택과 학습 체크포인트를 적용 중'),self.status_path)
-            atomic_json({**catalog,'active':active,'selection_revision':revision},self.catalog_path)
-            self.runtime.settings.enabled_experts=active
-            atomic_json(self.runtime.settings.model_dump(),self.runtime.config)
-            deadline=time.monotonic()+20
-            while read_json(self.status_path).get('stage')!='complete':
-                if time.monotonic()>deadline:raise TimeoutError('선택은 저장됐지만 학습기 확인이 지연됐습니다. 프로세스 상태를 확인하세요.')
-                time.sleep(.2)
-        except Exception as exc:
-            atomic_json(dict(stage='error',kind=kind,error=str(exc)),self.status_path)
-        finally:self.active=False
 
     def _pause(self,kind):
         rt=self.runtime;rt.command('engine',False,internal=True)
         atomic_json(dict(stage='pausing',kind=kind,detail='학습 상태를 저장하고 구성 변경 준비'),self.status_path)
-        deadline=time.monotonic()+30
+        deadline=time.monotonic()+rt.settings.resources.inference_timeout_seconds+30
         while any(rt.process(role) for role in ('agent','learner','experts')):
             if time.monotonic()>deadline:raise TimeoutError('추론·학습 정지가 완료되지 않았습니다.')
             time.sleep(.25)
@@ -85,6 +56,12 @@ class LibraryOperations:
         try:
             if paused:self._pause(kind)
             result=self._execute(kind,payload,request)
+            if kind in ('acquire','import') and result and result.get('check',{}).get('status')=='passed' and payload.get('activate',True):
+                catalog=read_json(self.catalog_path);base=(result.get('conversion') or {}).get('source_id',result['id'])
+                family=[k for k,v in catalog['experts'].items() if k==base or (v.get('conversion') or {}).get('source_id')==base]
+                active=[k for k in catalog.get('active',[]) if k not in family]+[result['id']]
+                before=rt.controls.copy();paused=True;self._pause('apply')
+                self._execute('apply',dict(active=active,admission_id=result['id']),request)
             if kind in ('optimize','optimize_all') and result and result.get('target_active') is not None:
                 before=rt.controls.copy();paused=True;self._pause('apply')
                 self._execute('apply',dict(active=result['target_active'],optimizer_base=result['base']),request)

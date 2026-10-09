@@ -1,5 +1,41 @@
 import {test,expect} from '@playwright/test';
 
+test('MoE explains learning, groups actual roles and filters model families',async({page})=>{
+ await page.goto('/#moe');
+ const guide=page.locator('details').filter({has:page.getByText('중앙 모델과 Expert · 무엇이 학습되나요?',{exact:true})});
+ await guide.locator('summary').click();
+ await expect(guide.getByText(/v번호 증가만으로 학습이 진행됐다고/)).toBeVisible();
+ await expect(guide.getByText(/중앙 신경망의 자동 용량 확장은 아직/)).toBeVisible();
+ await page.getByRole('tab',{name:/^매매 판단/}).click();
+ await expect(page.getByRole('button',{name:'FinCast 1.0B 상세',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'FinRL trading bot A2C 상세',exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:/^시계열 예측/}).click();
+ await expect(page.getByRole('button',{name:'FinCast 1.0B 상세',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'FinRL trading bot A2C 상세',exact:true})).toHaveCount(0);
+});
+
+test('process liveness is separate from real inference and learner progress',async({page})=>{
+ const state=await (await page.request.get('/api/state')).json();
+ state.progress={experts:{code:'progress',label:'실제 처리 증가',service_alive:true,observed_seconds:60,
+  counters:{inferences:100,new_inputs:10},changes:{inferences:5,new_inputs:0},last_completed_at:1791516602,detail:'같은 입력 재분석'},
+  learner:{code:'waiting',label:'학습 경험 수집 중',service_alive:true,observed_seconds:60,
+  counters:{updates:330},changes:{updates:0},last_completed_at:1791516602,detail:'같은 구성 2/4개'}};
+ await page.route('**/api/state',r=>r.fulfill({json:state}));await page.goto('/#moe');
+ const expert=page.getByTestId('progress-experts'),learner=page.getByTestId('progress-learner');
+ await expect(expert.getByText('서비스 켜짐',{exact:true})).toBeVisible();
+ await expect(expert.getByText('+5 / 100',{exact:true})).toBeVisible();
+ await expect(expert.getByText('+0 / 10',{exact:true})).toBeVisible();
+ await expect(learner.getByText('+0 / 330',{exact:true})).toBeVisible();
+ await learner.locator('summary').click();await expect(learner.getByText('현재 이유: 같은 구성 2/4개',{exact:true})).toBeVisible();
+});
+
+test('failed automatic admission stays visible with the actual blocking cause',async({page})=>{
+ const state=await (await page.request.get('/api/state')).json();
+ state.library.catalog.admission={id:'unsupported',stage:'blocked',detail:'원본의 뉴스 입력 공급자가 없습니다.',time:1791516602};
+ await page.route('**/api/state',r=>r.fulfill({json:state}));await page.goto('/#moe');
+ await expect(page.getByText(/자동 추가 차단.*원본의 뉴스 입력 공급자가 없습니다/)).toBeVisible();
+});
+
 test('diagnostics shows the backend learning cause instead of a generic wait',async({page,request})=>{
  await page.goto('/#system');
  const state=await (await request.get('/api/state')).json();
@@ -26,7 +62,7 @@ test('precision variants stay beside their original Expert',async({page,request}
   await expect(family.getByRole('group',{name:'Expert 정밀도 버전'}).getByRole('button',{name:/FP16/})).toBeVisible();
   await expect(page.getByRole('button',{name:'FinCast 1.0B · FP16 상세',exact:true})).toHaveCount(0);
  }
- await expect(family.getByRole('button',{name:'자동 최적화',exact:true})).toBeVisible();
+ await expect(family.getByRole('button',{name:'이 Expert 자동 양자화',exact:true})).toBeVisible();
 });
 
 test('all precision outcomes expose rejected, failed and absent versions',async({page})=>{
@@ -67,7 +103,7 @@ test('inspection and financial discovery send single complete requests',async({p
   actions.push({kind:route.request().url().split('/').at(-1)!,payload:route.request().postDataJSON()});
   await route.fulfill({json:{accepted:true}});
  });
- await page.goto('/#moe');await page.getByRole('button',{name:'전체 검사',exact:true}).click();
+ await page.goto('/#moe');await page.getByRole('button',{name:'등록 모델 실행 검사',exact:true}).click();
  expect(actions).toEqual([{kind:'probe_all',payload:{device:'auto'}}]);
  await expect(page.getByRole('button',{name:'검사',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'금융 Expert 찾기',exact:true}).click();
@@ -90,7 +126,7 @@ test('speed ratios describe the inference duration and discovery keeps dates dis
  await page.getByRole('button',{name:'금융 Expert 찾기',exact:true}).click();
  const dialog=page.getByRole('dialog');await expect(dialog.getByText('원본에 날짜 미기재',{exact:false})).toBeVisible();
  await expect(dialog.getByText(/저장소 등록.*2024/)).toBeVisible();await expect(dialog.getByText(/최근 업데이트.*2026/)).toBeVisible();
- await expect(dialog.getByRole('button',{name:'다운로드 · 자동 검사',exact:true})).toBeDisabled();
+ await expect(dialog.getByRole('button',{name:'다운로드 · 검사 · 자동 사용',exact:true})).toBeDisabled();
  await page.setViewportSize({width:390,height:844});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
 });

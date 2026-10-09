@@ -20,6 +20,7 @@ import {
   Skeleton,
 } from "../ui/Primitives";
 import { bytes, date, number } from "../ui/format";
+import {HelpDisclosure} from "../ui/HelpDisclosure";
 
 export function TrainingWorkspace() {
   const { state, refresh } = useOperations();
@@ -31,7 +32,7 @@ export function TrainingWorkspace() {
     observations: number;
   } | null>(null);
   if (!state) return <Skeleton />;
-  const learner = state.learner,
+  const learner = state.learner, measurement=state.last_learning?.measurement??state.learner,
     batch = state.training?.required ?? state.settings.learning.batch_size;
   const restore = async (file: string) => {
     setError("");
@@ -173,28 +174,31 @@ export function TrainingWorkspace() {
       </section>
       <div className="grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
         <section>
-          <h3 className="mb-4 text-sm font-bold">최근 학습 측정</h3>
+          <h3 className="mb-4 text-sm font-bold">마지막 학습 결과 · 처리 지표</h3>
+          <div className="mb-4"><HelpDisclosure title="학습 지표 설명 · 기록 없음의 의미"><p>Loss는 정책·가치 예측을 학습하는 계산값이며 계좌 손실 금액이나 수익률이 아닙니다. 처리량과 배치 시간은 마지막 실제 학습의 측정값입니다.</p><p>측정 기록 없음은 현재 조회 가능한 배치 지표가 없다는 뜻입니다. 과거에 학습한 적이 없다는 뜻으로 사용하지 않습니다. 누적 학습 조정과 마지막 완료 기록을 따로 확인하세요.</p></HelpDisclosure></div>
+          <p className="mb-3 text-xs text-slate-500">마지막 확인된 학습 완료: {state.last_learning?.time?date(state.last_learning.time):'완료 시각 기록 없음'}</p>
+          {state.last_learning?.detail&&<p className="mb-4 text-xs text-slate-500">{state.last_learning.detail}</p>}
           <dl className="space-y-4 text-sm">
             {[
               {
-                label: "최근 손실",
+                label: "학습 계산 loss",
                 value:
-                  learner.loss != null
-                    ? number(learner.loss, 6)
+                  measurement.loss != null
+                    ? number(measurement.loss, 6)
                     : "측정 기록 없음",
               },
               {
-                label: "학습 속도",
+                label: "학습 경험 처리량",
                 value:
-                  learner.samples_per_second != null
-                    ? `${number(learner.samples_per_second)} 경험/s`
+                  measurement.samples_per_second != null
+                    ? `${number(measurement.samples_per_second)} 경험/s`
                     : "측정 대기",
               },
               {
                 label: "최근 배치 시간",
                 value:
-                  learner.seconds != null
-                    ? `${number(learner.seconds, 3)}s`
+                  measurement.seconds != null
+                    ? `${number(measurement.seconds, 3)}s`
                     : "측정 대기",
               },
               { label: "경험 저장 크기", value: bytes(state.replay.bytes) },

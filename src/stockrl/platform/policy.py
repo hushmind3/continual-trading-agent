@@ -14,7 +14,7 @@ INPUT_KEYS = ["evidence", "expert_mask", "account", "market", "policy_q"]
 
 
 class MoETrunk(nn.Module):
-    """Only trainable Champion modules. Frozen Expert bodies live in their own service."""
+    """Trainable Champion modules, fed by the same process's frozen Expert stage."""
     def __init__(self, spec):
         super().__init__()
         config = spec["config"]
@@ -150,7 +150,9 @@ def observation(evidence,mask,account,market,policy_q):
 
 @torch.no_grad()
 def decide(actor,critic,obs,*,explore):
+    obs=obs.to(next(actor.parameters()).device)
     with set_exploration_type(ExplorationType.RANDOM if explore else ExplorationType.MEAN):
         actor(obs)
     weights=obs['action'] if actor.model_spec.get('policy_family')=='dirichlet-v1' else sparse_weights(obs['action'])
-    return weights.cpu().numpy(),obs.detach().clone()
+    # Only the compact action and durable experience leave the GPU pipeline.
+    return weights.cpu().numpy(),obs.detach().to('cpu').clone()

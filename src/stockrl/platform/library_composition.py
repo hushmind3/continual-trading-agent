@@ -12,7 +12,8 @@ from .experience_schema import can_extend,prepare_extension
 
 def publish_header(settings,header,active,progress):
     path=settings.resolve(settings.expert_checkpoint)
-    previous=torch.load(path,map_location='cpu',weights_only=True)
+    from .integrated_asset import read_header,integrate
+    previous=read_header(path)
     layout_changed=(previous['config'].get('feature_sizes')!=header['config'].get('feature_sizes') or
                     previous['config'].get('stock_policy_ids')!=header['config'].get('stock_policy_ids') or
                     previous['config'].get('router_family')!='per-expert-context-v1')
@@ -40,9 +41,11 @@ def publish_header(settings,header,active,progress):
         if template[name].shape!=value.shape:raise ValueError('기존 Expert의 출력 규격을 바꾸려면 새 슬롯을 사용하세요.')
         template[name]=value
     header['state_dict']=template
+    integrate(header,path,active,progress)
     partial=atomic_torch_save(header,path)
     selected,initial=load_moe_head(partial);selected['source_model']=str(path)
     selected['slot_sources']=header.get('slot_sources',{})
+    selected['selection_revision']=read_json(settings.state_dir/'expert-library.json').get('selection_revision',0)
     checkpoints=Checkpoints(settings.state_dir/'policies',settings.resources.revisions)
     current=read_json(checkpoints.root/'current.json');records=list(checkpoints.revisions())
     prepared=[]
@@ -54,7 +57,9 @@ def publish_header(settings,header,active,progress):
         actor,critic,optimizer=compose_policy(saved,chosen,settings.learning,initial)
         prepared.append((record,saved,actor,critic,optimizer))
         progress(stage='migrating',completed=index+1,total=len(records),detail='가중치와 optimizer 상태를 이름별로 이어받는 중')
-    partial.replace(path)
+    header.pop('frozen_experts',None)
+    import gc
+    gc.collect();partial.replace(path)
     checkpoints.retain=len(records)*2+1;published=None
     for record,saved,actor,critic,optimizer in prepared:
         latest=record['file']==current['file'];version=saved['version']+1 if latest else saved['version']

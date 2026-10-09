@@ -81,7 +81,8 @@ def run(config,request_path):
     catalog=save_catalog(settings,header)
     if header['config'].get('router_family')!='per-expert-context-v1':
         publish_header(settings,header,header.get('active_experts',settings.enabled_experts or sorted(header['expert_mapping'])),progress)
-        header=torch.load(model,map_location='cpu',weights_only=True)
+        from .integrated_asset import read_header
+        header=read_header(model)
         catalog=save_catalog(settings,header,catalog)
     result=None
     if kind=='prepare':
@@ -178,6 +179,8 @@ def run(config,request_path):
     elif kind=='apply':
         result=apply(settings,header,catalog,list(payload.get('active',[])),progress)
         catalog['installed']={k:r['sha256'] for k,r in header['expert_packages'].items()}
+        if payload.get('admission_id'):
+            catalog['admission']=dict(id=payload['admission_id'],stage='active',detail='양자화·실제 실행 검사 통과 · 운영 구성에 자동 추가',time=time.time())
         if payload.get('optimizer_base'):
             records=catalog.get('optimizations',{}) if payload['optimizer_base']=='all' else {payload['optimizer_base']:catalog['optimizations'][payload['optimizer_base']]}
             for record in records.values():
@@ -199,6 +202,8 @@ def run(config,request_path):
         if weight and not any(k!=key and v['package']['file'].endswith('.json') and read_json(package_path(model,v['package'])).get('weight_asset',{}).get('file')==weight['file'] for k,v in catalog['experts'].items()):recycle(package_path(model,weight))
         catalog['experts'].pop(key);catalog['active']=active
         catalog['installed']={k:r['sha256'] for k,r in header['expert_packages'].items()}
+    if kind in ('import','acquire') and result and result.get('check',{}).get('status')!='passed':
+        catalog['admission']=dict(id=result['id'],stage='blocked',detail=result['check'].get('detail','실행 검사 실패 · 자동 추가 안 함'),time=time.time())
     atomic_json(catalog,catalog_path(settings));atomic_json(settings.model_dump(),Path(config))
     progress(stage='complete',result=result,detail='완료 · 기존 학습 상태 유지',finished=time.time())
 

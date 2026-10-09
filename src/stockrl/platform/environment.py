@@ -30,8 +30,9 @@ def market_view(frame):
 
 
 class PortfolioEnvironment:
-    def __init__(self, settings, journal, model_spec):
+    def __init__(self, settings, journal, model_spec,device=None):
         self.settings,self.journal,self.model_spec=settings,journal,model_spec
+        self.device=device;self.frame_identity=None;self.symbol_frames={}
         self.account = PaperAccount.in_memory(settings.risk.fee, settings.risk.slippage)
         saved = journal.get_state("account")
         if saved:
@@ -65,12 +66,17 @@ class PortfolioEnvironment:
                 book['fees']/equity,book['slippage']/equity,book['spread']/equity,exposure]
         if self.settings.enabled_experts:
             packets={k:v for k,v in packets.items() if k in self.settings.enabled_experts}
-        evidence,mask,policy_q=prepare_evidence(packets,symbols,self.model_spec,as_of,
-                                              self.settings.resources.market_refresh_seconds)
+        if self.device is not None:
+            from .tensor_evidence import prepare_tensor_evidence
+            evidence,mask,policy_q=prepare_tensor_evidence(packets,symbols,self.model_spec,as_of,
+                self.settings.resources.market_refresh_seconds,self.device)
+        else:evidence,mask,policy_q=prepare_evidence(packets,symbols,self.model_spec,as_of,self.settings.resources.market_refresh_seconds)
         market=np.zeros((len(symbols),8),np.float32)
         context=np.column_stack([np.asarray(pstate)[indices],np.broadcast_to(astate,(len(indices),len(astate)))]).astype(np.float32)
+        if frame is not self.frame_identity:
+            self.frame_identity=frame;self.symbol_frames={s:g for s,g in frame.groupby('symbol',sort=False)}
         for n,s in enumerate(symbols):
-            data = frame[(frame.symbol==s)&(frame.date<=pd.Timestamp(as_of))].tail(32)
+            group=self.symbol_frames[s];data=group.loc[group.date<=pd.Timestamp(as_of)].tail(32)
             closes = data.close.to_numpy(float)
             returns = np.diff(np.log(np.maximum(closes,1e-9)))
             volume = data.volume.to_numpy(float)
@@ -81,7 +87,8 @@ class PortfolioEnvironment:
                 min(age/self.settings.risk.freshness_seconds,10), float(view.observed[index,indices[n]])]
         current = np.asarray([pstate[i][1] for i in indices])
         fresh = np.asarray([view.observed[index,i] and np.isfinite(view.closes[index,i]) for i in indices])
-        fresh = fresh & mask.any(1)
+        available=mask.any(1).cpu().numpy() if torch.is_tensor(mask) else mask.any(1)
+        fresh = fresh & available
         obs=observation(evidence,mask,np.nan_to_num(context),np.nan_to_num(market),policy_q)
         book = self.account.snapshot()["books"][currency]
         self.peak[currency] = max(self.peak[currency],book["equity"])
@@ -89,7 +96,7 @@ class PortfolioEnvironment:
         obs['market'][:,7]=float(drawdown)
         return {"observation":obs,"symbols":symbols,"current_weights":current,"fresh":fresh,
                 "currency":currency,"drawdown":drawdown,
-                "as_of":as_of,"coverage":int(mask.any(1).sum()),"indices":indices,"equity":book["equity"]}
+                "as_of":as_of,"coverage":int(available.sum()),"indices":indices,"equity":book["equity"]}
 
     def settle(self, data, version):
         currency = data["currency"]
@@ -107,7 +114,8 @@ class PortfolioEnvironment:
         terminal = pending["symbols"] != data["symbols"] or elapsed>self.settings.risk.freshness_seconds
         reward = float(np.log(max(data["equity"],1e-9)/max(pending["equity"],1e-9)))
         td = pending["transition"]
-        td["next"] = {k:td[k] if terminal else data["observation"][k] for k in INPUT_KEYS}
+        following=None if terminal else data['observation'].to('cpu')
+        td["next"] = {k:td[k] if terminal else following[k] for k in INPUT_KEYS}
         td["next"]["reward"] = torch.tensor([reward*100],dtype=torch.float32)
         td["next"]["done"] = torch.tensor([terminal])
         td['next']['discount']=torch.tensor([self.settings.learning.discount**(elapsed/60)],dtype=torch.float32)

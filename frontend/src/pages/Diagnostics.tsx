@@ -1,8 +1,9 @@
 import { Activity, CircuitBoard, FileText } from "lucide-react";
 import { useOperations } from "../data/Operations";
-import { Empty, Skeleton, Status } from "../ui/Primitives";
-import { bytes, date, number, workerState } from "../ui/format";
+import { Empty, Skeleton } from "../ui/Primitives";
+import { bytes, date, number } from "../ui/format";
 import { TrainingReadiness } from "../ui/TrainingReadiness";
+import {ServiceProgress} from '../ui/ServiceProgress';
 
 const roles: Record<string, string> = {
   feed: "시세 수집",
@@ -18,7 +19,7 @@ export function Diagnostics() {
       <section className="overflow-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/50">
         <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 text-sm font-bold">
           <CircuitBoard size={17} className="text-blue-500" />
-          실행 프로세스
+          실행 단계 · 통합 MoE는 같은 PID를 공유합니다
         </div>
         <table className="w-full text-left text-sm">
           <thead className="text-xs text-slate-400">
@@ -38,28 +39,27 @@ export function Diagnostics() {
           <tbody>
             {Object.entries(state.workers).map(([role, worker]) => {
               const resource = state.resources.processes.find(
-                  (p) => p.role === role,
-                ),
-                status = workerState(worker);
+                  (p) => p.role === role || p.roles?.includes(role),
+                );
               return (
                 <tr key={role} className="border-t border-slate-50">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold">
                     {roles[role] ?? role}
                   </td>
                   <td className="px-5 py-4">
-                    {role==='learner'?<TrainingReadiness compact/>:<Status tone={status.tone}>{status.label}</Status>}
+                    {role==='learner'&&<TrainingReadiness compact/>}<ServiceProgress role={role} showState={role!=='learner'}/>
                   </td>
                   <td className="px-5 py-4 font-mono text-xs text-slate-400">
                     {worker.pid ?? "정지"}
                   </td>
                   <td className="whitespace-nowrap px-5 py-4 tabular-nums">
-                    {bytes(resource?.rss_bytes)}
+                    {resource?.role==='moe'&&role!=='experts'?'위 통합 MoE와 공유':bytes(resource?.rss_bytes)}
                   </td>
                   <td className="px-5 py-4 tabular-nums">
-                    {resource ? number(resource.cpu_percent) + "%" : "정지"}
+                    {resource?.role==='moe'&&role!=='experts'?'공유':resource ? number(resource.cpu_percent) + "%" : "정지"}
                   </td>
                   <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-400">
-                    {resource
+                    {resource?.role==='moe'&&role!=='experts'?'공유':resource
                       ? `${bytes(resource.read_bytes)} 읽기 / ${bytes(resource.write_bytes)} 쓰기`
                       : "정지"}
                   </td>

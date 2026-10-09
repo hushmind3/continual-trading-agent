@@ -20,7 +20,7 @@ from .data_universe import prepare
 from .training_status import readiness
 from .library_operations import LibraryOperations,ONLINE_LIBRARY_JOBS
 
-MODULES={"experts":"stockrl.platform.expert_worker","agent":"stockrl.platform.agent_worker","learner":"stockrl.platform.learner"}
+MODULES={role:'stockrl.platform.moe_worker' for role in ('experts','agent','learner')}
 
 
 def terminate_tree(process):
@@ -45,6 +45,8 @@ class Runtime:
         self.lock=threading.RLock(); self.closing=threading.Event(); self.children={}; self.handles={}; self.retries={}
         self.controls=read_json(self.root/"control.json") or {"feed":False,"engine":False,"paper":False,"learning":True,"mode":"live"}
         self.library=LibraryOperations(self)
+        from .progress_status import ProgressTracker
+        self.progress=ProgressTracker()
         atomic_json(self.controls,self.root/"control.json")
         self.thread=threading.Thread(target=self._monitor,daemon=True,name="finrlx-supervisor"); self.thread.start()
 
@@ -52,7 +54,8 @@ class Runtime:
         return bool(self.controls["feed"] if role=="feed" else self.controls["engine"] and (role!="learner" or self.controls["learning"]))
 
     def process(self,role):
-        record=read_json(self.root/"workers"/(role+".pid.json"))
+        owner=role if role=='feed' else 'agent'
+        record=read_json(self.root/"workers"/(owner+".pid.json"))
         state=read_json(self.root/'workers'/(role+'.json'))
         expected=str(self.root/'live'/'market.csv') if role=='feed' else str(self.config)
         tag='stockrl' if role=='feed' else MODULES[role]
@@ -74,7 +77,9 @@ class Runtime:
             except (KeyError,psutil.Error):return None
 
     def spawn(self,role):
-        stop=self.root/"workers"/(role+".stop"); stop.unlink(missing_ok=True)
+        for stage in ('experts','agent','learner') if role=='agent' else (role,):
+            (self.root/"workers"/(stage+".stop")).unlink(missing_ok=True)
+            atomic_json({"status":"starting","error":None},self.root/"workers"/(stage+".json"))
         if role=="feed":
             self.input_config=prepare(self.settings)
             args=[sys.executable,"-m","stockrl.platform.feed_worker","--config",str(self.config),
@@ -103,7 +108,7 @@ class Runtime:
                         self.journal.event('error','디스크 여유 공간이 운영 기준보다 작습니다. 시세·체결·학습을 정지했습니다.')
                         self.controls.update(feed=False,paper=False,learning=False)
                         atomic_json(self.controls,self.root/'control.json')
-                for role in ("feed","experts","agent","learner"):
+                for role in ("feed","agent"):
                     process=self.process(role)
                     if not self.wanted(role):
                         if process: (self.root/"workers"/(role+".stop")).touch()
@@ -112,7 +117,8 @@ class Runtime:
                         continue
                     if process:
                         state=read_json(self.root/"workers"/(role+".json"))
-                        if role=="experts" and state.get("status")=="inference" and time.time()-state.get("active_since",time.time())>self.settings.resources.inference_timeout_seconds:
+                        expert_state=read_json(self.root/'workers'/'experts.json') if role=='agent' else {}
+                        if expert_state.get("status")=="inference" and time.time()-expert_state.get("active_since",time.time())>self.settings.resources.inference_timeout_seconds:
                             self.journal.event("error","Expert 추론 시간 제한을 넘었습니다. 프로세스를 복구합니다.")
                             terminate_tree(process)
                         continue
@@ -161,7 +167,7 @@ class Runtime:
         training=readiness(self.controls,workers,replay,self.settings.learning)
         if self.library.active and self.library.snapshot()['job'].get('kind') not in ONLINE_LIBRARY_JOBS:
             training.update(code='composition',label='Expert 구성 적용 중',detail=self.library.snapshot()['job'].get('detail','학습 상태를 이어받는 중'),action=None)
-        return dict(architecture="finrlx-moe-ppo-v1",controls=self.controls.copy(),workers=workers,feed=feed,
+        result=dict(architecture="finrlx-unified-gpu-moe-v1",controls=self.controls.copy(),workers=workers,feed=feed,
                     agent=agent,experts=expert.get("experts",[]),learner=learner,
                     account=self.journal.get_state("account"),decisions=self.journal.get_state("decisions") or [],
                     replay=replay,training=training,
@@ -169,13 +175,18 @@ class Runtime:
                     revisions=self.checkpoints.revisions(),settings=self.settings.model_dump(),real_orders_enabled=False,
                     current_policy=read_json(self.checkpoints.root/'current.json'),
                     library=self.library.snapshot(),time=time.time())
+        actual=self.journal.get_state('learning_metrics') or {}
+        row=self.journal.db.execute("SELECT created,detail FROM events WHERE kind='learning' ORDER BY id DESC LIMIT 1").fetchone()
+        result['last_learning']=dict(time=actual.get('updated_at') or (row[0] if row else None),detail=row[1] if row else None,measurement=actual or None)
+        result['progress']=self.progress.snapshot(result)
+        return result
 
     def shutdown(self):
         self.closing.set(); self.thread.join(timeout=3)
         if self.library.child and self.library.child.poll() is None:
             terminate_tree(psutil.Process(self.library.child.pid))
         processes=[]
-        for role in ("feed","experts","agent","learner"):
+        for role in ("feed","agent"):
             process=self.process(role)
             if process:
                 (self.root/"workers"/(role+".stop")).touch(); processes.append(process)

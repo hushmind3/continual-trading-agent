@@ -55,10 +55,11 @@ class Residency:
         if preference=='cuda:0':raise MemoryError('CUDA 실행의 모델·연산 여유 공간이 부족합니다.')
         restore_host(expert);return 'cpu'
 
-    def preload(self,keys,progress=lambda **kw:None):
+    def preload(self,keys,progress=lambda **kw:None,stopped=lambda:False):
         from ..expert_device import host_state,finish_device
         keys=list(keys)
         for index,key in enumerate(keys):
+            if stopped():break
             progress(key=key,completed=index,total=len(keys))
             try:
                 expert=self.pool.get(key);device=self.device(key,expert,0)

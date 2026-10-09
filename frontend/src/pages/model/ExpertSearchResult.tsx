@@ -30,6 +30,6 @@ export function ExpertSearchResult({item,busy,onDownload}:{item:DiscoveredExpert
    {item.input_evidence?.snippets.map((line,index)=><blockquote key={index} className="border-l-2 border-slate-200 pl-3">{line}</blockquote>)}
    {!item.requirements_verified&&<p className="text-amber-700">문서 단서는 입력 계약의 검증 결과가 아닙니다. 실행기·입력 연결이 확인되기 전에는 추가할 수 없습니다.</p>}
   </div></details>
-  <Button disabled={busy||!item.compatible||item.same_weights} tone="primary" onClick={onDownload}><Download size={14}/>다운로드 · 자동 검사</Button>
+  <Button disabled={busy||!item.compatible||item.same_weights} tone="primary" onClick={onDownload}><Download size={14}/>다운로드 · 검사 · 자동 사용</Button>
  </article>;
 }

@@ -27,5 +27,5 @@ class ReactAssetChecks(unittest.TestCase):
             for path in ['missing.js','%2e%2e/config.py','C:/Windows/win.ini']:
                 self.assertEqual(client.get('/assets/'+path).status_code,404)
             health=client.get('/api/health').json()
-            self.assertEqual(health['architecture'],'finrlx-moe-ppo-v1')
+            self.assertEqual(health['architecture'],'finrlx-unified-gpu-moe-v1')
             self.assertEqual(health['project'],str(PROJECT_ROOT))

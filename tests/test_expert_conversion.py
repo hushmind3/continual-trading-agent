@@ -27,6 +27,17 @@ from unittest.mock import Mock
 
 
 class PrecisionTests(unittest.TestCase):
+    def test_downloaded_checked_expert_is_added_by_the_control_owner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);rt=SimpleNamespace(root=root,config=root/'config.json',controls={'engine':True,'paper':True,'learning':True,'feed':True},command=Mock(),closing=Mock(is_set=Mock(return_value=False)))
+            operations=LibraryOperations(rt)
+            operations.catalog_path.write_text('{"installed":{"a":"hash"},"active":["a"],"experts":{"a":{},"new_nf4":{"conversion":{"source_id":"new"}}}}',encoding='utf8')
+            with (patch.object(operations,'_pause') as pause,patch.object(operations,'_execute',side_effect=[{'id':'new_nf4','check':{'status':'passed'},'conversion':{'source_id':'new'}},None]) as execute,
+                  patch('stockrl.platform.config.load_settings',return_value=Mock()),patch('stockrl.platform.data_universe.prepare',return_value=root/'feed.json')):
+                operations._run('acquire',{})
+            pause.assert_called_once_with('apply')
+            self.assertEqual(execute.call_args_list[-1].args[:2],('apply',{'active':['a','new_nf4'],'admission_id':'new_nf4'}))
+            rt.command.assert_any_call('engine',True,internal=True);rt.command.assert_any_call('paper',True,internal=True)
     def test_optimizer_deployment_uses_the_control_owner_and_restores_controls(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);rt=SimpleNamespace(root=root,config=root/'config.json',controls={'engine':True,'paper':True,'learning':True,'feed':True},

@@ -1,4 +1,4 @@
-"""TorchRL clipped PPO in an independent CPU process, with crash-safe publication."""
+"""Asynchronous TorchRL PPO on the Champion device, with crash-safe publication."""
 import argparse
 import math
 import time
@@ -18,14 +18,15 @@ from ..state_io import read_json
 
 
 def learn_batch(actor, critic, optimizer, rows, cfg):
-    batch = torch.stack([TensorDict(row, batch_size=[]) for row in rows])
+    device=next(actor.parameters()).device
+    batch = torch.stack([TensorDict(row, batch_size=[]) for row in rows]).to(device)
     with torch.no_grad():
         critic(batch["next"])
         discount=batch.get(('next','discount'),cfg.discount)
         target = batch["next","reward"] + discount * (~batch["next","done"]).float() * batch["next","state_value"]
         batch["value_target"] = target
         batch["advantage"] = target-batch["state_value"]
-    buffer = TensorDictReplayBuffer(storage=LazyTensorStorage(len(batch)),
+    buffer = TensorDictReplayBuffer(storage=LazyTensorStorage(len(batch),device=device),
                                   sampler=SamplerWithoutReplacement(), batch_size=min(16,len(batch)))
     buffer.extend(batch)
     loss_module = ClipPPOLoss(actor,critic,functional=False,clip_epsilon=cfg.clip_epsilon,
@@ -46,13 +47,16 @@ def learn_batch(actor, critic, optimizer, rows, cfg):
     return sum(losses)/len(losses), steps
 
 
-def run(settings):
-    torch.set_num_threads(settings.learning.cpu_threads)
+def run(settings, *, session=None):
+    if session is None:torch.set_num_threads(settings.learning.cpu_threads)
+    device=session.device if session else torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    is_stopped=lambda:session.stopped('learner') if session else stopped(settings,'learner')
     journal = Journal(settings.state_dir/"operations.sqlite3",settings.resources.journal_limit_mib,settings.resources.retained_transitions)
     checkpoints = Checkpoints(settings.state_dir/"policies",settings.resources.revisions)
+    checkpoints.defer_mirror=session is not None
     try:
-        publish(settings,"learner",status="waiting_policy",device="cpu",message="정책 복원·변환 대기")
-        while not stopped(settings,"learner"):
+        publish(settings,"learner",status="waiting_policy",device=str(device),message="정책 복원·변환 대기")
+        while not is_stopped():
             state, manifest = checkpoints.load()
             if state and state['model_spec'].get('policy_family')=='sparse-normal-v2':
                 break
@@ -63,11 +67,16 @@ def run(settings):
         actor,critic = build_policy(state["model_spec"])
         actor.load_state_dict(state["actor"]); critic.load_state_dict(state["critic"])
         activate_policy(actor,critic,state['model_spec'].get('active_experts',state['expert_ids']))
+        actor.to(device);critic.to(device)
         optimizer = torch.optim.AdamW(parameters(actor,critic),lr=settings.learning.learning_rate)
         if state.get("optimizer"):
             optimizer.load_state_dict(state["optimizer"])
+        from .moe_session import optimizer_to
+        optimizer_to(optimizer,device)
         if state.get("torch_rng") is not None:
             torch.set_rng_state(state["torch_rng"])
+        if device.type=='cuda' and state.get('cuda_rng'):
+            for index,rng in enumerate(state['cuda_rng'][:torch.cuda.device_count()]):torch.cuda.set_rng_state(rng,index)
         version, steps = state["version"], state.get("optimizer_steps",0)
         generation=state.get('optimization_generation',version)
         selected_revision=state.get('model_spec',{}).get('selection_revision',0)
@@ -76,7 +85,7 @@ def run(settings):
         if metrics.get("version")==version:
             publish(settings,"learner",**metrics,last_update=metrics)
         last_update = 0.;next_update_at=0.
-        while not stopped(settings,"learner"):
+        while not is_stopped():
             revision,active=selection(settings,state['model_spec'].get('active_experts',state['expert_ids']))
             if revision!=selected_revision:
                 if read_json(settings.state_dir/'workers'/'agent.json').get('selection_revision',-1)<revision:
@@ -86,7 +95,7 @@ def run(settings):
                 selected_revision=revision;acknowledge(settings,revision)
             counts = journal.stats(generation,settings.learning.max_policy_lag)
             plan=batch_plan(counts,settings.learning)
-            publish(settings,"learner",status="waiting_batch",version=version,optimizer_steps=steps,replay=counts,device="cpu",
+            publish(settings,"learner",status="waiting_batch",version=version,optimizer_steps=steps,replay=counts,device=str(device),
                     message=f"같은 종목 구성의 학습 경험 {plan['ready']}/{plan['required']}개",next_update_at=next_update_at,
                     batch_plan=plan)
             if not control(settings).get("learning",True) or time.monotonic()-last_update < settings.learning.checkpoint_seconds:

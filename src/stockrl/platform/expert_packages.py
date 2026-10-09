@@ -33,7 +33,10 @@ def split_asset(path, progress=lambda **kw:None):
     """One migration writes each frozen tensor once; future edits change only the header."""
     path=Path(path);saved=torch.load(path,map_location='cpu',weights_only=True,mmap=True)
     # The small mutable header must not remain mmap-locked during online learning on Windows.
-    if saved.get('format')==HEADER_FORMAT:return torch.load(path,map_location='cpu',weights_only=True)
+    if saved.get('format')==HEADER_FORMAT:
+        del saved
+        from .integrated_asset import read_header
+        return read_header(path)
     if saved.get('format')!='registered_vertical_trading_moe_v1':raise ValueError('지원하는 MoE 파일이 아닙니다.')
     destination=path.parent/'expert-packages';destination.mkdir(exist_ok=True)
     references={};ids=list(saved['expert_mapping'])

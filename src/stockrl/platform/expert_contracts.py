@@ -29,6 +29,7 @@ def descriptor(key,package,reference):
                 weight_bytes=package.get('weight_asset',{}).get('bytes'),
                 origin=entry.get('origin'),
                 role='action' if entry.get('stock_policy') else 'market',
+                category='trading' if entry.get('stock_policy') else 'interpretation' if entry.get('backend')=='gguf_market' else 'forecast',
                 parameters=entry.get('parameters'),feature_size=package['feature_size'],
                 conversion=package.get('conversion'),package=reference,input=contract,check=dict(status='untested' if contract['supported'] else 'unsupported',
                 detail='실제 입력으로 추론 검사 전' if contract['supported'] else contract['reason']))

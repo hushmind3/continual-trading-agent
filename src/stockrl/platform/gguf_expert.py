@@ -6,6 +6,7 @@ import socket
 import subprocess
 import tempfile
 import time
+import threading
 from pathlib import Path
 import requests
 import numpy as np
@@ -22,7 +23,7 @@ SCHEMA=dict(type='object',properties={
 class GGUFExpert(nn.Module):
     def __init__(self,settings,package):
         super().__init__();self.settings=settings;self.entry=package['entry'];self.reference=package['weight_asset']
-        self.path=package_path(settings.resolve(settings.expert_checkpoint),self.reference)
+        self.path=package.get('embedded_path') or package_path(settings.resolve(settings.expert_checkpoint),self.reference)
         if digest(self.path)!=self.reference['sha256']:raise ValueError('GGUF 고정 가중치 checksum이 다릅니다.')
         self.child=None;self.device=None;self.log=None;self.log_dir=None;self.details={}
 
@@ -35,10 +36,12 @@ class GGUFExpert(nn.Module):
         self.log_dir=tempfile.TemporaryDirectory(prefix='stockrl-llama-');self.log_path=Path(self.log_dir.name)/'engine.log'
         args=[str(engine),'-m',str(self.path),'--host','127.0.0.1','--port',str(port),'-c','4096','-t',str(self.settings.learning.cpu_threads),
             '-ngl','auto' if device!='cpu' else '0','--fit','on','--fit-target',str(int(self.settings.resources.vram_reserve_gib*1024)),
-            '--parallel','1','--no-webui','--log-file',str(self.log_path),'--verbosity','4']
+            '--parallel','1','--cache-ram',str(self.settings.resources.gguf_prompt_cache_mib),
+            '--no-webui','--log-file',str(self.log_path),'--verbosity','4']
         self.child=subprocess.Popen(args,stdout=self.log,stderr=self.log,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         deadline=time.monotonic()+self.settings.resources.inference_timeout_seconds
         while time.monotonic()<deadline:
+            if getattr(self,'cancelled',lambda:False)():self.close();raise InterruptedError('MoE 정지 요청')
             if self.child.poll() is not None:
                 self.log.seek(0);detail=self.log.read().decode('utf8',errors='replace')[-1500:];self.close();raise ValueError('GGUF 원본 실행 실패: '+detail)
             try:
@@ -57,21 +60,37 @@ class GGUFExpert(nn.Module):
     def forward(self,root,data,device='cpu'):
         self.start(device);outputs=[]
         for symbol,series in zip(data['symbols'],data['series']):
+            if getattr(self,'cancelled',lambda:False)():raise InterruptedError('MoE 정지 요청')
             values=np.asarray(series[-32:],float)
             if len(values)<32 or not np.isfinite(values).all():raise ValueError('GGUF 시장 입력은 실제 관측 32개가 필요합니다.')
             # Actual relative prices; model output is a declared opinion, never a fabricated quote.
             relative=(values/max(abs(values[-1]),1e-9)-1).round(6).tolist()
-            response=requests.post(self.url+'/v1/chat/completions',json=dict(messages=[
+            response=self.query(dict(messages=[
                 dict(role='system',content='You are a frozen market analyst. Use only the observed prices. Return JSON: direction (-1 bearish to 1 bullish), confidence (0 to 1), risk (0 to 1). No future observations are given.'),
                 dict(role='user',content=json.dumps(dict(symbol=symbol,relative_prices=relative,sampling_seconds=data['sampling_seconds'])))],
                 temperature=0,seed=0,max_tokens=192,response_format={'type':'json_schema','json_schema':{'name':'market_opinion','schema':SCHEMA}},
-                chat_template_kwargs={'enable_thinking':False}),timeout=self.settings.resources.inference_timeout_seconds)
+                cache_prompt=self.settings.resources.gguf_prompt_cache_mib>0,
+                chat_template_kwargs={'enable_thinking':False}))
             response.raise_for_status();value=json.loads(response.json()['choices'][0]['message']['content'])
             row=[float(value[k]) for k in ('direction','confidence','risk')]
             if not np.isfinite(row).all() or not -1<=row[0]<=1 or not all(0<=v<=1 for v in row[1:]):raise ValueError('GGUF 의견 출력이 입력 계약을 벗어났습니다.')
             outputs.append(row)
         return dict(native_output=outputs,symbols=data['symbols'],as_of=data['as_of'],sampling_seconds=data['sampling_seconds'],
             horizon=1,layout='symbol,direction_confidence_risk',units='model_opinion',output_shape=[len(outputs),3],frozen=True,**self.details)
+
+    def query(self,payload):
+        """A stop during native generation cancels the child instead of waiting on HTTP."""
+        done=threading.Event();result={}
+        def receive():
+            try:result['response']=requests.post(self.url+'/v1/chat/completions',json=payload,timeout=self.settings.resources.inference_timeout_seconds)
+            except Exception as exc:result['error']=exc
+            finally:done.set()
+        thread=threading.Thread(target=receive,name='gguf-response',daemon=True);thread.start()
+        while not done.wait(.2):
+            if getattr(self,'cancelled',lambda:False)():
+                self.close();thread.join(timeout=2);raise InterruptedError('MoE 정지 요청')
+        if 'error' in result:raise result['error']
+        return result['response']
 
     def offload(self):self.close()
 

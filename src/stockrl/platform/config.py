@@ -26,6 +26,7 @@ class ResourceSettings(BaseModel):
     vram_reserve_gib: float = Field(1.5, ge=0.5)
     expert_cache_count: int = Field(16, ge=1, le=128)
     gpu_resident: bool = True
+    gguf_prompt_cache_mib: int = Field(0,ge=0,le=512)
     isolated_expert_parameters: int = Field(10000000, ge=1)
     expert_devices: dict[str,Literal['cpu','auto','cuda:0']] = Field(default_factory=dict)
     market_refresh_seconds: int = Field(300, ge=30)

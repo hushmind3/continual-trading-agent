@@ -1,4 +1,4 @@
-"""One shared frozen Expert process; market execution and training never wait on it."""
+"""Frozen resident Expert stage, sharing inputs and outputs with the central MoE."""
 import argparse
 import time
 import pandas as pd
@@ -16,38 +16,44 @@ from .selection import selection,SlotDisabled
 import gc
 
 
-def run(settings,config=CONFIG_PATH):
-    torch.set_num_threads(settings.learning.cpu_threads)
-    weight_reads=guard_model_assets(settings.resolve(settings.expert_checkpoint))
+def run(settings,config=CONFIG_PATH, *, session=None):
+    if session is None:torch.set_num_threads(settings.learning.cpu_threads)
+    is_stopped=lambda:session.stopped('experts') if session else stopped(settings,'experts')
+    weight_reads=guard_model_assets(settings.resolve(settings.expert_checkpoint),trainable_root=settings.state_dir/'policies' if session else None)
     journal = Journal(settings.state_dir/"operations.sqlite3",settings.resources.journal_limit_mib,settings.resources.retained_transitions)
     publish(settings,"experts",status="loading",message="Expert 자산 목록을 읽는 중")
     pool = ExpertPool(settings,keep_device=settings.resources.gpu_resident,live=True)
+    pool.cancelled=is_stopped
+    pool.tensor_output=session is not None
     pool.metrics=journal.get_state('expert_metrics') or {}
+    for metric in pool.metrics.values():
+        metric.update(loaded=False,preloaded=False,residency='unloaded',resident_bytes=0,device=None,status='loading',error=None)
     if settings.resources.gpu_resident:
         _,initial=selection(settings,pool.active)
-        pool.residency.preload(sorted(initial),lambda **v:publish(settings,'experts',status='loading',message=f"Expert GPU 상주 준비 · {v['completed']+1}/{v['total']}",experts=pool.catalog()))
+        pool.residency.preload(sorted(initial),lambda **v:publish(settings,'experts',status='loading',message=f"Expert GPU 상주 준비 · {v['completed']+1}/{v['total']}",experts=pool.catalog()),stopped=is_stopped)
         journal.set_state('expert_metrics',pool.metrics)
     atomic_json({"model_spec":pool.model_spec(),"experts":pool.catalog()},settings.state_dir/"expert_catalog.json")
     reader=IncrementalMarketCSV(settings.state_dir/"live"/"market.csv",retain_timestamps=256)
     last_run={}; cursor=0; previous_signature=None; cached_frame=None; daily_signature=None; cached_daily=pd.DataFrame()
     try:
-        while not stopped(settings,"experts"):
+        while not is_stopped():
             _,active=selection(settings,pool.active)
             added=set(active)-pool.active
             pool.active=set(active)
             for inactive in set(pool.loaded)-pool.active:
                 pool.release(inactive)
-            if settings.resources.gpu_resident and added:pool.residency.preload(sorted(added))
+            if settings.resources.gpu_resident and added:pool.residency.preload(sorted(added),stopped=is_stopped)
             if not reader.path.exists():
                 publish(settings,"experts",status="waiting",experts=pool.catalog(),message="실시간 시세 대기")
                 time.sleep(1); continue
-            frame,signature=reader.refresh()
+            if session:_,frame,signature=session.market()
+            else:frame,signature=reader.refresh()
             if frame is None or frame.empty:
                 time.sleep(1); continue
-            if signature!=previous_signature:
+            if not session and signature!=previous_signature:
                 cached_frame=frame.copy(); cached_frame['date']=pd.to_datetime(cached_frame.date,utc=True).dt.tz_localize(None)
                 previous_signature=signature
-            frame=cached_frame
+            if not session:frame=cached_frame
             stamp=str(frame.date.max()); reader.processed_through=stamp
             keys=[key for key in pool.ids if key in pool.active]
             if not keys:
@@ -73,11 +79,12 @@ def run(settings,config=CONFIG_PATH):
                 else:
                     packets=[]
                     for batch_index,data in enumerate(batches):
-                        if stopped(settings,'experts'):break
+                        if is_stopped():break
                         publish(settings,'experts',status='inference',active_expert=key,active_since=time.time(),batch=batch_index+1,batches=len(batches))
                         packets.append(pool.run(key,data,snapshot))
                     pool.metrics[key]['weight_files']=sorted(weight_reads)
-                journal.put_evidence(key,packets)
+                if session:session.put_evidence(key,packets)
+                else:journal.put_evidence(key,packets)
             except SlotDisabled:
                 publish(settings,'experts',status='ready',active_expert=None,experts=pool.catalog())
                 continue

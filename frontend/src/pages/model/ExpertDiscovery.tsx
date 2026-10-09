@@ -23,7 +23,8 @@ export function ExpertDiscovery({onClose}:{onClose:()=>void}){
    {models.map(item=><ExpertSearchResult key={item.id} item={item} busy={busy} onDownload={()=>void run('acquire',{id:item.id,device:'auto'})}/>)}
    {found&&!models.length&&<Empty title="조건에 맞는 후보가 없습니다." detail="필터를 바꾸거나 모델 이름으로 검색하세요."/>}
    {found&&<p className="text-xs leading-5 text-slate-500">{found.scope}</p>}
-   {!busy&&job?.kind==='acquire'&&job.stage==='complete'&&(job.result?.check?.status==='passed'?<p className="text-sm text-emerald-700">실제 검사 완료 · 라이브러리에서 사용 여부를 선택하세요.</p>:<ErrorMessage message={job.result?.check?.detail??'후보 검사 결과를 확인하세요.'}/>)}
+   {library?.catalog.admission&&<p className="text-xs text-emerald-700">{library.catalog.admission.stage==='blocked'?'자동 추가 차단':'최근 자동 구성 추가'}: {library.catalog.experts?.[library.catalog.admission.id]?.name??library.catalog.admission.id}</p>}
+   {!busy&&job?.kind==='acquire'&&job.stage==='complete'&&(job.result?.check?.status==='passed'?<p className="text-sm text-emerald-700">실제 검사 통과 · 운영 구성 자동 추가 진행</p>:<ErrorMessage message={job.result?.check?.detail??'후보 검사 결과를 확인하세요.'}/>)}
   </div>
  </Drawer>;
 }

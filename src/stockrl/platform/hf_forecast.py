@@ -56,9 +56,9 @@ class HfForecastExpert(nn.Module):
                 values,_=Chronos2Pipeline(model).predict_quantiles(context.unsqueeze(1),prediction_length=1,quantile_levels=levels)
                 forecast=torch.cat(values,dim=0)
             else:forecast,_=ChronosBoltPipeline(model).predict_quantiles(context,prediction_length=1,quantile_levels=levels)
-            output=forecast.float().cpu()
+            output=forecast.float() if data.get('_tensor_output') else forecast.float().cpu()
             if tuple(output.shape)!=(len(data['symbols']),1,9) or not torch.isfinite(output).all():raise ValueError('공식 예측 출력의 크기 또는 값이 유효하지 않습니다.')
-            return dict(expert=self.entry['id'],as_of=data['as_of'],symbols=data['symbols'],native_output=output.tolist(),
+            return dict(expert=self.entry['id'],as_of=data['as_of'],symbols=data['symbols'],native_output=output if data.get('_tensor_output') else output.tolist(),
                 output_shape=list(output.shape),layout='symbol,horizon,quantile',units=data['units'],
                 horizon=1,sampling_seconds=data['sampling_seconds'],quantile_levels=levels,frozen=True,
                 native_features_verified=True,forward_seconds=time.perf_counter()-started)

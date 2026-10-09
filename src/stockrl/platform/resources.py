@@ -14,15 +14,18 @@ class ResourceMonitor:
     def snapshot(self, workers):
         memory=psutil.virtual_memory()
         rows=[]
-        alive=set()
+        alive=set();owners=set()
         for role,record in workers.items():
             pid=record.get("pid")
             if not pid or not record.get("alive"):
                 continue
+            if pid in owners:continue
+            owners.add(pid)
             try:
                 process=self.processes.setdefault(pid,psutil.Process(pid))
                 group=[process,*process.children(recursive=True)]
-                row=dict(role=role,pid=pid,rss_bytes=0,cpu_percent=0.,threads=0,read_bytes=0,write_bytes=0,child_pids=[])
+                roles=[r for r,v in workers.items() if v.get('pid')==pid and v.get('alive')]
+                row=dict(role='moe' if len(roles)>1 else role,roles=roles,pid=pid,rss_bytes=0,cpu_percent=0.,threads=0,read_bytes=0,write_bytes=0,child_pids=[])
                 for member in group:
                     try:
                         member=self.processes.setdefault(member.pid,member);alive.add(member.pid)

@@ -1,4 +1,4 @@
-"""Live/replay environment loop; Expert and learner work run out of this process."""
+"""Live/replay account loop using the resident Champion GPU decision state."""
 import argparse
 import time
 import numpy as np
@@ -17,14 +17,18 @@ from .environment import PortfolioEnvironment,market_view
 from .worker_state import publish,stopped,control
 
 
-def run(settings):
-    torch.set_num_threads(settings.learning.cpu_threads)
+def run(settings, *, session=None):
+    if session is None:torch.set_num_threads(settings.learning.cpu_threads)
+    device=session.device if session else torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    is_stopped=lambda:session.stopped('agent') if session else stopped(settings,'agent')
     journal=Journal(settings.state_dir/"operations.sqlite3",settings.resources.journal_limit_mib,settings.resources.retained_transitions)
     checkpoints=Checkpoints(settings.state_dir/"policies",settings.resources.revisions)
+    checkpoints.defer_mirror=session is not None
     state,manifest=checkpoints.load()
     source_spec,original=load_moe_head(settings.resolve(settings.expert_checkpoint))
     if state is None and source_spec.get('source_format')=='registered_vertical_trading_moe_v2':
-        header=torch.load(settings.resolve(settings.expert_checkpoint),map_location='cpu',weights_only=True)
+        from .integrated_asset import read_header
+        header=read_header(settings.resolve(settings.expert_checkpoint))
         recovered=header.get('learned_policy')
         if recovered:
             recovered['model_spec']['source_model']=str(settings.resolve(settings.expert_checkpoint))
@@ -54,10 +58,11 @@ def run(settings):
         manifest=checkpoints.save(actor,critic,None,0,spec["expert_ids"])
     selected_revision,selected=selection(settings,spec.get('active_experts',spec['expert_ids']))
     activate_policy(actor,critic,selected);actor.eval(); critic.eval()
+    actor.to(device);critic.to(device)
     del original
     version=manifest["version"]
     generation=state.get('optimization_generation',version) if state else version
-    environment=PortfolioEnvironment(settings,journal,spec)
+    environment=PortfolioEnvironment(settings,journal,spec,device=device if session else None)
     contract='sparse-separate-currency-portfolio-v4'
     if journal.get_state('execution_contract')!=contract:
         with journal.transaction():
@@ -69,13 +74,15 @@ def run(settings):
     strategy=PortfolioStrategy(actor,critic)
     reader=IncrementalMarketCSV(settings.state_dir/"live"/"market.csv",retain_timestamps=256)
     last=environment.account.state.get("last_timestamp")
-    started_live=False
+    started_live=False;cached_signature=None;cached_view=None;cached_frame=None
     decisions={d['symbol']:d for d in journal.get_state('decisions') or []}
     latest=list(decisions.values());last_decision=None
+    decision_batches=0;market_batches=0;last_decision_at=None
     try:
         publish(settings,"agent",status="ready",version=version,source_updates=spec["source_updates"],
-                expert_count=len(selected),model=spec["source_model"],message="Champion MoE 학습 상태를 이어받았습니다.")
-        while not stopped(settings,"agent"):
+                expert_count=len(selected),model=spec["source_model"],device=str(device),
+                **(session.metadata(actor) if session else {}),message="Champion MoE 학습 상태를 이어받았습니다.")
+        while not is_stopped():
             revision,active=selection(settings,spec.get('active_experts',spec['expert_ids']))
             if revision!=selected_revision:
                 activate_policy(actor,critic,active)
@@ -100,10 +107,16 @@ def run(settings):
             if not reader.path.exists():
                 publish(settings,"agent",status="waiting",version=version,message="시세 입력 대기")
                 time.sleep(1); continue
-            frame,_=reader.refresh()
+            if session:
+                view,frame,signature=session.market(view=True)
+            else:
+                frame,signature=reader.refresh()
             if frame is None or frame.empty:
                 time.sleep(1); continue
-            view,frame=market_view(frame)
+            if not session:
+                if signature!=cached_signature:
+                    cached_view,cached_frame=market_view(frame);cached_signature=signature
+                view,frame=cached_view,cached_frame
             if not len(view.dates):
                 time.sleep(1); continue
             if last is None and not started_live and modes.get("mode","live")=="live":
@@ -112,7 +125,7 @@ def run(settings):
             else:
                 indices=[i for i,stamp in enumerate(view.dates) if last is None or stamp>np.datetime64(last)]
             started_live=True
-            packets={k:v for k,v in journal.evidence().items() if k in active}
+            packets=session.evidence(active) if session else {k:v for k,v in journal.evidence().items() if k in active}
             for index in indices:
                 started=time.perf_counter(); stamp=str(view.dates[index])
                 made_decision=False
@@ -143,11 +156,15 @@ def run(settings):
                         journal.record_nav(currency,stamp,book)
                     journal.record_fills(fills,environment.account.state['books'])
                 last=stamp; reader.processed_through=stamp
+                market_batches+=1
+                if made_decision:decision_batches+=1;last_decision_at=time.time()
                 atomic_json({'last_timestamp':stamp},reader.path.parent/'agent'/'live_cursor.json')
                 publish(settings,"agent",status="running" if made_decision else 'waiting',version=version,last_as_of=last_decision,market_cursor=stamp,
+                        market_batches_total=market_batches,decision_batches_total=decision_batches,last_decision_at=last_decision_at,
                         fills=fills[-20:],decision_seconds=time.perf_counter()-started,
                         checkpoint=manifest,source_updates=spec["source_updates"],expert_count=len(active))
             publish(settings,"agent",status="running" if latest else "waiting",version=version,last_as_of=last_decision,market_cursor=last,
+                    **(session.metadata(actor) if session else {}),
                     message="새로운 완료 시세 대기" if not indices else None)
             time.sleep(0.5)
     finally:

@@ -50,6 +50,13 @@ def run(settings,source):
     output=settings.state_dir/'live'/'market.csv'
     writer=MarketWriter(output,settings.resources.market_queue_batches,settings)
     shared={}; initialized=threading.Event()
+    progress_lock=threading.Lock();progress={'new_rows_total':0,'poll_cycles_total':0,'last_new_bar_at':None,'source_as_of':None}
+    def report(**values):
+        with progress_lock:publish(settings,'feed',**progress,**values)
+    def record_added(count,source_as_of=None,poll=False):
+        with progress_lock:
+            progress['new_rows_total']+=count;progress['poll_cycles_total']+=int(poll)
+            if count:progress.update(last_new_bar_at=time.time(),source_as_of=source_as_of)
 
     class Collector(LiveMarketCollector):
         def run(self,*args,**kwargs):
@@ -63,9 +70,10 @@ def run(settings,source):
                 if streams:streams.close()
 
         def collect_once(self):
-            publish(settings,'feed',status='polling',message='공개 시세와 과거 일봉 갱신 중')
+            report(status='polling',message='공개 시세와 과거 일봉 갱신 중')
             result=super().collect_once()
-            publish(settings,'feed',status='running',rows_appended=result,message=None)
+            record_added(result,max(self.latest_completed.values(),default=None),poll=True)
+            report(status='running',rows_appended=result,message=None)
             return result
 
     def poll():
@@ -110,7 +118,8 @@ def run(settings,source):
                     for row in rows:
                         self_stamp=datetime.fromisoformat(row['date']).timestamp()
                         collector.latest_completed[row['symbol']]=max(self_stamp,collector.latest_completed.get(row['symbol'],0))
-                    publish(settings,'feed',status='running',broker_rows_appended=added,last_as_of=rows[-1]['date'])
+                    record_added(added,rows[-1]['date'])
+                    report(status='running',broker_rows_appended=added,last_as_of=rows[-1]['date'])
                 if time.monotonic()-last_metrics>1:
                     metrics=read_json(collector.metrics_path)
                     metrics.update(broker_connected=bool(collector.broker_status.get('connected')),

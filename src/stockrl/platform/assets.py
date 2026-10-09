@@ -19,13 +19,17 @@ from ..expert_device import restore_host
 
 
 
-def guard_model_assets(path,extra_references=()):
+def guard_model_assets(path,extra_references=(),trainable_root=None):
     bank=Path(path).resolve();reads=set()
     saved=torch.load(bank,map_location='cpu',weights_only=True,mmap=True) if bank.is_file() else {}
     allowed={bank}
     if saved.get('format')==HEADER_FORMAT:
-        allowed.update(package_path(bank,r) for r in saved['expert_packages'].values())
+        if not saved.get('integrated_experts'):allowed.update(package_path(bank,r) for r in saved['expert_packages'].values())
     allowed.update(package_path(bank,r) for r in extra_references)
+    if saved.get('integrated_experts'):
+        for key,body in saved.get('frozen_experts',{}).items():
+            if body.get('executor')=='llama_cpp' and trainable_root:
+                ref=body['weight_asset'];allowed.add((Path(trainable_root).parent/'engines'/(key+'-'+ref['sha256'][:16]+'.gguf')).resolve())
     from ..state_io import read_json
     for manifest in list(allowed):
         if manifest.suffix=='.json':
@@ -38,7 +42,8 @@ def guard_model_assets(path,extra_references=()):
         weight=candidate.suffix in ('.pt','.pth','.ckpt','.safetensors','.gguf') or candidate.name=='pytorch_model.bin'
         if not weight:return
         candidate=candidate.resolve()
-        if candidate not in allowed:
+        learned=trainable_root and candidate.is_relative_to(Path(trainable_root).resolve()) and candidate.name.startswith('policy-')
+        if candidate not in allowed and not learned:
             raise RuntimeError('MoE에 등록되지 않은 가중치를 읽으려 했습니다: '+str(candidate))
         reads.add(str(candidate))
     sys.addaudithook(audit)
@@ -53,8 +58,7 @@ class ExpertPool:
         path = settings.resolve(settings.expert_checkpoint)
         self.path=path
         self.saved = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
-        if self.saved.get('format')==HEADER_FORMAT:
-            self.saved=torch.load(path,map_location='cpu',weights_only=True)
+        self.embedded=self.saved.get('frozen_experts',{})
         if self.saved.get("format") not in ("registered_vertical_trading_moe_v1",HEADER_FORMAT):
             raise ValueError("Expert 자산 패키지 형식을 확인하세요.")
         self.entries = self.saved["expert_mapping"]
@@ -120,11 +124,18 @@ class ExpertPool:
         metadata=self.saved['metadata']
         quantization=None
         if self.saved['format']==HEADER_FORMAT:
-            package=load_package(self.path,self.saved['expert_packages'][key])
+            if self.live and self.saved.get('integrated_experts'):
+                if key not in self.embedded:raise ValueError('Champion 내부에 선택한 Expert가 없습니다. 구성을 적용하세요: '+key)
+                package=self.embedded[key]
+            else:package=load_package(self.path,self.saved['expert_packages'][key])
             if package['id']!=key or package['module_count']!=count:raise ValueError('Expert 패키지 구성이 다릅니다.')
             if package.get('executor')=='llama_cpp':
                 from .gguf_expert import GGUFExpert
+                if package.get('embedded_weight') is not None:
+                    from .integrated_asset import materialize_gguf
+                    package={**package,'embedded_path':materialize_gguf(self.settings,key,package)}
                 expert=GGUFExpert(self.settings,package);expert.keep_device=self.keep_device
+                expert.cancelled=getattr(self,'cancelled',lambda:False)
                 self.loaded[key]=expert
                 self.metrics.setdefault(key,{}).update(load_seconds=time.perf_counter()-started,loaded=True,engine='llama.cpp',weight_bytes=package['weight_asset']['bytes'])
                 return expert
@@ -187,7 +198,7 @@ class ExpertPool:
             floating=next((p.dtype for p in expert.parameters() if p.is_floating_point()),torch.float32)
             reduced=floating in (torch.float16,torch.bfloat16)
             with torch.autocast('cuda' if device.startswith('cuda') else 'cpu',dtype=floating if reduced else torch.bfloat16,enabled=reduced):
-                packet = expert(self.roots[key], data, device)
+                packet = expert(self.roots[key], {**data,'_tensor_output':getattr(self,'tensor_output',False)}, device)
         if any(p.requires_grad or p.grad is not None for p in expert.parameters()):
             raise RuntimeError("Expert가 고정 가중치 상태를 벗어났습니다.")
         packet["expert"] = key
@@ -196,6 +207,7 @@ class ExpertPool:
         packet["native_features_verified"] = True
         metrics = self.metrics.setdefault(key, {})
         metrics.update(status="ready", device=device, inference_seconds=time.perf_counter()-started,
+                       last_completed_at=time.time(),
                        inference_count=metrics.get('inference_count',0)+1,
                        residency='gpu_ram_layer_offload' if getattr(expert,'_layer_offloaded',False) else 'gpu_resident' if self.keep_device and device.startswith('cuda') else 'ram_offload' if self.keep_device else 'temporary',
                        resident_bytes=sum(p.numel()*p.element_size() for p in list(expert.parameters())+list(expert.buffers()) if p.is_cuda),
@@ -205,6 +217,9 @@ class ExpertPool:
                        peak_vram_bytes=max(0,torch.cuda.max_memory_allocated()-allocated_before)+sum(p.numel()*p.element_size() for p in list(expert.parameters())+list(expert.buffers()) if p.is_cuda) if device.startswith('cuda') else 0,
                        memory_measurement='model residency + inference allocation delta',
                        last_as_of=packet.get("as_of"), error=None)
+        source_time=max(packet.get('symbol_as_of',{}).values(),default=packet.get('as_of') or '')
+        if source_time>(metrics.get('latest_input_as_of') or ''):
+            metrics.update(latest_input_as_of=source_time,new_input_count=metrics.get('new_input_count',0)+1,last_new_input_at=time.time())
         if hasattr(expert,'details'):
             import psutil
             child=psutil.Process(expert.child.pid).memory_info() if expert.child else None
@@ -226,6 +241,6 @@ class ExpertPool:
 
     def close(self):
         for key in list(self.loaded):self.release(key)
-        self.saved = None
+        self.saved = None;self.embedded=None
         gc.collect()
         self.temp.cleanup()

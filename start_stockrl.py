@@ -24,7 +24,7 @@ def ready() -> bool:
         with urlopen(URL + "api/health", timeout=2) as response:
             payload = json.load(response)
             if (response.status == 200 and payload.get("service") == "stockrl"
-                    and payload.get("port") == PORT and payload.get('architecture')=='finrlx-moe-ppo-v1'
+                    and payload.get("port") == PORT and payload.get('architecture')=='finrlx-unified-gpu-moe-v1'
                     and Path(payload.get('project','')).resolve()==ROOT.resolve()):
                 return True
     except (OSError, URLError, ValueError):

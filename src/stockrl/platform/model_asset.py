@@ -5,8 +5,8 @@ from .expert_packages import HEADER_FORMAT
 
 
 def load_moe_head(path):
-    saved=torch.load(path,map_location="cpu",weights_only=True,mmap=True)
-    if saved.get('format')==HEADER_FORMAT:saved=torch.load(path,map_location='cpu',weights_only=True)
+    from .integrated_asset import read_header
+    saved=read_header(path)
     if saved.get("format") not in ("registered_vertical_trading_moe_v1",HEADER_FORMAT):
         raise ValueError("선택한 파일은 기존 Champion MoE 형식이 아닙니다.")
     config={k:saved["config"][k] for k in ("feature_sizes","stock_policy_ids","assembly_routing","router_family") if k in saved["config"]}
@@ -21,6 +21,7 @@ def load_moe_head(path):
           "source_model":str(path),"source_model_bytes":path.stat().st_size}
     if saved.get('format')==HEADER_FORMAT:
         spec.update(source_format=HEADER_FORMAT,expert_packages=saved['expert_packages'],
+                    integrated_experts=saved.get('integrated_experts',False),integrated_summary=saved.get('integrated_summary'),
                     active_experts=saved.get('active_experts',sorted(saved['expert_mapping'])))
     return spec,state
 

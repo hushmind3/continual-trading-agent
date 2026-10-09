@@ -25,6 +25,13 @@ export interface Worker {
   expert_count?: number;
   retries?: number;
   device?: string;
+  execution?:string;
+  trainable_parameters?:number;
+  central_parameters?:number;
+  central_weight_bytes?:number;
+  frozen_parameters?:number;
+  frozen_weight_bytes?:number;
+  integrated_expert_ids?:string[];
 }
 export interface Expert {
   id: string;
@@ -144,6 +151,8 @@ export interface Event {
   read: boolean;
 }
 export interface Snapshot {
+  last_learning?:{time:number|null;detail:string|null;measurement?:{loss?:number;seconds?:number;samples_per_second?:number;samples?:number;updated_at?:number}|null};
+  progress?:Record<string,{code:string;label:string;service_alive:boolean;heartbeat_at:number|null;last_completed_at:number|null;source_as_of?:string|number|null;counters:Record<string,number|null>;changes:Record<string,number|null>;observed_seconds:number;window_seconds:number;detail?:string|null}>;
   library?:import('./library').LibraryState;
   architecture: string;
   time: number;
@@ -183,6 +192,7 @@ export interface Snapshot {
       total_bytes?: number;
     };
     processes: {
+      roles?:string[];
       role: string;
       pid: number;
       rss_bytes: number;

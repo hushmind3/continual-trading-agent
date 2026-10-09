@@ -22,6 +22,14 @@ class Checkpoints:
                  "optimizer": optimizer.state_dict() if optimizer else None, "applied_ids": list(applied_ids),
                  "torch_rng": torch.get_rng_state(), "optimizer_steps":optimizer_steps,
                  "optimization_generation":version if optimization_generation is None else optimization_generation}
+        def portable(value):
+            if torch.is_tensor(value):return value.detach().cpu().clone()
+            if isinstance(value,dict):return {k:portable(v) for k,v in value.items()}
+            if isinstance(value,list):return [portable(v) for v in value]
+            if isinstance(value,tuple):return tuple(portable(v) for v in value)
+            return value
+        if any(p.is_cuda for p in actor.parameters()):state['cuda_rng']=torch.cuda.get_rng_state_all()
+        state=portable(state)
         with temp.open("wb") as stream:
             torch.save(state, stream)
             stream.flush()
@@ -40,19 +48,23 @@ class Checkpoints:
         return manifest
 
     def mirror(self,state):
-        """Champion carries the current learned decision state, never duplicated Expert bodies."""
+        """Publish the learned central state; resident mmap bodies are sealed on clean stop."""
+        if getattr(self,'defer_mirror',False):return
         from .expert_packages import HEADER_FORMAT
         import torch
         spec=state['model_spec']
         if spec.get('source_format')!=HEADER_FORMAT:return
         path=Path(spec['source_model'])
         if not path.is_file():raise ValueError('Champion 구성 파일이 없습니다.')
-        header=torch.load(path,map_location='cpu',weights_only=True)
+        header=torch.load(path,map_location='cpu',weights_only=True,mmap=True)
         if header.get('format')!=HEADER_FORMAT or header['expert_packages']!=spec['expert_packages']:
             raise ValueError('현재 Champion과 정책의 Expert 버전이 다릅니다.')
         header['learned_policy']=state
         from .model_composition import atomic_torch_save
-        temporary=atomic_torch_save(header,path);temporary.replace(path)
+        temporary=atomic_torch_save(header,path)
+        del header
+        import gc
+        gc.collect();temporary.replace(path)
 
     def publish(self,manifest):
         import torch

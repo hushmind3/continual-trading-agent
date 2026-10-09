@@ -49,12 +49,15 @@ def fetch_source(settings,source,progress,root=None):
                     progress(stage='downloading',completed=size,total=total,detail='패키지 다운로드 중')
         from urllib.parse import urlsplit
         suffix=Path(urlsplit(source).path).suffix.lower()
-        target=root/(digest(partial)+(suffix if suffix in ('.pt','.pth','.zip','.safetensors') else '.pt'));partial.replace(target);return target
+        target=root/(digest(partial)+(suffix if suffix in ('.pt','.pth','.zip','.safetensors','.gguf') else '.pt'));partial.replace(target);return target
     except BaseException:
         partial.unlink(missing_ok=True);raise
 
 
 def inspect_source(path,settings=None,catalog=None):
+    if path.suffix.lower()=='.gguf':
+        from .gguf_registration import inspect_gguf
+        return [inspect_gguf(path)]
     from .native_upgrade import read_native,inspect_native
     saved=read_native(path)
     if saved.get('format')==PACKAGE_FORMAT:
@@ -69,6 +72,9 @@ def inspect_source(path,settings=None,catalog=None):
 def import_package(settings,path,key,slot,progress,template=None):
     if not re.fullmatch(r'[a-z][a-z0-9_]{0,79}',slot):raise ValueError('슬롯 이름은 영문 소문자·숫자·밑줄로 지정하세요.')
     if slot in dir(torch.nn.ModuleDict()):raise ValueError('모델 내부에서 사용하는 이름입니다. 다른 슬롯 이름을 지정하세요.')
+    if path.suffix.lower()=='.gguf':
+        from .gguf_registration import register_gguf
+        return register_gguf(settings,path,slot,progress)
     from .native_upgrade import read_native,upgrade_from_template
     saved=read_native(path)
     if saved.get('format')==PACKAGE_FORMAT:

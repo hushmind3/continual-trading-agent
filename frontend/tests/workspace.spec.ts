@@ -11,10 +11,10 @@ test('diagnostics shows the backend learning cause instead of a generic wait',as
 test('expert conversion exposes four precisions without starting a job',async({page})=>{
  await page.goto('/#moe');await page.getByRole('button',{name:'FinCast 1.0B 정밀도 변환',exact:true}).click();
  const drawer=page.getByRole('dialog');await expect(drawer).toBeVisible();
- for(const precision of ['FP16','BF16','INT8','INT4'])await expect(drawer.getByRole('button',{name:precision,exact:true})).toBeVisible();
+ for(const precision of ['FP16','BF16','INT8','INT4','NF4'])await expect(drawer.getByRole('button',{name:precision,exact:true})).toBeVisible();
  await drawer.getByRole('button',{name:'INT4',exact:true}).click();
  await expect(drawer.getByRole('button',{name:'INT4',exact:true})).toHaveAttribute('aria-pressed','true');
- await expect(drawer.getByText(/속도 개선은 측정 결과로 확인/)).toBeVisible();
+ await expect(drawer.getByText(/속도 배수로 선택하지 않으며/)).toBeVisible();
  await page.keyboard.press('Escape');await expect(drawer).toHaveCount(0);
 });
 
@@ -39,9 +39,9 @@ test('all precision outcomes expose rejected, failed and absent versions',async(
  for(const [id,item] of Object.entries(state.library.catalog.experts))if((item as any).conversion?.source_id==='fincast'&&['int4','bf16'].includes((item as any).conversion.precision))delete state.library.catalog.experts[id];
  await page.route('**/api/state',route=>route.fulfill({json:state}));
  await page.goto('/#moe');const family=page.getByRole('button',{name:base.name+' 상세',exact:true});
- const versions=family.getByRole('group',{name:'Expert 정밀도 버전'});await expect(versions.locator(':scope > div')).toHaveCount(5);
+ const versions=family.getByRole('group',{name:'Expert 정밀도 버전'});await expect(versions.locator(':scope > div')).toHaveCount(6);
  await expect(versions.getByText('출력 기준 탈락',{exact:true})).toBeVisible();await expect(versions.getByText('최적화 실패',{exact:true})).toBeVisible();
- await versions.locator(':scope > div').last().getByRole('button',{name:'판단 근거',exact:true}).click();
+ await versions.locator(':scope > div').nth(4).getByRole('button',{name:'판단 근거',exact:true}).click();
  const dialog=page.getByRole('dialog');await expect(dialog.getByText('상대 RMSE 5% > 1% · 적용 차단',{exact:true})).toBeVisible();
  await expect(dialog.getByText(/현재 사용할 가중치 파일이 없습니다/)).toBeVisible();await expect(dialog.getByText('0.1s',{exact:true})).toBeVisible();
  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
@@ -72,7 +72,7 @@ test('inspection and financial discovery send single complete requests',async({p
  await expect(page.getByRole('button',{name:'검사',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'금융 Expert 찾기',exact:true}).click();
  await page.getByRole('button',{name:'금융 Expert 자동 검색',exact:true}).click();
- expect(actions[1]).toEqual({kind:'search',payload:{preset:'finance'}});
+ expect(actions[1]).toEqual({kind:'search',payload:{preset:'finance',recent_days:365}});
 });
 
 test('speed ratios describe the inference duration and discovery keeps dates distinct',async({page})=>{
@@ -86,7 +86,7 @@ test('speed ratios describe the inference duration and discovery keeps dates dis
   input_summary:'뉴스 텍스트',api_requirement:'미확인',overlap:[],installed_versions:[]
  }]};
  await page.route('**/api/state',route=>route.fulfill({json:state}));
- await page.goto('/#moe');await expect(page.getByText('추론 시간 20.5% 증가 · 느림',{exact:true})).toBeVisible();
+ await page.goto('/#moe');await expect(page.getByText('추론 시간 20.5% 증가 · 느림',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'금융 Expert 찾기',exact:true}).click();
  const dialog=page.getByRole('dialog');await expect(dialog.getByText('원본에 날짜 미기재',{exact:false})).toBeVisible();
  await expect(dialog.getByText(/저장소 등록.*2024/)).toBeVisible();await expect(dialog.getByText(/최근 업데이트.*2026/)).toBeVisible();

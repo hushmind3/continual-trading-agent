@@ -7,7 +7,7 @@ export function ExpertSearchResult({item,busy,onDownload}:{item:DiscoveredExpert
  const installed=Boolean(item.installed_versions?.length);
  return <article className="space-y-3 rounded-xl border border-slate-100 bg-white p-4">
   <div className="flex items-start justify-between gap-3"><a href={item.url} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-2 break-all text-sm font-semibold text-blue-800">{item.repository}<ExternalLink size={13} className="shrink-0"/></a><Status tone={item.same_weights?'neutral':item.compatible?'good':'warn'}>{item.same_weights?'동일 가중치 보유':installed?'다른 버전 보유':item.compatible?'검사 가능':'입력·실행기 확인 필요'}</Status></div>
-  <p className="text-xs text-slate-400">{item.domain} · 다운로드 {number(item.downloads,0)}</p>
+  <p className="text-xs text-slate-400">{item.source??'Hugging Face'} · {item.domain}{item.source!=='GitHub'?` · 다운로드 ${number(item.downloads,0)}`:''}</p>
   <div className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
    <p><span className="text-slate-400">가중치 파일 </span>{bytes(item.bytes)}</p>
    <p><span className="text-slate-400">릴리즈 </span>{item.release_date?<a href={item.release_source} target="_blank" rel="noreferrer">{calendarDate(item.release_date)}</a>:'원본에 날짜 미기재'}</p>

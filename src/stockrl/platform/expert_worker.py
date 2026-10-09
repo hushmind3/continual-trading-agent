@@ -21,17 +21,23 @@ def run(settings,config=CONFIG_PATH):
     weight_reads=guard_model_assets(settings.resolve(settings.expert_checkpoint))
     journal = Journal(settings.state_dir/"operations.sqlite3",settings.resources.journal_limit_mib,settings.resources.retained_transitions)
     publish(settings,"experts",status="loading",message="Expert 자산 목록을 읽는 중")
-    pool = ExpertPool(settings)
+    pool = ExpertPool(settings,keep_device=settings.resources.gpu_resident,live=True)
     pool.metrics=journal.get_state('expert_metrics') or {}
+    if settings.resources.gpu_resident:
+        _,initial=selection(settings,pool.active)
+        pool.residency.preload(sorted(initial),lambda **v:publish(settings,'experts',status='loading',message=f"Expert GPU 상주 준비 · {v['completed']+1}/{v['total']}",experts=pool.catalog()))
+        journal.set_state('expert_metrics',pool.metrics)
     atomic_json({"model_spec":pool.model_spec(),"experts":pool.catalog()},settings.state_dir/"expert_catalog.json")
     reader=IncrementalMarketCSV(settings.state_dir/"live"/"market.csv",retain_timestamps=256)
     last_run={}; cursor=0; previous_signature=None; cached_frame=None; daily_signature=None; cached_daily=pd.DataFrame()
     try:
         while not stopped(settings,"experts"):
             _,active=selection(settings,pool.active)
+            added=set(active)-pool.active
             pool.active=set(active)
             for inactive in set(pool.loaded)-pool.active:
-                pool.loaded.pop(inactive);gc.collect()
+                pool.release(inactive)
+            if settings.resources.gpu_resident and added:pool.residency.preload(sorted(added))
             if not reader.path.exists():
                 publish(settings,"experts",status="waiting",experts=pool.catalog(),message="실시간 시세 대기")
                 time.sleep(1); continue
@@ -62,7 +68,7 @@ def run(settings,config=CONFIG_PATH):
             publish(settings,"experts",status="inference",active_expert=key,active_since=time.time(),experts=pool.catalog())
             try:
                 batches,snapshot=snapshot_for(pool.entries[key],frame,journal,daily_path,daily)
-                if int(pool.entries[key].get('parameters',0))>=settings.resources.isolated_expert_parameters:
+                if not settings.resources.gpu_resident and int(pool.entries[key].get('parameters',0))>=settings.resources.isolated_expert_parameters:
                     packets=run_job(settings,key,batches,pool.metrics,config)
                 else:
                     packets=[]

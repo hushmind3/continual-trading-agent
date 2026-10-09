@@ -55,6 +55,7 @@ def apply(settings,header,catalog,active,progress):
     for key in active:
         if key not in catalog['experts']:raise ValueError('라이브러리에 없는 Expert: '+key)
         item=catalog['experts'][key];check=item['check']
+        if not item.get('quantized') and (item.get('conversion') or {}).get('precision') not in ('nf4','int4','int8') and item.get('executor')!='llama_cpp':raise ValueError('운영 구성에는 양자화 실행 검사를 통과한 Expert를 사용하세요: '+item['name'])
         if check.get('status')!='passed' or check.get('package_sha256')!=item['package']['sha256'] or (item.get('conversion') and item['conversion'].get('validation',{}).get('passed') is not True):
             raise ValueError('현재 패키지의 실제 추론 검사를 먼저 통과해야 합니다: '+item['name'])
         package=load_package(settings.resolve(settings.expert_checkpoint),item['package'],verify=True)
@@ -111,6 +112,9 @@ def run(config,request_path):
                 result=compare(settings,config,catalog,dict(baseline=baseline,variant=item['id'],device=payload.get('device','auto'),repeats=3),progress)
                 catalog['comparison']=result;item['comparison']=result
         except Exception as exc:item['check']=dict(status='failed',detail=str(exc),tested=time.time())
+        if item['check']['status']=='passed':
+            from .expert_optimizer import admit_quantized
+            item=admit_quantized(settings,config,catalog,item,payload,progress)
         result=item
     elif kind=='import':
         path=fetch_source(settings,payload.get('source',''),progress)
@@ -121,6 +125,9 @@ def run(config,request_path):
         progress(stage='probing',expert=slot,detail='실제 시장·계좌 입력으로 추가 전 검사')
         try:item['check']=probe(settings,item)
         except Exception as exc:item['check']=dict(status='failed',detail=str(exc),tested=time.time())
+        if item['check']['status']=='passed':
+            from .expert_optimizer import admit_quantized
+            item=admit_quantized(settings,config,catalog,item,payload,progress)
         result=item
     elif kind=='probe_all':
         from .expert_inspection import inspect_all
@@ -165,16 +172,22 @@ def run(config,request_path):
     elif kind=='optimize':
         from .expert_optimizer import optimize
         result=optimize(settings,config,catalog,payload,progress)
+    elif kind=='optimize_all':
+        from .expert_optimizer import optimize_all
+        result=optimize_all(settings,config,catalog,payload,progress)
     elif kind=='apply':
         result=apply(settings,header,catalog,list(payload.get('active',[])),progress)
         catalog['installed']={k:r['sha256'] for k,r in header['expert_packages'].items()}
         if payload.get('optimizer_base'):
-            record=catalog['optimizations'][payload['optimizer_base']]
-            record.update(stage='complete',applied=True,finished=time.time());record.pop('target_active',None)
+            records=catalog.get('optimizations',{}) if payload['optimizer_base']=='all' else {payload['optimizer_base']:catalog['optimizations'][payload['optimizer_base']]}
+            for record in records.values():
+                if record.get('target_active'):record.update(stage='complete',applied=True,finished=time.time());record.pop('target_active',None)
     elif kind=='delete':
         key=payload.get('id','')
         if key not in catalog['experts']:raise ValueError('등록되지 않은 패키지')
         item=catalog['experts'][key];active=[k for k in catalog.get('active',[]) if k!=key]
+        manifest=package_path(model,item['package'])
+        removed=read_json(manifest) if manifest.suffix=='.json' else {}
         header['expert_mapping'].pop(key,None);header['expert_packages'].pop(key,None)
         header.get('slot_sources',{}).pop(key,None)
         for field in ('feature_sizes','native_module_counts'):header['config'][field].pop(key,None)
@@ -182,6 +195,8 @@ def run(config,request_path):
         if not any(not e.get('stock_policy') for e in header['expert_mapping'].values()):raise ValueError('시장 분석 슬롯 하나는 남겨 두세요.')
         result=publish_header(settings,header,active,progress)
         file=package_path(model,item['package']);recycle(file)
+        weight=removed.get('weight_asset')
+        if weight and not any(k!=key and v['package']['file'].endswith('.json') and read_json(package_path(model,v['package'])).get('weight_asset',{}).get('file')==weight['file'] for k,v in catalog['experts'].items()):recycle(package_path(model,weight))
         catalog['experts'].pop(key);catalog['active']=active
         catalog['installed']={k:r['sha256'] for k,r in header['expert_packages'].items()}
     atomic_json(catalog,catalog_path(settings));atomic_json(settings.model_dump(),Path(config))

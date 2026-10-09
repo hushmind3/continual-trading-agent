@@ -2,6 +2,7 @@
 import json
 import re
 import struct
+from datetime import datetime,timedelta,timezone
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 import requests
@@ -19,7 +20,7 @@ def discover_repositories(api,payload,progress):
     errors=[];repos={}
     def fetch(term):
         try:
-            popular=list(api.list_models(search=term,sort='downloads',direction=-1,limit=12 if query else 2,full=True))
+            popular=list(api.list_models(search=term,sort='created_at',direction=-1,limit=12 if query else 2,full=True))
             recent=[] if query else list(api.list_models(search=term,sort='lastModified',direction=-1,limit=1,full=True))
             return popular+recent,None
         except Exception as exc:return [],dict(query=term,detail=str(exc)[:300])
@@ -46,7 +47,7 @@ def tensor_header(url):
 def templates(settings,catalog):
     result={}
     for key,item in catalog['experts'].items():
-        if item['role']!='market' or item.get('conversion') or not item['input']['supported']:continue
+        if item['role']!='market' or item.get('conversion') or item.get('executor')=='llama_cpp' or not item['input']['supported']:continue
         package=load_package(settings.resolve(settings.expert_checkpoint),item['package'])
         signature=weight_signature(package)
         if signature:result[key]=dict(item=item,signature=signature,entry=package['entry'],active=key in catalog.get('active',[]))
@@ -67,7 +68,7 @@ def search(settings,catalog,payload,progress):
     import psutil
     available_ram=max(0,psutil.virtual_memory().available-settings.resources.ram_reserve_gib*2**30)
     def inspect(repo):
-        row=dict(id=repo.id+'@'+repo.sha,repository=repo.id,revision=repo.sha,
+        row=dict(id=repo.id+'@'+repo.sha,source='Hugging Face',repository=repo.id,revision=repo.sha,
             updated=repo.last_modified.isoformat() if repo.last_modified else None,
             downloads=repo.downloads or 0,url='https://huggingface.co/'+repo.id,compatible=False)
         try:
@@ -81,10 +82,17 @@ def search(settings,catalog,payload,progress):
                     files.append(dict(name=name,bytes=sibling.size or 0,sha256=getattr(lfs,'sha256',None),
                         url='https://huggingface.co/'+repo.id+'/resolve/'+repo.sha+'/'+quote(name,safe='/')))
             safe=[f for f in files if f['name'].endswith('.safetensors')]
+            gguf=[f for f in files if f['name'].lower().endswith('.gguf') and any(q in f['name'].lower() for q in ('q4','q5','iq4'))]
             selected=safe or files[:1]
+            if gguf:
+                selected=[min(gguf,key=lambda f:(not any(q in f['name'].lower() for q in ('q4','iq4')),f['bytes']))]
             row.update(files=selected,bytes=sum(f['bytes'] for f in selected) or None,
                 same_weights=(repo.id,repo.sha) in stored)
             if not selected:raise ValueError('지원하는 고정 가중치 파일이 없습니다.')
+            if gguf:
+                row.update(compatible=True,executor='llama_cpp',backend='gguf_market',template_name='llama.cpp 압축 가중치 추론',
+                    detail='GGUF 저비트 파일 · 로컬 적재·구조화 시장 의견 검사 필요',input={'pipeline':'gguf_market','requires':['완료 가격 시계열','llama.cpp 구조화 의견']})
+                return annotate(row,info,known,installed,available_ram)
             if any(f['name'].endswith(('.gguf','.tflite')) for f in selected):
                 raise ValueError('파일 크기는 확인했지만 이 형식의 추론 실행기는 아직 등록돼 있지 않습니다.')
             matches=[]
@@ -132,8 +140,12 @@ def search(settings,catalog,payload,progress):
             models.append(row);progress(stage='searching',completed=index+1,total=len(repos),detail=f'공개 모델 입력·가중치 구조 검사 · {index+1}/{len(repos)}')
     if not payload.get('query'):
         models=[m for m in models if m.get('financial_relevance',False) or m.get('compatible',False)]
-    models.sort(key=lambda r:(not r['compatible'],r.get('same_weights',False),-r['downloads']))
-    return dict(query=query,keywords=keywords,errors=errors,models=models,source='Hugging Face 공개 API',
+    days=max(30,min(3650,int(payload.get('recent_days',365))));cutoff=(datetime.now(timezone.utc)-timedelta(days=days)).isoformat()
+    models=[m for m in models if (m.get('updated') or m.get('created') or '')>=cutoff]
+    from .github_discovery import search_github
+    github,github_errors=search_github(days,progress,payload.get('query'));models+=github;errors+=github_errors
+    models.sort(key=lambda r:r.get('updated') or r.get('created') or '',reverse=True)
+    return dict(query=query,keywords=keywords,errors=errors,models=models,recent_days=days,source='Hugging Face + GitHub 공개 API',
         scope='입력·구조 호환성을 확인한 후보입니다. 실제 추론·자원 검사를 통과한 뒤 사용할 수 있으며 수익 성능을 보장하지 않습니다.')
 
 

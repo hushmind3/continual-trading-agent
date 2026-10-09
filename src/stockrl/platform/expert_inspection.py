@@ -28,7 +28,7 @@ def inspect_all(settings,config,catalog,payload,progress):
                 if any(item[field]!=items[source][field] for field in ('input','feature_size','role')):raise ValueError('원본과 입력·출력 계약이 다릅니다.')
                 result=comparison_result(items,[baselines[source],measurement],fixtures[source])
                 previous=item['conversion'].get('validation') or {}
-                quality_check(item,result,{k:previous[k] for k in ('max_relative_rmse','min_action_agreement') if k in previous})
+                quality_check(item,result,{'validation_mode':previous.get('mode','reference'),**{k:previous[k] for k in ('max_relative_rmse','min_action_agreement') if k in previous}})
             else:baselines[source]=measurement
         except Exception as exc:
             item['check']=dict(status='failed',detail=str(exc),tested=time.time())

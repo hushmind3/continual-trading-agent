@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import gc
 import hashlib
+import json
 from pathlib import Path
 import torch
 
@@ -77,6 +78,9 @@ def split_asset(path, progress=lambda **kw:None):
 def load_package(header_path,reference,verify=False):
     path=package_path(header_path,reference)
     if verify and digest(path)!=reference['sha256']:raise ValueError('Expert 패키지 checksum이 다릅니다.')
-    saved=torch.load(path,map_location='cpu',weights_only=True,mmap=True)
+    saved=json.loads(path.read_text(encoding='utf8')) if path.suffix=='.json' else torch.load(path,map_location='cpu',weights_only=True,mmap=True)
     if saved.get('format')!=PACKAGE_FORMAT:raise ValueError('Frozen Expert 패키지 형식이 아닙니다.')
+    if saved.get('weight_asset'):
+        weight=package_path(header_path,saved['weight_asset'])
+        if verify and digest(weight)!=saved['weight_asset']['sha256']:raise ValueError('GGUF 고정 가중치 checksum이 다릅니다.')
     return saved

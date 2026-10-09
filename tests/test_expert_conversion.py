@@ -50,7 +50,7 @@ class PrecisionTests(unittest.TestCase):
         self.assertIn('5% 미만',reports[1]['reason'])
         reports=[row('original',1,400),row('fp16',2,200),row('int4',.1,100,False)]
         best_precision(reports,'original','balanced',1000,1000)
-        self.assertIn('15%',reports[1]['reason']);self.assertEqual(reports[2]['decision'],'rejected')
+        self.assertTrue(reports[1]['eligible']);self.assertEqual(reports[2]['decision'],'rejected')
         reports=[row('original',1,400),row('current',.5,200,False)]
         self.assertEqual(best_precision(reports,'current','balanced',1000,1000)['id'],'original')
         self.assertIn('정확도를 우선',reports[0]['reason'])

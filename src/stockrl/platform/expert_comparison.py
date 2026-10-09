@@ -17,6 +17,7 @@ def forecast_directions(packet,data):
     values=np.asarray(packet['native_output'],float)
     if packet['layout']=='nine_quantiles,batch,variate,horizon':values=values[:,0].transpose(1,0,2)
     values=values.reshape(len(packet['symbols']),-1)
+    if packet['layout']=='symbol,direction_confidence_risk':return np.sign(values[:,0])
     point=values[:,0] if 'point_and_nine_quantiles' in packet['layout'] else values[:,3] if 'OHLCV_amount' in packet['layout'] else np.median(values,axis=1)
     if packet['units']=='daily_excess_return':reference=np.zeros(len(point))
     elif data and data.get('series'):reference=np.asarray([row[-1] for row in data['series']])
@@ -84,7 +85,7 @@ def comparison_result(items,results,fixture):
         symbols=results[0]['packet']['symbols'],mean_absolute_error=float(np.abs(delta).mean()),
         max_absolute_error=float(np.abs(delta).max()),rmse=float(np.sqrt(np.mean(delta**2))),
         relative_rmse=float(np.linalg.norm(delta)/max(np.linalg.norm(a),1e-12)),action_agreement=agreement,direction_agreement=direction,
-        speed_ratio=results[0]['warm_median_seconds']/max(results[1]['warm_median_seconds'],1e-12),
+        speed_ratio=results[0]['warm_median_seconds']/max(results[1]['warm_median_seconds'],1e-12) if results[0]['metrics']['device']==results[1]['metrics']['device'] else None,
         file_bytes={k:items[k]['package']['bytes'] for k in ids},account_changed=False,model_trained=False,
         scope='동일한 실제 입력의 출력·지연·자원 비교이며 매매 수익 성능을 보장하지 않습니다.'+
               (' 가용 자원에 따라 두 모델의 실행 장치가 다릅니다.' if results[0]['metrics']['device']!=results[1]['metrics']['device'] else ''))

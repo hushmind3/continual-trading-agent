@@ -29,6 +29,10 @@ def acquire(settings,catalog,payload,progress):
             path=fetch_source(settings,file['url'],progress,root=Path(temporary))
             checksum=digest(path)
             if file.get('sha256') and checksum!=file['sha256']:raise ValueError('다운로드 파일 checksum이 원본과 다릅니다.')
+            if selected.get('executor')=='llama_cpp':
+                from .gguf_registration import register_gguf
+                slot=slot_name(selected,catalog);item=register_gguf(settings,path,slot,progress,origin=dict(repository=selected['repository'],revision=selected['revision']))
+                return item,None
             values=read_native(path)
             if len(selected['files'])==1:weights=values
             else:

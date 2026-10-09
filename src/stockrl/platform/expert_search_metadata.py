@@ -23,6 +23,7 @@ def annotate(row,info,known,stored,available_ram):
     elif row.get('executor')=='hf_forecast':
         from .expert_contracts import input_contract
         row['input']=input_contract(dict(backend=row['backend']))
+    elif row.get('executor')=='llama_cpp':row['input']=dict(pipeline='gguf_market',requires=['완료 가격 시계열','llama.cpp 로컬 구조화 의견'])
     if row.get('input'):
         contract=row['input'];row['input_summary']=' · '.join(contract.get('requires',[]))
         row['api_requirement']='추가 추론 API 없음 · 현재 시세/일봉 파이프라인 사용'

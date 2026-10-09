@@ -26,11 +26,16 @@ def guard_model_assets(path,extra_references=()):
     if saved.get('format')==HEADER_FORMAT:
         allowed.update(package_path(bank,r) for r in saved['expert_packages'].values())
     allowed.update(package_path(bank,r) for r in extra_references)
+    from ..state_io import read_json
+    for manifest in list(allowed):
+        if manifest.suffix=='.json':
+            weight=read_json(manifest).get('weight_asset')
+            if weight:allowed.add(package_path(bank,weight))
     del saved
     def audit(event,args):
         if event!='open' or not args or not isinstance(args[0],str):return
         candidate=Path(args[0])
-        weight=candidate.suffix in ('.pt','.pth','.ckpt','.safetensors') or candidate.name=='pytorch_model.bin'
+        weight=candidate.suffix in ('.pt','.pth','.ckpt','.safetensors','.gguf') or candidate.name=='pytorch_model.bin'
         if not weight:return
         candidate=candidate.resolve()
         if candidate not in allowed:
@@ -41,9 +46,10 @@ def guard_model_assets(path,extra_references=()):
 
 
 class ExpertPool:
-    def __init__(self, settings, extra_packages=None,keep_device=False):
+    def __init__(self, settings, extra_packages=None,keep_device=False,live=False):
         self.settings = settings
         self.keep_device=keep_device
+        self.live=live
         path = settings.resolve(settings.expert_checkpoint)
         self.path=path
         self.saved = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
@@ -81,6 +87,8 @@ class ExpertPool:
         self.metrics = {}
         self.process = psutil.Process()
         self.ids = sorted(self.entries)
+        from .expert_residency import Residency
+        self.residency=Residency(self)
 
     def model_spec(self):
         config={k:self.saved["config"][k] for k in ("feature_sizes","stock_policy_ids","assembly_routing") if k in self.saved["config"]}
@@ -100,10 +108,9 @@ class ExpertPool:
         entry=self.entries[key]
         reserve=self.settings.resources.ram_reserve_gib*2**30
         estimated=max(float(entry.get('weight_bytes',0))*1.25,self.metrics.get(key,{}).get('peak_ram_increment',0))
-        while self.loaded and (len(self.loaded) >= self.settings.resources.expert_cache_count or
+        while self.loaded and (not self.keep_device and len(self.loaded) >= self.settings.resources.expert_cache_count or
                 psutil.virtual_memory().available < reserve+estimated):
-            self.loaded.popitem(last=False)
-            gc.collect()
+            self.release(next(iter(self.loaded)))
         if psutil.virtual_memory().available < reserve+estimated:
             raise MemoryError("사용 가능한 RAM이 운영 여유 공간보다 적습니다.")
         started = time.perf_counter()
@@ -115,6 +122,12 @@ class ExpertPool:
         if self.saved['format']==HEADER_FORMAT:
             package=load_package(self.path,self.saved['expert_packages'][key])
             if package['id']!=key or package['module_count']!=count:raise ValueError('Expert 패키지 구성이 다릅니다.')
+            if package.get('executor')=='llama_cpp':
+                from .gguf_expert import GGUFExpert
+                expert=GGUFExpert(self.settings,package);expert.keep_device=self.keep_device
+                self.loaded[key]=expert
+                self.metrics.setdefault(key,{}).update(load_seconds=time.perf_counter()-started,loaded=True,engine='llama.cpp',weight_bytes=package['weight_asset']['bytes'])
+                return expert
             weights=package['state_dict'];prefix='models.';metadata=package['metadata']
             quantization=package.get('quantization')
             self.roots[key]=self.root/key
@@ -147,8 +160,10 @@ class ExpertPool:
             expert = NativeExpert(modules, entry,metadata['native_runner_source'])
         expert.requires_grad_(False).eval()
         expert.keep_device=self.keep_device
+        expert.retain_host_weights=not self.live
         self.loaded[key] = expert
         self.metrics.setdefault(key, {}).update(load_seconds=time.perf_counter()-started,loaded=True,
+            load_count=self.metrics.get(key,{}).get('load_count',0)+1,
             peak_ram_increment=max(0,self.process.memory_info().rss-rss_before))
         return expert
 
@@ -162,17 +177,10 @@ class ExpertPool:
         if data is None:
             raise ValueError("현재 시세에서 이 Expert의 원본 입력을 만들 수 없습니다.")
         prior_peak = self.metrics.get(key, {}).get("peak_vram_bytes", 0)
-        device = "cpu"
+        device=self.residency.device(key,expert,prior_peak)
         preference=self.settings.resources.expert_devices.get(key,'auto')
-        large=int(self.entries[key].get('parameters',0))>=self.settings.resources.isolated_expert_parameters
-        if preference!='cpu' and (large or preference=='cuda:0') and torch.cuda.is_available():
-            free, total = torch.cuda.mem_get_info()
-            weight_bytes=sum(p.numel()*p.element_size() for p in list(expert.parameters())+list(expert.buffers()))
-            resident=any(p.is_cuda for p in list(expert.parameters())+list(expert.buffers()))
-            required = max(64*2**20,prior_peak*1.1-weight_bytes) if resident else max(prior_peak*1.1,weight_bytes*1.05) if prior_peak else weight_bytes*1.35
-            if free - required > self.settings.resources.vram_reserve_gib * 2**30:
-                device = "cuda:0"
-                torch.cuda.reset_peak_memory_stats()
+        if device.startswith('cuda'):torch.cuda.reset_peak_memory_stats()
+        allocated_before=torch.cuda.memory_allocated() if device.startswith('cuda') else 0
         if device=='cpu':restore_host(expert)
         if preference=='cuda:0' and device=='cpu':raise MemoryError('CUDA 지정 실행에 필요한 VRAM 여유가 부족합니다.')
         with torch.inference_mode():
@@ -188,17 +196,36 @@ class ExpertPool:
         packet["native_features_verified"] = True
         metrics = self.metrics.setdefault(key, {})
         metrics.update(status="ready", device=device, inference_seconds=time.perf_counter()-started,
+                       inference_count=metrics.get('inference_count',0)+1,
+                       residency='gpu_ram_layer_offload' if getattr(expert,'_layer_offloaded',False) else 'gpu_resident' if self.keep_device and device.startswith('cuda') else 'ram_offload' if self.keep_device else 'temporary',
+                       resident_bytes=sum(p.numel()*p.element_size() for p in list(expert.parameters())+list(expert.buffers()) if p.is_cuda),
                        rss_bytes=self.process.memory_info().rss,
                        peak_ram_bytes=getattr(self.process.memory_info(), "peak_wset", self.process.memory_info().rss),
-                       peak_vram_bytes=max(prior_peak,torch.cuda.max_memory_allocated() if device.startswith("cuda") else 0),
+                       peak_workspace_bytes=max(metrics.get('peak_workspace_bytes',0),max(0,torch.cuda.max_memory_allocated()-allocated_before)) if device.startswith('cuda') else metrics.get('peak_workspace_bytes',0),
+                       peak_vram_bytes=max(0,torch.cuda.max_memory_allocated()-allocated_before)+sum(p.numel()*p.element_size() for p in list(expert.parameters())+list(expert.buffers()) if p.is_cuda) if device.startswith('cuda') else 0,
+                       memory_measurement='model residency + inference allocation delta',
                        last_as_of=packet.get("as_of"), error=None)
+        if hasattr(expert,'details'):
+            import psutil
+            child=psutil.Process(expert.child.pid).memory_info() if expert.child else None
+            metrics.update(**expert.details,device='gpu' if expert.details.get('gpu_layers') else 'cpu',
+                residency='gpu_resident' if expert.details.get('gpu_layers')==expert.details.get('total_layers') else 'gpu_cpu_hybrid' if expert.details.get('gpu_layers') else 'ram_offload',
+                peak_ram_bytes=self.process.memory_info().rss+(getattr(child,'peak_wset',child.rss) if child else 0))
         if device.startswith("cuda") and not self.keep_device:
             torch.cuda.empty_cache()
         return packet
 
+    def release(self,key):
+        self.residency.pinned.discard(key)
+        expert=self.loaded.pop(key)
+        if not getattr(expert,'_gpu_owned',False):restore_host(expert)
+        if hasattr(expert,'close'):expert.close()
+        self.metrics.setdefault(key,{}).update(loaded=False,residency='unloaded',resident_bytes=0)
+        gc.collect()
+        if torch.cuda.is_available():torch.cuda.empty_cache()
+
     def close(self):
-        for expert in self.loaded.values():restore_host(expert)
-        self.loaded.clear()
+        for key in list(self.loaded):self.release(key)
         self.saved = None
         gc.collect()
         self.temp.cleanup()

@@ -83,5 +83,9 @@ def restore_packed(model,state,layers,prefix=''):
         original=model.get_submodule(local)
         if type(original) is not nn.Linear:raise ValueError('변환 패키지의 Linear 구조가 원본과 다릅니다: '+local)
         parent,_,child=local.rpartition('.')
-        model.get_submodule(parent)._modules[child]=PackedLinear(original,spec['bits'],spec['group_size'])
+        if spec.get('engine')=='bitsandbytes':
+            from .nf4_linear import replace_nf4
+            local_state={k.removeprefix(local+'.'):v for k,v in state.items() if k.startswith(local+'.')}
+            model.get_submodule(parent)._modules[child]=replace_nf4(original,local_state)
+        else:model.get_submodule(parent)._modules[child]=PackedLinear(original,spec['bits'],spec['group_size'])
     return model.load_state_dict(state,strict=True,assign=True)

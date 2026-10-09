@@ -8,7 +8,9 @@ def host_state(module):
 
 def restore_host(module,saved=None):
     saved=saved or getattr(module,'_device_home',None)
-    if saved is None:return
+    if saved is None:
+        if getattr(module,'_gpu_owned',False):module.cpu();module._gpu_owned=False
+        return
     parameters,buffers=saved
     for parameter,value in parameters:parameter.data=value
     for child,name,value in buffers:child._buffers[name]=value
@@ -16,6 +18,8 @@ def restore_host(module,saved=None):
 
 
 def finish_device(module,saved,device):
+    if getattr(module,'_layer_offloaded',False):return
     if getattr(module,'keep_device',False) and device.startswith('cuda'):
-        module._device_home=saved
+        if getattr(module,'retain_host_weights',True):module._device_home=saved
+        else:module.__dict__.pop('_device_home',None);module._gpu_owned=True
     else:restore_host(module,saved)

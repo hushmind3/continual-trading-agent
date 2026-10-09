@@ -14,7 +14,7 @@ class InspectionTests(unittest.TestCase):
         base=dict(id='base',name='base',representation='FP32',package={'sha256':'base','bytes':1000},check={'status':'passed','detail':'original'})
         catalog={'experts':{'base':base},'active':[]}
         def convert(settings,catalog,payload,progress):
-            if payload['precision']=='bf16':raise ValueError('지원하는 변환 계층 없음')
+            if payload['precision']=='nf4':raise ValueError('지원하는 변환 계층 없음')
             return dict(id=payload['slot'],name=payload['slot'],representation=payload['precision'].upper(),package={'sha256':payload['slot'],'bytes':500},
                 conversion={'source_id':'base','precision':payload['precision']},check={'status':'pending'})
         def compare(settings,config,catalog,payload,progress,**kw):
@@ -29,9 +29,9 @@ class InspectionTests(unittest.TestCase):
                   patch('stockrl.platform.resources.ResourceMonitor.snapshot',return_value={'ram_total_bytes':1000,'gpu':{}}),
                   patch('torch.cuda.is_available',return_value=False),patch('stockrl.platform.expert_optimizer.package_path',side_effect=lambda _,r:Path(directory)/r['sha256']),
                   patch('stockrl.platform.expert_optimizer.recycle') as recycle):
-                result=optimize(settings,'config',catalog,{'id':'base'},lambda **kw:None)
-        self.assertEqual(result['selected'],'base_int8');self.assertEqual(result['attempts']['bf16']['status'],'failed')
-        self.assertEqual(len(result['reports']),4);self.assertEqual(recycle.call_count,2)
+                result=optimize(settings,'config',catalog,{'id':'base','goal':'balanced','validation_mode':'reference','quantization_first':False},lambda **kw:None)
+        self.assertEqual(result['selected'],'base_int8');self.assertEqual(result['attempts']['nf4']['status'],'failed')
+        self.assertEqual(len(result['reports']),3);self.assertEqual(recycle.call_count,1)
         self.assertNotIn('base_int4',catalog['experts'])
         rejected=next(r for r in result['reports'] if r['id']=='base_int4')
         self.assertFalse(rejected['package_available']);self.assertEqual(rejected['decision'],'rejected')
@@ -66,7 +66,7 @@ class InspectionTests(unittest.TestCase):
                 self.calls.append(kw);return [SimpleNamespace(id='same/model')]
         api=API();title,keywords,repos,errors=discover_repositories(api,{},lambda **kw:None)
         self.assertEqual(keywords,list(FINANCE_QUERIES));self.assertEqual(len(repos),1);self.assertFalse(errors)
-        self.assertEqual({kw['sort'] for kw in api.calls},{'downloads','lastModified'})
+        self.assertEqual({kw['sort'] for kw in api.calls},{'created_at','lastModified'})
         self.assertIn('금융',title)
 
     def test_creation_is_never_fabricated_release_and_requirements_remain_unknown(self):

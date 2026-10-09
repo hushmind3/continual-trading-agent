@@ -47,7 +47,7 @@ class HfForecastExpert(nn.Module):
         model=self.models[0];home=host_state(self)
         started=time.perf_counter()
         try:
-            model.to(device)
+            if not getattr(self,'_layer_offloaded',False):model.to(device)
             # Chronos-2 pins CPU input batches and transfers them to its model device internally.
             input_device='cpu' if self.entry['backend']=='chronos2' else device
             context=torch.as_tensor(data['series'],dtype=torch.float32,device=input_device)

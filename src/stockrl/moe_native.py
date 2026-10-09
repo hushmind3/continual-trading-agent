@@ -68,6 +68,8 @@ def _compiled_runner(runner):
                 return ast.Call(ast.Name("_restore",ast.Load()),[node.func.value,*node.args],node.keywords)
             if name=="load_file" or name=="load" and isinstance(node.func,ast.Attribute) and isinstance(node.func.value,ast.Name) and node.func.value.id=="torch":
                 return ast.Call(ast.Name("_weights",ast.Load()),[ast.Constant(name),*node.args],node.keywords)
+            if name=='to' and isinstance(node.func,ast.Attribute):
+                return ast.Call(ast.Name('_move',ast.Load()),[node.func.value,*node.args],node.keywords)
             return node
 
     tree=Reuse().visit(tree)
@@ -137,7 +139,9 @@ def native_call(backend, root, data, device="cpu", *, modules=None, states=None,
         if hasattr(model,"tie_weights"): model.tie_weights()
         return result
 
-    namespace.update(_construct=construct,_pretrained=pretrained,_weights=weights,_restore=restore,_load_only=load_only)
+    def move(value,*args,**kwargs):
+        return value if isinstance(value,nn.Module) and (hasattr(value,'_hf_hook') or any(hasattr(m,'_hf_hook') for m in value.modules())) else value.to(*args,**kwargs)
+    namespace.update(_construct=construct,_pretrained=pretrained,_weights=weights,_restore=restore,_load_only=load_only,_move=move)
     exec(code,namespace)
     # Baseline backend reseeds isolated workers; do not overwrite policy RNG here.
     with torch.random.fork_rng(devices=[]):

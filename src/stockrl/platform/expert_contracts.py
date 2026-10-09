@@ -1,5 +1,5 @@
 """Explicit input capabilities checked before a frozen asset enters the MoE."""
-SUPPORTED_MARKET={'chronos','chronos2','chronos_bolt','timesfm','kronos','exaone','fincast','timemoe','toto'}
+SUPPORTED_MARKET={'chronos','chronos2','chronos_bolt','timesfm','kronos','exaone','fincast','timemoe','toto','gguf_market'}
 SUPPORTED_STOCK={'adilbai','msft','a2c','ppo','sac'}
 
 
@@ -25,6 +25,8 @@ def descriptor(key,package,reference):
     precision=package.get('representation') or '/'.join({'float32':'FP32','float16':'FP16','bfloat16':'BF16'}.get(t,t) for t in types) or entry.get('dtype','native')
     return dict(id=key,name=entry.get('name',key),backend=entry.get('backend'),
                 executor=package.get('executor','torch_native'),representation=precision,
+                quantized=bool(package.get('quantization')) or package.get('executor')=='llama_cpp',
+                weight_bytes=package.get('weight_asset',{}).get('bytes'),
                 origin=entry.get('origin'),
                 role='action' if entry.get('stock_policy') else 'market',
                 parameters=entry.get('parameters'),feature_size=package['feature_size'],

@@ -19,7 +19,7 @@ function decision(report:OptimizationReport|undefined,optimization:Optimization|
 }
 
 export function versionResults(base:LibraryExpert,variants:LibraryExpert[],selected:string,active:string[],optimization?:Optimization,inspection?:Inspection):VersionResult[]{
- return ['original','fp16','bf16','int8','int4'].map(key=>{
+ return (base.executor==='llama_cpp'?['original']:['original','fp16','bf16','int8','int4','nf4']).map(key=>{
   const versions=variants.filter(v=>precisionOf(v)===key);
   const reports=optimization?.reports?.filter(r=>key==='original'?r.id===base.id:r.precision.toLowerCase().startsWith(key))??[];
   const item=versions.find(v=>v.id===selected)??versions.find(v=>active.includes(v.id))??versions.find(v=>v.id===reports.at(-1)?.id)??versions[0];

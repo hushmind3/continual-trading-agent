@@ -40,6 +40,7 @@ export interface Expert {
   load_seconds?: number;
   inference_seconds?: number;
   device?: string;
+  residency?:string;resident_bytes?:number;engine?:string;preloaded?:boolean;
   peak_vram_bytes?: number;
   peak_ram_bytes?: number;
   last_as_of?: string;
@@ -116,6 +117,7 @@ export interface OpsSettings {
   };
   resources: {
     ram_reserve_gib: number;
+    gpu_resident?:boolean;
     vram_reserve_gib: number;
     expert_cache_count: number;
     isolated_expert_parameters: number;

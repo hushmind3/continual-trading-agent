@@ -8,7 +8,7 @@ from pathlib import Path
 from ..paths import PROJECT_ROOT
 from ..state_io import atomic_json,read_json
 
-ONLINE_LIBRARY_JOBS=('inspect','import','probe','probe_all','compare','convert','search','acquire','optimize')
+ONLINE_LIBRARY_JOBS=('inspect','import','probe','probe_all','compare','convert','search','acquire','optimize','optimize_all')
 
 
 class LibraryOperations:
@@ -43,6 +43,7 @@ class LibraryOperations:
             catalog=read_json(self.catalog_path);active=sorted(set(payload.get('active',[])))
             for key in active:
                 item=catalog['experts'][key]
+                if not item.get('quantized') and (item.get('conversion') or {}).get('precision') not in ('nf4','int4','int8') and item.get('executor')!='llama_cpp':raise ValueError('양자화 Expert만 운영 구성에 사용할 수 있습니다: '+item['name'])
                 if item['check'].get('status')!='passed' or item['check'].get('package_sha256')!=item['package']['sha256'] or (item.get('conversion') and item['conversion'].get('validation',{}).get('passed') is not True):
                     raise ValueError('실제 추론 검사를 먼저 통과해야 합니다: '+item['name'])
             revision=catalog.get('selection_revision',0)+1
@@ -84,7 +85,7 @@ class LibraryOperations:
         try:
             if paused:self._pause(kind)
             result=self._execute(kind,payload,request)
-            if kind=='optimize' and result and result.get('target_active'):
+            if kind in ('optimize','optimize_all') and result and result.get('target_active') is not None:
                 before=rt.controls.copy();paused=True;self._pause('apply')
                 self._execute('apply',dict(active=result['target_active'],optimizer_base=result['base']),request)
             rt.settings=__import__('stockrl.platform.config',fromlist=['load_settings']).load_settings(rt.config)

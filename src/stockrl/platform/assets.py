@@ -55,13 +55,11 @@ class ExpertPool:
             self.loaded.move_to_end(key)
             return self.loaded[key]
         entry=self.entries[key]
-        reserve=self.settings.resources.ram_reserve_gib*2**30
-        estimated=max(float(entry.get('weight_bytes',0))*1.25,self.metrics.get(key,{}).get('peak_ram_increment',0))
-        while self.loaded and (not self.keep_device and len(self.loaded) >= self.settings.resources.expert_cache_count or
-                psutil.virtual_memory().available < reserve+estimated):
+        estimated=max(float(entry.get('weight_bytes',0)),self.metrics.get(key,{}).get('peak_ram_increment',0))
+        while self.loaded and psutil.virtual_memory().available < estimated:
             self.release(next(iter(self.loaded)))
-        if psutil.virtual_memory().available < reserve+estimated:
-            raise MemoryError("사용 가능한 RAM이 운영 여유 공간보다 적습니다.")
+        if psutil.virtual_memory().available < estimated:
+            raise MemoryError("사용 가능한 RAM이 Expert 적재에 부족합니다.")
         started = time.perf_counter()
         rss_before=self.process.memory_info().rss
         count = self.counts[key]

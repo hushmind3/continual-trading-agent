@@ -55,9 +55,9 @@ Expert는 동결 자산이며 등록·선택·로딩·해제는 프로젝트 연
 | Expert 출력 요약 | 8개 값 | 프로젝트 관측 계약 |
 | 예측 요청 기본 horizon | 1 | 프로젝트 호출 계약; 최대 요청 128 |
 | 최소 시장 이력 | 예측형 32행, 매매형 128행 | Expert 등록 계약 |
-| Expert 결과 캐시 상한 | 128 | Expert 실행 계층 |
-| 메모리 여유 예약 | RAM 4 GiB, VRAM 1.5 GiB | Expert 상주 계층 |
-| Expert 요청 제한 시간 | 180초 | 프로세스/요청 복구 계약 |
+| Expert 결과 캐시 상한 | 제한 없음 | 별도 캐시 제한 제거 |
+| 메모리 여유 예약 | 없음 | 현재 사용 가능 RAM/VRAM 기준 |
+| Expert 요청 제한 시간 | HTTP 라이브러리 기본값 | 요청 timeout 인자 생략 |
 | Native Expert Torch CPU threads | PyTorch 기본값 | 별도 전역 재설정 제거 |
 | Native Expert seed | 라이브러리 난수 기본 상태 | 별도 전역 seed 재설정 제거 |
 | Chronos 샘플 수 | Chronos API 기본값 | `num_samples` 인자 생략 |
@@ -65,7 +65,7 @@ Expert는 동결 자산이며 등록·선택·로딩·해제는 프로젝트 연
 | Kronos context / sample count / verbosity | Kronos API 기본값 | 선택 인자 생략 |
 | GGUF 포트·로그 경로 | 동적 포트·전용 로그 파일 | 여러 Expert 프로세스 연결 |
 
-메모리 예약·캐시 상한·요청 제한은 프로젝트 운영 설정이며 FinRL-X 기본값이 아니다. Expert 입출력 계약은 유지하면서, 라이브러리가 자체 기본값을 제공하는 선택 인자는 생략한다. horizon, 장치, 모델 가중치 형식, 입출력 tensor dtype처럼 패키지 호환에 필요한 인자는 유지한다.
+메모리 예약·캐시 상한을 임의로 제한하지 않고 현재 사용 가능 메모리로 적재를 판단한다. Expert 입출력 계약은 유지하면서 라이브러리가 기본값을 제공하는 선택 인자는 생략한다. horizon, 장치, 모델 가중치 형식, 입출력 tensor dtype처럼 패키지 호환에 필요한 인자는 유지한다.
 
 공식 설정과 프로젝트 연결 설정을 적용할 때의 기준은 다음과 같다.
 
@@ -76,7 +76,7 @@ Expert는 동결 자산이며 등록·선택·로딩·해제는 프로젝트 연
 
 ## GGUF / llama.cpp
 
-GGUF 실행은 설치된 `llama-server`를 사용한다. 컨텍스트 길이, CPU 스레드, GPU 레이어, 메모리 맞춤, RAM 캐시, 병렬 슬롯, 샘플링 온도, seed, 생성 토큰 수, thinking 옵션을 실행 명령이나 요청에 강제로 넣지 않는다. llama.cpp와 GGUF 모델이 제공하는 기본값을 따른다. 프로젝트는 포트·로그 경로와 Expert 요청 제한 시간을 연결에 사용한다. 이 연결 항목은 llama.cpp 모델 추론 설정값과 구분한다.
+GGUF 실행은 설치된 `llama-server`를 사용한다. 컨텍스트 길이, CPU 스레드, GPU 레이어, 메모리 맞춤, RAM 캐시, 병렬 슬롯, 샘플링 온도, seed, 생성 토큰 수, thinking 옵션을 실행 명령이나 요청에 강제로 넣지 않는다. llama.cpp와 GGUF 모델이 제공하는 기본값을 따른다. 프로젝트는 포트와 로그 경로만 연결에 사용한다.
 
 ## 현재 범위와 검증 상태
 

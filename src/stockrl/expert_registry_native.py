@@ -16,8 +16,7 @@ class ExpertRegistry:
         self.registry_file=ROOT/'configs/experts.json'
         self.model_dir=Path.home()/'Desktop'/'모델'
         self.state_dir=ROOT/'runtime/experts';self.state_dir.mkdir(parents=True,exist_ok=True)
-        resources=SimpleNamespace(expert_cache_count=128,ram_reserve_gib=4,vram_reserve_gib=1.5,
-            expert_devices={},gguf_prompt_cache_mib=0,inference_timeout_seconds=180)
+        resources=SimpleNamespace(expert_devices={})
         self.settings=SimpleNamespace(registry_file=self.registry_file,model_dir=self.model_dir,
             state_dir=self.state_dir,resources=resources)
         self.pool=None;self.cache={};self.last_outputs={};self.signature=None;self.reported_at=0
@@ -85,7 +84,6 @@ class ExpertRegistry:
                 self.last_outputs[key]={'status':'needs_input','reason':str(exc)}
         if time.monotonic()-self.reported_at>=5:
             atomic_json({'as_of':stamp,'experts':self.last_outputs,'resources':self.pool.metrics},self.state_dir/'status.json');self.reported_at=time.monotonic()
-        if len(self.cache)>5000:self.cache.clear()
         result=[]
         for values in groups.values():
             result.extend([float(np.mean(values)),float(np.std(values)),float(np.max(np.abs(values))),float(len(values))] if values else [0.,0.,0.,0.])

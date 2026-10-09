@@ -37,16 +37,14 @@ class GGUFExpert(nn.Module):
         args=[str(engine),'-m',str(self.path),'--host','127.0.0.1','--port',str(port),
             '--log-file',str(self.log_path)]
         self.child=subprocess.Popen(args,stdout=self.log,stderr=self.log,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-        deadline=time.monotonic()+self.settings.resources.inference_timeout_seconds
-        while time.monotonic()<deadline:
+        while True:
             if getattr(self,'cancelled',lambda:False)():self.close();raise InterruptedError('MoE 정지 요청')
             if self.child.poll() is not None:
                 self.log.seek(0);detail=self.log.read().decode('utf8',errors='replace')[-1500:];self.close();raise ValueError('GGUF 원본 실행 실패: '+detail)
             try:
-                if requests.get(self.url+'/health',timeout=1).ok:break
+                if requests.get(self.url+'/health').ok:break
             except requests.RequestException:pass
             time.sleep(.2)
-        else:self.close();raise TimeoutError('GGUF 모델 적재 시간 초과')
         self.log.seek(0);text=self.log.read().decode('utf8',errors='replace')
         if self.log_path.exists():text=self.log_path.read_text(encoding='utf8',errors='replace') or text
         layers=re.findall(r'offloaded (\d+)\s*/\s*(\d+) layers',text)
@@ -78,13 +76,13 @@ class GGUFExpert(nn.Module):
         """A stop during native generation cancels the child instead of waiting on HTTP."""
         done=threading.Event();result={}
         def receive():
-            try:result['response']=requests.post(self.url+'/v1/chat/completions',json=payload,timeout=self.settings.resources.inference_timeout_seconds)
+            try:result['response']=requests.post(self.url+'/v1/chat/completions',json=payload)
             except Exception as exc:result['error']=exc
             finally:done.set()
         thread=threading.Thread(target=receive,name='gguf-response',daemon=True);thread.start()
         while not done.wait(.2):
             if getattr(self,'cancelled',lambda:False)():
-                self.close();thread.join(timeout=2);raise InterruptedError('MoE 정지 요청')
+                self.close();thread.join();raise InterruptedError('MoE 정지 요청')
         if 'error' in result:raise result['error']
         return result['response']
 
@@ -93,8 +91,7 @@ class GGUFExpert(nn.Module):
     def close(self):
         if self.child and self.child.poll() is None:
             self.child.terminate()
-            try:self.child.wait(timeout=10)
-            except subprocess.TimeoutExpired:self.child.kill();self.child.wait()
+            self.child.wait()
         self.child=None
         if self.log:self.log.close();self.log=None
         if self.log_dir:self.log_dir.cleanup();self.log_dir=None

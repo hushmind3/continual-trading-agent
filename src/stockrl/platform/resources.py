@@ -45,7 +45,7 @@ class ResourceMonitor:
             if command:
                 try:
                     result=subprocess.run([command,"--query-gpu=name,utilization.gpu,memory.used,memory.total","--format=csv,noheader,nounits"],
-                                          capture_output=True,text=True,timeout=2,check=True,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+                                          capture_output=True,text=True,check=True,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
                     name,util,used,total=result.stdout.splitlines()[0].split(',')
                     self.gpu=dict(name=name.strip(),utilization_percent=float(util),used_bytes=float(used)*2**20,total_bytes=float(total)*2**20)
                 except (ValueError,OSError,subprocess.SubprocessError):

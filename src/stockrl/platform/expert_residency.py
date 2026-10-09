@@ -29,22 +29,22 @@ class Residency:
         settings=self.pool.settings;preference=settings.resources.expert_devices.get(key,'auto')
         if preference=='cpu' or not torch.cuda.is_available():return 'cpu'
         if getattr(expert,'_layer_offloaded',False):return 'cuda:0'
-        free,total=self.free();reserve=settings.resources.vram_reserve_gib*2**30
+        free,total=self.free()
         tensors=list(expert.parameters())+list(expert.buffers())
         weights=sum(p.numel()*p.element_size() for p in tensors)
         if hasattr(expert,'reference'):weights=expert.reference['bytes']
         resident=any(p.is_cuda for p in tensors) or hasattr(expert,'child') and expert.child is not None and expert.device!='cpu'
-        workspace=self.pool.metrics.get(key,{}).get('peak_workspace_bytes',max(64*2**20,weights*.35))
-        required=max(64*2**20,workspace*1.1)+(0 if resident else weights)
+        workspace=self.pool.metrics.get(key,{}).get('peak_workspace_bytes',0)
+        required=workspace+(0 if resident else weights)
         for other in list(self.pool.loaded):
-            if free>=required+reserve:break
+            if free>=required:break
             if other!=key and other not in self.pinned:free+=self.offload(other)
-        if free>=required+reserve:return 'cuda:0'
+        if free>=required:return 'cuda:0'
         # An oversized model streams only its overflow layers from RAM to GPU.
-        if self.pool.keep_device and weights>free-reserve and not hasattr(expert,'reference'):
+        if self.pool.keep_device and weights>free and not hasattr(expert,'reference'):
             from accelerate import dispatch_model,infer_auto_device_map
             restore_host(expert)
-            budget=max(0,int(free-reserve));ram=max(0,int(psutil.virtual_memory().available-settings.resources.ram_reserve_gib*2**30))
+            budget=max(0,int(free));ram=max(0,int(psutil.virtual_memory().available))
             classes=sorted({type(m).__name__ for m in expert.modules() if any(x in type(m).__name__ for x in ('Block','DecoderLayer','Attention'))})
             mapping=infer_auto_device_map(expert,max_memory={0:budget,'cpu':ram},no_split_module_classes=classes)
             if any(v=='disk' for v in mapping.values()):raise MemoryError('GPU와 RAM의 운영 여유 공간에 모델이 들어가지 않습니다.')

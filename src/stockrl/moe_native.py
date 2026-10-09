@@ -38,7 +38,7 @@ class NativeExpert(nn.Module):
             else:self.cpu()
 
 
-@lru_cache(maxsize=8)
+@lru_cache
 def _compiled_runner(runner):
     """Cache code only; model instances and per-call bindings stay outside."""
     source = runner if isinstance(runner, str) else inspect.getsource(runner)
@@ -65,8 +65,8 @@ def _compiled_runner(runner):
                 arg=node.args[0]
                 if isinstance(arg,ast.Name) and arg.id=='output' or isinstance(arg,ast.Call) and isinstance(arg.func,ast.Name) and arg.func.id=='infer':
                     return ast.Call(ast.Name('_finite_output' if name=='isfinite' else '_native_array',ast.Load()),node.args,[])
-            if name in ('manual_seed','seed'):
-                return ast.Call(ast.Name('_runner_seed',ast.Load()),[node.func,*node.args],node.keywords)
+            if name in ('manual_seed','seed','set_num_threads'):
+                return ast.Call(ast.Name('_runner_setting',ast.Load()),[node.func,*node.args],node.keywords)
             if name=="load_native_pretrained":
                 return ast.Call(ast.Name("_pretrained",ast.Load()),node.args,node.keywords)
             if name in constructors:
@@ -168,8 +168,8 @@ def native_call(backend, root, data, device="cpu", *, modules=None, states=None,
     namespace.update(_construct=construct,_pretrained=pretrained,_weights=weights,_restore=restore,_load_only=load_only,_move=move,
         _native_array=native_array,_native_operand=native_operand,_finite_output=finite,
         _packet_output=lambda value:value.detach() if tensor_output and torch.is_tensor(value) else value.tolist(),
-        _runner_seed=lambda fn,*args,**kwargs:None if tensor_output else fn(*args,**kwargs))
+        _runner_setting=lambda fn,*args,**kwargs:None)
     exec(code,namespace)
-    # Baseline backend reseeds isolated workers; do not overwrite policy RNG here.
-    with torch.random.fork_rng(devices=[]):
+    # Preserve library RNG defaults without leaking Expert RNG state to training.
+    with torch.random.fork_rng():
         return namespace["run_native"](backend,Path(root),data,device)

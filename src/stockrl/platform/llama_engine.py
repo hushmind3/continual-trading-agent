@@ -12,7 +12,7 @@ from ..state_io import read_json,atomic_json
 def ensure_engine(settings,progress=lambda **kw:None):
     root=settings.state_dir/'engines'/'llama.cpp';manifest=read_json(root/'engine.json')
     if manifest and (root/'llama-server.exe').is_file() and (root/'llama-quantize.exe').is_file():return root/'llama-server.exe'
-    response=requests.get('https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=5',timeout=20);response.raise_for_status()
+    response=requests.get('https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=5');response.raise_for_status()
     release=next((r for r in response.json() if any(a['name'].endswith('bin-win-vulkan-x64.zip') for a in r['assets'])),None)
     if not release:raise ValueError('공식 Windows GPU llama.cpp 실행 파일을 찾지 못했습니다.')
     asset=next(a for a in release['assets'] if a['name'].endswith('bin-win-vulkan-x64.zip'))
@@ -20,7 +20,7 @@ def ensure_engine(settings,progress=lambda **kw:None):
     root.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.llama-',dir=root.parent) as directory:
         path=Path(directory)/'engine.zip';digest=hashlib.sha256();size=0
-        with requests.get(asset['browser_download_url'],stream=True,timeout=(10,30)) as download:
+        with requests.get(asset['browser_download_url'],stream=True) as download:
             download.raise_for_status()
             with path.open('wb') as stream:
                 for chunk in download.iter_content(1024*1024):

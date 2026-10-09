@@ -9,7 +9,7 @@ const roles: Record<string, string> = {
   feed: "시세 수집",
   experts: "Expert 실행",
   agent: "MoE · 가상계좌",
-  learner: "TorchRL 학습",
+  learner: "SAC 학습",
 };
 export function Diagnostics() {
   const { state } = useOperations();

@@ -133,7 +133,7 @@ def make_app(runtime=None,config=CONFIG_PATH):
     def experts(request:Request):
         runtime=rt(request); snapshot=runtime.snapshot(); values=snapshot["experts"]
         if not values:
-            catalog=read_json(runtime.root/"expert_catalog.json") or read_json(EXPERT_ASSETS_DIR/"registry.template.json")
+            catalog=read_json(runtime.root/"expert_catalog.json")
             values=catalog.get("experts",[])
         return {"experts":values,"selected":runtime.settings.enabled_experts,"model":runtime.settings.expert_checkpoint}
 

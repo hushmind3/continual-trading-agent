@@ -9,15 +9,8 @@ import { ConnectionSettings } from "./pages/ConnectionSettings";
 import { Diagnostics } from "./pages/Diagnostics";
 
 export function route(hash: string) {
-  const aliases: Record<string, string> = {
-    assembly: "moe",
-    experts: "moe",
-    "trading-moe": "portfolio",
-    autoTrading: "portfolio",
-    promotionTrial: "learning",
-  };
   const name = hash.replace(/^#/, "") || "control";
-  return aliases[name] ?? name;
+  return ["control","moe","markets","portfolio","learning","connection","system"].includes(name) ? name : "control";
 }
 export default function App() {
   const [active, setActive] = useState(() => route(location.hash));

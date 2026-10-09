@@ -198,7 +198,7 @@ export function ConnectionSettings() {
                 }
               />
               <Field
-                label="CPU 학습 threads"
+                label="CPU 보조 threads"
                 value={settings.learning.cpu_threads}
                 disabled={running}
                 change={(v) =>

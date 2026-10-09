@@ -9,13 +9,13 @@ def load_moe_head(path):
     saved=read_header(path)
     if saved.get("format") not in ("registered_vertical_trading_moe_v1",HEADER_FORMAT):
         raise ValueError("선택한 파일은 기존 Champion MoE 형식이 아닙니다.")
-    config={k:saved["config"][k] for k in ("feature_sizes","stock_policy_ids","assembly_routing","router_family") if k in saved["config"]}
+    config={k:saved["config"][k] for k in ("feature_sizes","stock_policy_ids","assembly_routing","router_family","central") if k in saved["config"]}
     state={k:v.clone() for k,v in saved["state_dict"].items() if k.startswith(("controller.","adapters."))}
     state={k.replace("calibration.weight","scale").replace("calibration.bias","bias"):
            (v.diagonal() if k.endswith("calibration.weight") else v) for k,v in state.items()}
     digest=hashlib.sha256()
     for key,value in state.items():
-        digest.update(key.encode()); digest.update(value.contiguous().view(torch.uint8).numpy().tobytes())
+        digest.update(key.encode()); digest.update(value.contiguous().reshape(-1).view(torch.uint8).numpy().tobytes())
     spec={"config":config,"expert_ids":sorted(saved["expert_mapping"]),
           "source_updates":int(saved.get("optimizer_updates",0)),"source_head_sha256":digest.hexdigest(),
           "source_model":str(path),"source_model_bytes":path.stat().st_size}

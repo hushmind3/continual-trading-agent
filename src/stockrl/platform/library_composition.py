@@ -32,14 +32,12 @@ def publish_header(settings,header,active,progress):
     old_markets=sorted({k.split('.')[2] for k in header['state_dict'] if k.startswith('controller.router.')})
     original=split_context(header['state_dict'],old_markets)
     original=inherit_slots(original,header.get('slot_sources',{}),sorted({n.split('.')[1] for n in original if n.startswith('adapters.')}))
-    spec=dict(expert_ids=ids,config={k:config[k] for k in ('feature_sizes','stock_policy_ids','assembly_routing','router_family') if k in config})
+    spec=dict(expert_ids=ids,config={k:config[k] for k in ('feature_sizes','stock_policy_ids','assembly_routing','router_family','central') if k in config})
     with torch.random.fork_rng(devices=[]):
         torch.manual_seed(0);trunk=MoETrunk(spec)
+    from .policy_transfer import transfer_state
+    transfer_state(trunk,original)
     template=trunk.state_dict()
-    for name,value in original.items():
-        if name not in template:continue
-        if template[name].shape!=value.shape:raise ValueError('기존 Expert의 출력 규격을 바꾸려면 새 슬롯을 사용하세요.')
-        template[name]=value
     header['state_dict']=template
     integrate(header,path,active,progress)
     partial=atomic_torch_save(header,path)

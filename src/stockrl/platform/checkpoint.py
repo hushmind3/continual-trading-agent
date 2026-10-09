@@ -16,14 +16,22 @@ class Checkpoints:
         name = f"policy-{version:08d}-{time.time_ns()}.pt"
         path = self.root / name
         temp = path.with_suffix(".tmp")
-        state = {"format": "finrlx-portfolio-ppo-v1", "expert_ids": expert_ids, "version": version,
+        state = {"format": "finrlx-portfolio-sac-v1", "expert_ids": expert_ids, "version": version,
                  "model_spec":actor.model_spec,
                  "actor": actor.state_dict(), "critic": critic.state_dict(),
                  "optimizer": optimizer.state_dict() if optimizer else None, "applied_ids": list(applied_ids),
                  "torch_rng": torch.get_rng_state(), "optimizer_steps":optimizer_steps,
                  "optimization_generation":version if optimization_generation is None else optimization_generation}
+        from .policy import parameter_names
+        state['optimizer_names']=[n for n,_ in parameter_names(actor,critic)]
+        from .learner import training_state
+        state['sac']=training_state(actor)
+        copies={}
         def portable(value):
-            if torch.is_tensor(value):return value.detach().cpu().clone()
+            if torch.is_tensor(value):
+                key=(value.untyped_storage().data_ptr(),value.storage_offset(),tuple(value.shape),tuple(value.stride()),value.dtype,value.device)
+                if key not in copies:copies[key]=value.detach().cpu().clone()
+                return copies[key]
             if isinstance(value,dict):return {k:portable(v) for k,v in value.items()}
             if isinstance(value,list):return [portable(v) for v in value]
             if isinstance(value,tuple):return tuple(portable(v) for v in value)
@@ -83,7 +91,7 @@ class Checkpoints:
                 if hashlib.sha256(path.read_bytes()).hexdigest()!=record['sha256']:
                     continue
                 state=torch.load(path,map_location='cpu',weights_only=True)
-                if state.get('format')!='finrlx-portfolio-ppo-v1':
+                if state.get('format') not in ('finrlx-portfolio-sac-v1','finrlx-portfolio-ppo-v1'):
                     continue
                 if record is not manifest:
                     record={**record,'recovered_from':manifest.get('file')}

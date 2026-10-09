@@ -119,6 +119,7 @@ class PortfolioEnvironment:
         td["next"]["reward"] = torch.tensor([reward*100],dtype=torch.float32)
         td["next"]["done"] = torch.tensor([terminal])
         td['next']['discount']=torch.tensor([self.settings.learning.discount**(elapsed/60)],dtype=torch.float32)
+        td['_trace']=dict(currency=currency,start=pending['as_of'],end=data['as_of'])
         self.journal.settle(currency,json.dumps(pending["symbols"]),pending["version"],td)
         self.pending.pop(currency,None)
 
@@ -133,7 +134,7 @@ class PortfolioEnvironment:
                               observed=view.observed[:,indices],closes=view.closes[:,indices],features=view.features[:,indices])
         orders = self.account.queue_decisions(sub,index,np.eye(3)[actions],True,
                          np.r_[weights, result.metadata["risk"]["cash_weight"]],actions)
-        transition = result.metadata["transition"].select(*INPUT_KEYS,"action","action_log_prob","state_value").to_dict()
+        transition = result.metadata["transition"].select(*INPUT_KEYS,"action","state_value","policy_family").to_dict()
         pending = dict(as_of=data["as_of"],symbols=data["symbols"],version=version,equity=data["equity"],transition=transition,order_ids=sorted(orders))
         self.pending[data["currency"]] = pending
         self.journal.replace_pending(data["currency"],pending)

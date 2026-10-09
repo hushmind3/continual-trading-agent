@@ -12,7 +12,6 @@ import numpy as np
 import torch
 from torch import nn
 from stockrl import expert_backends, moe_native, state_io
-from stockrl.moe_paper import TradingMoEPaper
 
 
 RUNNER = """def run_native(expert, root, data, device='cpu'):
@@ -129,38 +128,6 @@ class StatePersistenceTests(unittest.TestCase):
         self.assertEqual(len(state_io._locks), baseline)
 
 
-class SharedPaperInputTests(unittest.TestCase):
-    def test_symbols_share_owned_input_block_and_ledger_replay_still_mature(self):
-        panel = SimpleNamespace(
-            dates=np.array(['2025-10-29T14:00', '2025-10-29T14:01', '2025-10-29T15:02'], dtype='datetime64[ns]'),
-            symbols=['AAPL', 'MSFT'], groups={'AAPL': ('US', 'equity'), 'MSFT': ('US', 'equity')},
-            observed=np.ones((3, 2), bool), closes=np.array([[100., 200.], [101., 201.], [102., 202.]]),
-            features=np.zeros((3, 2, 17), np.float32), symbol_ids=np.array([0, 1]),
-            market_ids=np.array([0, 0]), asset_ids=np.array([0, 0]))
-        result = {'as_of': str(panel.dates[0]), 'currencies': {'AAPL': 'USD', 'MSFT': 'USD'},
-            'trading_output': {'actions': {'AAPL': 'BUY', 'MSFT': 'BUY'},
-                'target_weights': {'AAPL': .3, 'MSFT': .3}, 'cash_weights_by_currency': {'USD': .4}}}
-        with tempfile.TemporaryDirectory() as directory:
-            bridge = TradingMoEPaper(directory)
-            bridge.advance(panel, 0)
-            self.assertTrue(bridge.submit(result, panel, 0, paper_executable=True)['orders'])
-            self.assertEqual(len(bridge.pending), 2)
-            first, second = bridge.pending
-            for key in ('features', 'valid_mask', 'symbol_ids', 'market_ids', 'asset_ids'):
-                self.assertIs(first[key], second[key])
-            panel.features[0] = 99
-            panel.symbol_ids[0] = 77
-            self.assertEqual(first['features'].max(), 0)
-            self.assertEqual(first['symbol_ids'][0], 0)
-            panel.features[0] = 0
-            panel.symbol_ids[0] = 0
-            resumed = TradingMoEPaper(directory)
-            self.assertEqual(len(resumed.pending), 2)
-            fills = resumed.advance(panel, 1)
-            self.assertEqual(len(fills), 2)
-            resumed.advance(panel, 2)
-            self.assertGreater(resumed.replay.stats()['total'], 0)
-            self.assertGreater(resumed.paper_account.snapshot()['books']['USD']['holdings_value'], 0)
 
 
 if __name__ == '__main__':

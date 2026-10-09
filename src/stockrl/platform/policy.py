@@ -1,158 +1,141 @@
-"""TorchRL allocator initialized from the actual Champion MoE trainable state."""
+"""Frozen MoE registered in the official Stable-Baselines3 SAC Actor and Twin Critic."""
 from __future__ import annotations
-
 import torch
 from torch import nn
-from torch.distributions import Dirichlet
 from tensordict import TensorDict
-from tensordict.nn import TensorDictModule
-from torchrl.modules import ProbabilisticActor,IndependentNormal
-from torchrl.envs.utils import set_exploration_type, ExplorationType
-from ..trading_moe import EvidenceAdapter, VerticalController
+import gymnasium as gym
+import numpy as np
+from stable_baselines3.sac.policies import SACPolicy
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+from ..trading_moe import EvidenceAdapter
+from .portfolio_network import PortfolioController,DEFAULT_NETWORK
 
-INPUT_KEYS = ["evidence", "expert_mask", "account", "market", "policy_q"]
-
+INPUT_KEYS=['evidence','expert_mask','account','market','policy_q']
+POLICY_FAMILY='sb3-sac-moe-v1'
 
 class MoETrunk(nn.Module):
-    """Trainable Champion modules, fed by the same process's frozen Expert stage."""
-    def __init__(self, spec):
-        super().__init__()
-        config = spec["config"]
-        self.expert_ids = spec["expert_ids"]
-        self.active=set(spec.get('active_experts',self.expert_ids))
-        self.adapters = nn.ModuleDict({k:EvidenceAdapter(size) for k,size in config["feature_sizes"].items()})
-        self.controller = VerticalController(config["feature_sizes"],config.get("stock_policy_ids",()),
-            config.get('router_family')=='per-expert-context-v1')
-        if config.get("assembly_routing"):
-            self.controller.assembly_routing = config["assembly_routing"]
+    def __init__(self,spec):
+        super().__init__();cfg=spec['config'];self.expert_ids=spec['expert_ids'];self.active=set(spec.get('active_experts',self.expert_ids))
+        self.slot_sources=spec.get('slot_sources',{})
+        self.adapters=nn.ModuleDict({k:EvidenceAdapter(size) for k,size in cfg['feature_sizes'].items()})
+        self.controller=PortfolioController(cfg['feature_sizes'],cfg.get('stock_policy_ids',[]),cfg.get('central'))
+    def forward(self,evidence,mask,account,market,policy_q):
+        values={k:evidence[k]*self.adapters[k].scale+self.adapters[k].bias for k in self.expert_ids}
+        validity={k:mask[...,i] for i,k in enumerate(self.expert_ids)}
+        return self.controller(values,validity,account,market,policy_q)
 
-    def forward(self, evidence, mask, account, policy_q):
-        unbatched = account.ndim==2
-        values = {k:evidence[k]*self.adapters[k].scale+self.adapters[k].bias for k in self.expert_ids}
-        # Availability is recorded in each observation. Replay must retain the mask
-        # under which its action was taken, including Experts disabled afterwards.
-        validity = {k:mask[...,i] for i,k in enumerate(self.expert_ids)}
-        q = {k:policy_q[k] for k in self.controller.policy_ids}
-        if unbatched:
-            values={k:v.unsqueeze(0) for k,v in values.items()}
-            validity={k:v.unsqueeze(0) for k,v in validity.items()}
-            q={k:v.unsqueeze(0) for k,v in q.items()}; account=account.unsqueeze(0)
-        output=self.controller(values,validity,account,q)
-        return {k:v.squeeze(0) for k,v in output.items()} if unbatched else output
+class MoEFeatures(BaseFeaturesExtractor):
+    """Register the existing MoE as SB3's features extractor; no SAC algorithm here."""
+    def __init__(self,space,spec):
+        width=spec['config'].get('central',DEFAULT_NETWORK)['hidden_size']
+        super().__init__(space,width+2);self.trunk=MoETrunk(spec)
+    def forward(self,inputs):
+        out=self.trunk({k:inputs['e_'+k][:,None] for k in self.trunk.expert_ids},
+            inputs['expert_mask'][:,None].bool(),inputs['account'][:,None],inputs['market'][:,None],
+            {k:inputs['q_'+k][:,None] for k in self.trunk.controller.policy_ids})
+        return torch.cat([out['shared_latent'][:,0],out['allocation_scores'],out['cash_scores']],-1)
 
 
-class Allocator(nn.Module):
-    def __init__(self, trunk, legacy=False):
-        super().__init__()
-        self.trunk=trunk
-        self.legacy=legacy
-        if not legacy:self.log_scale=nn.Parameter(torch.tensor(-3.912023))
-        self.adjustment=nn.Sequential(nn.Linear(72,64),nn.SiLU(),nn.Linear(64,1))
-        self.cash_adjustment=nn.Linear(64,1)
-        for head in (self.adjustment[-1],self.cash_adjustment):
-            nn.init.zeros_(head.weight); nn.init.zeros_(head.bias)
-
-    def forward(self,evidence,expert_mask,account,market,policy_q):
-        output=self.trunk(evidence,expert_mask,account,policy_q)
-        latent=output["shared_latent"]
-        # The allocator reuses the learned heads on the real 64D latent.
-        # Frozen policy target=0 is evidence, not a hard prohibition on RL exploration.
-        scores=self.trunk.controller.market_fusion.allocation(latent).squeeze(-1)+self.adjustment(torch.cat([latent,market],-1)).squeeze(-1)
-        cash=self.trunk.controller.market_fusion.cash(latent.mean(-2))+self.cash_adjustment(latent.mean(-2))
-        scores=scores.masked_fill(~output['coverage'],-20 if self.legacy else -1000000)
-        logits=torch.cat([scores,cash],-1)
-        if self.legacy:
-            return logits.clamp(-20,20).softmax(-1)*20+0.01,output['value'].mean(-1,keepdim=True)
-        active=torch.cat([output['coverage'],torch.ones_like(cash,dtype=torch.bool)],-1)
-        scale=torch.where(active,self.log_scale.exp().clamp(0.0001,2),torch.ones_like(logits))
-        return logits,scale,output['value'].mean(-1,keepdim=True)
+def spaces_for(spec):
+    sizes=spec['config']['feature_sizes']
+    shapes={'account':(16,),'market':(8,),'expert_mask':(len(spec['expert_ids']),),
+        **{'e_'+k:(n,) for k,n in sizes.items()},
+        **{'q_'+k:(4,) for k in spec['config'].get('stock_policy_ids',[])}}
+    return gym.spaces.Dict({k:gym.spaces.Box(-np.inf,np.inf,shape=s,dtype=np.float32) for k,s in shapes.items()})
 
 
-class Value(nn.Module):
-    def __init__(self,trunk):
-        super().__init__(); self.trunk=trunk
-
-    def forward(self,evidence,expert_mask,account,market,policy_q):
-        return self.trunk(evidence,expert_mask,account,policy_q)["value"].mean(-1,keepdim=True)
+def asset_observations(obs,spec):
+    return {'account':obs['account'],'market':obs['market'],'expert_mask':obs['expert_mask'].float(),
+        **{'e_'+k:obs['evidence'][k] for k in spec['expert_ids']},
+        **{'q_'+k:obs['policy_q'][k] for k in spec['config'].get('stock_policy_ids',[])}}
 
 
-def build_policy(model_spec, initial_state=None, *, legacy=False):
-    trunk=MoETrunk(model_spec)
+class RegisteredActor(nn.Module):
+    def __init__(self,spec):
+        super().__init__();self.model_spec={**spec,'policy_family':POLICY_FAMILY}
+        self.backend=SACPolicy(spaces_for(spec),gym.spaces.Box(-1,1,(2,),dtype=np.float32),lambda _:0.0003,
+            net_arch={'pi':[],'qf':[256,256]},features_extractor_class=MoEFeatures,
+            features_extractor_kwargs={'spec':spec},share_features_extractor=True,normalize_images=False)
+        # The official Actor starts from the retained allocation and cash opinions.
+        with torch.no_grad():
+            self.backend.actor.mu.weight.zero_();self.backend.actor.mu.bias.zero_()
+            self.backend.actor.mu.weight[0,-2]=1;self.backend.actor.mu.weight[1,-1]=1
+            self.backend.actor.log_std.weight.zero_();self.backend.actor.log_std.bias.fill_(-3)
+        self.engine=None
+    def forward(self,td,deterministic=False):
+        inputs=asset_observations(td,self.model_spec)
+        actions=self.backend.actor(inputs,deterministic=deterministic)
+        td['action']=actions
+        td['state_value']=torch.cat(self.backend.critic(inputs,actions),-1).mean().reshape(1)
+        td['policy_family']=POLICY_FAMILY
+        return td
+
+
+class RegisteredCritic(nn.Module):
+    def __init__(self,actor):
+        super().__init__();self.network=actor.backend.critic;self.spec=actor.model_spec
+    def forward(self,td):
+        td['state_value']=torch.cat(self.network(asset_observations(td,self.spec),td['action']),-1).mean().reshape(1)
+        return td
+
+
+def build_policy(model_spec,initial_state=None):
+    actor=RegisteredActor(model_spec);critic=RegisteredCritic(actor)
+    actor.backend.critic_target.requires_grad_(False)
     if initial_state is not None:
-        trunk.load_state_dict(initial_state,strict=True)
-    module=TensorDictModule(Allocator(trunk,legacy),in_keys=INPUT_KEYS,
-        out_keys=["concentration","state_value"] if legacy else ['loc','scale','state_value'])
-    actor=ProbabilisticActor(module,in_keys=['concentration'] if legacy else ['loc','scale'],out_keys=['action'],
-        distribution_class=Dirichlet if legacy else IndependentNormal,return_log_prob=True)
-    critic=TensorDictModule(Value(trunk),in_keys=INPUT_KEYS,out_keys=["state_value"])
-    actor.model_spec={**model_spec,'policy_family':'dirichlet-v1' if legacy else 'sparse-normal-v2'}
+        from .policy_transfer import transfer_state
+        transfer_state(actor.backend.actor.features_extractor.trunk,initial_state)
     return actor,critic
 
 
 def parameters(actor,critic):
-    # Actor and critic share the real Champion trunk; each parameter is optimized once.
     return list({id(p):p for p in list(actor.parameters())+list(critic.parameters())}.values())
 
+def parameter_names(actor,critic):
+    seen=set();result=[]
+    for prefix,module in [('',actor),('critic.',critic)]:
+        for name,param in module.named_parameters():
+            if id(param) in seen:continue
+            seen.add(id(param));result.append((prefix+name,param))
+    return result
 
 def activate_policy(actor,critic,active):
     active=set(active);ids=set(actor.model_spec['expert_ids'])
-    if not active.issubset(ids):raise ValueError('등록되지 않은 Expert 슬롯')
+    if not active.issubset(ids):raise ValueError('unregistered Expert slot')
     actor.model_spec['active_experts']=sorted(active)
     for module in actor.modules():
         if isinstance(module,MoETrunk):module.active=active
     for name,param in actor.named_parameters():
-        parts=name.split('.');owned=set()
-        for index,part in enumerate(parts[:-1]):
-            if part in ('adapters','router','context_routers','policy_adapters','policy_router','projections') and parts[index+1] in ids:
-                owned.add(parts[index+1])
-        param.requires_grad_(not owned or bool(owned.intersection(active)))
+        parts=name.split('.');owners=set(parts)&ids
+        param.requires_grad_(not owners or bool(owners&active))
         if not param.requires_grad:param.grad=None
-
+    actor.backend.critic_target.requires_grad_(False)
 
 def sparse_weights(logits):
-    shifted=logits-logits.max(-1,keepdim=True).values
-    ordered=shifted.sort(-1,descending=True).values
-    rank=torch.arange(1,ordered.shape[-1]+1,device=logits.device,dtype=logits.dtype)
-    cumulative=ordered.cumsum(-1)
-    support=1+rank*ordered>cumulative
-    count=support.sum(-1,keepdim=True).clamp_min(1)
+    shifted=logits-logits.max(-1,keepdim=True).values;ordered=shifted.sort(-1,descending=True).values
+    rank=torch.arange(1,ordered.shape[-1]+1,device=logits.device,dtype=logits.dtype);cumulative=ordered.cumsum(-1)
+    support=1+rank*ordered>cumulative;count=support.sum(-1,keepdim=True).clamp_min(1)
     threshold=(cumulative.gather(-1,count-1)-1)/count
     return (shifted-threshold).clamp_min(0)
 
-
-def migrate_policy(state,learning):
-    """Keep learned MoE/allocator weights and Adam moments when adding sparse allocation."""
-    old_actor,old_critic=build_policy(state['model_spec'],legacy=True)
-    old_actor.load_state_dict(state['actor']);old_critic.load_state_dict(state['critic'])
-    actor,critic=build_policy(state['model_spec'])
-    result=actor.load_state_dict(state['actor'],strict=False)
-    if result.unexpected_keys or any(not k.endswith('log_scale') for k in result.missing_keys):
-        raise ValueError('이전 정책의 가중치 구성이 예상과 다릅니다.')
-    critic.load_state_dict(state['critic'])
-    optimizer=torch.optim.AdamW(parameters(actor,critic),lr=learning.learning_rate)
-    if state.get('optimizer'):
-        old_optimizer=torch.optim.AdamW(parameters(old_actor,old_critic),lr=learning.learning_rate)
-        old_optimizer.load_state_dict(state['optimizer'])
-        new=dict(actor.named_parameters());old=dict(old_actor.named_parameters())
-        for name,parameter in old.items():
-            if parameter in old_optimizer.state:
-                optimizer.state[new[name]]={k:v.clone() if torch.is_tensor(v) else v for k,v in old_optimizer.state[parameter].items()}
-    return actor,critic,optimizer
-
-
 def observation(evidence,mask,account,market,policy_q):
-    return TensorDict({"evidence":{k:torch.as_tensor(v,dtype=torch.float32) for k,v in evidence.items()},
-                       "expert_mask":torch.as_tensor(mask,dtype=torch.bool),
-                       "account":torch.as_tensor(account,dtype=torch.float32),
-                       "market":torch.as_tensor(market,dtype=torch.float32),
-                       "policy_q":{k:torch.as_tensor(v,dtype=torch.float32) for k,v in policy_q.items()}},batch_size=[])
-
+    return TensorDict({'evidence':{k:torch.as_tensor(v,dtype=torch.float32) for k,v in evidence.items()},
+        'expert_mask':torch.as_tensor(mask,dtype=torch.bool),'account':torch.as_tensor(account,dtype=torch.float32),
+        'market':torch.as_tensor(market,dtype=torch.float32),'policy_q':{k:torch.as_tensor(v,dtype=torch.float32) for k,v in policy_q.items()}},batch_size=[])
 
 @torch.no_grad()
 def decide(actor,critic,obs,*,explore):
     obs=obs.to(next(actor.parameters()).device)
-    with set_exploration_type(ExplorationType.RANDOM if explore else ExplorationType.MEAN):
-        actor(obs)
-    weights=obs['action'] if actor.model_spec.get('policy_family')=='dirichlet-v1' else sparse_weights(obs['action'])
-    # Only the compact action and durable experience leave the GPU pipeline.
-    return weights.cpu().numpy(),obs.detach().to('cpu').clone()
+    with torch.autocast('cuda',dtype=torch.bfloat16,enabled=next(actor.parameters()).is_cuda):
+        actor(obs,deterministic=not explore)
+    actions=obs['action'].float()
+    available=obs['expert_mask'].any(-1)
+    scores=actions[:,0].masked_fill(~available,-1e6)
+    cash=actions[available,1].mean() if available.any() else actions.new_tensor(1.)
+    logits=torch.cat([scores,cash.reshape(1)])
+    return sparse_weights(logits).cpu().numpy(),obs.detach().to('cpu').clone()
+
+
+def migrate_policy(state,learning):
+    from .model_composition import compose_policy
+    return compose_policy(state,state['model_spec'],learning)

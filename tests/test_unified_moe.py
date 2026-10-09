@@ -1,4 +1,4 @@
-"""Integrated body membership, GPU evidence/PPO and shared input regressions."""
+"""Integrated body membership, GPU evidence/SAC and shared input regressions."""
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,7 +15,7 @@ from stockrl.platform.observations import prepare_evidence
 from stockrl.platform.tensor_evidence import prepare_tensor_evidence
 from stockrl.platform.moe_session import MoESession,optimizer_to
 from stockrl.platform.policy import build_policy,parameters,decide,INPUT_KEYS
-from stockrl.platform.learner import learn_batch
+from stockrl.platform.learner import register,ingest,training_state
 from stockrl.platform.config import LearningSettings
 from stockrl.platform.checkpoint import Checkpoints
 from stockrl.moe_native import native_call
@@ -105,32 +105,27 @@ class UnifiedMoETests(unittest.TestCase):
             self.assertEqual(list(session.evidence(['a'])),['a'])
 
     @unittest.skipUnless(torch.cuda.is_available(),'CUDA required')
-    def test_cuda_ppo_preserves_cpu_checkpoint_moments_and_updates_central_weights(self):
+    def test_official_sac_updates_on_cuda_and_resumes(self):
+        from stockrl.platform.policy import asset_observations
         torch.set_num_threads(2)
-        actor,critic=build_policy(spec());opt=torch.optim.AdamW(parameters(actor,critic),lr=.001)
-        for p in parameters(actor,critic):p.grad=torch.ones_like(p)*.01
-        opt.step();opt.zero_grad(set_to_none=True)
+        actor,critic=build_policy(spec());actor.to('cuda');critic.to('cuda')
+        engine=register(actor,LearningSettings(buffer_size=256),'cuda')
+        before=next(actor.backend.actor.parameters()).detach().clone()
+        for _ in range(8):
+            _,td=decide(actor,critic,obs(),explore=True)
+            inputs=asset_observations(td,actor.model_spec)
+            for i in range(2):
+                row={k:v[i].numpy()[None] for k,v in inputs.items()}
+                engine.replay_buffer.add(row,row,td['action'][i].numpy()[None],np.array([.01]),np.array([0]),[{}])
+        engine.train(1,4)
+        self.assertFalse(torch.equal(before,next(actor.backend.actor.parameters())))
+        self.assertEqual(engine._n_updates,1)
         with tempfile.TemporaryDirectory() as directory:
-            cps=Checkpoints(Path(directory));cps.save(actor,critic,opt,9,spec()['expert_ids'],optimizer_steps=330)
-            saved,_=cps.load();actor2,critic2=build_policy(saved['model_spec'])
-            actor2.load_state_dict(saved['actor']);critic2.load_state_dict(saved['critic'])
-            actor2.cuda();critic2.cuda();opt2=torch.optim.AdamW(parameters(actor2,critic2),lr=.001)
-            opt2.load_state_dict(saved['optimizer']);optimizer_to(opt2,'cuda:0')
-            for old,new in zip(parameters(actor,critic),parameters(actor2,critic2)):
-                torch.testing.assert_close(old,new.cpu())
-                torch.testing.assert_close(opt.state[old]['exp_avg'],opt2.state[new]['exp_avg'].cpu())
-                self.assertTrue(opt2.state[new]['exp_avg'].is_cuda)
-            before=next(actor2.parameters()).detach().clone();rows=[]
-            for i in range(4):
-                _,td=decide(actor2,critic2,obs(),explore=True)
-                row=td.select(*INPUT_KEYS,'action','action_log_prob','state_value').to_dict()
-                row['next']={**obs().to_dict(),'reward':torch.tensor([.01*i]),'done':torch.tensor([False])};rows.append(row)
-            loss,steps=learn_batch(actor2,critic2,opt2,rows,LearningSettings(epochs=1))
-            self.assertTrue(np.isfinite(loss));self.assertGreater(steps,0)
-            self.assertFalse(torch.equal(before,next(actor2.parameters())))
-            cps.save(actor2,critic2,opt2,10,spec()['expert_ids'],optimizer_steps=330+steps)
-            restored,_=cps.load();self.assertEqual(restored['optimizer_steps'],331)
-            self.assertTrue(all(v.device.type=='cpu' for v in restored['actor'].values()))
-
-
-if __name__=='__main__':unittest.main()
+            cps=Checkpoints(Path(directory));cps.save(actor,critic,None,2,spec()['expert_ids'],optimizer_steps=331)
+            saved,_=cps.load();self.assertEqual(saved['sac']['updates'],1)
+            a,c=build_policy(saved['model_spec']);a.load_state_dict(saved['actor']);c.load_state_dict(saved['critic']);a.to('cuda')
+            resumed=register(a,LearningSettings(buffer_size=256),'cuda',saved['sac'])
+            self.assertEqual(resumed._n_updates,1)
+            file=Path(directory)/'replay.pkl';engine.save_replay_buffer(file);resumed.load_replay_buffer(file)
+            self.assertEqual(resumed.replay_buffer.size(),16)
+            resumed.train(1,4);self.assertEqual(resumed._n_updates,2)

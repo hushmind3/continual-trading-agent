@@ -163,7 +163,7 @@ class Runtime:
                            "requested":self.wanted(role),"retries":self.retries.get(role,(0,0))[0]}
         agent=workers["agent"]; expert=workers["experts"]; learner=workers["learner"]
         feed=read_json(self.root/"live"/"live_feed_metrics.json")
-        replay=self.journal.stats(agent.get("rollout_generation",agent.get("version",0)),self.settings.learning.max_policy_lag)
+        replay=learner.get("replay") or self.journal.stats(agent.get("rollout_generation",agent.get("version",0)),0)
         training=readiness(self.controls,workers,replay,self.settings.learning)
         if self.library.active and self.library.snapshot()['job'].get('kind') not in ONLINE_LIBRARY_JOBS:
             training.update(code='composition',label='Expert 구성 적용 중',detail=self.library.snapshot()['job'].get('detail','학습 상태를 이어받는 중'),action=None)

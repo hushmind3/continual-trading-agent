@@ -10,7 +10,7 @@ from .config import load_settings, CONFIG_PATH
 from .journal import Journal
 from .checkpoint import Checkpoints
 from .model_asset import load_moe_head,validate_source
-from .policy import build_policy,migrate_policy,activate_policy,parameters
+from .policy import build_policy,migrate_policy,activate_policy,parameters,POLICY_FAMILY
 from .selection import selection
 from .weights import PortfolioStrategy
 from .environment import PortfolioEnvironment,market_view
@@ -35,6 +35,7 @@ def run(settings, *, session=None):
             actor,critic=build_policy(recovered['model_spec']);actor.load_state_dict(recovered['actor']);critic.load_state_dict(recovered['critic'])
             optimizer=torch.optim.AdamW(parameters(actor,critic),lr=settings.learning.learning_rate)
             if recovered.get('optimizer'):optimizer.load_state_dict(recovered['optimizer'])
+            actor.sac_saved=recovered.get('sac')
             manifest=checkpoints.save(actor,critic,optimizer,recovered['version'],recovered['expert_ids'],
                 optimizer_steps=recovered.get('optimizer_steps',0),optimization_generation=recovered.get('optimization_generation',recovered['version']))
             state=recovered
@@ -43,7 +44,7 @@ def run(settings, *, session=None):
         validate_source(state["model_spec"],source_spec)
         spec=state["model_spec"]
         spec['source_model']=str(settings.resolve(settings.expert_checkpoint))
-        if spec.get('policy_family')!='sparse-normal-v2':
+        if spec.get('policy_family')!=POLICY_FAMILY:
             actor,critic,optimizer=migrate_policy(state,settings.learning)
             manifest=checkpoints.save(actor,critic,optimizer,state['version']+1,state['expert_ids'],
                                       optimizer_steps=state.get('optimizer_steps',0))
@@ -52,6 +53,7 @@ def run(settings, *, session=None):
         else:
             actor,critic=build_policy(spec)
             actor.load_state_dict(state["actor"]); critic.load_state_dict(state["critic"])
+            actor.sac_saved=state.get("sac")
     else:
         spec=source_spec
         actor,critic=build_policy(spec,original)
@@ -63,7 +65,7 @@ def run(settings, *, session=None):
     version=manifest["version"]
     generation=state.get('optimization_generation',version) if state else version
     environment=PortfolioEnvironment(settings,journal,spec,device=device if session else None)
-    contract='sparse-separate-currency-portfolio-v4'
+    contract='sac-separate-currency-portfolio-v1'
     if journal.get_state('execution_contract')!=contract:
         with journal.transaction():
             journal.db.execute('UPDATE transitions SET learned=-1 WHERE learned IS NULL')
@@ -81,7 +83,7 @@ def run(settings, *, session=None):
     try:
         publish(settings,"agent",status="ready",version=version,source_updates=spec["source_updates"],
                 expert_count=len(selected),model=spec["source_model"],device=str(device),
-                **(session.metadata(actor) if session else {}),message="Champion MoE 학습 상태를 이어받았습니다.")
+                **(session.metadata(actor,critic) if session else {}),message="Champion MoE 학습 상태를 이어받았습니다.")
         while not is_stopped():
             revision,active=selection(settings,spec.get('active_experts',spec['expert_ids']))
             if revision!=selected_revision:
@@ -94,7 +96,7 @@ def run(settings, *, session=None):
                 new,record=checkpoints.load()
                 if new["model_spec"]["expert_ids"]!=spec["expert_ids"]:
                     raise ValueError("정책과 Expert 자산 구성이 다릅니다.")
-                if new['model_spec'].get('policy_family')!='sparse-normal-v2':
+                if new['model_spec'].get('policy_family')!=POLICY_FAMILY:
                     actor,critic,optimizer=migrate_policy(new,settings.learning)
                     record=checkpoints.save(actor,critic,optimizer,new['version']+1,new['expert_ids'],
                                             optimizer_steps=new.get('optimizer_steps',0))
@@ -164,7 +166,7 @@ def run(settings, *, session=None):
                         fills=fills[-20:],decision_seconds=time.perf_counter()-started,
                         checkpoint=manifest,source_updates=spec["source_updates"],expert_count=len(active))
             publish(settings,"agent",status="running" if latest else "waiting",version=version,last_as_of=last_decision,market_cursor=last,
-                    **(session.metadata(actor) if session else {}),
+                    **(session.metadata(actor,critic) if session else {}),
                     message="새로운 완료 시세 대기" if not indices else None)
             time.sleep(0.5)
     finally:

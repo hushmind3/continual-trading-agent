@@ -6,7 +6,7 @@ from stockrl.platform.quantized_linear import pack_weight,PackedLinear,restore_p
 from stockrl.platform.batch_readiness import batch_plan
 from stockrl.platform.config import LearningSettings
 from stockrl.platform.model_composition import compose_policy
-from stockrl.platform.policy import build_policy,parameters
+from stockrl.platform.policy import parameter_names,build_policy,parameters
 from stockrl.platform.expert_inputs import admission_input
 from stockrl.platform.expert_conversion import quality_check
 from stockrl.platform.work_devices import choose_device
@@ -84,7 +84,7 @@ class PrecisionTests(unittest.TestCase):
         self.assertFalse(can_extend(previous,{'config':{'feature_sizes':{'a':4}}}))
 
     def test_added_unavailable_slot_preserves_behavior_and_value(self):
-        ids=['a','b'];cfg={'feature_sizes':{'a':4,'b':6},'stock_policy_ids':[],'router_family':'per-expert-context-v1'}
+        ids=['a','b'];cfg={'feature_sizes':{'a':4,'b':6},'stock_policy_ids':[],'central':{'hidden_size':32,'head_dim':16,'num_attention_heads':2,'num_key_value_heads':1,'intermediate_size':96},'router_family':'per-expert-context-v1'}
         actor,critic=build_policy({'expert_ids':ids,'config':cfg});actor.eval();critic.eval()
         old=observation({'a':np.ones((2,4)),'b':np.ones((2,6))},np.ones((2,2),bool),np.ones((2,16)),np.ones((2,8)),{})
         saved={'expert_ids':ids,'actor':actor.state_dict(),'critic':critic.state_dict()}
@@ -94,8 +94,8 @@ class PrecisionTests(unittest.TestCase):
         from tensordict import TensorDict
         expanded=TensorDict(expanded,batch_size=[])
         with torch.no_grad():
-            actor(old);critic(old);new(expanded);new_critic(expanded)
-        self.assertTrue(torch.allclose(old['loc'],expanded['loc'],atol=1e-6))
+            actor(old,deterministic=True);critic(old);new(expanded,deterministic=True);new_critic(expanded)
+        self.assertTrue(torch.allclose(old['action'],expanded['action'],atol=1e-6))
         self.assertTrue(torch.allclose(old['state_value'],expanded['state_value'],atol=1e-6))
     def test_official_bolt_definition_restores_frozen_and_handles_dynamic_batch(self):
         cfg=dict(architectures=['ChronosBoltModelForForecasting'],decoder_start_token_id=0,pad_token_id=0,eos_token_id=1,d_model=16,d_ff=32,num_layers=1,num_decoder_layers=1,num_heads=2,d_kv=8,
@@ -173,7 +173,7 @@ class PrecisionTests(unittest.TestCase):
         self.assertEqual(linear_layers(tied),{})
 
     def test_live_batch_timeout_never_trains_singletons_or_mixed_groups(self):
-        settings=LearningSettings()
+        settings=LearningSettings(minimum_batch_size=4)
         replay={'batch_ready':7,'groups':[{'ready':7,'oldest_created':100}]}
         self.assertEqual(batch_plan(replay,settings,now=399)['required'],32)
         self.assertEqual(batch_plan(replay,settings,now=400)['required'],7)
@@ -183,11 +183,11 @@ class PrecisionTests(unittest.TestCase):
         self.assertEqual(batch_plan(replay,settings,now=401)['required'],32)
 
     def test_precision_variant_inherits_learned_slot_and_independent_adam(self):
-        cfg={'feature_sizes':{'market':4},'stock_policy_ids':[],'router_family':'per-expert-context-v1'}
+        cfg={'feature_sizes':{'market':4},'stock_policy_ids':[],'central':{'hidden_size':32,'head_dim':16,'num_attention_heads':2,'num_key_value_heads':1,'intermediate_size':96},'router_family':'per-expert-context-v1'}
         actor,critic=build_policy({'expert_ids':['market'],'config':cfg})
         optimizer=torch.optim.AdamW(parameters(actor,critic),lr=.003)
         sum(p.square().sum() for p in actor.parameters()).backward();optimizer.step()
-        saved={'expert_ids':['market'],'actor':actor.state_dict(),'critic':critic.state_dict(),'optimizer':optimizer.state_dict()}
+        saved={'expert_ids':['market'],'actor':actor.state_dict(),'critic':critic.state_dict(),'optimizer':optimizer.state_dict(),'optimizer_names':[n for n,_ in parameter_names(actor,critic)]}
         spec={'expert_ids':['market','market_int4'],'active_experts':['market_int4'],
               'config':{**cfg,'feature_sizes':{'market':4,'market_int4':4}},'slot_sources':{'market_int4':'market'}}
         result,_,opt=compose_policy(saved,spec,LearningSettings())
@@ -196,6 +196,8 @@ class PrecisionTests(unittest.TestCase):
             if 'market_int4' not in name.split('.'):continue
             original=source[name.replace('.market_int4.','.market.')]
             self.assertTrue(torch.equal(param,original),name)
+            if name.startswith('backend.actor.'):
+                self.assertIn('exp_avg',opt.state[param])
             for key,value in opt.state[param].items():
                 self.assertTrue(torch.equal(value,optimizer.state[original][key]))
                 self.assertNotEqual(value.data_ptr(),optimizer.state[original][key].data_ptr())

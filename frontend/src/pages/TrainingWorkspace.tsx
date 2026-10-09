@@ -64,14 +64,13 @@ export function TrainingWorkspace() {
           <div>
             <div className="flex items-center gap-2 text-xs font-medium text-violet-600">
               <Workflow size={15} />
-              TorchRL PPO
+              FinRL-X · 공식 SAC
             </div>
             <h2 className="mt-2 text-2xl font-bold">
               실제 손익으로 가중치 업데이트
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-              Expert는 고정합니다. 기존 MoE 결합부와 비중 Allocator를 별도 CPU
-              프로세스에서 학습합니다.
+              Expert는 고정합니다. 공식 SAC Actor와 Twin Critic이 MoE 출력을 이용해 GPU에서 학습하고, 공식 Replay Buffer에서 과거 경험을 다시 꺼냅니다.
             </p>
           </div>
           <div className="space-y-3 text-right">
@@ -85,7 +84,7 @@ export function TrainingWorkspace() {
             value={number(state.agent.source_updates, 0) + "회"}
           />
           <Count
-            label="TorchRL 가중치 업데이트"
+            label="중앙 가중치 업데이트"
             value={number(learner.optimizer_steps ?? 0, 0) + "회"}
           />
           <Count
@@ -110,19 +109,19 @@ export function TrainingWorkspace() {
             {
               title: "결과 확정",
               value: state.replay.total,
-              note: "비용 반영 순자산 변화",
+              note: "통화별 계좌 경험 · 비용 반영",
               icon: Database,
             },
             {
-              title: "학습 대기",
+              title: "Replay 보관",
               value: state.replay.ready,
-              note: `동일 구성 ${batch}개 · 수집 시간에 맞춰 조절`,
+              note: `종목 샘플 · 최소 ${state.settings.learning.minimum_batch_size}개부터 재사용`,
               icon: Workflow,
             },
             {
-              title: "학습 완료",
+              title: "Replay 등록",
               value: state.replay.completed,
-              note: "정책 · 처리 여부 저장",
+              note: "재시작 후에도 경험 복원",
               icon: Check,
             },
           ].map((phase, i) => (
@@ -148,7 +147,7 @@ export function TrainingWorkspace() {
           <Meter
             value={(state.replay.batch_ready / batch) * 100}
             label="다음 학습 배치"
-            detail={`${Math.min(state.replay.batch_ready, batch)} / ${batch} · 같은 종목 구성 기준`}
+            detail={`${Math.min(state.replay.batch_ready, batch)} / ${batch} · 공식 Replay 샘플 기준`}
             color="bg-violet-500"
           />
         </div>
@@ -172,6 +171,7 @@ export function TrainingWorkspace() {
           달러 기록 평가
         </Button>
       </section>
+      <HelpDisclosure title="공식 SAC · 경험 재사용 · Actor와 Critic"><p>학습 엔진은 Stable-Baselines3 SAC입니다. Actor는 종목 비중 점수와 현금 선호를 출력하고, Twin Critic과 Target Critic은 그 행동의 가치를 평가합니다.</p><p>MoE를 공식 정책의 FeaturesExtractor로 등록했습니다. 종목마다 동일한 중앙 정책을 공유하므로 종목 개수를 고정하지 않습니다. 통화별 계좌의 실제 보상을 공유하며, 종목별 독립 수익으로 꾸며내지 않습니다.</p><p>Replay Buffer는 경험을 한 번 쓰고 버리지 않고 반복 샘플링합니다. 학습 대기는 버퍼의 실제 경험 수와 업데이트 간격을 기준으로 표시합니다.</p></HelpDisclosure>
       <div className="grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
         <section>
           <h3 className="mb-4 text-sm font-bold">마지막 학습 결과 · 처리 지표</h3>
@@ -201,6 +201,8 @@ export function TrainingWorkspace() {
                     ? `${number(measurement.seconds, 3)}s`
                     : "측정 대기",
               },
+              { label: "Actor loss", value: measurement.actor_loss!=null?number(measurement.actor_loss,6):"측정 대기" },
+              { label: "Twin Critic loss", value: measurement.critic_loss!=null?number(measurement.critic_loss,6):"측정 대기" },
               { label: "경험 저장 크기", value: bytes(state.replay.bytes) },
               {
                 label: "이전 정책 · 체결 조건으로 제외",
@@ -220,9 +222,9 @@ export function TrainingWorkspace() {
             <dl className="mt-4 space-y-2 text-xs text-slate-400">
               <div>Learning rate {state.settings.learning.learning_rate}</div>
               <div>
-                목표 배치 {state.settings.learning.batch_size} · 최소 {state.settings.learning.minimum_batch_size}개 · 수집 {state.settings.learning.batch_wait_seconds}초 후 작은 배치 허용 · Epoch {state.settings.learning.epochs}
+                Replay 배치 {state.settings.learning.batch_size} · 최소 {state.settings.learning.minimum_batch_size}개 · 업데이트 {state.settings.learning.gradient_steps}회
               </div>
-              <div>PPO clip {state.settings.learning.clip_epsilon}</div>
+              <div>SAC τ {state.settings.learning.tau} · Replay 최대 {state.settings.learning.buffer_size.toLocaleString()}개 · 엔트로피 {state.settings.learning.entropy_coefficient}</div>
               <div>CPU {state.settings.learning.cpu_threads} threads</div>
             </dl>
           </details>

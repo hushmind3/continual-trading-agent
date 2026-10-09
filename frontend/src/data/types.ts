@@ -18,6 +18,7 @@ export interface Worker {
   active_expert?: string | null;
   inference_seconds?: number;
   loss?: number;
+  actor_loss?:number;critic_loss?:number;entropy_coefficient?:number;
   samples?: number;
   last_update?: {version:number;samples:number;optimizer_steps?:number;updated_at?:number};
   samples_per_second?: number;
@@ -28,6 +29,7 @@ export interface Worker {
   execution?:string;
   trainable_parameters?:number;
   central_parameters?:number;
+  hidden_size?:number;attention_heads?:number;ffn_size?:number;
   central_weight_bytes?:number;
   frozen_parameters?:number;
   frozen_weight_bytes?:number;
@@ -114,11 +116,12 @@ export interface OpsSettings {
     batch_size: number;
     minimum_batch_size: number;
     batch_wait_seconds: number;
-    epochs: number;
+    gradient_steps: number;
+    buffer_size: number;
+    tau: number;
+    entropy_coefficient:number|string;
     learning_rate: number;
     discount: number;
-    clip_epsilon: number;
-    max_policy_lag: number;
     checkpoint_seconds: number;
     cpu_threads: number;
   };
@@ -151,7 +154,8 @@ export interface Event {
   read: boolean;
 }
 export interface Snapshot {
-  last_learning?:{time:number|null;detail:string|null;measurement?:{loss?:number;seconds?:number;samples_per_second?:number;samples?:number;updated_at?:number}|null};
+  rehearsal?:{reusable:number;sampled_total:number;sampled_unique:number;repeated_draws:number;regimes:Record<string,number>;linked_experiences:number;last_horizons:number[];incompatible:number};
+  last_learning?:{time:number|null;detail:string|null;measurement?:{actor_loss?:number;critic_loss?:number;loss?:number;seconds?:number;samples_per_second?:number;samples?:number;updated_at?:number}|null};
   progress?:Record<string,{code:string;label:string;service_alive:boolean;heartbeat_at:number|null;last_completed_at:number|null;source_as_of?:string|number|null;counters:Record<string,number|null>;changes:Record<string,number|null>;observed_seconds:number;window_seconds:number;detail?:string|null}>;
   library?:import('./library').LibraryState;
   architecture: string;

@@ -1,4 +1,4 @@
-"""Portfolio-contract, actual MoE state, TorchRL learning and crash recovery regressions."""
+"""Portfolio-contract, actual MoE state, 공식 SAC learning and crash recovery regressions."""
 import hashlib
 import tempfile
 import unittest
@@ -10,10 +10,9 @@ import torch
 from tensordict import TensorDict
 from strategies.base_strategy import StrategyResult
 
-from stockrl.platform.policy import build_policy,observation,decide,parameters,INPUT_KEYS,MoETrunk,sparse_weights,migrate_policy
+from stockrl.platform.policy import parameter_names,build_policy,observation,decide,parameters,INPUT_KEYS,MoETrunk,sparse_weights,migrate_policy
 from stockrl.platform.model_asset import load_moe_head,validate_source
 from stockrl.platform.config import LearningSettings,RiskSettings,Settings
-from stockrl.platform.learner import learn_batch
 from stockrl.platform.journal import Journal
 from stockrl.platform.checkpoint import Checkpoints
 from stockrl.platform.weights import executable_weights,evaluate_recorded_weights
@@ -23,7 +22,7 @@ from stockrl.platform.environment import PortfolioEnvironment,market_view
 
 def spec():
     return {"expert_ids":["chronos","stock_test"],"config":{
-        "feature_sizes":{"chronos":4,"stock_test":5},"stock_policy_ids":["stock_test"]},"source_updates":9}
+        "feature_sizes":{"chronos":4,"stock_test":5},"stock_policy_ids":["stock_test"],"central":{'hidden_size':32,'head_dim':16,'num_attention_heads':2,'num_key_value_heads':1,'intermediate_size':96}},"source_updates":9}
 
 
 def obs(n=2):
@@ -51,20 +50,6 @@ class MoEPolicyTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(),digest)
             self.assertFalse(any(name.startswith('experts.') for name,_ in actor.named_parameters()))
 
-    def test_torchrl_updates_real_moe_and_accepts_variable_asset_count(self):
-        actor,critic=build_policy(spec());trunk=next(m for m in actor.modules() if isinstance(m,MoETrunk));initial=next(trunk.parameters()).detach().clone(); rows=[]
-        for i in range(8):
-            weights,td=decide(actor,critic,obs(),explore=True)
-            self.assertAlmostEqual(float(weights.sum()),1,places=5)
-            row=td.select(*INPUT_KEYS,'action','action_log_prob','state_value').to_dict()
-            row['next']={**obs().to_dict(),'reward':torch.tensor([.01*i]),'done':torch.tensor([False])}
-            rows.append(row)
-        optimizer=torch.optim.AdamW(parameters(actor,critic),lr=.001)
-        loss,steps=learn_batch(actor,critic,optimizer,rows,LearningSettings(batch_size=8,epochs=2))
-        self.assertTrue(np.isfinite(loss)); self.assertGreater(steps,0)
-        self.assertFalse(torch.equal(initial,next(trunk.parameters())))
-        self.assertEqual(decide(actor,critic,obs(5),explore=False)[0].shape,(6,))
-        self.assertEqual(len(parameters(actor,critic)),len({id(p) for p in parameters(actor,critic)}))
 
     def test_future_and_missing_native_inputs_are_not_relabelled(self):
         packet={"expert":"chronos","as_of":"2026-01-02","symbols":["A"],"native_output":[[.1]],
@@ -111,20 +96,23 @@ class MoEPolicyTests(unittest.TestCase):
         actor,critic=build_policy(spec())
         weights,td=decide(actor,critic,obs(5),explore=True)
         self.assertAlmostEqual(float(weights.sum()),1.,places=5)
-        torch.testing.assert_close(actor.get_dist(td).log_prob(td['action']),td['action_log_prob'])
+        self.assertEqual(tuple(td['action'].shape),(5,2))
+        self.assertTrue((td['action'].abs()<=1).all())
 
-    def test_policy_migration_preserves_weights_and_adam_history(self):
-        old,old_value=build_policy(spec(),legacy=True)
-        opt=torch.optim.AdamW(parameters(old,old_value),lr=.001)
-        for p in parameters(old,old_value):p.grad=torch.ones_like(p)*.01
-        opt.step()
-        saved={'model_spec':old.model_spec,'actor':old.state_dict(),'critic':old_value.state_dict(),'optimizer':opt.state_dict()}
-        actor,critic,optimizer=migrate_policy(saved,LearningSettings())
-        old_names=dict(old.named_parameters());new_names=dict(actor.named_parameters())
-        for name,p in old_names.items():
-            torch.testing.assert_close(p,new_names[name],rtol=0,atol=0)
-            torch.testing.assert_close(opt.state[p]['exp_avg'],optimizer.state[new_names[name]]['exp_avg'])
-        self.assertEqual(actor.model_spec['policy_family'],'sparse-normal-v2')
+
+
+    def test_registered_actor_critic_are_official_and_use_expert_target(self):
+        from stable_baselines3.sac.policies import Actor
+        from stable_baselines3.common.policies import ContinuousCritic
+        from stockrl.platform.policy import asset_observations
+        actor,critic=build_policy(spec())
+        self.assertIs(type(actor.backend.actor),Actor)
+        self.assertIs(type(critic.network),ContinuousCritic)
+        a=obs();b=obs();b['policy_q','stock_test'][:,3]=.9
+        with torch.no_grad():
+            first=actor.backend.actor.get_action_dist_params(asset_observations(a,actor.model_spec))[0]
+            second=actor.backend.actor.get_action_dist_params(asset_observations(b,actor.model_spec))[0]
+        self.assertGreater(float((second[:,0]-first[:,0]).mean()),.5)
 
 
 class DurableOperationsTests(unittest.TestCase):

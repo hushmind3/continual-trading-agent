@@ -7,6 +7,9 @@ def batch_plan(replay, settings, now=None):
     minimum=target if isinstance(settings,int) else min(target,settings.minimum_batch_size)
     wait=0 if isinstance(settings,int) else settings.batch_wait_seconds
     now=time.time() if now is None else now
+    if replay.get('engine')=='sb3-sac':
+        ready=replay.get('batch_ready',0)
+        return dict(ready=ready,required=minimum,target=target,minimum=minimum,adaptive=ready<target,collection_wait_seconds=0)
     groups=replay.get('groups',[])
     full=[g for g in groups if g['ready']>=target]
     eligible=[g for g in groups if g['ready']>=minimum and now-g.get('oldest_created',now)>=wait]

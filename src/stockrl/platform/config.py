@@ -9,14 +9,16 @@ from ..paths import PROJECT_ROOT, DEFAULT_MODEL_DIR
 
 class LearningSettings(BaseModel):
     batch_size: int = Field(32, ge=4, le=1024)
-    minimum_batch_size: int = Field(4, ge=4, le=1024)
+    minimum_batch_size: int = Field(16, ge=4, le=1024)
     batch_wait_seconds: int = Field(300, ge=30, le=3600)
-    epochs: int = Field(4, ge=1, le=20)
+    gradient_steps: int = Field(4,ge=1,le=64)
+    buffer_size: int = Field(100000,ge=256,le=1000000)
+    replay_memory_mib: int = Field(128,ge=16,le=1024)
+    tau: float = Field(.005,gt=0,le=1)
+    target_update_interval: int = Field(1,ge=1)
+    entropy_coefficient: str | float = 'auto_0.002'
     learning_rate: float = Field(0.0003, gt=0, le=0.01)
     discount: float = Field(0.99, ge=0, le=1)
-    clip_epsilon: float = Field(0.2, gt=0, lt=1)
-    entropy_coefficient: float = Field(0.002, ge=0, le=0.1)
-    max_policy_lag: int = Field(2, ge=0, le=10)
     checkpoint_seconds: int = Field(60, ge=5)
     cpu_threads: int = Field(2, ge=1)
 
@@ -77,4 +79,5 @@ CONFIG_PATH = PROJECT_ROOT / "configs" / "operations.json"
 
 
 def load_settings(path: Path = CONFIG_PATH) -> Settings:
-    return Settings.model_validate(json.loads(Path(path).read_text(encoding="utf-8")))
+    values=json.loads(Path(path).read_text(encoding="utf-8"))
+    return Settings.model_validate(values)

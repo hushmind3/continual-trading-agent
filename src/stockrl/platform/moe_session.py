@@ -44,11 +44,14 @@ class MoESession:
             self.packets={k:v for k,v in self.packets.items() if k in active}
             return self.packets.copy()
 
-    def metadata(self, actor):
+    def metadata(self, actor,critic=None):
         from .policy import parameters
-        params=parameters(actor,actor)
+        params=parameters(actor,critic or actor)
         summary=actor.model_spec.get('integrated_summary') or {}
         return dict(execution='unified-gpu-moe-v1',execution_device=str(self.device),
+            hidden_size=actor.model_spec['config'].get('central',{}).get('hidden_size',512),
+            attention_heads=actor.model_spec['config'].get('central',{}).get('num_attention_heads',8),
+            ffn_size=actor.model_spec['config'].get('central',{}).get('intermediate_size',1792),
             central_parameters=sum(p.numel() for p in params),trainable_parameters=sum(p.numel() for p in params if p.requires_grad),
             central_weight_bytes=sum(p.numel()*p.element_size() for p in params),
             frozen_parameters=summary.get('frozen_parameters'),frozen_weight_bytes=summary.get('frozen_weight_bytes'),

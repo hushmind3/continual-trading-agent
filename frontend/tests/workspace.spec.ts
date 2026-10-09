@@ -39,7 +39,7 @@ test('failed automatic admission stays visible with the actual blocking cause',a
 test('diagnostics shows the backend learning cause instead of a generic wait',async({page,request})=>{
  await page.goto('/#system');
  const state=await (await request.get('/api/state')).json();
- const row=page.getByRole('row').filter({hasText:'TorchRL 학습'});
+ const row=page.getByRole('row').filter({hasText:'SAC 학습'});
  await expect(row).toBeVisible();await expect(row.getByText('학습 경험 대기',{exact:true})).toHaveCount(0);
  await expect(row.getByText(state.training.label,{exact:true})).toBeVisible();
 });
@@ -144,8 +144,8 @@ test('all operating routes, history and direct refresh use the served applicatio
  expect(errors).toEqual([]);
 });
 
-test('legacy hashes resolve immediately to the relevant current workspace',async({page})=>{
- for(const [hash,title] of [['assembly','MoE'],['experts','MoE'],['trading-moe','계좌'],['promotionTrial','학습']]){
+test('current routes and unknown routes resolve to the current workspace',async({page})=>{
+ for(const [hash,title] of [['removed-screen','운영'],['moe','MoE'],['portfolio','계좌'],['learning','학습']]){
   await page.goto(`/#${hash}`);await expect(page.getByRole('heading',{name:title,exact:true,level:1})).toBeVisible();
  }
 });

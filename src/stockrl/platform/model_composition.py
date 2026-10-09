@@ -43,38 +43,23 @@ def inherit_slots(values,sources,existing_ids):
 
 
 def compose_policy(saved,spec,learning,initial_state=None):
-    """Preserve every retained slot and shared parameter; initialize only genuinely new slots."""
-    family='sparse-normal-v2' if any(k.endswith('log_scale') for k in saved['actor']) else 'dirichlet-v1'
-    old_market=sorted({name.split('.controller.router.',1)[1].split('.')[0] for name in saved['actor'] if '.controller.router.' in name})
-    actor,critic=build_policy({**spec,'policy_family':family},initial_state,legacy=family=='dirichlet-v1')
+    """Retain matching slots and widen saved tensors; new Qwen blocks initialize independently."""
+    from .policy_transfer import transfer_state,transfer_optimizer
+    from .portfolio_network import DEFAULT_NETWORK
+    spec={**spec,'config':{**spec['config'],'central':{**DEFAULT_NETWORK,**spec['config'].get('central',{})}}}
+    actor,critic=build_policy(spec,initial_state)
+    old_market=sorted({n.split('.controller.router.',1)[1].split('.')[0] for n in saved['actor'] if '.controller.router.' in n})
     for module,values in ((actor,saved['actor']),(critic,saved['critic'])):
-        prior=split_context(values,old_market) if spec['config'].get('router_family')=='per-expert-context-v1' else values
-        prior=inherit_slots(prior,spec.get('slot_sources',{}),saved['expert_ids'])
-        current=module.state_dict()
-        for name,value in prior.items():
-            if name not in current:continue
-            if value.shape!=current[name].shape:raise ValueError('기존 슬롯의 입출력 크기가 바뀌었습니다: '+name)
-            current[name]=value
-        module.load_state_dict(current,strict=True)
-    optimizer=torch.optim.AdamW(parameters(actor,critic),lr=learning.learning_rate)
-    previous=saved.get('optimizer')
-    if previous:
-        groups=previous['param_groups'];names=list(saved['actor'])
-        if len(groups)!=1 or len(groups[0]['params'])!=len(names):raise ValueError('optimizer 파라미터 순서가 다릅니다.')
-        moments={name:previous['state'][i] for name,i in zip(names,groups[0]['params']) if i in previous['state']}
-        transformed={}
-        for name,values in moments.items():
-            for key,value in values.items():
-                if 'router_context.' in name:
-                    prefix,suffix=name.split('router_context.',1)
-                    for index,expert in enumerate(old_market):
-                        target=prefix+'context_routers.'+expert+'.'+suffix
-                        transformed.setdefault(target,{})[key]=value[index:index+1].clone() if torch.is_tensor(value) and value.ndim else value.clone() if torch.is_tensor(value) else value
-                else:transformed.setdefault(name,{})[key]=value.clone() if torch.is_tensor(value) else value
-        transformed=inherit_slots(transformed,spec.get('slot_sources',{}),saved['expert_ids'])
-        for name,param in actor.named_parameters():
-            if name in transformed:optimizer.state[param]={k:v.clone() if torch.is_tensor(v) else v for k,v in transformed[name].items()}
-        optimizer.param_groups[0].update({k:v for k,v in groups[0].items() if k!='params'})
+        previous=split_context(values,old_market)
+        previous=inherit_slots(previous,spec.get('slot_sources',{}),saved.get('expert_ids',(saved.get('model_spec') or spec).get('expert_ids',[])))
+        transfer_state(module,previous)
+    if not any(k.startswith('backend.actor.') for k in saved['actor']):
+        actor.backend.critic_target.load_state_dict(actor.backend.critic.state_dict())
     from .policy import activate_policy
     activate_policy(actor,critic,spec.get('active_experts',spec['expert_ids']))
-    return actor,critic,optimizer
+    from .learner import register
+    engine=register(actor,learning,'cpu',saved.get('sac'))
+    if not saved.get('sac') and saved.get('optimizer'):
+        from .policy_transfer import transfer_optimizer
+        transfer_optimizer(saved,actor,engine.actor.optimizer,critic)
+    return actor,critic,engine.actor.optimizer

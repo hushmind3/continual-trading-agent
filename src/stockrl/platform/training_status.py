@@ -26,5 +26,6 @@ def readiness(controls, workers, replay, batch_size):
         detail=agent.get('error') or agent.get('message') or '사용 가능한 Expert 출력과 새로운 완료 시세가 필요합니다.'
         return status('observing','첫 학습 경험 생성 중',detail)
     timeout=plan['collection_wait_seconds']
+    if replay.get('engine')=='sb3-sac':return status('collecting','Replay 경험 수집 중',f'종목 샘플 {ready}/{batch_size}개 · 비용 반영 결과 대기 {pending}건')
     adaptive_note=f" · {timeout}초 후 최소 {plan['minimum']}개로 학습" if timeout else f" · 최소 {plan['minimum']}개부터 학습"
     return status('collecting','학습 경험 수집 중',f"같은 종목 구성 {ready}/{batch_size}개{adaptive_note if plan['minimum']<batch_size else ''} · 결과 대기 {pending}건")

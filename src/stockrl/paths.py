@@ -13,8 +13,6 @@ DEFAULT_MODEL_DIR = Path.home() / "Desktop" / "모델"
 # code, config, native data and Python environments belong to this project.
 EXPERT_ASSETS_DIR = PROJECT_ROOT / "artifacts" / "experts"
 EXPERT_WEIGHTS_DIR = DEFAULT_MODEL_DIR / "experts"
-TRADING_MOE_CHECKPOINT = DEFAULT_MODEL_DIR / "TradingMoE.pt"
-GPU_OWNER_LOCK = PROJECT_ROOT / "runtime" / "gpu-owner.lock"
 
 
 def expert_weight_path(path: str | Path) -> Path:

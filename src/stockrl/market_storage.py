@@ -32,26 +32,26 @@ class AppendOnlyMarketCSV:
     def __init__(self, path: str | Path):
         self.path = ensure_project_path(path, "market data")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.db_path = self.path.with_suffix(self.path.suffix + ".sqlite3")
-        self.db = sqlite3.connect(self.db_path, timeout=30)
-        self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.execute("CREATE TABLE IF NOT EXISTS seen (symbol TEXT NOT NULL, stamp_ns INTEGER NOT NULL, PRIMARY KEY(symbol,stamp_ns))")
-        self.db.execute("CREATE INDEX IF NOT EXISTS seen_stamp_idx ON seen(stamp_ns)")
-        self.db.commit()
+        from .platform.finrl_modules import DataStore,DataProcessor
+        self.store=DataStore(str(self.path.parent/'data'))
+        self.processor=DataProcessor(str(self.path.parent/'data'))
+        self.db_path=self.store.db_path
+        self.db=sqlite3.connect(self.db_path,timeout=30)
+        self.db.execute('PRAGMA journal_mode=WAL')
         self._next_csv_compaction = self.COMPACT_CSV_BYTES
         self._next_index_compaction = self.COMPACT_INDEX_BYTES
         self._seed_index()
 
     def _seed_index(self) -> None:
-        # Recover keys if a prior process stopped after writing CSV but before
-        # committing the corresponding SQLite transaction.
-        if not self.path.exists() or self.path.stat().st_size == 0:
-            return
-        for chunk in pd.read_csv(self.path, usecols=["date", "symbol"], chunksize=100_000):
-            stamps = pd.to_datetime(chunk["date"], utc=True, errors="coerce")
-            rows = [(str(symbol), int(stamp.value)) for symbol, stamp in zip(chunk.symbol, stamps) if not pd.isna(stamp)]
-            with self.db:
-                self.db.executemany("INSERT OR IGNORE INTO seen VALUES (?,?)", rows)
+        if self.path.exists() and self.path.stat().st_size:
+            for chunk in pd.read_csv(self.path,chunksize=100_000):self._save_prices(chunk)
+
+    def _save_prices(self,frame):
+        canonical=frame.rename(columns={'symbol':'gvkey','date':'datadate','open':'prcod','high':'prchd','low':'prcld','close':'prccd','volume':'cshtrd'}).copy()
+        canonical['ajexdi']=1.
+        canonical=self.processor._clean_price_data(canonical)
+        canonical['datadate']=canonical.datadate.map(lambda value:value.isoformat())
+        return self.store.save_price_data(canonical)
 
     def append(self, rows: list[dict[str, Any]]) -> int:
         unique: list[dict[str, Any]] = []
@@ -62,11 +62,9 @@ class AppendOnlyMarketCSV:
         if not valid:return 0
         symbols=sorted({str(r.get('symbol')) for r in rows if r.get('symbol')})
         existing=set()
-        for start in range(0,len(symbols),400):
-            group=symbols[start:start+400]
-            placeholders=','.join('?' for _ in group)
-            existing.update(self.db.execute(f'SELECT symbol,stamp_ns FROM seen WHERE stamp_ns BETWEEN ? AND ? AND symbol IN ({placeholders})',
-                                            (min(valid),max(valid),*group)).fetchall())
+        stored=self.store.get_price_data(symbols,min(s.isoformat() for s in stamps if not pd.isna(s)),max(s.isoformat() for s in stamps if not pd.isna(s)))
+        if not stored.empty:
+            existing={(str(symbol),int(pd.Timestamp(stamp).value)) for symbol,stamp in zip(stored.tic,stored.datadate)}
         for row,stamp in zip(rows,stamps):
             row = {key: row.get(key) for key in FEED_COLUMNS}
             if pd.isna(stamp) or not row["symbol"]:
@@ -87,9 +85,7 @@ class AppendOnlyMarketCSV:
             writer.writerows(unique)
             f.flush()
             os.fsync(f.fileno())
-        with self.db:
-            self.db.executemany("INSERT OR IGNORE INTO seen VALUES (?,?)",
-                                [(str(r["symbol"]), int(pd.Timestamp(r["date"]).value)) for r in unique])
+        self._save_prices(pd.DataFrame(unique))
         self._compact_if_needed()
         return len(unique)
 
@@ -105,12 +101,12 @@ class AppendOnlyMarketCSV:
         recent_temporary = self.path.with_suffix(self.path.suffix + ".recent.tmp")
         try:
             latest_rows = self.db.execute(
-                "SELECT DISTINCT stamp_ns FROM seen ORDER BY stamp_ns DESC LIMIT ?",
+                "SELECT DISTINCT date FROM price_data ORDER BY date DESC LIMIT ?",
                 (self.RETAIN_TIMESTAMPS,)).fetchall()
             if not latest_rows:
                 return
-            cutoff_ns = int(latest_rows[-1][0]) if len(latest_rows) >= self.RETAIN_TIMESTAMPS else None
-            latest_ns = int(latest_rows[0][0])
+            cutoff_ns = int(pd.Timestamp(latest_rows[-1][0]).value) if len(latest_rows) >= self.RETAIN_TIMESTAMPS else None
+            latest_ns = int(pd.Timestamp(latest_rows[0][0]).value)
             cursor_path = self.path.parent / "agent" / "live_cursor.json"
             try:
                 cursor = json.loads(cursor_path.read_text(encoding="utf-8")).get("last_timestamp")
@@ -120,11 +116,11 @@ class AppendOnlyMarketCSV:
             if cursor_ns is None:
                 return
             context_rows = self.db.execute(
-                "SELECT DISTINCT stamp_ns FROM seen WHERE stamp_ns<=? ORDER BY stamp_ns DESC LIMIT 128",
-                (cursor_ns,)).fetchall()
+                "SELECT DISTINCT date FROM price_data WHERE date<=? ORDER BY date DESC LIMIT 128",
+                (pd.Timestamp(cursor_ns,tz="UTC").isoformat(),)).fetchall()
             if not context_rows:
                 return
-            protected_ns = int(context_rows[-1][0])
+            protected_ns = int(pd.Timestamp(context_rows[-1][0]).value)
             cutoff_ns = min(cutoff_ns, protected_ns) if cutoff_ns is not None else None
             carry_by_symbol = {}
             recent_counts = {}
@@ -164,7 +160,7 @@ class AppendOnlyMarketCSV:
             os.replace(temporary, self.path)
             keep_after = latest_ns - int(pd.Timedelta(days=self.DEDUPE_DAYS).value)
             with self.db:
-                self.db.execute("DELETE FROM seen WHERE stamp_ns < ?", (keep_after,))
+                self.db.execute("DELETE FROM price_data WHERE date < ?", (pd.Timestamp(keep_after,tz="UTC").isoformat(),))
             self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             self.db.execute("VACUUM")
         except (OSError, sqlite3.Error, pd.errors.ParserError, ValueError) as exc:
@@ -178,3 +174,6 @@ class AppendOnlyMarketCSV:
 
     def close(self):
         self.db.close()
+        # Upstream sqlite context managers leave connections for cyclic GC.
+        import gc
+        gc.collect()

@@ -188,7 +188,6 @@ def _expert_payload(active):
         package = dict(package)
         if package.get("weight_asset"):
             ref = package["weight_asset"]
-            asset = load_package(expert_registry, entry["package"], verify=True)
             source = (expert_registry.parent / ref["file"]).resolve()
             if not source.is_relative_to(expert_registry.parent.resolve()):
                 raise ValueError("Expert 추가 파일 경로가 모델 폴더 밖을 가리킵니다.")

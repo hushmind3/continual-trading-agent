@@ -159,8 +159,6 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
     if expert != "kronos":
         if series.ndim != 2 or series.shape[1] < 32 or not np.isfinite(series).all():
             raise ValueError("native series must be finite [symbols,time] with >=32 observations")
-    if expert in ("chronos", "timesfm") and data.get("units") != "daily_excess_return":
-        raise ValueError("FinText requires explicit daily excess returns; raw prices are not equivalent")
 
     if expert == "chronos":
         from chronos import ChronosPipeline
@@ -173,7 +171,7 @@ def run_native(expert, root, data, device="cpu", status_path=None, expert_id=Non
             samples = pipeline.predict(torch.tensor(series), prediction_length=horizon)
             return samples.float().cpu().numpy()
         layout = "symbol,sample,horizon"
-        units = "daily_excess_return"
+        units = data.get("units", "price")
     elif expert in ("timesfm", "fincast"):
         if expert == "timesfm":
             ppd = source_module("research_timesfm_decoder", sources / "TimesFM-legacy/src/timesfm/pytorch_patched_decoder.py")

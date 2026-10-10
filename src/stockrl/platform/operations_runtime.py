@@ -145,7 +145,8 @@ class OperationsRuntime:
         # Test status updates do not change the loaded Expert weights or selection.
         signature=json.dumps({'active':catalog.get('active',[]),
             'packages':{key:item.get('package') for key,item in catalog.get('experts',{}).items()}},sort_keys=True)
-        if self.pool and signature!=self.pool_signature:self.pool.close();self.pool=None
+        if self.pool and signature!=self.pool_signature:
+            self.pool.refresh_catalog(catalog);self.pool_signature=signature
         if self.pool is None:
             cfg=settings();cfg.state_dir=ROOT/'runtime/experts'
             self.pool=ExpertPool(cfg,keep_device=True,live=True);self.pool_signature=signature
@@ -194,7 +195,7 @@ class OperationsRuntime:
                 'output':values.tolist(),'batches':len(packets),'symbols_checked':symbols_checked}
             report.update(as_of=fixture['snapshot']['as_of'],resources=pool.metrics)
             atomic_json(report,ROOT/'runtime/experts/status.json')
-            return {'packet':packets[0],'metrics':dict(pool.metrics.get(key,{})),
+            return {'packet':packets[0],'packets':packets,'metrics':dict(pool.metrics.get(key,{})),
                 'batches':len(packets),'symbols_checked':symbols_checked}
 
     def sac_decision(self):

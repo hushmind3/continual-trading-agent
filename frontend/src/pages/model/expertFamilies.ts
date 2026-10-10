@@ -5,7 +5,7 @@ export function expertFamilies(items:LibraryExpert[]){
  const ids=new Set(items.map(item=>item.id));
  const rootOf=(item:LibraryExpert)=>{
   const source=item.conversion?.source_id;
-  if(source&&ids.has(source))return source;
+  if(source)return source;
   const candidate=item.id.replace(/_(fp16|bf16|int8|int4|nf4)$/i,'');
   return candidate!==item.id&&ids.has(candidate)?candidate:item.id;
  };

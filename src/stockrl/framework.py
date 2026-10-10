@@ -81,7 +81,7 @@ def champion_structure_environment(currency,symbols,registry,champion_ids):
     symbols=list(symbols);count=len(symbols);stamp=pd.Timestamp('2000-01-01')
     data={'date':[stamp]*count,'tic':symbols,'close':[1.]*count,'cov_list':[np.eye(count)]*count}
     data.update({name:[0.]*count for name in config.INDICATORS})
-    frame=pd.DataFrame(data);frame.index=0
+    frame=pd.DataFrame(data);frame.index=np.zeros(count,dtype=int)
     env=StockPortfolioEnv(df=frame,stock_dim=count,hmax=100,initial_amount=1000000,
         transaction_cost_pct=0.001,reward_scaling=1e-4,state_space=count,
         action_space=count,tech_indicator_list=config.INDICATORS)

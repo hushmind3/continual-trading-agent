@@ -35,8 +35,9 @@ class GGUFExpert(nn.Module):
         self.log=tempfile.TemporaryFile(mode='w+b')
         self.log_dir=tempfile.TemporaryDirectory(prefix='stockrl-llama-');self.log_path=Path(self.log_dir.name)/'engine.log'
         args=[str(engine),'-m',str(self.path),'--host','127.0.0.1','--port',str(port),
-            '--log-file',str(self.log_path)]
+            '--log-file',str(self.log_path),'--reasoning','off','--log-verbosity','4']
         # The pinned llama.cpp server auto-fits GPU layers and keeps overflow in host RAM.
+        if device=='cpu':args.extend(['--n-gpu-layers','0'])
         self.child=subprocess.Popen(args,stdout=self.log,stderr=self.log,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         while True:
             if getattr(self,'cancelled',lambda:False)():self.close();raise InterruptedError('MoE 정지 요청')
@@ -47,11 +48,12 @@ class GGUFExpert(nn.Module):
             except requests.RequestException:pass
             time.sleep(.2)
         self.log.seek(0);text=self.log.read().decode('utf8',errors='replace')
-        if self.log_path.exists():text=self.log_path.read_text(encoding='utf8',errors='replace') or text
+        if self.log_path.exists():text+='\n'+self.log_path.read_text(encoding='utf8',errors='replace')
+        text=re.sub(r'\x1b\[[0-9;]*m','',text)
         layers=re.findall(r'offloaded (\d+)\s*/\s*(\d+) layers',text)
-        self.details=dict(engine='llama.cpp Vulkan/CPU',gpu_layers=int(layers[-1][0]) if layers else 0,total_layers=int(layers[-1][1]) if layers else None)
-        buffers=re.findall(r'(?:Vulkan|CUDA)\d[^\n]*?buffer size\s*=\s*([\d.]+) MiB',text)
-        self.details['resident_bytes']=int(sum(float(v) for v in buffers)*2**20)
+        self.details=dict(engine='llama.cpp Vulkan/CPU',gpu_layers=int(layers[-1][0]) if layers else None,total_layers=int(layers[-1][1]) if layers else None)
+        buffers=dict(re.findall(r'((?:Vulkan|CUDA)\d[^\n]*?buffer size\s*=\s*([\d.]+) MiB)',text))
+        self.details['resident_bytes']=int(sum(float(v) for v in buffers.values())*2**20) if buffers else None
         self.details['peak_vram_bytes']=self.details['resident_bytes']
 
     def forward(self,root,data,device='cpu'):
@@ -67,7 +69,11 @@ class GGUFExpert(nn.Module):
                 dict(role='user',content=json.dumps(dict(symbol=symbol,relative_prices=relative,sampling_seconds=data['sampling_seconds'])))],
                 response_format={'type':'json_schema','json_schema':{'name':'market_opinion','schema':SCHEMA}},
                 max_tokens=256))
-            response.raise_for_status();value=json.loads(response.json()['choices'][0]['message']['content'])
+            response.raise_for_status();choice=response.json()['choices'][0]
+            content=choice['message'].get('content')
+            if not content:raise ValueError('GGUF 구조화 출력이 비었습니다. 종료 사유: '+str(choice.get('finish_reason')))
+            try:value=json.loads(content)
+            except json.JSONDecodeError as exc:raise ValueError('GGUF 출력이 JSON 계약과 다릅니다: '+content[:200]) from exc
             row=[float(value[k]) for k in ('direction','confidence','risk')]
             if not np.isfinite(row).all() or not -1<=row[0]<=1 or not all(0<=v<=1 for v in row[1:]):raise ValueError('GGUF 의견 출력이 입력 계약을 벗어났습니다.')
             outputs.append(row)

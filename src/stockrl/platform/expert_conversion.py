@@ -38,12 +38,12 @@ def quality_check(item,comparison,payload):
         relative_rmse=measured,action_agreement=actions,direction_agreement=directions,input_sha256=comparison['input_sha256'])
     item['conversion']['comparison']={k:v for k,v in comparison.items() if k not in ('baseline','variant')}
     for side in ('baseline','variant'):
-        item['conversion']['comparison'][side]={k:v for k,v in comparison.get(side,{}).items() if k not in ('packet','outputs','weight_files')}
+        item['conversion']['comparison'][side]={k:v for k,v in comparison.get(side,{}).items() if k not in ('packet','packets','outputs','weight_files')}
     reasons=[]
     if not math.isfinite(measured) or measured>error:reasons.append(f'상대 RMSE {measured:.2%} > {error:.2%}')
     if actions is not None and actions<agreement:reasons.append(f'판단 일치 {actions:.2%} < {agreement:.2%}')
     if directions is not None and directions<agreement:reasons.append(f'예측방향 일치 {directions:.2%} < {agreement:.2%}')
-    if not passed:item['check'].update(status='quality_warning',detail=' · '.join(reasons)+' · 적용 차단')
+    if not passed:item['check'].update(status='quality_warning',detail=' · '.join(reasons)+' · 원본 근사 기준 초과')
     elif mode=='functional':item['check'].update(status='passed',detail='실제 입력·출력·고정 가중치 기능 검사 통과'+(' · 원본 차이: '+' · '.join(reasons) if reasons else ' · 원본 근사 기준도 통과'))
     elif item['check'].get('status')=='quality_warning':item['check'].update(status='passed',detail='실제 추론·설정한 출력 차이 기준 통과')
 

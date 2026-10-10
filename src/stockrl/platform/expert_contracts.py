@@ -14,8 +14,7 @@ def input_contract(entry):
     backend=entry.get('backend')
     if backend not in SUPPORTED_MARKET:
         return dict(supported=False,reason='이 모델의 원본 입력을 만드는 파이프라인이 등록돼 있지 않습니다.',pipeline='unsupported')
-    daily=backend in ('chronos','timesfm')
-    return dict(supported=True,pipeline='price_forecast' if backend in ('chronos2','chronos_bolt') else backend,requires=['완료 일봉','SPY 초과수익률'] if daily else ['완료 OHLCV'] if backend=='kronos' else ['완료 가격 시계열'],
+    return dict(supported=True,pipeline='price_forecast' if backend in ('chronos2','chronos_bolt') else backend,requires=['완료 OHLCV'] if backend=='kronos' else ['완료 가격 시계열'],
                 minimum_history=32,universe=None)
 
 

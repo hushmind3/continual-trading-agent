@@ -24,22 +24,33 @@ class LibraryOperations:
             if self.active:raise ValueError('진행 중인 Expert 작업이 있습니다.')
             self.cancelled.clear();runtime.cancel_inference.clear()
             self.active=True
-            atomic_json(dict(stage='queued',kind=kind,started=time.time()),self.status_path)
+            atomic_json(dict(stage='queued',kind=kind,detail=kind+(' · '+str(payload['id']) if payload.get('id') else ''),started=time.time()),self.status_path)
             threading.Thread(target=self._run,args=(kind,payload),name='expert-library-operation',daemon=True).start()
         return self.snapshot()
 
     def _run(self,kind,payload):
+        started=read_json(self.status_path).get('started',time.time())
         def progress(**values):
             if self.cancelled.is_set():raise InterruptedError('사용자가 모델 작업 중지를 요청했습니다.')
-            atomic_json(dict(kind=kind,**values),self.status_path)
+            atomic_json(dict(kind=kind,started=started,**values),self.status_path)
         try:
             result=self._execute(kind,payload,progress)
             if self.cancelled.is_set():raise InterruptedError('모델 작업 중지 요청을 반영했습니다. 이미 생성된 결과물은 보존합니다.')
-            partial=isinstance(result,dict) and bool(result.get('failed',0))
-            atomic_json(dict(stage='partial' if partial else 'complete',kind=kind,result=result,
-                error=str(result['failed'])+'개 Expert 작업 실패' if partial else None,finished=time.time()),self.status_path,
+            partial=isinstance(result,dict) and bool(result.get('failed',0) or result.get('skipped',0))
+            atomic_json(dict(stage='partial' if partial else 'complete',kind=kind,result=result,started=started,
+                error=(result.get('detail') or str(result['failed'])+'개 모델 작업 실패') if result.get('failed') else None,finished=time.time()),self.status_path,
                 default=lambda x:x.tolist() if hasattr(x,'tolist') else str(x))
+        except InterruptedError as exc:
+            atomic_json(dict(stage='stopped',kind=kind,detail=str(exc),started=started,finished=time.time()),self.status_path)
         except Exception as exc:
+            if kind=='convert' and payload.get('id') and payload.get('precision'):
+                latest=read_json(self.catalog_path);base=payload['id'];precision=payload['precision']
+                if base in latest.get('experts',{}):
+                    record=latest.setdefault('optimizations',{}).setdefault(base,{})
+                    record.update(stage='partial',finished=time.time())
+                    record.setdefault('attempts',{})[precision]={'status':'failed','detail':str(exc)}
+                    record['failures']=[row for row in record.get('failures',[]) if row.get('precision')!=precision]+[{'precision':precision,'detail':str(exc)}]
+                    atomic_json(latest,self.catalog_path)
             atomic_json(dict(stage='error',kind=kind,error=str(exc),finished=time.time()),self.status_path)
         finally:self.active=False
 
@@ -92,8 +103,9 @@ class LibraryOperations:
                         result=dict(id=key,status='passed',metrics=inference.get('metrics'),
                             seconds=inference.get('metrics',{}).get('inference_seconds'))
                     else:
-                        self._execute('optimize',{'id':key,'goal':'memory','device':'auto'},progress)
-                        result=dict(id=key,status='passed')
+                        optimized=self._execute('optimize',{'id':key,'goal':'memory','device':payload.get('device','auto')},progress)
+                        result=dict(id=key,status='failed' if optimized.get('failed') else 'skipped' if optimized.get('skipped') else 'passed',
+                            detail=optimized.get('detail'))
                     results.append(result)
                 except InterruptedError:
                     raise
@@ -126,7 +138,7 @@ class LibraryOperations:
             keys=[payload['baseline'],payload['variant']];items={key:catalog['experts'][key] for key in keys}
             if items[keys[0]]['input']!=items[keys[1]]['input'] or items[keys[0]]['feature_size']!=items[keys[1]]['feature_size']:
                 raise ValueError('동일한 입력 계약·출력 크기의 모델을 비교하세요.')
-            fixture=runtime.fixture(keys[0]);results=[]
+            fixture=runtime.fixture(keys[0],all_batches=True);results=[]
             for key in keys:
                 progress(stage='comparison',detail=key);results.append(measure(runtime,key,fixture))
             result=comparison_result(items,results,fixture);catalog['comparison']=result
@@ -139,14 +151,47 @@ class LibraryOperations:
         if kind=='unload':runtime.unload(payload['id']);return {'unloaded':payload['id']}
         if kind=='remove':
             ids=sorted(set(payload.get('ids',[])))
+            failure_records=payload.get('failures',[])
             experts=catalog.get('experts',{})
-            if not ids or any(key not in experts for key in ids):raise ValueError('Registry에 있는 Expert를 선택하세요.')
+            if not (ids or failure_records) or any(key not in experts for key in ids):raise ValueError('등록 모델 또는 실패 기록을 선택하세요.')
+            optimizations=catalog.get('optimizations',{})
+            for row in failure_records:
+                if row.get('source_id') not in optimizations or row.get('precision') not in ('fp16','bf16','int8','int4','nf4'):
+                    raise ValueError('현재 목록의 양자화 실패 기록을 선택하세요.')
+            removed_precisions={(experts[key].get('conversion',{}).get('source_id'),experts[key].get('conversion',{}).get('precision')) for key in ids}
+            removed_precisions.update((row['source_id'],row['precision']) for row in failure_records)
             for key in ids:runtime.unload(key)
             catalog['active']=[key for key in catalog.get('active',[]) if key not in ids]
             for key in ids:experts.pop(key)
+            for source,record in list(optimizations.items()):
+                precisions={precision for root,precision in removed_precisions if root==source}
+                record['reports']=[row for row in record.get('reports',[]) if row.get('id') not in ids and row.get('precision') not in precisions]
+                record['failures']=[row for row in record.get('failures',[]) if row.get('precision') not in precisions]
+                record['attempts']={precision:value for precision,value in record.get('attempts',{}).items() if precision not in precisions}
+                for field in ('selected','previous'):
+                    if record.get(field) in ids:record[field]=None
+                if not (record['reports'] or record['failures'] or record['attempts']):optimizations.pop(source)
             atomic_json(catalog,cfg.registry_file)
-            return {'removed':ids,'model_files_preserved':True}
-        if kind=='probe':return runtime.infer(payload['id'])
+            return {'removed':ids,'removed_failures':failure_records,'model_files_preserved':True}
+        if kind=='probe':
+            key=payload['id'];started=time.time();metrics={}
+            try:
+                result=runtime.infer(key)
+                result.update(id=key,status='passed')
+                metrics=result.get('metrics',{})
+            except InputUnavailable as exc:
+                result={'id':key,'status':'skipped','skipped':1,'detail':str(exc)}
+            except InterruptedError:raise
+            except Exception as exc:
+                result={'id':key,'status':'failed','failed':1,'detail':str(exc)}
+                current=runtime.pool.metrics.get(key,{}) if runtime.pool else {}
+                if max(current.get('last_completed_at',0),current.get('last_attempted_at',0))>=started:metrics=dict(current)
+            latest=read_json(cfg.registry_file);entry=latest.get('experts',{}).get(key)
+            if entry is not None and entry.get('package')==catalog.get('experts',{}).get(key,{}).get('package'):
+                entry['check']={'status':result['status'],'detail':result.get('detail','실제 입력 전체 묶음·출력 계약 통과'),
+                    'tested':time.time(),'seconds':time.time()-started,**({'metrics':metrics} if metrics else {})}
+                atomic_json(latest,cfg.registry_file)
+            return result
         if kind=='search':
             from .expert_discovery import search
             result=search(cfg,catalog,payload,progress)
@@ -188,37 +233,73 @@ class LibraryOperations:
                         template=catalog['experts'].get(payload.get('template')))
             catalog=read_json(cfg.registry_file)
             catalog.setdefault('experts',{})[item['id']]=item
+            if kind=='convert' and catalog.get('optimizations',{}).get(payload['id']):
+                record=catalog['optimizations'][payload['id']];precision=payload['precision']
+                record.setdefault('attempts',{})[precision]={'status':'complete','detail':'변환 완료 · 실제 추론 검사 전'}
+                record['failures']=[row for row in record.get('failures',[]) if row.get('precision')!=precision]
             if payload.get('activate',kind=='acquire'):
                 catalog['active']=sorted(set([*catalog.get('active',[]),item['id']]))
             atomic_json(catalog,cfg.registry_file)
             return item
         if kind=='optimize':
-            from .expert_optimizer import best_precision
+            from .expert_optimizer import best_precision,measurement_summary
             from .expert_comparison import comparison_result,measure
             from .expert_conversion import convert,quality_check
-            base=payload['id'];fixture=runtime.fixture(base)
-            first=measure(runtime,base,fixture)
-            rows=[{'id':base,'precision':catalog['experts'][base].get('representation','original'),
-                'passed':True,'bytes':catalog['experts'][base]['package']['bytes'],'measurement':first}]
+            base=payload['id'];fixture=first=None;rows=[];input_error=None;baseline_error=None
+            record={'stage':'running','goal':payload.get('goal','memory'),'started':time.time(),'reports':rows,'attempts':{},'failures':[]}
+            try:
+                fixture=runtime.fixture(base,all_batches=True)
+                first=measure(runtime,base,fixture)
+                rows.append({'id':base,'precision':'original','passed':True,'status':'passed',
+                    'bytes':catalog['experts'][base]['package']['bytes'],'measurement':measurement_summary(first)})
+            except InputUnavailable as exc:input_error=str(exc)
+            except InterruptedError:raise
+            except Exception as exc:baseline_error=str(exc)
             for precision in payload.get('precisions',['nf4','int4','int8']):
                 slot=base+'_'+precision
-                if slot not in catalog['experts']:
-                    item=convert(cfg,catalog,{'id':base,'precision':precision,'slot':slot,
-                        'device':payload.get('device','auto')},progress)
-                    catalog['experts'][slot]=item;atomic_json(catalog,cfg.registry_file)
-                variant=measure(runtime,slot,fixture)
-                compared=comparison_result({base:catalog['experts'][base],slot:catalog['experts'][slot]},[first,variant],fixture)
-                item=catalog['experts'][slot]
-                item['check']={'status':'passed','detail':'동일 실제 입력의 유한 출력 확인'}
-                quality_check(item,compared,payload)
-                rows.append({'id':slot,'precision':precision,'passed':item['check']['status']=='passed',
-                    'bytes':item['package']['bytes'],'measurement':variant,'detail':item['check']['detail']})
+                catalog=read_json(cfg.registry_file);item=catalog['experts'].get(slot)
+                record['attempts'][precision]={'status':'running','detail':'버전 생성·실제 출력 검사'}
+                catalog.setdefault('optimizations',{})[base]=record;atomic_json(catalog,cfg.registry_file)
+                try:
+                    if item is None:
+                        item=convert(cfg,catalog,{'id':base,'precision':precision,'slot':slot,
+                            'device':payload.get('device','auto')},progress)
+                        catalog=read_json(cfg.registry_file);catalog['experts'][slot]=item
+                        catalog.setdefault('optimizations',{})[base]=record;atomic_json(catalog,cfg.registry_file)
+                    if first is not None:
+                        variant=measure(runtime,slot,fixture)
+                        compared=comparison_result({base:catalog['experts'][base],slot:item},[first,variant],fixture)
+                        item['check']={'status':'passed','detail':'동일 실제 입력 전체 묶음의 유한 출력 확인',
+                            'tested':time.time(),'metrics':variant['metrics'],'seconds':variant['metrics']['inference_seconds']}
+                        quality_check(item,compared,payload)
+                        row={'id':slot,'precision':precision,'passed':item['check']['status']=='passed',
+                            'status':'passed' if item['check']['status']=='passed' else 'failed',
+                            'bytes':item['package']['bytes'],'measurement':measurement_summary(variant),'detail':item['check']['detail']}
+                    else:
+                        reason=input_error or baseline_error
+                        item['check']={'status':'skipped','detail':'변환 완료 · 원본 비교 검사 미실행: '+str(reason)}
+                        row={'id':slot,'precision':precision,'passed':False,'status':'skipped','bytes':item['package']['bytes'],'detail':item['check']['detail']}
+                    rows.append(row)
+                    record['attempts'][precision]={'status':'complete' if row['status']=='passed' else row['status'],'detail':row.get('detail')}
+                except InterruptedError:raise
+                except Exception as exc:
+                    detail=str(exc);record['attempts'][precision]={'status':'failed','detail':detail}
+                    if item is not None:item['check']={'status':'failed','detail':detail}
+                    else:record['failures'].append({'precision':precision,'detail':detail})
+                    rows.append({'id':slot,'precision':precision,'passed':False,'status':'failed','detail':detail})
+                latest=read_json(cfg.registry_file)
+                if item is not None:latest['experts'][slot]=item
+                latest.setdefault('optimizations',{})[base]=record;atomic_json(latest,cfg.registry_file)
+                catalog=latest
             from .resources import ResourceMonitor
             resources=ResourceMonitor(cfg.state_dir).snapshot({})
-            selected=best_precision(rows,base,payload.get('goal','memory'),
-                resources['ram_total_bytes'],resources['gpu'].get('total_bytes',1))
-            catalog.setdefault('optimizations',{})[base]={'stage':'complete','selected':selected['id'],'reports':rows}
-            atomic_json(catalog,cfg.registry_file)
-            return catalog['optimizations'][base]
+            measured=[row for row in rows if row.get('measurement')]
+            selected=best_precision(measured,base,payload.get('goal','memory'),resources['ram_total_bytes'],resources['gpu'].get('total_bytes',1)) if first is not None else None
+            failed=sum(row['status']=='failed' for row in rows);skipped=sum(row['status']=='skipped' for row in rows)
+            record.update(stage='partial' if failed or skipped else 'complete',selected=selected['id'] if selected else None,
+                finished=time.time(),total=len(rows),failed=failed,skipped=skipped,passed=sum(row['status']=='passed' for row in rows),
+                detail=input_error or baseline_error or (str(failed)+'개 버전 실패' if failed else '버전 생성·검사 완료'))
+            latest=read_json(cfg.registry_file);latest.setdefault('optimizations',{})[base]=record;atomic_json(latest,cfg.registry_file)
+            return record
 
 library=LibraryOperations()

@@ -69,8 +69,8 @@ class RunRequest(BaseModel):
 
 
 class ChampionRequest(BaseModel):
-    currency:Literal["USD","KRW"]="USD"
-    symbols:list[str]=Field(min_length=1,max_length=1000)
+    currency:Literal["USD","KRW"]|None=None
+    symbols:list[str]=Field(default_factory=list,max_length=1000)
     experts:list[str]=Field(default_factory=list,max_length=128)
 
 
@@ -295,6 +295,14 @@ def capabilities():
     }
 
 
+@lru_cache(maxsize=256)
+def expert_descriptor(key,file,checksum,size,modified):
+    from .platform.expert_packages import load_package
+    from .platform.expert_contracts import descriptor
+    reference={"file":file,"sha256":checksum,"bytes":size}
+    return descriptor(key,load_package(MODEL_DIR/"expert_registry.json",reference),reference)
+
+
 def expert_state():
     from .platform.operations_runtime import runtime
     registry = read_json(ROOT / "configs/experts.json", {"active": [], "experts": {}})
@@ -306,7 +314,21 @@ def expert_state():
         available = path.is_relative_to(MODEL_DIR.resolve()) and path.is_file()
         if available and reference.get("bytes") is not None:
             available = path.stat().st_size == reference["bytes"]
-        rows.append({**item, "id": key, "active": key in registry.get("active", []),
+        detail=dict(item)
+        if available:
+            try:
+                actual=expert_descriptor(key,reference["file"],reference["sha256"],reference["bytes"],path.stat().st_mtime_ns)
+                detail={**item,**actual,"name":item.get("name",actual["name"]),
+                    "check":item.get("check",actual["check"]),"conversion":item.get("conversion",actual.get("conversion"))}
+                if actual.get("executor")=="llama_cpp":
+                    from .platform.gguf_format import stored_precision
+                    package=read_json(path);weight=(MODEL_DIR/package["weight_asset"]["file"]).resolve()
+                    if not weight.is_relative_to(MODEL_DIR.resolve()):raise ValueError("GGUF 경로가 모델 폴더 밖입니다.")
+                    info=weight.stat()
+                    detail["representation"]=stored_precision(str(weight),info.st_mtime_ns,info.st_size)
+            except (ValueError,OSError,KeyError,RuntimeError) as exc:
+                detail["metadata_error"]=str(exc)
+        rows.append({**detail, "id": key, "active": key in registry.get("active", []),
                      "package_available": available, "package_path": str(path),
                      "inference": status.get("experts", {}).get(key),
                      "resources": status.get("resources", {}).get(key, {}),
@@ -655,6 +677,17 @@ def champions():
 @app.post("/api/champions/create")
 def champion_create(request:ChampionRequest):
     if job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")
+    from .framework import policy_files
+    from .platform.operations_settings import settings
+    current=read_json(policy_files()/"dataset.json")
+    recent=read_json(RUNTIME/"job.json")
+    request.currency=request.currency or recent.get("currency") or current.get("currency") or "USD"
+    if not request.symbols:
+        configured=settings().symbols
+        request.symbols=configured or (recent.get("symbols") if recent.get("currency")==request.currency else []) or (current.get("symbols") if current.get("currency")==request.currency else []) or []
+        if not request.symbols:
+            request.symbols=[row["symbol"] for row in database()["instruments"] if row["currency"]==request.currency and row["eligible"] and row["stored"]]
+    if not request.symbols:raise HTTPException(400,"기존 운영·학습 종목 구성이 없습니다. 종목을 등록한 뒤 생성하세요.")
     if len(request.symbols)!=len(set(request.symbols)) or len(request.experts)!=len(set(request.experts)):
         raise HTTPException(400,"종목과 Expert는 중복 없이 선택하세요.")
     request.symbols=sorted(request.symbols);request.experts=sorted(request.experts)

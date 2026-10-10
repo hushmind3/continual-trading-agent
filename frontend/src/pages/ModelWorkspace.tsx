@@ -23,7 +23,7 @@ export function ModelWorkspace(){
   <header className="flex flex-wrap items-start justify-between gap-4 rounded-2xl bg-[#202e4a] px-6 py-6 text-white">
    <div><div className="mb-2 flex items-center gap-2 text-xs text-blue-200"><Layers3 size={15}/>지속학습 MoE</div>
     <h2 className="text-2xl font-bold">Expert 슬롯 관리</h2>
-    <p className="mt-3 text-sm text-slate-300">현재 구성에 선택된 Frozen Expert {active}개 · SAC 정책 {state.model.compatible?'호환':'미생성 또는 비호환'}</p>
+    <p className="mt-3 text-sm text-slate-300">등록 모델 {state.experts.items.length}개 · 사용 선택 {active}개 · 현재 메모리에 올린 모델 {state.experts.items.filter(item=>item.loaded).length}개</p>
     <p className="mt-2 text-xs text-slate-400">Frozen Expert를 학습 가능한 MoE 결합부와 SB3 SAC Actor·Twin Critic에 조립해 버전별 Champion을 생성합니다.</p>
    </div>
    <div className="flex flex-wrap gap-2">

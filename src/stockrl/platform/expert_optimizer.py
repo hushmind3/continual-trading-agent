@@ -33,4 +33,4 @@ def best_precision(reports,current,goal,ram_total,vram_total,quantization_first=
     return chosen
 
 def measurement_summary(value):
-    return {key:v for key,v in value.items() if key not in ('packet','outputs','weight_files')}
+    return {key:v for key,v in value.items() if key not in ('packet','packets','outputs','weight_files')}

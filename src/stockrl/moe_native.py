@@ -47,6 +47,18 @@ def _compiled_runner(runner):
                     "TimeMoeForPrediction", "Toto2Model"}
 
     class Reuse(ast.NodeTransformer):
+        def visit_If(self,node):
+            if len(node.body)==1 and isinstance(node.body[0],ast.Raise):
+                error=node.body[0].exc
+                if isinstance(error,ast.Call) and error.args and isinstance(error.args[0],ast.Constant) and str(error.args[0].value).startswith('FinText requires explicit daily excess returns'):
+                    return None
+            return self.generic_visit(node)
+
+        def visit_Assign(self,node):
+            if any(isinstance(target,ast.Name) and target.id=='units' for target in node.targets) and isinstance(node.value,ast.Constant) and node.value.value=='daily_excess_return':
+                node.value=ast.Call(ast.Attribute(ast.Name('data',ast.Load()),'get',ast.Load()),[ast.Constant('units'),ast.Constant('price')],[])
+            return self.generic_visit(node)
+
         def visit_Dict(self,node):
             node=self.generic_visit(node)
             for index,key in enumerate(node.keys):
@@ -155,6 +167,10 @@ def native_call(backend, root, data, device="cpu", *, modules=None, states=None,
         return result
 
     def move(value,*args,**kwargs):
+        # Restored variants already carry their storage dtypes, including NF4 quantization state.
+        if isinstance(value,nn.Module) and modules is not None and 'dtype' in kwargs:
+            kwargs={key:item for key,item in kwargs.items() if key!='dtype'}
+            if not args and not kwargs:return value
         return value if isinstance(value,nn.Module) and (hasattr(value,'_hf_hook') or any(hasattr(m,'_hf_hook') for m in value.modules())) else value.to(*args,**kwargs)
     tensor_output=isinstance(data,dict) and data.get('_tensor_output',False)
     def native_array(value):

@@ -1,6 +1,7 @@
 import {createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {request} from './api';
 import type {Snapshot} from './types';
+import type {LibraryState} from './library';
 interface Context {
   state:Snapshot|null;error:string;pending:Set<string>;refresh:()=>Promise<void>;
   execute:<T>(path:string,body:unknown)=>Promise<T>;
@@ -16,6 +17,7 @@ export function OperationsProvider({children}:{children:ReactNode}) {
     }catch(e){if(revision<applied.current)return;applied.current=revision;setError(e instanceof Error?e.message:'연결 실패');}
   },[]);
   useEffect(()=>{let disposed=false;let timer:ReturnType<typeof setTimeout>;const poll=async()=>{if(disposed)return;await refresh();if(!disposed)timer=setTimeout(poll,4000)};void poll();return()=>{disposed=true;clearTimeout(timer)}},[refresh]);
+  useEffect(()=>{let disposed=false;let timer:ReturnType<typeof setTimeout>;const poll=async()=>{try{const library=await request<LibraryState>('library');if(!disposed)setState(current=>current?{...current,library}:current)}catch{}if(!disposed)timer=setTimeout(poll,2000)};void poll();return()=>{disposed=true;clearTimeout(timer)}},[]);
   const execute=async<T,>(path:string,body:unknown):Promise<T>=>{
     setPending(old=>new Set(old).add(path));try{const result=await request<T>(path,body);await refresh();return result}
     finally{setPending(old=>{const next=new Set(old);next.delete(path);return next})}

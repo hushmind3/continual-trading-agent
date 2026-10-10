@@ -9,7 +9,9 @@ def measure(runtime,key,fixture,repeats=1):
     for iteration in range(repeats+1):
         lap=time.perf_counter();value=runtime.infer(key,fixture);elapsed=time.perf_counter()-lap
         if not iteration:cold=elapsed
-        else:times.append(elapsed);outputs.append(value['packet']['native_output'])
+        else:
+            times.append(elapsed)
+            outputs.append(np.concatenate([np.asarray(packet['native_output'],float).reshape(-1) for packet in value.get('packets',[value['packet']])]).tolist())
     return {'id':key,**value,'cold_seconds':cold,'warm_median_seconds':statistics.median(times),
         'warm_min_seconds':min(times),'warm_max_seconds':max(times),'repeats':repeats,'outputs':outputs}
 
@@ -28,16 +30,26 @@ def forecast_directions(packet,data):
 def comparison_result(items,results,fixture):
     base=items[results[0]['id']];ids=[r['id'] for r in results]
     canonical=json.dumps(fixture,sort_keys=True,default=str).encode()
-    a,b=[np.asarray(r['packet']['native_output'],float) for r in results]
-    if a.shape!=b.shape or results[0]['packet']['symbols']!=results[1]['packet']['symbols']:
-        raise ValueError('비교 출력의 종목 순서 또는 크기가 다릅니다.')
+    packets=[r.get('packets',[r['packet']]) for r in results]
+    if len(packets[0])!=len(packets[1]):raise ValueError('비교 입력 묶음 수가 다릅니다.')
+    symbols=[];directions=[[],[]]
+    inputs=fixture.get('inputs',[fixture['input']])
+    for index,(left,right) in enumerate(zip(*packets)):
+        if np.asarray(left['native_output']).shape!=np.asarray(right['native_output']).shape or left['symbols']!=right['symbols'] or left['layout']!=right['layout'] or left['units']!=right['units']:
+            raise ValueError('비교 출력의 종목 순서·차원·단위가 다릅니다.')
+        symbols.extend(left['symbols'])
+        for side,packet in enumerate((left,right)):
+            direction=forecast_directions(packet,inputs[index])
+            if direction is not None:directions[side].extend(direction)
+    a,b=[np.concatenate([np.asarray(packet['native_output'],float).reshape(-1) for packet in group]) for group in packets]
     delta=b-a;agreement=None;direction=None
-    if base['role']=='action':agreement=float(np.mean(a[...,:3].argmax(-1)==b[...,:3].argmax(-1)))
+    if base['role']=='action':
+        action_a,action_b=[np.concatenate([np.asarray(packet['native_output'],float).reshape(len(packet['symbols']),-1) for packet in group]) for group in packets]
+        agreement=float(np.mean(action_a[...,:3].argmax(-1)==action_b[...,:3].argmax(-1)))
     else:
-        directions=[forecast_directions(r['packet'],fixture['input']) for r in results]
-        if all(d is not None for d in directions):direction=float(np.mean(directions[0]==directions[1]))
+        if all(len(values)==len(symbols) for values in directions):direction=float(np.mean(np.asarray(directions[0])==np.asarray(directions[1])))
     return dict(baseline=results[0],variant=results[1],input_as_of=fixture['snapshot']['as_of'],input_sha256=hashlib.sha256(canonical).hexdigest(),
-        symbols=results[0]['packet']['symbols'],mean_absolute_error=float(np.abs(delta).mean()),
+        symbols=symbols,mean_absolute_error=float(np.abs(delta).mean()),
         max_absolute_error=float(np.abs(delta).max()),rmse=float(np.sqrt(np.mean(delta**2))),
         relative_rmse=float(np.linalg.norm(delta)/max(np.linalg.norm(a),1e-12)),action_agreement=agreement,direction_agreement=direction,
         speed_ratio=results[0]['warm_median_seconds']/max(results[1]['warm_median_seconds'],1e-12) if results[0]['metrics']['device']==results[1]['metrics']['device'] else None,

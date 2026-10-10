@@ -11,19 +11,8 @@ def native_input(key, frame, daily, as_of, max_batch=8):
     source = frame
     intervals=frame.sort_values('date').groupby('symbol').date.diff().dt.total_seconds().dropna()
     units, seconds = "price", int(intervals[intervals>0].median()) if (intervals>0).any() else 86400
-    if key in ("timesfm", "chronos"):
-        if daily.empty or "SPY" not in set(daily.symbol):
-            raise InputUnavailable("실제 SPY 일봉이 있어야 일별 초과수익률을 계산할 수 있습니다.")
-        ordered=daily.sort_values(["symbol","date"]).drop_duplicates(["symbol","date"],keep="last").copy()
-        ordered["return"]=ordered.groupby("symbol").close.pct_change(fill_method=None)
-        benchmark=ordered.loc[ordered.symbol=='SPY',["date","return"]].dropna().rename(columns={"return":"benchmark"})
-        source=pd.merge_asof(ordered.loc[ordered.symbol!='SPY'].sort_values('date'),benchmark.sort_values('date'),
-                             on='date',direction='backward',tolerance=pd.Timedelta(days=7))
-        source["close"]=source['return']-source['benchmark']
-        source=source.dropna(subset=['close'])
-        units, seconds = "daily_excess_return", 86400
     inputs = []
-    candidates = [s for s,g in source.groupby("symbol") if len(g) >= 32 and (s != "SPY" or key not in ("chronos", "timesfm"))]
+    candidates = [s for s,g in source.groupby("symbol") if len(g.dropna(subset=['close'])) >= 32]
     for offset in range(0, len(candidates), max_batch):
         symbols = candidates[offset:offset+max_batch]
         rows = source[source.symbol.isin(symbols)].sort_values(["date", "symbol"])

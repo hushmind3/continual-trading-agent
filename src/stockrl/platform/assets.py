@@ -46,6 +46,19 @@ class ExpertPool:
         from .expert_residency import Residency
         self.residency=Residency(self)
 
+    def refresh_catalog(self,catalog):
+        references={key:item['package'] for key,item in catalog.get('experts',{}).items()}
+        changed={key for key in set(self.references)|set(references) if self.references.get(key)!=references.get(key)}
+        for key in changed:
+            if key in self.loaded:self.release(key)
+            if key not in references:
+                for values in (self.entries,self.references,self.counts,self.roots,self.metrics):values.pop(key,None)
+                continue
+            package=load_package(self.path,references[key])
+            self.entries[key]={**package['entry'],'id':key}
+            self.references[key]=references[key];self.counts[key]=package['module_count'];self.roots[key]=self.root
+        self.active=set(catalog.get('active',[]));self.ids=sorted(self.entries)
+
     def catalog(self):
         return [dict(id=key, name=e.get("name", key), role="action" if e.get("stock_policy") else "market",
                      frozen=True, parameters=e.get("parameters"), symbols=e.get("stock_policy", {}).get("universe"),
@@ -134,7 +147,8 @@ class ExpertPool:
             with torch.inference_mode():
                 floating=next((p.dtype for p in expert.parameters() if p.is_floating_point()),torch.float32)
                 reduced=floating in (torch.float16,torch.bfloat16)
-                with torch.autocast('cuda' if device.startswith('cuda') else 'cpu',dtype=floating if reduced else torch.bfloat16,enabled=reduced):
+                compute_dtype=torch.bfloat16 if self.entries[key].get('backend')=='toto' and floating==torch.float16 and device.startswith('cuda') and torch.cuda.is_bf16_supported() else floating
+                with torch.autocast('cuda' if device.startswith('cuda') else 'cpu',dtype=compute_dtype if reduced else torch.bfloat16,enabled=reduced):
                     packet = expert(self.roots[key], {**data,'_tensor_output':getattr(self,'tensor_output',False)}, device)
         except Exception as exc:
             metrics=self.metrics.setdefault(key,{})
@@ -157,6 +171,7 @@ class ExpertPool:
         packet["native_features_verified"] = True
         metrics = self.metrics.setdefault(key, {})
         metrics.update(status="ready", device=device, inference_seconds=time.perf_counter()-started,
+                       autocast_dtype=str(compute_dtype).removeprefix('torch.') if reduced else None,
                        last_completed_at=time.time(),
                        inference_count=metrics.get('inference_count',0)+1,
                        residency='gpu_ram_layer_offload' if getattr(expert,'_layer_offloaded',False) else 'gpu_resident' if self.keep_device and device.startswith('cuda') else 'ram_offload' if self.keep_device else 'temporary',
@@ -173,8 +188,10 @@ class ExpertPool:
         if hasattr(expert,'details'):
             import psutil
             child=psutil.Process(expert.child.pid).memory_info() if expert.child else None
-            metrics.update(**expert.details,device='gpu' if expert.details.get('gpu_layers') else 'cpu',
-                residency='gpu_resident' if expert.details.get('gpu_layers')==expert.details.get('total_layers') else 'gpu_cpu_hybrid' if expert.details.get('gpu_layers') else 'ram_offload',
+            layers=expert.details.get('gpu_layers')
+            metrics.update(**expert.details,device=('gpu' if layers else 'cpu') if layers is not None else device,
+                residency=('gpu_resident' if layers==expert.details.get('total_layers') else 'gpu_cpu_hybrid' if layers else 'ram_offload') if layers is not None else 'device_unconfirmed',
+                memory_measurement='llama.cpp allocation logs / process working set',
                 peak_ram_bytes=self.process.memory_info().rss+(getattr(child,'peak_wset',child.rss) if child else 0))
         if device.startswith("cuda") and not self.keep_device:
             torch.cuda.empty_cache()

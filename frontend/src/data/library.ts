@@ -8,7 +8,7 @@ export interface DiscoveredExpert {
   installed_versions?:{name:string;revision?:string;active?:boolean}[];input_evidence?:{source?:string;snippets?:string[]};
 }
 export interface OptimizationReport {
-  id:string;precision?:string;passed?:boolean;eligible?:boolean;bytes?:number;reason?:string;detail?:string;
+  id:string;precision?:string;status?:string;passed?:boolean;eligible?:boolean;bytes?:number;reason?:string;detail?:string;
   score?:number;relative_rmse?:number;action_agreement?:number|null;direction_agreement?:number|null;
   measurement?:{cold_seconds?:number;warm_median_seconds?:number;metrics?:{device?:string;peak_ram_bytes?:number;peak_vram_bytes?:number}};
 }

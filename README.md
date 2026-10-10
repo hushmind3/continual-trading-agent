@@ -75,7 +75,7 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 | 메뉴 | 실제 HTTP 엔드포인트 (`/api` 접두사) | 호출 함수·소스 |
 | --- | --- | --- |
 | 운영 `#control` | GET state, POST controls/{feed,paper,engine} | `web_api.state`, `OperationsRuntime.command` |
-| MoE `#moe` | GET state/models/library, POST experts/register, experts/select, library/{kind} | `ExpertRegistry.register/select`, `model_files`, `LibraryOperations.start/_execute` |
+| MoE `#moe` | GET state/models/library, POST experts/register, experts/select, library/{kind}, champions/create | `ExpertRegistry.register/select`, `model_files`, `LibraryOperations.start/_execute` |
 | 시장 `#markets` | GET state/prices/connections, POST collect, controls/feed | `price_history`, `job_worker.main` → FinRL-X `fetch_price_data`; `LiveMarketCollector.run` |
 | 계좌 `#portfolio` | GET state/result/{weights,trades}, POST orders, preflight/backtest, backtest | `OperationsRuntime.manual_order` → `PaperAccount._fill`; `framework.backtest` → `BacktestEngine.run_backtest` |
 | 학습 `#learning` | GET state/checkpoint, POST preflight/train, train, stop, checkpoints/restore | `preflight`, `launch`, `stop`, `restore_checkpoint` → 현재 SB3 SAC |
@@ -126,7 +126,7 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 
 등록 경로: `/api/models` 파일 조회 → `library/inspect` 원본 계약 조회 → `library/import` 참조 등록 → 현재 Registry → `ExpertPool.get/run`. 외부 폴더의 기존 패키지는 참조를 등록하고 원본을 복사·수정하지 않습니다. 새로운 다운로드와 변환 결과는 기존 `expert-packages`의 별도 파일로 저장하며 원본과 구분됩니다.
 
-입력은 `observations.native_input`의 완료 가격 시계열/OHLCV 또는 `StockPolicyExpert.prepare_input`의 원본 종목·지표·USD 계좌입니다. `expert_inference.prepare_inputs/run_batches`를 개별 검사·전체 검사·SAC 관측이 공유하며, 전체 검사는 입력의 모든 종목 묶음에 대해 출력 크기·유한값·종목 일치를 확인합니다. Chronos/TimesFM의 기존 계약은 실제 SPY 일봉 초과수익률을 요구합니다. 출력 packet은 `native_output`, `symbols`, `as_of`, `layout`, `units`를 갖고 관측 요약에 전달됩니다. 입력 부족·형식 불일치·실패는 오류/실패 기록으로 표시하며 결과를 만들어 채우지 않습니다.
+입력은 `observations.native_input`의 완료 가격 시계열/OHLCV 또는 `StockPolicyExpert.prepare_input`의 원본 종목·지표·USD 계좌입니다. `expert_inference.prepare_inputs/run_batches`를 개별 검사·전체 검사·SAC 관측이 공유하며, 전체 검사는 입력의 모든 종목 묶음에 대해 출력 크기·유한값·종목 일치를 확인합니다. Chronos/TimesFM을 포함한 시계열 Expert는 실제 저장 시계열을 원본 예측 API에 전달하며 일봉·SPY 조건으로 실행 검사를 차단하지 않습니다. 입력 주기·출력 단위를 packet에 함께 기록합니다. 출력 packet은 `native_output`, `symbols`, `as_of`, `layout`, `units`를 갖고 관측 요약에 전달됩니다. 입력 부족·형식 불일치·실패는 오류/실패 기록으로 표시하며 결과를 만들어 채우지 않습니다.
 
 실행기는 기존 `NativeExpert`, `StockPolicyExpert`, `HfForecastExpert`, `GGUFExpert`입니다. Torch·Transformers·Chronos·TimesFM·bitsandbytes·Accelerate·safetensors 및 llama.cpp 외부 실행기가 필요합니다. `llama_engine.ensure_engine`의 기존 실행기 준비 경로는 `runtime/.../engines`입니다. GGUF 가중치를 다시 다운로드하는 기능과 실행기 준비는 서로 다릅니다.
 
@@ -168,7 +168,7 @@ $env:PYTHONUTF8="1"
 
 - **소스 연결 완료 / 실제 실행 미확인**: React 운영 제어·KRW/USD 가상계좌·키움 인증/수신·외부 모델 조회/등록/적재/추론·검색/다운로드·변환/최적화·정책 선택 복원·운영 설정 API. 복구 커밋 a7301ae에서는 이 작업들을 실행하지 않았습니다. 현재 적용 자동화의 실제 빌드·응답 결과는 apply 상태에 기록되며, 전체 시작 전에는 인증·시세·추론·학습·가상매매 실행 성공을 주장하지 않습니다.
 - **기존 연결 유지**: 공식 SAC 학습·Replay·백테스트·저장 가격 조회·FMP 수집·기존 동결 관측 구조. 새로운 실행 성공을 주장하지 않습니다.
-- **미연결**: 실제 증권 계좌 주문, Alpaca 주문. **사용 조건 미충족**: 현재 저장된 이전 SAC는 원본 환경과 호환되지 않으며 SPY/필수 종목의 실제 이력이 없는 Expert는 입력 오류를 표시합니다.
+- **미연결**: 실제 증권 계좌 주문, Alpaca 주문. **사용 조건 미충족**: 현재 저장된 이전 SAC는 원본 환경과 호환되지 않으며 원본 학습 종목·필수 지표의 실제 이력이 없는 주식 정책 Expert는 입력 오류를 표시합니다.
 - **제거한 실행 대상**: 루트 Streamlit 화면, 구형 화면 테스트/설정, 감사 보고서/임시 프론트 백업, 호출되지 않는 구형 operating_rules·package_disposal. 확인한 미사용 파일만 프로젝트 휴지통으로 이동했습니다. 공식 프레임워크와 정상 사용 모듈은 유지합니다.
 - **배포 상태**: `runtime/official/applied-sources.json`은 실제 적용된 소스/정적 파일 해시를 기록합니다. `apply.json`의 적용 단계와 `applied` 값으로 코드 반영을 확인합니다. 연결 점검의 준비 부족과 코드 적용 실패는 구분합니다.
 
@@ -178,7 +178,7 @@ GitHub에는 React 소스·FastAPI/백엔드·기존 연결 모듈·공개 Regis
 
 운영 화면에 `변경 적용 · 전체 점검`, `전체 시스템 시작`, `전체 시스템 중지`를 제공합니다.
 
-MoE 상세 검색 UI는 `f153957`의 금융 Expert 탐색·결과 카드(최근 3/6/12개월, 설치·호환 상태 필터, 원본 출시일·업데이트일·API/입력·중복 역할·근거)를 현재 `library/search`·`library/acquire`에 다시 연결했습니다. 개별 정밀도 대화창은 CPU/CUDA/자동 장치와 FP16/BF16/INT8/INT4/NF4 선택을 복구했습니다. 단순 `convert`는 후보 생성만 수행하고, 원본 품질 허용치와 동일 입력 비교는 기존 `library/optimize`에서 실행합니다. 결과의 실제 성공 여부는 백엔드 작업 기록으로 확인합니다. 기존 7개 메뉴와 공통 개별 제어를 유지합니다. 모델 비교 실행, 모델 폴더 열기, 모델 작업 중지, 공급원 연결 해제와 학습 화면의 백테스트 접근도 기존 함수로 연결했습니다. MoE의 등록 Expert 일괄 추론 검사(`probe_all`)는 가격 데이터를 1회 읽어 각 Expert의 전체 입력 묶음을 검사하고 개별 결과를 Registry `check`와 모델 작업 상태에 기록합니다(일부 실패 시 `partial`). 선택 Expert 일괄 양자화(`optimize_all`)는 기존 변환 함수를 순차 호출합니다.
+MoE 상세 검색 UI는 `f153957`의 금융 Expert 탐색·결과 카드(최근 3/6/12개월, 설치·호환 상태 필터, 원본 출시일·업데이트일·API/입력·중복 역할·근거)를 현재 `library/search`·`library/acquire`에 다시 연결했습니다. 개별 정밀도 대화창은 CPU/CUDA/자동 장치와 FP16/BF16/INT8/INT4/NF4 선택을 복구했습니다. 단순 `convert`는 후보 생성만 수행하고, 원본 품질 허용치와 동일 입력 비교는 기존 `library/optimize`에서 실행합니다. 결과의 실제 성공 여부는 백엔드 작업 기록으로 확인합니다. 기존 7개 메뉴와 공통 개별 제어를 유지합니다. 모델 비교 실행, 모델 폴더 열기, 모델 작업 중지, 공급원 연결 해제와 학습 화면의 백테스트 접근도 기존 함수로 연결했습니다. MoE의 등록 Expert 일괄 추론 검사(`probe_all`)는 가격 데이터를 1회 읽어 각 Expert의 전체 입력 묶음을 검사하고 개별 결과를 Registry `check`와 모델 작업 상태에 기록합니다(일부 실패 시 `partial`). 등록 원본 Expert 일괄 양자화(`optimize_all`)는 기존 변환 함수를 순차 호출하고 후보별 실패를 기록합니다. 가격 입력이 부족해 비교 검사를 못 해도 가중치 변환은 별도로 수행하며 검사 미실행을 표시합니다. 실패 기록과 등록 후보는 기존 목록 선택 작업줄의 `library/remove`로 제거할 수 있고 모델 파일은 보존합니다. MoE 대시보드의 단일 `SAC Champion 생성` 버튼은 선택 모델과 기존 운영·학습 종목 구성을 `champions/create`에 전달합니다. 시장·종목 선택 패널은 제거했습니다. GGUF 정밀도 표시는 파일의 실제 `general.file_type`을 읽으며 llama.cpp 자동 GPU/RAM 배치와 구조화 출력을 사용합니다.
 
 | 동작 | API / 실제 실행 경로 |
 | --- | --- |

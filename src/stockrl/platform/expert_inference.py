@@ -1,6 +1,7 @@
 """Shared Expert input construction and output checks for inspection and SAC."""
 import numpy as np
 import pandas as pd
+import time
 
 from .observations import InputUnavailable,native_input
 
@@ -24,9 +25,12 @@ def prepare_inputs(entry, frame, account):
 
 
 def run_batches(pool,key,snapshot,batches):
-    packets=[]
+    packets=[];started=time.perf_counter();peaks={}
     for data in batches:
         packet=pool.run(key,data,snapshot)
+        for name in ('peak_ram_bytes','peak_vram_bytes','peak_workspace_bytes'):
+            value=pool.metrics.get(key,{}).get(name)
+            if value is not None:peaks[name]=max(peaks.get(name,0),value)
         values=np.asarray(packet['native_output'],dtype=float)
         symbols=packet.get('symbols',[])
         if not symbols or values.size==0:
@@ -48,4 +52,5 @@ def run_batches(pool,key,snapshot,batches):
         packets.append(packet)
     if not packets:
         raise ValueError('Expert가 실행한 추론 묶음이 없습니다.')
+    pool.metrics.setdefault(key,{}).update(inference_seconds=time.perf_counter()-started,inference_batches=len(packets),**peaks)
     return packets

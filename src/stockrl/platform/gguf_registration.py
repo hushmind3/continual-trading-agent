@@ -20,7 +20,7 @@ def register_gguf(settings,path,slot,progress,origin=None):
     inspect_gguf(path);model=settings.resolve(settings.expert_checkpoint);root=model.parent/'expert-packages';root.mkdir(exist_ok=True)
     from .gguf_format import quantize_if_needed
     path,kind=quantize_if_needed(settings,path,progress)
-    from .gguf_format import describe
+    from .gguf_format import describe,precision_label
     parameters=describe(path)['parameters']
     progress(stage='gguf_register',detail='GGUF 원본 checksum과 로컬 입력 계약 확인')
     checksum=digest(path);target=root/(checksum[:24]+'.gguf')
@@ -31,7 +31,7 @@ def register_gguf(settings,path,slot,progress,origin=None):
     else:shutil.copyfile(path,target)
     weight=dict(file=target.relative_to(model.parent).as_posix(),sha256=checksum,bytes=target.stat().st_size)
     package=dict(format=PACKAGE_FORMAT,id=slot,executor='llama_cpp',module_count=1,feature_size=6,state_dict={},metadata={},
-        representation=f'GGUF · quantized type {kind}',weight_asset=weight,
+        representation=precision_label(kind),weight_asset=weight,
         entry=dict(id=slot,name=origin['repository'] if origin else path.stem,backend='gguf_market',frozen=True,parameters=parameters,weight_bytes=weight['bytes'],dtype='GGUF',origin=origin))
     manifest=root/(slot+'.json');atomic_json(package,manifest);reference=dict(file=manifest.relative_to(model.parent).as_posix(),sha256=digest(manifest),bytes=manifest.stat().st_size)
     item=descriptor(slot,package,reference);item['weight_bytes']=weight['bytes'];return item

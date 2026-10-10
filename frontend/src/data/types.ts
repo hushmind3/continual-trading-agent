@@ -44,8 +44,8 @@ export interface Snapshot {
     processes:{role:string;pid:number;rss_bytes:number;cpu_percent:number;threads:number;read_bytes:number;write_bytes:number}[]};
   checkpoints:Checkpoint[];
   operations?:OperationsState;
-  library?:{job:{busy:boolean;stage?:string;kind?:string;error?:string;detail?:string;result?:unknown};
-    catalog:{discovery?:{models:DiscoveryModel[]};optimizations?:Record<string,unknown>}};
+  library?:{job:{busy:boolean;stage?:string;kind?:string;error?:string;detail?:string;result?:unknown;completed?:number;total?:number};
+    catalog:{discovery?:{models:DiscoveryModel[];query?:string;keywords?:string[];errors?:{query:string;detail:string}[];scope?:string;recent_days?:number};optimizations?:Record<string,unknown>}};
   automation?:AutomationState;
   capabilities:Record<string,{status:"supported"|"not_connected"|"removed"|"requires_configuration";reason:string;source:string}>;
 }
@@ -64,7 +64,13 @@ export interface OperationsState {
   pool:{id:string;loaded?:boolean;device?:string;resident_bytes?:number;peak_ram_increment?:number}[];
 }
 export interface DiscoveryModel {id:string;repository:string;compatible:boolean;same_weights?:boolean;
-  detail?:string;bytes?:number;url:string;updated?:string}
+  detail?:string;bytes?:number;url:string;source?:string;domain?:string;downloads?:number;
+  created?:string;updated?:string;release_date?:string;release_source?:string;revision?:string;
+  resource_note?:string;api_requirement?:string;input_summary?:string;
+  overlap?:string[];overlap_basis?:string;requirements_verified?:boolean;
+  template_name?:string;installed_versions?:{name:string;revision?:string;active?:boolean}[];
+  input_evidence?:{source?:string;snippets?:string[]};
+}
 export interface OperationStage {id:string;title:string;status:'pending'|'running'|'complete'|'failed'|'blocked';detail?:string;log_path?:string;log?:string}
 export interface OperationProgress {status:string;active?:boolean;applied?:boolean;detail?:string;error?:string;stages:OperationStage[];checks?:OperationStage[];changed_files?:string[];currencies?:string[]}
 export interface AutomationState {apply:OperationProgress;system:OperationProgress}

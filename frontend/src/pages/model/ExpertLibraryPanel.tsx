@@ -1,29 +1,43 @@
 import {useCallback,useState} from 'react';
-import {PackagePlus,Plus,Search,Save} from 'lucide-react';
+import {PackagePlus,Plus,Search,Save,FlaskConical,WandSparkles} from 'lucide-react';
 import {useOperations} from '../../data/Operations';
 import {Button,Drawer,Empty,ErrorMessage,Status,Tabs,inputClass} from '../../ui/Primitives';
 import {bytes} from '../../ui/format';
 import {expertFamilies,expertCategory,categoryNames} from './expertFamilies';
 import {ExpertVariants} from './ExpertVariants';
 import {ExpertTasks} from './ExpertTasks';
+import {ExpertDiscovery} from './ExpertDiscovery';
 export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}) {
  const {state:s,execute,pending}=useOperations();
- const [open,setOpen]=useState(false),[source,setSource]=useState(''),[slot,setSlot]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState(''),[category,setCategory]=useState('all'),[search,setSearch]=useState(''),[versions,setVersions]=useState<Record<string,string>>({});
- const close=useCallback(()=>setOpen(false),[]);if(!s)return null;
+ const [discoveryOpen,setDiscoveryOpen]=useState(false),[open,setOpen]=useState(false),[source,setSource]=useState(''),[slot,setSlot]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState(''),[category,setCategory]=useState('all'),[search,setSearch]=useState(''),[versions,setVersions]=useState<Record<string,string>>({});
+ const close=useCallback(()=>setOpen(false),[]);
+ const job=s?.library?.job;
+ const bulkResult=job?.kind==='probe_all'||job?.kind==='optimize_all'?job.result as {total:number;passed:number;failed:number;skipped:number;items:{id:string;status:string;detail?:string}[]} | undefined:undefined;
+ if(!s)return null;
  const families=expertFamilies(s.experts.items),shown=families.filter(f=>(category==='all'||expertCategory(f.base)===category)&&(f.base.name+' '+f.id).toLowerCase().includes(search.toLowerCase()));
  const busy=s.job.running||Boolean(s.library?.job?.busy)||pending.has('experts/select')||pending.has('experts/register');
  const apply=async(active:string[])=>{setError('');setMessage('');try{const result=await execute<{message:string}>('experts/select',{active});setMessage(result.message)}catch(e){setError(e instanceof Error?e.message:'선택 실패')}};
  const register=async()=>{setError('');try{const result=await execute<{message:string}>('experts/register',{path:source,slot});setMessage(result.message);setOpen(false);setSource('');setSlot('')}catch(e){setError(e instanceof Error?e.message:'등록 실패')}};
  const bulk=async(kind:'probe_all'|'optimize_all')=>{setError('');setMessage('');try{await execute('library/'+kind,{});setMessage('일괄 작업을 요청했습니다. 아래 모델 작업에서 진행·실패 결과를 확인하세요.')}catch(e){setError(e instanceof Error?e.message:'Expert 일괄 작업 요청 실패')}};
- return <section className="space-y-4"><header className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-sm font-bold">Expert · 정밀도 버전</h3><p className="mt-1 text-xs text-slate-500">등록된 실제 패키지만 표시합니다. 원본과 변환 버전의 선택·교체·해제를 지원합니다.</p></div><div className="flex flex-wrap gap-2"><Button disabled={busy||!s.experts.items.length} busy={pending.has('library/probe_all')} onClick={()=>void bulk('probe_all')}>등록 Expert 일괄 추론 검사</Button><Button disabled={busy||!s.experts.active.length} busy={pending.has('library/optimize_all')} onClick={()=>void bulk('optimize_all')}>사용 중 Expert 일괄 양자화</Button><Button disabled={busy} onClick={()=>setOpen(true)}><PackagePlus size={16}/>패키지 가져오기</Button></div></header>
+ return <section className="space-y-4"><header className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-sm font-bold">Expert · 정밀도 버전</h3><p className="mt-1 text-xs text-slate-500">등록된 실제 패키지만 표시합니다. 원본과 변환 버전의 선택·교체·해제를 지원합니다.</p></div><div className="flex flex-wrap gap-2"><Button disabled={busy||!s.experts.items.length} busy={pending.has('library/probe_all')} onClick={()=>void bulk('probe_all')}><FlaskConical size={15}/>등록 Expert 일괄 추론 검사</Button><Button disabled={busy||!s.experts.active.length} busy={pending.has('library/optimize_all')} onClick={()=>void bulk('optimize_all')}><WandSparkles size={15}/>사용 중 Expert 일괄 양자화</Button><Button disabled={busy} onClick={()=>setDiscoveryOpen(true)}><Search size={15}/>금융 Expert 찾기</Button><Button disabled={busy} onClick={()=>setOpen(true)}><PackagePlus size={16}/>패키지 가져오기</Button></div></header>
  <div className="rounded-xl bg-blue-50 px-4 py-3 text-xs leading-6 text-blue-800">원본 ExpertPool / Residency에서 GPU·RAM 적재를 처리합니다. 아래 적재·추론 수치는 마지막 status.json 기록이며 현재 API 프로세스의 상주 상태가 아닙니다.</div>
  <div className="flex flex-wrap items-center gap-3"><div className="min-w-0 overflow-auto"><Tabs value={category} onChange={setCategory} items={[{id:'all',label:'전체 '+families.length},...Object.entries(categoryNames).map(([id,label])=>({id,label:label+' '+families.filter(f=>expertCategory(f.base)===id).length}))]}/></div><label className="flex items-center gap-2"><Search size={15} className="text-slate-400"/><input aria-label="Expert 검색" className={inputClass} value={search} onChange={e=>setSearch(e.target.value)} placeholder="모델 이름 / ID"/></label></div>
  <ErrorMessage message={error}/>{message&&<p role="status" className="text-xs text-emerald-700">{message}</p>}
+ {(job?.kind==='probe_all'||job?.kind==='optimize_all')&&<div className="rounded-xl bg-white p-4 text-sm ring-1 ring-slate-200/60" aria-live="polite">
+  <b>{job.kind==='probe_all'?'등록 Expert 전체 검사':'사용 중 Expert 자동 양자화'} · {job.stage||'대기'}</b>
+  {job.detail&&<p className="mt-2 text-xs text-slate-600">{job.detail}</p>}
+  {job.total!=null&&<p className="mt-1 text-xs text-slate-500">진행 {job.completed??0}/{job.total}</p>}
+  {bulkResult&&<details className="mt-3" open><summary className="cursor-pointer text-xs">전체 {bulkResult.total} · 통과 {bulkResult.passed} · 실패 {bulkResult.failed} · 건너뜀 {bulkResult.skipped}</summary>
+   <ul className="mt-2 space-y-2">{bulkResult.items.map(row=><li className="text-xs text-slate-600" key={row.id}><Status tone={row.status==='passed'?'good':row.status==='failed'?'bad':'warn'}>{row.status}</Status> {row.id} {row.detail&&' · '+row.detail}</li>)}</ul>
+  </details>}
+  {job.error&&<ErrorMessage message={job.error}/>}
+ </div>}
  <div className="space-y-3">{shown.map(family=>{const activeVersion=family.variants.find(e=>s.experts.active.includes(e.id)),item=family.variants.find(v=>v.id===(versions[family.id]||activeVersion?.id))||family.base;const included=s.experts.active.includes(item.id);
  return <article key={family.id} className="grid gap-4 rounded-xl bg-white px-5 py-5 ring-1 ring-slate-200/50 xl:grid-cols-[minmax(200px,.8fr)_minmax(0,1.5fr)_auto] xl:items-center"><div><Button className="!bg-transparent !p-0 !text-left" aria-label={family.base.name+' 상세'} onClick={()=>onInspect(item.id)}>{family.base.name}</Button><div className="mt-2"><Status tone={included?'good':item.package_available?'idle':'bad'}>{included?'사용 구성에 포함':item.package_available?'패키지 보관':'파일 없음 / 크기 불일치'}</Status></div><p className="mt-2 text-xs leading-5 text-slate-500">{item.input.requires?.join(' · ')||item.input.reason} · {bytes(item.weight_bytes??item.package.bytes)}</p><p className="mt-1 text-xs text-slate-400">{item.inference?.reason||(!item.inference?'추론 기록 없음':'마지막 추론 '+item.inference.status)}</p></div>
  <ExpertVariants variants={family.variants} selected={item.id} active={s.experts.active} onSelect={id=>setVersions(old=>({...old,[family.id]:id}))}/>
  <div className="flex flex-wrap gap-2"><Button tone={included?'neutral':'primary'} disabled={busy||(!included&&(!item.package_available||!item.input.supported))} onClick={()=>void apply(included?s.experts.active.filter(k=>k!==item.id):[...s.experts.active.filter(k=>!family.variants.some(v=>v.id===k)),item.id])}>{included?'해제':<><Plus size={14}/>{activeVersion?'이 버전으로 교체':'사용'}</>}</Button><Button disabled={busy} onClick={()=>onInspect(item.id)}>입력·추론·자원</Button><ExpertTasks item={item}/></div>
  </article>})}{!shown.length&&<Empty title="해당 분류의 등록 패키지가 없습니다."/>}</div>
+ {discoveryOpen&&<ExpertDiscovery onClose={()=>setDiscoveryOpen(false)}/>}
  <Drawer title="Frozen Expert 가져오기" open={open} onClose={close}><p className="mb-5 text-sm leading-6 text-slate-500">현재 ExpertRegistry.register가 지원하는 로컬 PT/PTH 또는 GGUF 참조 JSON 패키지를 등록합니다. 가중치·구조·입력 계약이 필요합니다.</p><form onSubmit={e=>{e.preventDefault();void register()}} className="space-y-4"><label className="block space-y-2 text-sm"><span>패키지 파일 전체 경로</span><input aria-label="Expert 패키지 경로" required className={inputClass} value={source} onChange={e=>setSource(e.target.value)} placeholder="C:\\모델\\expert.pt"/></label><label className="block space-y-2 text-sm"><span>슬롯 이름</span><input aria-label="Expert 슬롯 이름" pattern="[a-z][a-z0-9_]{0,79}" required className={inputClass} value={slot} onChange={e=>setSlot(e.target.value)} placeholder="my_expert"/></label><ErrorMessage message={error}/><Button type="submit" tone="primary" busy={pending.has('experts/register')} disabled={busy&&!pending.has('experts/register')}><Save size={15}/>패키지 등록</Button></form></Drawer>
  </section>;
 }

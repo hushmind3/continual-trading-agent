@@ -19,10 +19,16 @@ export function ExpertDiscovery({onClose}:{onClose:()=>void}){
    {(error||job?.error)&&<ErrorMessage message={error||job?.error||''}/>}
    {found&&<><p className="text-xs leading-5 text-slate-500">{found.query} · {found.models.filter(m=>m.compatible&&!m.same_weights).length}개 검사 가능한 후보</p>{found.keywords&&<p className="text-xs text-slate-400">검색 범위: {found.keywords.join(' · ')} · Hugging Face + GitHub · 최신 공개/업데이트 순</p>}<select aria-label="검색 결과 필터" value={filter} onChange={e=>setFilter(e.target.value)} className="rounded-xl bg-white px-3 py-2 text-sm"><option value="all">모든 결과</option><option value="ready">현재 검사 가능한 새 가중치</option><option value="new">미설치 모델</option><option value="installed">이미 설치한 모델 / 다른 버전</option></select></>}
    {found?.errors?.map(e=><p key={e.query} className="text-xs text-amber-700">{e.query} 검색 실패 · {e.detail}</p>)}
-   {models.map(item=><ExpertSearchResult key={item.id} item={item} busy={busy} onDownload={()=>void run('acquire',{id:item.id,device:'auto'})}/>)}
+   {models.map(item=>{
+    const registered=state?.experts.items.find(expert=>{
+     const origin=typeof expert.origin==='object'&&expert.origin!==null?expert.origin:null;
+     return origin?.repository===item.repository&&origin?.revision===item.revision;
+    });
+    return <ExpertSearchResult key={item.id} item={item} busy={busy} registered={Boolean(registered)} active={Boolean(registered?.active)} onDownload={()=>void run('acquire',{id:item.id,device:'auto'})}/>;
+   })}
    {found&&!models.length&&<Empty title="조건에 맞는 후보가 없습니다." detail="필터를 바꾸거나 모델 이름으로 검색하세요."/>}
    {found&&<p className="text-xs leading-5 text-slate-500">{found.scope}</p>}
-   {!busy&&job?.kind==='acquire'&&job.stage==='complete'&&<p className="text-sm text-emerald-700">다운로드·등록 작업 결과가 기록됐습니다. 등록 상태는 Expert 목록에서 확인하세요.</p>}
+   {!busy&&job?.kind==='acquire'&&job.stage==='complete'&&<p className="text-sm text-emerald-700">다운로드·등록이 완료되어 현재 Expert 사용 구성에 적용했습니다.</p>}
   </div>
  </Drawer>;
 }

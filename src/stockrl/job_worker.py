@@ -28,19 +28,21 @@ def main():
                 job["symbols"],job["start_date"],job["end_date"])
             print("FinRL-X 가격 수집 완료:",len(frame),"행",flush=True)
             return
-        if job["command"] == "train" and not job["resume"]:
+        if job["command"] == "train":
             backup = root / "archives" / job_id
             for name in ("sac.zip", "replay.pkl", "dataset.json"):
                 if (root / name).is_file():
                     backup.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(root / name, backup / name)
-            print("새 학습: 이전 SAC·Replay는 archives에 보관합니다.", flush=True)
+            print("학습 저장 전: 이전 SAC·Replay는 archives에 보관합니다.", flush=True)
         args = ["stockrl", job["command"], "--currency", job["currency"], "--symbols", *job["symbols"]]
         if job["resume"]:
             args.append("--resume")
         sys.argv = args
         from .official_cli import main as official_main
         official_main()
+        if job["command"]=="train":
+            atomic_json({"path":"sac.zip"},root/"active-checkpoint.json")
     except BaseException:
         exit_code = 1
         traceback.print_exc()

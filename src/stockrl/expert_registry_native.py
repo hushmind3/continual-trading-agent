@@ -16,7 +16,7 @@ class ExpertRegistry:
         self.registry_file=ROOT/'configs/experts.json'
         self.model_dir=Path.home()/'Desktop'/'모델'
         self.state_dir=ROOT/'runtime/experts';self.state_dir.mkdir(parents=True,exist_ok=True)
-        resources=SimpleNamespace(expert_devices={})
+        resources=SimpleNamespace(expert_devices=read_json(ROOT/'configs/local/operations.json').get('expert_devices',{}))
         self.settings=SimpleNamespace(registry_file=self.registry_file,model_dir=self.model_dir,
             state_dir=self.state_dir,resources=resources)
         self.pool=None;self.cache={};self.last_outputs={};self.signature=None;self.reported_at=0
@@ -39,7 +39,8 @@ class ExpertRegistry:
         if not contract['supported']:raise ValueError(contract['reason'])
         if package.get('weight_asset'):
             load_package(self.model_dir/'expert_registry.json',{'file':source.relative_to(self.model_dir).as_posix(),'sha256':digest(source),'bytes':source.stat().st_size},verify=True)
-        checksum=digest(source);target=self.model_dir/'expert-packages'/(slot+'-'+checksum[:16]+source.suffix)
+        checksum=digest(source)
+        target=source if source.is_relative_to(self.model_dir.resolve()) else self.model_dir/'expert-packages'/(slot+'-'+checksum[:16]+source.suffix)
         target.parent.mkdir(parents=True,exist_ok=True)
         if target.resolve()!=source:shutil.copyfile(source,target)
         ref={'file':target.relative_to(self.model_dir).as_posix(),'sha256':checksum,'bytes':target.stat().st_size}

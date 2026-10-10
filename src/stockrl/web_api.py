@@ -129,7 +129,8 @@ def source_settings():
 def database():
     if not DB.is_file():
         return {"error": "가격 DB가 없습니다.", "rows": 0, "tickers": 0, "instruments": []}
-    stamp = (DB.stat().st_mtime_ns, DB.stat().st_size,
+    wal=DB.with_name(DB.name+'-wal')
+    stamp = (DB.stat().st_mtime_ns, DB.stat().st_size,wal.stat().st_mtime_ns if wal.exists() else 0,
              (ROOT / "configs/instruments.json").stat().st_mtime_ns)
     if database_cache["stamp"] == stamp:
         return database_cache["value"]
@@ -170,9 +171,11 @@ def database():
 
 
 def model_state(settings):
-    path = RUNTIME / "sac.zip"
-    replay = RUNTIME / "replay.pkl"
-    identity = read_json(RUNTIME / "dataset.json")
+    from .framework import policy_files
+    selected=policy_files()
+    path = selected / "sac.zip"
+    replay = selected / "replay.pkl"
+    identity = read_json(selected / "dataset.json")
     result = {"file": file_info(path), "replay": file_info(replay), "identity": identity,
               "compatible": False, "reasons": [], "num_timesteps": None, "updates": None}
     if not path.is_file():
@@ -215,7 +218,8 @@ def replay_metadata(path_string, modified, size):
 
 
 def saved_replay():
-    path = RUNTIME / "replay.pkl"
+    from .framework import policy_files
+    path = policy_files() / "replay.pkl"
     if not path.exists():
         return {"status":"missing"}
     try:
@@ -247,18 +251,19 @@ def capabilities():
         "learning":{"status":"supported","reason":"원본 train_sac · SB3 SAC 시작·중단·동일 정책 이어 학습","source":"stockrl.framework.train"},
         "expert_selection":{"status":"supported","reason":"Frozen Expert 등록·선택·같은 모델 정밀도 교체·해제","source":"stockrl.expert_registry_native.ExpertRegistry"},
         "collection":{"status":"supported","reason":"FinRL-X FMP 가격 수집 모듈. API 인증이 있어야 원격 수집 가능합니다.","source":"FinRL-X/src/data/data_fetcher.py::fetch_price_data"},
-        "paper_accounts":{"status":"removed","reason":"이전 두 통화 가상계좌·독립 체결 원장은 현재 백엔드에 없습니다. 계좌 화면은 실제 백테스트 결과를 표시합니다.","source":"stockrl.framework.backtest"},
-        "live_feed":{"status":"not_connected","reason":"실시간 수신은 현재 학습 경로에 연결되어 있지 않습니다. 시장 화면은 저장 가격을 조회합니다.","source":"stockrl.framework.prices"},
-        "kiwoom":{"status":"not_connected","reason":"현재 코드에 키움 수신·인증·주문 서비스가 없습니다.","source":"README.md"},
+        "paper_accounts":{"status":"supported","reason":"원본 PaperAccount의 KRW/USD 독립 잔고·보유·체결·손익 기능이 연결되어 있습니다.","source":"stockrl.paper_account.PaperAccount"},
+        "live_feed":{"status":"supported","reason":"복구한 LiveMarketCollector와 Kiwoom BrokerStreams의 완료 시세를 DataStore·가상계좌에 전달합니다.","source":"stockrl.live_feed"},
+        "kiwoom":{"status":"supported","reason":"기존 보안 저장소·인증·실시간 수신 모듈 연결. 실제 수신에는 유효한 인증이 필요합니다. 실제 주문은 전송하지 않습니다.","source":"stockrl.provider_credentials / platform.kiwoom_data"},
         "alpaca":{"status":"not_connected","reason":"공식 서브모듈에는 Alpaca 모듈이 있지만 현재 SAC 작업에 연결되지 않았습니다.","source":"FinRL-X/src/trading/alpaca_manager.py"},
-        "conversion":{"status":"not_connected","reason":"INT4/NF4 실행 부품은 있습니다. 과거 자동 변환·검사·최적화 작업 API는 현재 존재하지 않습니다.","source":"stockrl.platform.quantized_linear / nf4_linear"},
-        "discovery":{"status":"removed","reason":"과거 금융 Expert 검색·다운로드·자동 등록 서비스는 현재 백엔드에서 제거됐습니다.","source":"stockrl.expert_registry_native"},
-        "checkpoint_restore":{"status":"not_connected","reason":"SAC save/load와 이어 학습은 지원합니다. 과거 버전 rollback API는 현재 없습니다.","source":"stockrl.framework.train"},
-        "settings_edit":{"status":"not_connected","reason":"현재 학습은 공식 예제와 라이브러리 기본값을 사용합니다. 적용값은 읽기 전용입니다.","source":"stockrl.framework.sac_example"},
+        "conversion":{"status":"supported","reason":"기존 정밀도 변환과 품질 비교·후보 선택 함수를 연결합니다. 변환은 새 파일로 저장됩니다.","source":"stockrl.platform.expert_conversion / expert_optimizer"},
+        "discovery":{"status":"supported","reason":"기존 HF/GitHub 검색·가중치 호환 확인·다운로드·자동 등록 함수가 연결되어 있습니다.","source":"stockrl.platform.expert_discovery / expert_acquisition"},
+        "checkpoint_restore":{"status":"supported","reason":"기존 SB3 파일을 변경하지 않고 선택하여 복원·이어 학습에 사용합니다. 이전 자체 정책 형식은 호환되지 않습니다.","source":"stockrl.framework.policy_files"},
+        "settings_edit":{"status":"supported","reason":"시세·가상계좌·Expert 장치의 기존 운영 설정을 편집합니다. SAC 학습값은 변경하지 않습니다.","source":"stockrl.platform.operations_settings"},
     }
 
 
 def expert_state():
+    from .platform.operations_runtime import runtime
     registry = read_json(ROOT / "configs/experts.json", {"active": [], "experts": {}})
     status = read_json(ROOT / "runtime/experts/status.json")
     rows = []
@@ -271,7 +276,9 @@ def expert_state():
         rows.append({**item, "id": key, "active": key in registry.get("active", []),
                      "package_available": available, "package_path": str(path),
                      "inference": status.get("experts", {}).get(key),
-                     "resources": status.get("resources", {}).get(key, {})})
+                     "resources": status.get("resources", {}).get(key, {}),
+                     "current_resources": runtime.pool.metrics.get(key,{}) if runtime.pool else {},
+                     "loaded": bool(runtime.pool and key in runtime.pool.loaded)})
     return {"active": registry.get("active", []), "items": rows, "as_of": status.get("as_of"),
             "reported": file_info(ROOT / "runtime/experts/status.json").get("modified")}
 
@@ -397,9 +404,12 @@ def state():
     experts=expert_state()
     experts["observation_connection"]={"size":8,"configured":True,"recorded":bool(experts.get("as_of")),
         "last_success":{role:sum(1 for row in experts["items"] if row["active"] and row.get("inference") and row["inference"].get("status")=="ready" and row.get("role")==role) for role in ("market","action")}}
+    from .platform.operations_runtime import runtime
+    from .platform.library_operations import library
     return {"architecture":"finrlx-official-sac-v2","updated_at": now(), "settings": settings, "model": model,
             "data": db, "experts": experts, "job": job, "evaluation": evaluation(),
             "checkpoints":checkpoints(settings),"capabilities":capabilities(),
+            "operations":runtime.snapshot(),"library":library.snapshot(),
             "resources": resource_monitor.snapshot(workers)}
 
 
@@ -421,7 +431,7 @@ def connections():
 
 @app.get("/api/logs")
 def logs():
-    names=("api.stderr.log","api.stdout.log","ui.stderr.log","training.log")
+    names=("api.stderr.log","api.stdout.log","server.stderr.log","training.log")
     result=[]
     for name in names:
         path=RUNTIME/name
@@ -640,3 +650,150 @@ def register(req: Registration):
         except (ValueError, RuntimeError, OSError, KeyError) as exc:
             raise HTTPException(400, str(exc)) from exc
     return {"message": "Expert 패키지를 등록했습니다."}
+
+
+class ControlRequest(BaseModel):
+    enabled:bool
+
+
+class OrderRequest(BaseModel):
+    currency:Literal["KRW","USD"]
+    symbol:str
+    action:Literal["BUY","SELL"]
+    quantity:int=Field(gt=0)
+
+
+class CredentialRequest(BaseModel):
+    environment:Literal["paper","real"]="real"
+    app_key:str=""
+    secret:str=""
+    account:str=""
+
+
+@app.get("/api/operations")
+def operations():
+    from .platform.operations_runtime import runtime
+    return runtime.snapshot()
+
+
+@app.post("/api/controls/{name}")
+def operation_control(name:Literal["feed","paper","engine"],request:ControlRequest):
+    from .platform.operations_runtime import runtime
+    try:return {"controls":runtime.command(name,request.enabled)}
+    except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
+
+
+@app.post("/api/orders")
+def paper_order(request:OrderRequest):
+    from .platform.operations_runtime import runtime
+    try:return runtime.manual_order(request.symbol,request.currency,request.action,request.quantity)
+    except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
+
+
+@app.get("/api/provider")
+def provider():
+    from .provider_credentials import public_status
+    from .platform.operations_settings import settings
+    return public_status(settings().state_dir)
+
+
+@app.post("/api/provider/connect")
+def connect_provider(request:CredentialRequest):
+    from .provider_credentials import connect_credentials
+    from .platform.operations_settings import settings
+    try:return connect_credentials(settings().state_dir,request.environment,request.app_key,request.secret,request.account)
+    except (ValueError,RuntimeError,OSError) as exc:raise HTTPException(400,str(exc))
+
+
+@app.post("/api/provider/test")
+def check_provider(request:CredentialRequest):
+    from .provider_credentials import test_connection
+    from .platform.operations_settings import settings
+    try:return test_connection(settings().state_dir,"kiwoom",request.environment)
+    except (ValueError,RuntimeError,OSError) as exc:raise HTTPException(400,str(exc))
+
+
+@app.post("/api/provider/public")
+def public_feed():
+    from .provider_credentials import _write_settings,read_settings
+    from .platform.operations_settings import settings
+    root=settings().state_dir;value=read_settings(root);value['provider']='yahoo'
+    _write_settings(root,value)
+    return {"message":"기존 공개 시세 공급원을 선택했습니다."}
+
+
+@app.get("/api/settings")
+def operational_settings():
+    from .platform.operations_settings import settings
+    current=settings()
+    return {"risk":vars(current.risk),"data":vars(current.data),"symbols":current.symbols,
+            "expert_devices":current.resources.expert_devices,"sac_readonly":source_settings()}
+
+
+@app.post("/api/settings")
+def save_operational_settings(values:dict):
+    from .platform.operations_settings import update
+    from .platform.operations_runtime import runtime
+    if set(values)-{"risk","data","symbols","expert_devices"}:raise HTTPException(400,"운영 설정만 변경할 수 있습니다. SAC 설정은 원본값을 사용합니다.")
+    if runtime.controls['feed']:raise HTTPException(409,"시세 수신을 멈춘 뒤 운영 설정을 변경하세요.")
+    value=update(values)
+    if runtime.account:
+        from .platform.operations_settings import settings
+        current=settings();runtime.account.fee=current.risk.fee;runtime.account.slippage=current.risk.slippage
+    if runtime.pool:
+        runtime.pool.settings.resources.expert_devices=value.get('expert_devices',{})
+    return {"settings":value}
+
+
+@app.get("/api/library")
+def library_state():
+    from .platform.library_operations import library
+    return library.snapshot()
+
+
+@app.post("/api/library/{kind}")
+def library_job(kind:str,payload:dict):
+    from .platform.library_operations import library
+    if job_state()["running"] and kind not in ("search","inspect"):
+        raise HTTPException(409,"현재 SAC 작업 종료 후 모델 구성을 변경하세요.")
+    try:return library.start(kind,payload)
+    except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
+
+
+@app.get("/api/models")
+def model_files():
+    registry=_experts();registered={item['package']['file']:key for key,item in registry.get('experts',{}).items()}
+    for key,item in registry.get('experts',{}).items():
+        if item['package']['file'].endswith('.json'):
+            package=read_json(MODEL_DIR/item['package']['file'])
+            if package.get('weight_asset'):registered[package['weight_asset']['file']]=key
+    rows=[]
+    if MODEL_DIR.exists():
+        for path in MODEL_DIR.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in (".pt",".pth",".gguf",".json",".safetensors",".zip"):continue
+            relative=path.relative_to(MODEL_DIR).as_posix()
+            rows.append({"path":str(path),"name":relative,"format":path.suffix.lower(),
+                "bytes":path.stat().st_size,"registered":registered.get(relative)})
+    return {"root":str(MODEL_DIR),"files":rows}
+
+
+@app.post("/api/checkpoints/restore")
+def restore_checkpoint(request:dict):
+    if job_state()["running"]:raise HTTPException(409,"현재 SAC 작업 종료 후 복원하세요.")
+    path=(RUNTIME/request.get("path","")).resolve()
+    if not path.is_relative_to(RUNTIME.resolve()) or path.name!="sac.zip" or not path.is_file():
+        raise HTTPException(400,"저장된 SAC 버전을 선택하세요.")
+    identity=read_json(path.parent/"dataset.json")
+    settings=source_settings()
+    if identity.get("environment")!=settings["environment"] or identity.get("sac_example")!=settings["parameters"]:
+        raise HTTPException(400,"현재 공식 SAC 환경·예제와 호환되지 않는 이전 정책입니다.")
+    from stable_baselines3 import SAC
+    SAC.load(path)
+    atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
+    return {"message":"기존 가중치 파일을 변경하지 않고 해당 SAC 버전을 선택했습니다."}
+
+
+@app.on_event("shutdown")
+def close_operations():
+    from .platform.operations_runtime import runtime
+    runtime.close()

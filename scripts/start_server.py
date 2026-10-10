@@ -29,14 +29,6 @@ def classify(process):
     cwd = process.cwd()
     if same_path(cwd, ROOT) and "stockrl.web_api:app" in command and "uvicorn" in command:
         return "api"
-    if "streamlit" in command and "run" in command:
-        position = command.index("run") + 1
-        if position < len(command):
-            target = Path(command[position])
-            if not target.is_absolute():
-                target = Path(cwd) / target
-            if same_path(target, ROOT / "ui.py"):
-                return "streamlit"
     return None
 
 

@@ -16,6 +16,7 @@ export interface Expert {
   input:{supported:boolean;pipeline:string;requires?:string[];universe?:string[];minimum_history?:number;reason?:string};
   inference?:{status:string;reason?:string;as_of?:string;output?:number[]};
   resources:Record<string,unknown>;origin?:string|Record<string,unknown>;
+  current_resources?:Record<string,unknown>;loaded?:boolean;
 }
 export interface Job {
   running:boolean;id?:string;status?:string;command?:string;pid?:number;started_at?:string;finished_at?:string;
@@ -42,8 +43,24 @@ export interface Snapshot {
     gpu:{name?:string;total_bytes?:number;used_bytes?:number;utilization_percent?:number;error?:string};
     processes:{role:string;pid:number;rss_bytes:number;cpu_percent:number;threads:number;read_bytes:number;write_bytes:number}[]};
   checkpoints:Checkpoint[];
+  operations?:OperationsState;
+  library?:{job:{busy:boolean;stage?:string;kind?:string;error?:string;detail?:string;result?:unknown};
+    catalog:{discovery?:{models:DiscoveryModel[]};optimizations?:Record<string,unknown>}};
   capabilities:Record<string,{status:"supported"|"not_connected"|"removed"|"requires_configuration";reason:string;source:string}>;
 }
 export interface Preflight {ok:boolean;errors:string[];symbols:string[];currency:Currency;mode:string;steps_per_run:number;periods:{training_observations:number;test_observations:number;train_start:string;train_end_exclusive:string}|null}
 export interface ResultTable {columns:string[];rows:Record<string,unknown>[];total:number}
 export interface Connections {api:{status:string};data:{status:string;source:string|null;available_sources:string[];reason?:string};brokers:{name:string;status:string;reason:string}[]}
+export interface OperationsState {
+  controls:{feed:boolean;paper:boolean;engine:boolean};
+  account:{books:Record<Currency,{initial_cash:number;cash:number;equity:number;net_pnl:number;
+    holdings_value:number;fees:number;realized_pnl:number;trade_count:number;
+    positions:Record<string,{quantity:number;average_cost:number}>;marks:Record<string,number>}>;
+    fills:Record<string,unknown>[];pending:Record<string,unknown>};
+  quotes:Record<string,Record<string,unknown>>;decisions:Record<string,unknown>[];
+  feed:{status:string;error?:string;policy_error?:string;last_as_of?:string};
+  broker?:{connected?:boolean;last_error?:string;last_message_utc?:string};
+  pool:{id:string;loaded?:boolean;device?:string;resident_bytes?:number;peak_ram_increment?:number}[];
+}
+export interface DiscoveryModel {id:string;repository:string;compatible:boolean;same_weights?:boolean;
+  detail?:string;bytes?:number;url:string;updated?:string}

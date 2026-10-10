@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import gc
 import hashlib
+import os
 import json
 from pathlib import Path
 import torch
 
 
 PACKAGE_FORMAT='frozen_expert_package_v1'
+HEADER_FORMAT='registered_vertical_trading_moe_v2'
 
 
 def digest(path):
@@ -36,3 +38,14 @@ def load_package(header_path,reference,verify=False):
         weight=package_path(header_path,saved['weight_asset'])
         if verify and digest(weight)!=saved['weight_asset']['sha256']:raise ValueError('GGUF 고정 가중치 checksum이 다릅니다.')
     return saved
+
+
+def atomic_torch_save(value, path):
+    temporary=path.with_suffix('.partial')
+    try:
+        with temporary.open('wb') as stream:
+            torch.save(value,stream);stream.flush();os.fsync(stream.fileno())
+        return temporary
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise

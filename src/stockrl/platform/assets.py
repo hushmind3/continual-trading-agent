@@ -20,12 +20,14 @@ from ..expert_device import restore_host
 
 
 class ExpertPool:
-    def __init__(self, settings,keep_device=False,live=False):
+    def __init__(self, settings,keep_device=False,live=False,extra_packages=None):
         self.settings = settings
         self.keep_device=keep_device
         self.live=live
         from ..state_io import read_json
         catalog=read_json(settings.registry_file)
+        for key,reference in (extra_packages or {}).items():
+            catalog.setdefault('experts',{})[key]={'package':reference}
         self.path=settings.model_dir/'expert_registry.json'
         self.entries={};references={};sizes={};counts={}
         for key,item in catalog.get('experts',{}).items():

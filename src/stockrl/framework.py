@@ -78,13 +78,14 @@ def train(frame,registry,resume=False):
     example,parameters,steps=sac_example()
     root=ROOT/'runtime/official';root.mkdir(parents=True,exist_ok=True)
     from .state_io import read_json,atomic_json
+    saved=policy_files()
     identity={'currency':env.currency,'symbols':env.symbols,'sac_example':parameters,'environment':'finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv','rolling_days':[1095,365]}
     try:
-        if resume and read_json(root/'dataset.json')!=identity:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다. 새 학습으로 시작하세요.')
+        if resume and read_json(saved/'dataset.json')!=identity:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다. 새 학습으로 시작하세요.')
         agent=DRLAgent(env=env)
         print('FinRL-X 원본 SAC 예제:',parameters,'단계:',steps,flush=True)
         if resume:
-            model=SAC.load(root/'sac.zip',env=env);model.load_replay_buffer(root/'replay.pkl')
+            model=SAC.load(saved/'sac.zip',env=env);model.load_replay_buffer(saved/'replay.pkl')
             model=agent.train_model(model=model,tb_log_name='sac',total_timesteps=steps)
         else:model=example(agent)
         model.save(root/'sac')
@@ -120,9 +121,10 @@ def backtest(frame,registry):
     env=training_environment(frame,registry,training=False)
     try:
         from .state_io import read_json
-        identity=read_json(ROOT/'runtime/official/dataset.json')
+        saved=policy_files()
+        identity=read_json(saved/'dataset.json')
         if identity.get('currency')!=env.currency or identity.get('symbols')!=env.symbols:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다.')
-        model=SAC.load(ROOT/'runtime/official/sac.zip',env=env)
+        model=SAC.load(saved/'sac.zip',env=env)
         from finrl.agents.stablebaselines3.models import DRLAgent
         _,weights=DRLAgent.DRL_prediction(model=model,environment=env)
         result=finrlx('strategies.base_strategy').StrategyResult('Official SAC',weights)
@@ -133,3 +135,15 @@ def backtest(frame,registry):
         evaluated=module.BacktestEngine(config).run_backtest(result.strategy_name,prices_wide,result.weights)
         return evaluated
     finally:env.close()
+
+
+def policy_files():
+    """Select an existing native SB3 revision without modifying its weights."""
+    from .state_io import read_json
+    root=ROOT/'runtime/official'
+    selection=read_json(root/'active-checkpoint.json')
+    if not selection:return root
+    path=(root/selection['path']).resolve()
+    if not path.is_relative_to(root.resolve()) or path.name!='sac.zip':
+        raise ValueError('기존 SAC 체크포인트 경로가 유효하지 않습니다.')
+    return path.parent

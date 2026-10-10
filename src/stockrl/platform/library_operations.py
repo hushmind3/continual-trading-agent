@@ -45,13 +45,25 @@ class LibraryOperations:
     def _execute(self,kind,payload,progress):
         cfg=settings();catalog=read_json(cfg.registry_file)
         if kind in ('probe_all','optimize_all'):
-            keys=list(catalog.get('experts',{})) if kind=='probe_all' else list(catalog.get('active',[]))
+            experts=catalog.get('experts',{})
+            if kind=='probe_all':keys=list(experts)
+            else:
+                keys=[]
+                for expert_id,item in experts.items():
+                    source=item.get('conversion',{}).get('source_id')
+                    root=source if source in experts else expert_id
+                    if root==expert_id:
+                        for precision in ('fp16','bf16','int8','int4','nf4'):
+                            suffix='_'+precision
+                            if expert_id.lower().endswith(suffix) and expert_id[:-len(suffix)] in experts:
+                                root=expert_id[:-len(suffix)];break
+                    if root not in keys:keys.append(root)
             if not keys:raise ValueError('검사할 등록 Expert가 없습니다.' if kind=='probe_all' else '사용 중인 Expert가 없습니다.')
             results=[]
             for index,key in enumerate(keys,1):
                 if self.cancelled.is_set():raise InterruptedError('Expert 일괄 작업 중지를 요청했습니다.')
-                progress(stage=kind,detail=f'{index}/{len(keys)} · {key}')
-                item=catalog['experts'][key]
+                progress(stage=kind,completed=index-1,total=len(keys),detail=f'{index}/{len(keys)} · {key}')
+                item=experts[key]
                 if kind=='optimize_all' and (item.get('conversion') or item.get('executor')=='llama_cpp' or not item.get('input',{}).get('supported',False)):
                     results.append(dict(id=key,status='skipped',detail='원본 변환 불가 또는 입력 미지원'))
                     continue
@@ -68,6 +80,7 @@ class LibraryOperations:
                     results.append(dict(id=key,status='failed',detail=str(exc)))
                 finally:
                     if kind=='probe_all' and not was_loaded:runtime.unload(key)
+            progress(stage=kind,completed=len(keys),total=len(keys),detail='전체 원본 Expert 처리 완료')
             return {'total':len(keys),'passed':sum(x['status']=='passed' for x in results),
                 'failed':sum(x['status']=='failed' for x in results),
                 'skipped':sum(x['status']=='skipped' for x in results),'items':results}

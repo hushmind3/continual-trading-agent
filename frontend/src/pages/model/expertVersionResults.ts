@@ -5,7 +5,12 @@ export interface VersionResult {
  key:string;label:string;versions:LibraryExpert[];item?:LibraryExpert;report?:OptimizationReport;
  inspection:{label:string;detail:string;status:string};decision:{label:string;detail:string;status:string};
 }
-export function precisionOf(item:LibraryExpert){return item.conversion?.precision?.toLowerCase()??'original'}
+export function precisionOf(item:LibraryExpert){
+ const known=item.conversion?.precision?.toLowerCase();if(known)return known;
+ const suffix=item.id.match(/_(fp16|bf16|int8|int4|nf4)$/i)?.[1];
+ const label=item.name.match(/(?:·|\s)(FP16|BF16|INT8|INT4|NF4)$/i)?.[1];
+ return (suffix??label)?.toLowerCase()??'original';
+}
 
 function decision(report:OptimizationReport|undefined,optimization:Optimization|undefined,key:string):VersionResult['decision']{
  const attempt=optimization?.attempts?.[key];
@@ -29,8 +34,9 @@ export function versionResults(base:LibraryExpert,variants:LibraryExpert[],selec
   const check=item?.check;
   const tested=(check?.tested??0)>(inspection?.finished??Infinity)?undefined:inspection?.reports?.find(r=>r.id===item?.id);
   const waiting=inspection&&!inspection.finished&&item&&(check?.tested??0)<(inspection.started??0);
-  const status=tested?.status??(waiting?'pending':check?.status);
-  const detail=tested?.detail??check?.detail;
+  const inferred=item?.inference;
+  const status=tested?.status??(waiting?'pending':check?.status??(inferred?.status==='ready'?'passed':inferred?.reason?'failed':undefined));
+  const detail=tested?.detail??check?.detail??inferred?.reason??(inferred?.status==='ready'?'저장된 실제 추론 결과 통과':undefined);
   const inspected=(!item?{label:report?'파일 정리됨':'미생성',detail:report?'최적화 판단은 보존 · 현재 패키지 없음':'변환되지 않았거나 변환에 실패해 현재 패키지가 없습니다.',status:'absent'}:
    status==='passed'?{label:tested?'전체 검사 통과':'추론 검사 통과',detail:detail??'실제 입력 추론 통과',status:'passed'}:
    status==='quality_warning'?{label:'출력 기준 초과',detail:detail??'허용 오차 초과',status:'rejected'}:

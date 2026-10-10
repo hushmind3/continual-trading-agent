@@ -6,6 +6,7 @@ import csv
 import json
 import math
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -326,6 +327,7 @@ def expert_state():
                     if not weight.is_relative_to(MODEL_DIR.resolve()):raise ValueError("GGUF 경로가 모델 폴더 밖입니다.")
                     info=weight.stat()
                     detail["representation"]=stored_precision(str(weight),info.st_mtime_ns,info.st_size)
+                    detail["quantized"]=bool(re.search(r'(?:I?Q)\d+',detail["representation"]))
             except (ValueError,OSError,KeyError,RuntimeError) as exc:
                 detail["metadata_error"]=str(exc)
         rows.append({**detail, "id": key, "active": key in registry.get("active", []),

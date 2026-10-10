@@ -9,7 +9,7 @@ export interface Instrument {
 export interface Bar {date:string;open:number|null;high:number|null;low:number|null;close:number|null;volume:number|null}
 export interface Expert {
   id:string;name:string;role:"market"|"action";active:boolean;package_available:boolean;package_path:string;
-  representation?:string;executor?:string;backend?:string;category?:"forecast"|"trading"|"interpretation";
+  representation?:string;executor?:string;backend?:string;metadata_error?:string;category?:"forecast"|"trading"|"interpretation";
   parameters?:number;feature_size:number;weight_bytes?:number;quantized?:boolean;
   package:{file:string;bytes:number;sha256:string};
   conversion?:{source_id:string;precision?:string;original_tensor_bytes?:number;converted_tensor_bytes?:number;layers?:number;native_forward_layers?:number;validation?:{passed?:boolean;relative_rmse?:number;max_relative_rmse?:number;action_agreement?:number;direction_agreement?:number;min_action_agreement?:number};comparison?:unknown};

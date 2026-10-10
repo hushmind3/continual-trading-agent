@@ -57,7 +57,13 @@ class LibraryOperations:
     def _execute(self,kind,payload,progress):
         cfg=settings();catalog=read_json(cfg.registry_file)
         if kind=='quantize_all':
-            keys=list(dict.fromkeys(item.get('conversion',{}).get('source_id') or key for key,item in catalog.get('experts',{}).items()))
+            import re
+            experts=catalog.get('experts',{})
+            keys=[]
+            for key,item in experts.items():
+                source=(item.get('conversion') or {}).get('source_id') or re.sub(r'_(fp16|bf16|int8|int4|nf4)$','',key)
+                root=source if source in experts else key
+                if root not in keys:keys.append(root)
             results=[]
             for index,key in enumerate(keys):
                 progress(stage='quantize_all',completed=index,total=len(keys),detail=f'{index+1}/{len(keys)} · {key} 양자화')
@@ -74,9 +80,6 @@ class LibraryOperations:
             from .quantized_linear import linear_layers
             key=payload['id'];entry=catalog.get('experts',{}).get(key)
             if entry is None:raise ValueError('최초 원본 Expert가 Registry에 없습니다: '+key)
-            key=entry.get('conversion',{}).get('source_id') or key
-            entry=catalog['experts'].get(key)
-            if entry is None:raise ValueError('양자화에 필요한 최초 원본 Expert가 Registry에 없습니다: '+key)
             package=load_package(cfg.model_dir/'expert_registry.json',entry['package'],verify=True)
             if package.get('executor')=='llama_cpp':
                 from .expert_packages import package_path
@@ -84,7 +87,26 @@ class LibraryOperations:
                 weight=package_path(cfg.model_dir/'expert_registry.json',package['weight_asset'])
                 kind=file_type(weight)
                 if kind in (0,1,32):raise ValueError('현재 GGUF는 '+precision_label(kind)+'입니다. 원본 GGUF 가져오기의 llama.cpp 양자화 경로를 사용해야 합니다.')
-                return {'total':1,'created':0,'existing':1,'failed':0,'items':[{'id':key,'status':'existing','precision':precision_label(kind),'bytes':weight.stat().st_size,'detail':'이미 양자화된 GGUF 파일입니다.'}]}
+                import re
+                label=precision_label(kind);bits=re.search(r'(?:I?Q)(\d+)',label)
+                precision='int'+bits.group(1) if bits else label
+                row={'id':key,'status':'existing','precision':precision,'representation':label,'bytes':weight.stat().st_size,'detail':'이미 양자화된 GGUF 파일입니다. '+label}
+                latest=read_json(cfg.registry_file)
+                latest.setdefault('quantizations',{})[key]={'stage':'complete','finished':time.time(),'reports':[row],'attempts':{},'failures':[]}
+                atomic_json(latest,cfg.registry_file)
+                return {'total':1,'created':0,'existing':1,'failed':0,'items':[row]}
+            if package.get('quantization'):
+                conversion=package.get('conversion') or {}
+                row={'id':key,'status':'existing','precision':conversion.get('precision'),'bytes':entry.get('weight_bytes') or entry['package']['bytes'],
+                    'conversion':conversion,'detail':'이미 양자화된 가중치입니다. 다른 정밀도는 비양자화 원본에서 생성하세요.'}
+                latest=read_json(cfg.registry_file)
+                latest.setdefault('quantizations',{})[key]={'stage':'complete','finished':time.time(),'reports':[row],'attempts':{},'failures':[]}
+                atomic_json(latest,cfg.registry_file)
+                return {'total':1,'created':0,'existing':1,'failed':0,'items':[row]}
+            source=(package.get('conversion') or {}).get('source_id') or (entry.get('conversion') or {}).get('source_id')
+            if source in catalog['experts'] and source!=key:
+                key=source;entry=catalog['experts'][key]
+                package=load_package(cfg.model_dir/'expert_registry.json',entry['package'],verify=True)
             record={'stage':'running','started':time.time(),'reports':[],'attempts':{},'failures':[]};pool=None;targets=None
             try:
                 for precision in payload.get('precisions',['int8','int4','nf4']):
@@ -92,9 +114,12 @@ class LibraryOperations:
                     record['attempts'][precision]={'status':'running','detail':'양자화 가중치 생성'}
                     try:
                         latest=read_json(cfg.registry_file)
-                        candidate=next((item for item in latest.get('experts',{}).values() if item.get('conversion',{}).get('source_id')==key and item.get('conversion',{}).get('precision')==precision),None)
+                        candidate=next((item for item in latest.get('experts',{}).values() if (item.get('conversion') or {}).get('source_id')==key and (item.get('conversion') or {}).get('precision')==precision),None) or latest.get('experts',{}).get(slot)
                         if candidate is not None:
-                            load_package(cfg.model_dir/'expert_registry.json',candidate['package'],verify=True)
+                            from .expert_contracts import descriptor
+                            saved=load_package(cfg.model_dir/'expert_registry.json',candidate['package'],verify=True)
+                            if (saved.get('conversion') or {}).get('precision')!=precision:raise ValueError('등록된 버전 이름과 실제 패키지 정밀도가 다릅니다: '+slot)
+                            candidate=descriptor(candidate['id'],saved,candidate['package'])
                             status='existing'
                         else:
                             if targets is None:
@@ -222,7 +247,7 @@ class LibraryOperations:
             for row in failure_records:
                 if row.get('source_id') not in set(optimizations)|set(quantizations) or row.get('precision') not in ('fp16','bf16','int8','int4','nf4'):
                     raise ValueError('현재 목록의 양자화 실패 기록을 선택하세요.')
-            removed_precisions={(experts[key].get('conversion',{}).get('source_id'),experts[key].get('conversion',{}).get('precision')) for key in ids}
+            removed_precisions={((experts[key].get('conversion') or {}).get('source_id'),(experts[key].get('conversion') or {}).get('precision')) for key in ids}
             removed_precisions.update((row['source_id'],row['precision']) for row in failure_records)
             for key in ids:runtime.unload(key)
             catalog['active']=[key for key in catalog.get('active',[]) if key not in ids]

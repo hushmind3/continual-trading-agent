@@ -27,8 +27,8 @@ export function ExpertLibraryPanel(){
  const toggleManaged=(id:string)=>setSelectedIds(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
  const toggleFailure=(source_id:string,precision:string)=>setSelectedFailures(current=>current.some(row=>row.source_id===source_id&&row.precision===precision)?current.filter(row=>row.source_id!==source_id||row.precision!==precision):[...current,{source_id,precision}]);
  const createChampion=async()=>{setError('');setChampionResult(null);setCreating(true);try{setChampionResult(await request<ChampionResult>('champions/create',{experts:chosenExperts}));await refresh()}catch(e){setError(e instanceof Error?e.message:'SAC Champion 생성 실패')}finally{setCreating(false)}};
- const removeExpert=async(ids:string[])=>{if(await operation('remove',{ids})){setSelectedIds(current=>current.filter(id=>!ids.includes(id)))}};
- const removeSelected=async()=>{if(await operation('remove',{ids:selectedIds,failures:selectedFailures})){setSelectedIds([]);setSelectedFailures([])}};
+ const removeExpert=async(ids:string[],failures:{source_id:string;precision:string}[]=[])=>{if(!(ids.length+failures.length))return;if(await operation('remove',{ids,failures})){setSelectedIds(current=>current.filter(id=>!ids.includes(id)));setSelectedFailures(current=>current.filter(row=>!failures.some(removed=>removed.source_id===row.source_id&&removed.precision===row.precision)))}};
+ const removeSelected=()=>removeExpert(selectedIds,selectedFailures);
  return <section className="space-y-4">
   <header className="flex flex-wrap items-center justify-between gap-3">
    <div><h3 className="text-sm font-bold">Expert · 정밀도 버전</h3><p className="mt-1 text-xs text-slate-500">모델 버전을 선택해 SAC Champion을 생성합니다. 양자화 결과는 정밀도·가중치 크기·계층 수·실패 이유로 표시합니다.</p></div>
@@ -45,12 +45,12 @@ export function ExpertLibraryPanel(){
   {!busy&&['quantize','quantize_all'].includes(job?.kind??'')&&job?.result&&<details open className="rounded-xl bg-white px-4 py-3 text-xs text-slate-600"><summary className="cursor-pointer">양자화 결과 · 새로 생성 {job.result.created??0} · 기존 버전 {job.result.existing??0} · 실패 {job.result.failed??0}</summary><ul className="mt-3 space-y-2">{job.result.items?.map((row:any)=><li key={row.id} className={row.status==='failed'?'text-rose-700':'text-emerald-700'}>{row.id} · {row.precision?.toUpperCase()} · {row.status==='failed'?'실패':row.status==='existing'?'기존 파일 있음':'생성 완료'}{row.bytes!=null?' · '+bytes(row.bytes):''}{row.seconds!=null?' · '+number(row.seconds,2)+'s':''}{row.detail?' · '+inspectionDetail(row.detail):''}</li>)}</ul></details>}
   {(error||job?.error)&&<ErrorMessage message={error||job?.error||''}/>}
   {!items.length?<Empty title="Expert 등록 항목이 없습니다." detail="Registry가 비어 있습니다. 기존 패키지를 가져오거나 금융 Expert를 검색할 수 있습니다."/>:<div className="space-y-2">
-   {shown.map((family,index)=>{const kind=expertCategory(family.base);return <div key={family.id}>
+   {shown.map((family,index)=>{const kind=expertCategory(family.base),selectedVersions=family.variants.filter(item=>selectedIds.includes(item.id)).map(item=>item.id),failures=selectedFailures.filter(row=>row.source_id===family.id);return <div key={family.id}>
     {(index===0||expertCategory(shown[index-1].base)!==kind)&&<h3 className="mb-3 mt-6 text-sm font-semibold text-slate-700">{categoryNames[kind]}</h3>}
     <div className="grid gap-4 rounded-xl bg-white px-4 py-4 xl:grid-cols-[minmax(200px,.7fr)_minmax(0,1.6fr)_auto] xl:items-center">
      <div className="min-w-0"><b className="text-sm">{family.base.name}</b><p className="mt-1 text-xs text-slate-500">Frozen Expert · {number(family.base.parameters,0)} parameters</p>{!!family.base.input.universe?.length&&<p className="mt-1 text-xs text-slate-400">원본 학습 종목 {family.base.input.universe.length}개</p>}</div>
      <ExpertVariants variants={family.variants} quantization={catalog?.quantizations?.[family.id]} legacyFailures={catalog?.optimizations?.[family.id]} selectedIds={selectedIds} selectedFailurePrecisions={selectedFailures.filter(row=>row.source_id===family.id).map(row=>row.precision)} onToggleFailure={precision=>toggleFailure(family.id,precision)} onToggle={toggleManaged}/>
-     <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={()=>void operation('quantize',{id:family.base.id,device:'auto'})}><WandSparkles size={14}/>양자화</Button><Button tone="danger" disabled={busy} onClick={()=>void removeExpert(family.variants.map(item=>item.id))}><Trash2 size={14}/>Expert 삭제</Button></div>
+     <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={()=>void operation('quantize',{id:family.base.id,device:'auto'})}><WandSparkles size={14}/>양자화</Button><Button tone="danger" disabled={busy||!(selectedVersions.length+failures.length)} onClick={()=>void removeExpert(selectedVersions,failures)}><Trash2 size={14}/>선택 버전 삭제</Button></div>
     </div>
    </div>})}
   </div>}

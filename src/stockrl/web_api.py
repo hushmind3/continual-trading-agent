@@ -49,6 +49,15 @@ async def local_writes(request: Request, call_next):
         "http://127.0.0.1:8766", "http://localhost:8766"
     }:
         return JSONResponse({"detail": "로컬 화면에서 요청하세요."}, status_code=403)
+    if request.method!='GET':
+        from .platform.system_operations import system,apply_running
+        allowed_stop=request.url.path in ('/api/stop','/api/system/stop','/api/system/prepare-restart')
+        if (apply_running() or system.restarting) and not allowed_stop and request.url.path!='/api/system/apply':
+            return JSONResponse({'detail':'변경 적용/서버 갱신 중입니다. 기존 작업은 보존합니다.'},status_code=409)
+        path=request.url.path
+        conflict=path in ('/api/train','/api/backtest','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
+        if conflict:
+            system.cancel()
     return await call_next(request)
 
 
@@ -170,9 +179,9 @@ def database():
         return {"error": str(exc), "rows": 0, "tickers": 0, "instruments": []}
 
 
-def model_state(settings):
+def model_state(settings,selected=None):
     from .framework import policy_files
-    selected=policy_files()
+    selected=Path(selected) if selected is not None else policy_files()
     path = selected / "sac.zip"
     replay = selected / "replay.pkl"
     identity = read_json(selected / "dataset.json")
@@ -199,6 +208,12 @@ def model_state(settings):
         for key in ("batch_size", "buffer_size", "learning_rate", "learning_starts"):
             if state.get(key) != settings["parameters"][key]:
                 result["reasons"].append(f"{key}: 저장값 {state.get(key)} / 현재값 {settings['parameters'][key]}")
+        if identity.get('symbols'):
+            from finrl import config
+            count=len(identity['symbols']);expected_shape=[(count+len(config.INDICATORS))*count+8]
+            if result['observation_shape']!=expected_shape or result['action_shape']!=[count]:
+                result['reasons'].append(f"원본 환경+Expert 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{count}]")
+        result['policy_compatible']=not result['reasons']
         if not replay.is_file():
             result["reasons"].append("이어 학습에 필요한 Replay 파일이 없습니다.")
         result["compatible"] = not result["reasons"]
@@ -229,7 +244,7 @@ def saved_replay():
 
 
 def checkpoints(settings):
-    paths = ([RUNTIME/"sac.zip"] if (RUNTIME/"sac.zip").is_file() else []) + sorted((RUNTIME/"archives").glob("*/sac.zip"))
+    paths = ([RUNTIME/"sac.zip"] if (RUNTIME/"sac.zip").is_file() else []) + sorted((RUNTIME/"archives").glob("*/sac.zip")) + sorted((RUNTIME/"policies").glob("*/sac.zip"))
     items=[]
     for path in paths:
         try:
@@ -345,7 +360,7 @@ def evaluation():
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "finrlx-react-sac", "project": str(ROOT.resolve()), "pid": os.getpid()}
+    return {"ok": True, "service": "finrlx-react-sac", "project": str(ROOT.resolve()), "pid": os.getpid(),"deployment_id":os.environ.get('STOCKRL_APPLY_ID')}
 
 
 @app.get("/", include_in_schema=False)
@@ -406,10 +421,11 @@ def state():
         "last_success":{role:sum(1 for row in experts["items"] if row["active"] and row.get("inference") and row["inference"].get("status")=="ready" and row.get("role")==role) for role in ("market","action")}}
     from .platform.operations_runtime import runtime
     from .platform.library_operations import library
+    from .platform.system_operations import system,apply_state
     return {"architecture":"finrlx-official-sac-v2","updated_at": now(), "settings": settings, "model": model,
             "data": db, "experts": experts, "job": job, "evaluation": evaluation(),
             "checkpoints":checkpoints(settings),"capabilities":capabilities(),
-            "operations":runtime.snapshot(),"library":library.snapshot(),
+            "operations":runtime.snapshot(),"library":library.snapshot(),"automation":{"apply":apply_state(),"system":system.snapshot()},
             "resources": resource_monitor.snapshot(workers)}
 
 
@@ -454,7 +470,8 @@ def price_history(symbol: str, limit: int = Query(300, ge=1, le=2000)):
 
 @app.get("/api/download/{name}")
 def download(name: Literal["backtest.csv", "backtest_metrics.json", "backtest_weights.csv", "backtest_trades.csv", "sac.zip", "dataset.json"]):
-    path = RUNTIME / name
+    from .framework import policy_files
+    path = (policy_files() if name in ('sac.zip','dataset.json') else RUNTIME) / name
     if not path.is_file():
         raise HTTPException(404, "결과 파일이 없습니다.")
     return FileResponse(path, filename=name)
@@ -518,7 +535,7 @@ def check(command: Literal["train", "backtest"], req: RunRequest):
     return preflight(req, command)
 
 
-def launch(command, req):
+def launch(command, req,preserve_output=False):
     with launch_lock:
         if job_state()["running"]:
             raise HTTPException(409, "학습 또는 평가가 실행 중입니다.")
@@ -530,6 +547,7 @@ def launch(command, req):
         job = {"id": job_id, "status": "starting", "command": command, "currency": req.currency,
                "symbols": checked["symbols"], "resume": req.resume, "started_at": now(),
                "log": f"jobs/{job_id}.log", "finished_at": None, "exit_code": None}
+        if preserve_output:job['output']='policies/'+job_id
         (RUNTIME / "jobs").mkdir(exist_ok=True)
         env = os.environ.copy()
         env.update(PYTHONPATH=str(ROOT / "src"), PYTHONUTF8="1")
@@ -701,6 +719,8 @@ def provider():
 def connect_provider(request:CredentialRequest):
     from .provider_credentials import connect_credentials
     from .platform.operations_settings import settings
+    from .platform.operations_runtime import runtime
+    if runtime.controls['feed']:raise HTTPException(409,'기존 시세 수신을 중지한 뒤 공급원 인증을 변경하세요.')
     try:return connect_credentials(settings().state_dir,request.environment,request.app_key,request.secret,request.account)
     except (ValueError,RuntimeError,OSError) as exc:raise HTTPException(400,str(exc))
 
@@ -715,11 +735,20 @@ def check_provider(request:CredentialRequest):
 
 @app.post("/api/provider/public")
 def public_feed():
+    from .platform.operations_runtime import runtime
+    if runtime.controls['feed']:raise HTTPException(409,'시세 수신을 중지한 뒤 공급원을 변경하세요.')
     from .provider_credentials import _write_settings,read_settings
     from .platform.operations_settings import settings
     root=settings().state_dir;value=read_settings(root);value['provider']='yahoo'
     _write_settings(root,value)
     return {"message":"기존 공개 시세 공급원을 선택했습니다."}
+
+
+@app.post('/api/provider/disconnect')
+def disconnect_provider():
+    from .platform.operations_runtime import runtime
+    runtime.command('feed',False)
+    return {'message':'시세 연결 중지를 요청했습니다. 저장된 인증 정보는 유지합니다.'}
 
 
 @app.get("/api/settings")
@@ -753,6 +782,7 @@ def library_state():
 
 @app.post("/api/library/{kind}")
 def library_job(kind:str,payload:dict):
+    if kind=='stop':return stop_library()
     from .platform.library_operations import library
     if job_state()["running"] and kind not in ("search","inspect"):
         raise HTTPException(409,"현재 SAC 작업 종료 후 모델 구성을 변경하세요.")
@@ -762,7 +792,7 @@ def library_job(kind:str,payload:dict):
 
 @app.get("/api/models")
 def model_files():
-    registry=_experts();registered={item['package']['file']:key for key,item in registry.get('experts',{}).items()}
+    registry=read_json(ROOT/'configs/experts.json');registered={item['package']['file']:key for key,item in registry.get('experts',{}).items()}
     for key,item in registry.get('experts',{}).items():
         if item['package']['file'].endswith('.json'):
             package=read_json(MODEL_DIR/item['package']['file'])
@@ -787,10 +817,79 @@ def restore_checkpoint(request:dict):
     settings=source_settings()
     if identity.get("environment")!=settings["environment"] or identity.get("sac_example")!=settings["parameters"]:
         raise HTTPException(400,"현재 공식 SAC 환경·예제와 호환되지 않는 이전 정책입니다.")
-    from stable_baselines3 import SAC
-    SAC.load(path)
+    from .platform.operations_runtime import runtime
+    runtime.check_policy(path.parent)
     atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
+    selection_path=ROOT/'runtime/operations/policies.json'
+    if selection_path.is_file():
+        selected=read_json(selection_path);selected[identity['currency']]=path.relative_to(RUNTIME).as_posix();atomic_json(selected,selection_path)
     return {"message":"기존 가중치 파일을 변경하지 않고 해당 SAC 버전을 선택했습니다."}
+
+
+@app.get('/api/system/status')
+def system_status():
+    from .platform.system_operations import system,apply_state
+    return {'apply':apply_state(),'system':system.snapshot()}
+
+
+@app.post('/api/system/apply')
+def apply_changes():
+    from .platform.system_operations import start_apply
+    return start_apply()
+
+
+@app.get('/api/system/blockers')
+def restart_blockers():
+    from .platform.system_operations import busy
+    return {'items':busy()}
+
+
+@app.post('/api/system/prepare-restart')
+def prepare_restart():
+    from .platform.system_operations import busy,system
+    with launch_lock:
+        blockers=busy()
+        if blockers:raise HTTPException(409,' · '.join(blockers))
+        system.restarting=True
+        from .platform.operations_runtime import runtime
+        runtime.close()
+    return {'ready':True}
+
+
+@app.get('/api/system/check')
+def system_check():
+    from .platform.system_operations import check_system
+    return check_system()
+
+
+@app.post('/api/system/start')
+def start_system(values:dict):
+    from .platform.system_operations import system
+    currencies=values.get('currencies',['USD','KRW'])
+    if not currencies or not set(currencies)<= {'USD','KRW'}:raise HTTPException(400,'USD/KRW 운영 통화를 선택하세요.')
+    try:return system.start(list(dict.fromkeys(currencies)))
+    except ValueError as exc:raise HTTPException(409,str(exc))
+
+
+@app.post('/api/system/stop')
+def stop_system():
+    from .platform.system_operations import system
+    return system.stop()
+
+
+def stop_library():
+    from .platform.library_operations import library
+    from .platform.operations_runtime import runtime
+    library.cancelled.set();runtime.cancel_inference.set()
+    return {'message':'모델 작업 중지를 요청했습니다. 진행 중 연산은 종료 상태를 확인하세요.'}
+
+
+@app.post('/api/model/open-directory')
+def open_model_directory():
+    if not MODEL_DIR.is_dir():raise HTTPException(404,'실제 모델 폴더가 없습니다.')
+    if os.name!='nt':raise HTTPException(400,'현재 폴더 열기는 Windows에서 제공합니다.')
+    os.startfile(MODEL_DIR)
+    return {'path':str(MODEL_DIR)}
 
 
 @app.on_event("shutdown")

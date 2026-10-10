@@ -22,6 +22,7 @@ src/stockrl/
   __main__.py / official_cli.py CLI → 현재 프레임워크 함수
   framework.py                FinRL-X·FinRL·SB3 호출, 선택한 정책 경로
   job_worker.py               별도 SAC/백테스트/수집 작업과 저장 기록
+  platform/system_operations.py 통합 시작·중지·점검, 런처 적용 요청
   expert_registry_native.py   현재 Registry, 동결 추론, 8개 관측 요약
   expert_observation.py       원본 환경을 감싼 Gymnasium ObservationWrapper
   moe_native.py               패키지 원본 구조와 runner로 추론
@@ -150,7 +151,7 @@ SAC 자동 판단은 `OperationsRuntime.sac_decision` → 현재 원본 환경/E
 - GitHub: `git clone --recurse-submodules https://github.com/hushmind3/continual-trading-agent.git`.
 - Python 의존성: [requirements/operations.txt](requirements/operations.txt). 기존 설치 스크립트는 빠진 배포판만 설치하며 기존 패키지를 업그레이드하지 않습니다. FinRL·FinRL-Trading Git revision과 SB3·Torch 명세는 유지합니다.
 - React 의존성: `frontend/package-lock.json`. 새 환경은 `frontend`에서 `npm ci`로 준비합니다.
-- 운영: `서버켜기.cmd` → `scripts/start_server.py` → 8766 FastAPI 하나. 런처는 실제 cwd/명령/PID 소유권을 확인하고 이미 정상인 서버는 재사용합니다. 서버가 없을 때 기존 타입 검사·빌드 후 실행합니다.
+- 운영: `서버켜기.cmd` → `scripts/start_server.py` → 8766 FastAPI 하나. 런처는 Git 추적 소스/미추적 소스의 내용 해시와 마지막 적용 기록을 비교합니다. 바뀐 React만 타입 검사·빌드하고, 백엔드 변경/서버 부재일 때만 소유권을 확인해 서버를 갱신합니다. 이후 CMD 기본 실행은 같은 전체 시작 API를 호출합니다.
 - 개발: `frontend/start.cmd` 또는 `npm run dev` → 5173. 5173은 운영 런처에서 실행하지 않습니다.
 
 ```powershell
@@ -165,10 +166,37 @@ $env:PYTHONUTF8="1"
 
 ## 구현 상태와 보존 범위
 
-- **소스 연결 완료 / 실제 실행 미확인**: React 운영 제어·KRW/USD 가상계좌·키움 인증/수신·외부 모델 조회/등록/적재/추론·검색/다운로드·변환/최적화·정책 선택 복원·운영 설정 API. 이번 변경에서 테스트·빌드·인증·시세 수신·모델 추론·학습·백테스트를 실행하지 않았습니다.
+- **소스 연결 완료 / 실제 실행 미확인**: React 운영 제어·KRW/USD 가상계좌·키움 인증/수신·외부 모델 조회/등록/적재/추론·검색/다운로드·변환/최적화·정책 선택 복원·운영 설정 API. 복구 커밋 a7301ae에서는 이 작업들을 실행하지 않았습니다. 현재 적용 자동화의 실제 빌드·응답 결과는 apply 상태에 기록되며, 전체 시작 전에는 인증·시세·추론·학습·가상매매 실행 성공을 주장하지 않습니다.
 - **기존 연결 유지**: 공식 SAC 학습·Replay·백테스트·저장 가격 조회·FMP 수집·기존 동결 관측 구조. 새로운 실행 성공을 주장하지 않습니다.
 - **미연결**: 실제 증권 계좌 주문, Alpaca 주문. **사용 조건 미충족**: 현재 저장된 이전 SAC는 원본 환경과 호환되지 않으며 SPY/필수 종목의 실제 이력이 없는 Expert는 입력 오류를 표시합니다.
 - **제거한 실행 대상**: 루트 Streamlit 화면, 구형 화면 테스트/설정, 감사 보고서/임시 프론트 백업, 호출되지 않는 구형 operating_rules·package_disposal. 확인한 미사용 파일만 프로젝트 휴지통으로 이동했습니다. 공식 프레임워크와 정상 사용 모듈은 유지합니다.
-- **배포 미적용**: 이번 작업에서 운영 서버를 재시작하거나 React `dist`를 다시 빌드하지 않았습니다. 현재 실행 중인 8766 서버의 코드와 정적 화면이 이 소스 버전이라고 주장하지 않습니다.
+- **배포 상태**: `runtime/official/applied-sources.json`은 실제 적용된 소스/정적 파일 해시를 기록합니다. `apply.json`의 적용 단계와 `applied` 값으로 코드 반영을 확인합니다. 연결 점검의 준비 부족과 코드 적용 실패는 구분합니다.
 
 GitHub에는 React 소스·FastAPI/백엔드·기존 연결 모듈·공개 Registry/종목 설정·실행 스크립트·의존성·이 구조 설명을 보존합니다. `/data/`만 무시하므로 `frontend/src/data`의 `.ts/.tsx`는 추적합니다. 외부 모델 원본·가중치·가격/학습 실데이터·SAC/Replay·가상환경·node_modules·dist·로그·인증·휴지통은 업로드하지 않습니다. 외부 모델과 데이터를 별도로 준비해야 동일한 기능을 실행할 수 있습니다.
+
+## 통합 운영 자동화와 개별 제어
+
+운영 화면에 `변경 적용 · 전체 점검`, `전체 시스템 시작`, `전체 시스템 중지`를 제공합니다. 기존 7개 메뉴와 공통 개별 제어를 유지합니다. 모델 비교 실행, 모델 폴더 열기, 모델 작업 중지, 공급원 연결 해제와 학습 화면의 백테스트 접근도 기존 함수로 연결했습니다.
+
+| 동작 | API / 실제 실행 경로 |
+| --- | --- |
+| 변경 적용·점검 | POST `/api/system/apply` → `start_apply` → 별도 일회성 `scripts/start_server.py --apply-only` |
+| 진행 상태 | GET `/api/system/status` → `apply.json` + `SystemOperations.snapshot`; 재시작 전후 기록 유지 |
+| 전체 연결 점검 | GET `/api/system/check` → 기존 설정·정책 메타데이터·Registry·원장·공급원·프로세스 조회 |
+| 전체 시작 | POST `/api/system/start` → `SystemOperations.start/run`; CMD도 같은 API 호출 |
+| 전체 중지 | POST `/api/system/stop` → 기존 runtime.command + 기존 SAC stop; 관리 서버 유지 |
+| 모델 비교/작업 중지 | POST `/api/library/compare`, `/api/library/stop` → 기존 measure/comparison_result 및 작업 취소 요청 |
+| 모델 폴더 열기 | POST `/api/model/open-directory` → 실제 외부 모델 폴더 (Windows) |
+| 시세 연결 해제 | POST `/api/provider/disconnect` → 기존 수신 중지; 저장 인증 유지 |
+
+변경 적용은 기존 `startup_lock`, 서버 소유권 확인과 런처를 재사용합니다. React 소스는 Git 추적·미추적 목록에서 선별하고 파일 내용 해시를 비교합니다. README/AGENTS 변경만으로 재빌드하지 않습니다. 공식 서브모듈 revision과 백엔드 소스 변경을 확인합니다. 변경이 없고 기존 산출물이 맞으면 빌드·재시작을 생략합니다. 새 관리 서버/상주 감시 프로세스/AI 운영 판단은 만들지 않습니다.
+
+실행 중 SAC·모델 작업·시세·추론·가상매매·전체 시작이 있으면 갱신 충돌을 보류하고 기존 작업을 보존합니다. 서버 갱신 직전에 상태를 다시 확인합니다. 준비 부족이나 실패를 적용 완료라고 기록하지 않습니다. 필요한 빌드 출력은 기존 runtime 로그에 저장하고 실패 단계에서만 오류 부분을 표시합니다. 별도 테스트/감사 보고서는 만들지 않습니다. 브라우저 테스트나 벤치마크를 자동 실행하지 않습니다.
+
+전체 시작은 저장 인증 확인(키움이면 기존 인증 검사) → 기존 시세의 한 수집 주기와 실제 수신 확인 → 기존 KRW/USD 원장 로딩 → 사용자 선택 Expert 적재 → 통화별 정책 호환 확인 → 필요할 때만 공식 SAC 학습 → 기존 실제 입력 추론/가상체결 순서입니다. 운영 화면에서 두 통화 또는 한 통화를 선택할 수 있습니다. 학습 데이터/모델/시세가 부족한 통화는 원인을 표시합니다. 호환 정책이 있으면 새 학습을 하지 않습니다.
+
+자동 시작의 신규 SAC는 기존 `launch`/`job_worker`/`official_cli`/`framework.train`에 출력 경로만 전달하여 `runtime/official/policies/{job_id}/`에 저장합니다. 원본 SAC 설정, 알고리즘, 환경과 Expert 입력 계약은 바꾸지 않습니다. `runtime/operations/policies.json`은 준비된 통화별 기존 파일 경로만 기록합니다. 기존 가중치/Replay를 덮어쓰지 않습니다. 체크포인트 화면은 이 폴더도 조회하며 개별 복원 시 운영 경로를 함께 갱신합니다.
+
+운영 풀에 적재한 Expert는 기존 `ExpertRegistry`에 pool provider를 전달해 관측 추론에서 공유합니다. 기존 출력 요약·환경·관측 차원은 그대로입니다. 개별 제어가 자동 시작과 충돌하면 자동 절차는 중단 사유를 표시하고 사용자 명령을 우선합니다. 전체 중지는 기존 학습 중지와 시세/추론/가상체결 중지를 사용하며, 진행 중인 네이티브 연산의 종료 대기와 실제 중지 완료를 구분합니다. 실제 증권사 주문은 호출하지 않습니다.
+
+바탕화면 `서버켜기.cmd`는 프로젝트 루트의 같은 CMD로 전달하는 실행 진입점입니다. 다른 PC에서는 해당 루트 CMD의 바탕화면 바로가기를 사용할 수 있습니다. 루트 CMD → 기존 런처 → 변경 적용/상태 조회 → 같은 전체 시작 API 순서입니다. 서버가 이미 켜져 있어도 소스 변경을 적용합니다. `--apply-only`는 전체 운영을 시작하지 않습니다.

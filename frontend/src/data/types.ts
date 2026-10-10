@@ -46,6 +46,7 @@ export interface Snapshot {
   operations?:OperationsState;
   library?:{job:{busy:boolean;stage?:string;kind?:string;error?:string;detail?:string;result?:unknown};
     catalog:{discovery?:{models:DiscoveryModel[]};optimizations?:Record<string,unknown>}};
+  automation?:AutomationState;
   capabilities:Record<string,{status:"supported"|"not_connected"|"removed"|"requires_configuration";reason:string;source:string}>;
 }
 export interface Preflight {ok:boolean;errors:string[];symbols:string[];currency:Currency;mode:string;steps_per_run:number;periods:{training_observations:number;test_observations:number;train_start:string;train_end_exclusive:string}|null}
@@ -64,3 +65,6 @@ export interface OperationsState {
 }
 export interface DiscoveryModel {id:string;repository:string;compatible:boolean;same_weights?:boolean;
   detail?:string;bytes?:number;url:string;updated?:string}
+export interface OperationStage {id:string;title:string;status:'pending'|'running'|'complete'|'failed'|'blocked';detail?:string;log_path?:string;log?:string}
+export interface OperationProgress {status:string;active?:boolean;applied?:boolean;detail?:string;error?:string;stages:OperationStage[];checks?:OperationStage[];changed_files?:string[];currencies?:string[]}
+export interface AutomationState {apply:OperationProgress;system:OperationProgress}

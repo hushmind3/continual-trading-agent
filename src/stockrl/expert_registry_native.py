@@ -12,7 +12,8 @@ from .platform.expert_contracts import input_contract,descriptor
 
 
 class ExpertRegistry:
-    def __init__(self):
+    def __init__(self,pool_provider=None):
+        self.pool_provider=pool_provider
         self.registry_file=ROOT/'configs/experts.json'
         self.model_dir=Path.home()/'Desktop'/'모델'
         self.state_dir=ROOT/'runtime/experts';self.state_dir.mkdir(parents=True,exist_ok=True)
@@ -54,7 +55,7 @@ class ExpertRegistry:
         catalog=self.catalog();signature=json.dumps(catalog,sort_keys=True)
         if signature!=self.signature:
             self.close();self.last_outputs={};self.signature=signature
-        if self.pool is None:self.pool=ExpertPool(self.settings,keep_device=True,live=True)
+        if self.pool is None:self.pool=self.pool_provider() if self.pool_provider else ExpertPool(self.settings,keep_device=True,live=True)
         stamp=str(frame.date.max());daily=frame[frame.date<pd.Timestamp(stamp).normalize()]
         groups={'market':[],'action':[]}
         for key in catalog.get('active',[]):
@@ -91,5 +92,5 @@ class ExpertRegistry:
         return np.array(result,dtype=np.float32)
 
     def close(self):
-        if self.pool:self.pool.close()
+        if self.pool and not self.pool_provider:self.pool.close()
         self.pool=None;self.cache.clear()

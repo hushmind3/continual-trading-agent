@@ -19,6 +19,7 @@ class OperationsRuntime:
         self.collector=None;self.thread=None;self.pool=None;self.pool_signature=None
         self.account=None;self.quotes={};self.decisions=[];self.last_policy_date=None
         self.status={'status':'stopped','error':None}
+        self.feed_cycle=threading.Event();self.cancel_inference=threading.Event();self.inference_active=0
 
     def ledger(self):
         cfg=settings()
@@ -39,6 +40,8 @@ class OperationsRuntime:
             if name not in self.controls:raise ValueError('feed / paper / engine 제어를 선택하세요.')
             if name=='feed':
                 if enabled and not self.controls['feed']:
+                    if self.thread and self.thread.is_alive():raise ValueError('이전 시세 수신 작업이 종료 중입니다.')
+                    self.feed_cycle.clear()
                     self.controls['feed']=True
                     self.status={'status':'starting','error':None}
                     self.thread=threading.Thread(target=self.run,name='market-paper',daemon=True)
@@ -47,7 +50,9 @@ class OperationsRuntime:
                     self.controls['feed']=False
                     if self.collector:
                         self.collector.stop.set();self.collector.broker_stop.set()
-            else:self.controls[name]=bool(enabled)
+            else:
+                if name=='engine' and enabled:self.cancel_inference.clear()
+                self.controls[name]=bool(enabled)
             return self.controls.copy()
 
     def run(self):
@@ -64,9 +69,15 @@ class OperationsRuntime:
             original_append=collector.index.append
             def append(rows):
                 added=original_append(rows)
+                if rows:self.status.update(last_received_at=time.time(),last_as_of=str(max(row['date'] for row in rows)))
                 if added:self.accept(rows)
                 return added
             collector.index.append=append
+            original_collect=collector.collect_once
+            def collect_once():
+                try:return original_collect()
+                finally:self.feed_cycle.set()
+            collector.collect_once=collect_once
             if collector.broker_provider=='kiwoom':
                 from .kiwoom_data import BrokerStreams
                 broker=BrokerStreams(collector);broker.start();collector.broker_thread=broker.thread
@@ -133,7 +144,9 @@ class OperationsRuntime:
         signature=json.dumps(read_json(ROOT/'configs/experts.json'),sort_keys=True)
         if self.pool and signature!=self.pool_signature:self.pool.close();self.pool=None
         if self.pool is None:
-            self.pool=ExpertPool(settings(),keep_device=True,live=True);self.pool_signature=signature
+            cfg=settings();cfg.state_dir=ROOT/'runtime/experts'
+            self.pool=ExpertPool(cfg,keep_device=True,live=True);self.pool_signature=signature
+            self.pool.cancelled=self.cancel_inference.is_set
         return self.pool
 
     def load(self,key):
@@ -167,6 +180,11 @@ class OperationsRuntime:
         return {'input':batches[0],'snapshot':snapshot}
 
     def infer(self,key,fixture=None):
+        self.inference_active+=1
+        try:return self._infer(key,fixture)
+        finally:self.inference_active-=1
+
+    def _infer(self,key,fixture=None):
         fixture=fixture or self.fixture(key)
         with self.lock:
             pool=self.expert_pool();packet=pool.run(key,fixture['input'],fixture['snapshot'])
@@ -180,15 +198,41 @@ class OperationsRuntime:
             return {'packet':packet,'metrics':dict(pool.metrics.get(key,{}))}
 
     def sac_decision(self):
+        from ..framework import policy_files
+        self.inference_active+=1
+        try:
+            selected=read_json(ROOT/'runtime/operations/policies.json')
+            files=[(ROOT/'runtime/official'/path).resolve().parent for path in selected.values()] if selected else [policy_files()]
+            with self.lock:
+                self.decisions=[]
+                for folder in files:
+                    if not folder.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('운영 정책 경로가 runtime/official 밖에 있습니다.')
+                    if self.cancel_inference.is_set() or not self.controls['engine']:break
+                    self._sac_decision(folder)
+        finally:self.inference_active-=1
+
+    def check_policy(self,files):
+        self.inference_active+=1
+        try:return self._check_policy(files)
+        finally:self.inference_active-=1
+
+    def _check_policy(self,files):
+        from stable_baselines3 import SAC
+        from ..expert_registry_native import ExpertRegistry
+        identity=read_json(files/'dataset.json')
+        env=training_environment(prices(identity['currency'],identity['symbols']),ExpertRegistry(self.expert_pool),training=False)
+        try:SAC.load(files/'sac.zip',env=env)
+        finally:env.close()
+
+    def _sac_decision(self,files):
         from stable_baselines3 import SAC
         from ..expert_registry_native import ExpertRegistry
         from ..expert_observation import ExpertObservation
-        from ..framework import policy_files
-        files=policy_files();identity=read_json(files/'dataset.json')
+        identity=read_json(files/'dataset.json')
         if identity.get('environment')!='finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv':
             raise ValueError('현재 저장 SAC는 기존 환경의 파일입니다. 현재 원본 환경으로 학습한 정책이 필요합니다.')
         symbols=identity['symbols'];currency=identity['currency'];frame=prices(currency,symbols)
-        prepared=training_environment(frame,ExpertRegistry(),training=False)
+        prepared=training_environment(frame,ExpertRegistry(self.expert_pool),training=False)
         raw=prepared.unwrapped
         # Use the official day constructor for latest-state inference, with identical environment arguments.
         latest=raw.__class__(df=raw.df,stock_dim=raw.stock_dim,hmax=raw.hmax,initial_amount=raw.initial_amount,
@@ -213,7 +257,7 @@ class OperationsRuntime:
                 self.ledger().queue_decisions(panel,0,np.tile([0.,1.,0.],(len(symbols),1)),self.controls['paper'],
                     allocation=[*weights,0.],actions=actions)
                 self.ledger().save()
-                self.decisions=[{'symbol':s,'currency':currency,'target_weight':float(weight),'as_of':stamp} for s,weight in zip(symbols,weights)]
+                self.decisions.extend({'symbol':s,'currency':currency,'target_weight':float(weight),'as_of':stamp} for s,weight in zip(symbols,weights))
                 self.status.pop('policy_error',None)
         finally:
             wrapped.close();prepared.close()

@@ -1,6 +1,6 @@
 import {Workflow} from 'lucide-react';
 import {useOperations} from '../data/Operations';
-import {Skeleton} from '../ui/Primitives';
+import {Skeleton,Button} from '../ui/Primitives';
 import {Panel,KeyValues} from '../ui/Panel';
 import {TrainingReadiness} from '../ui/TrainingReadiness';
 import {JobLog} from '../ui/JobLog';
@@ -18,6 +18,6 @@ export function TrainingWorkspace(){const {state:s}=useOperations();if(!s)return
  <p className="mt-4 text-xs text-slate-400">로그 지표는 마지막 출력 시점, Replay 수치는 마지막 저장 시점 기준입니다. 실행 중 미저장 경험을 저장값으로 표시하지 않습니다.</p>
  </Panel>
  <div className="grid items-start gap-6 lg:grid-cols-2"><PolicyArchitecture/><Panel title="학습 설정" description="공식 예제 적용값과 SB3 라이브러리 기본값 · 읽기 전용"><h3 className="text-sm font-semibold">FinRL-X train_sac 적용값</h3><KeyValues items={Object.entries(s.settings.parameters).map(([k,v])=>[k,String(v)])}/><details className="mt-4"><summary className="cursor-pointer text-xs text-blue-600">SB3 기본값·환경 설정 펼치기</summary><KeyValues items={Object.entries(s.settings.sb3_defaults).map(([k,v])=>[k,JSON.stringify(v)])}/><KeyValues items={Object.entries(s.settings.environment_args).map(([k,v])=>[k,String(v)])}/></details><HelpDisclosure title="원본 설정 출처"><p>{s.settings.parameter_source}</p><p>{s.settings.environment_source}</p>{s.settings.notes.map(note=><p key={note}>{note}</p>)}</HelpDisclosure></Panel></div>
- <JobLog/><CheckpointPanel/>
+ <JobLog/><CheckpointPanel/><a href="#portfolio"><Button>백테스트 실행 · 결과 화면 →</Button></a>
  </div>;
 }

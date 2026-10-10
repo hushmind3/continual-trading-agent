@@ -28,7 +28,7 @@ def main():
                 job["symbols"],job["start_date"],job["end_date"])
             print("FinRL-X 가격 수집 완료:",len(frame),"행",flush=True)
             return
-        if job["command"] == "train":
+        if job["command"] == "train" and not job.get('output'):
             backup = root / "archives" / job_id
             for name in ("sac.zip", "replay.pkl", "dataset.json"):
                 if (root / name).is_file():
@@ -38,11 +38,12 @@ def main():
         args = ["stockrl", job["command"], "--currency", job["currency"], "--symbols", *job["symbols"]]
         if job["resume"]:
             args.append("--resume")
+        if job.get('output'):args.extend(['--output',str(root/job['output'])])
         sys.argv = args
         from .official_cli import main as official_main
         official_main()
         if job["command"]=="train":
-            atomic_json({"path":"sac.zip"},root/"active-checkpoint.json")
+            atomic_json({"path":job['output']+'/sac.zip' if job.get('output') else 'sac.zip'},root/"active-checkpoint.json")
     except BaseException:
         exit_code = 1
         traceback.print_exc()

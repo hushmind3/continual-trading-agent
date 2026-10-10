@@ -71,12 +71,14 @@ def training_environment(frame,registry,training=True):
     return wrapped
 
 
-def train(frame,registry,resume=False):
+def train(frame,registry,resume=False,output=None):
     from stable_baselines3 import SAC
     from finrl.agents.stablebaselines3.models import DRLAgent
     env=training_environment(frame,registry)
     example,parameters,steps=sac_example()
-    root=ROOT/'runtime/official';root.mkdir(parents=True,exist_ok=True)
+    root=Path(output) if output is not None else ROOT/'runtime/official'
+    if not root.resolve().is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('정책 출력은 기존 runtime/official 내부에 저장합니다.')
+    root.mkdir(parents=True,exist_ok=True)
     from .state_io import read_json,atomic_json
     saved=policy_files()
     identity={'currency':env.currency,'symbols':env.symbols,'sac_example':parameters,'environment':'finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv','rolling_days':[1095,365]}

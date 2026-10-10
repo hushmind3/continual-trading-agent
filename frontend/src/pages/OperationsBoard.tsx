@@ -6,8 +6,10 @@ import {bytes,date,number} from '../ui/format';
 import {ServiceProgress} from '../ui/ServiceProgress';
 import {Capability} from '../ui/Capability';
 import {OperationsControls} from '../ui/OperationsControls';
+import {SystemControls} from '../ui/SystemControls';
 export function OperationsBoard(){const {state:s}=useOperations();if(!s)return <Skeleton/>;const r=s.resources;
  return <div className="space-y-6">
+  <SystemControls/>
   <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/60"><div className="flex flex-wrap justify-between gap-4 border-b border-slate-100 px-6 py-4"><div><h2 className="text-base font-bold">공식 SAC 운영</h2><p className="mt-1 text-xs text-slate-400">FinRL-X · FinRL 환경 · Stable-Baselines3 · 동결 Expert 관측</p></div><a className="text-sm text-blue-600" href="#learning">학습 화면 →</a></div><div className="grid grid-cols-2 lg:grid-cols-4">
   {([{role:'feed',title:'시장 입력',Icon:Radio,color:'text-blue-500'},{role:'experts',title:'Expert 분석',Icon:Boxes,color:'text-violet-500'},{role:'agent',title:'SAC 정책',Icon:Database,color:'text-emerald-500'},{role:'learner',title:'공식 학습',Icon:GraduationCap,color:'text-amber-500'}] as const).map(({role,title,Icon,color},i)=><div key={role} className="relative flex gap-3 border-b border-slate-50 p-5"><Icon className={color+' mt-1 shrink-0'} size={22}/><div><h3 className="text-sm font-semibold">{title}</h3><div className="mt-2"><ServiceProgress role={role}/></div></div>{i<3&&<ArrowRight size={14} className="absolute right-0 top-9 hidden text-slate-200 lg:block"/>}</div>)}
   </div></section>

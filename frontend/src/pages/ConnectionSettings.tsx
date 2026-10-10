@@ -6,6 +6,7 @@ import type {Connections} from '../data/types';
 import {Panel,KeyValues} from '../ui/Panel';
 import {Button,ErrorMessage,Skeleton,Status,inputClass} from '../ui/Primitives';
 import {Capability} from '../ui/Capability';
+import {OperationsControls} from '../ui/OperationsControls';
 interface Provider {provider:string;environment:string;saved:boolean;vault_error?:string;last_test?:{ok:boolean;message:string}}
 interface Settings {risk:{fee:number;slippage:number};data:{poll_seconds:number;timeout_seconds:number};symbols:string[];expert_devices:Record<string,string>}
 function ProviderForm(){
@@ -16,7 +17,8 @@ function ProviderForm(){
   setMessage(result.message||result.last_test?.message||'연결 설정을 반영했습니다.');
   if(action==='connect'){setAppKey('');setSecret('');setAccount('');}await provider.refresh();
  }catch(e){setError(e instanceof Error?e.message:String(e));}}
- return <Panel title="키움 인증·시세 연결" description="기존 OS 보안 저장소 사용 · 실제 주문 전송 기능은 연결하지 않습니다.">
+ return <Panel title="키움 인증·시세 연결" description="기존 OS 보안 저장소 사용 · 실제 주문 전송 기능은 연결하지 않습니다." actions={<Button busy={pending.has('provider/disconnect')} onClick={()=>void send('disconnect')}>시세 연결 해제</Button>}>
+  <OperationsControls/>
   <KeyValues items={[["공급원",provider.data?.provider],["저장 환경",provider.data?.environment],["인증 저장",provider.data?.saved?'저장됨':'미저장']]}/>
   <ErrorMessage message={error||provider.error||provider.data?.vault_error||''}/>
   {provider.data?.last_test&&<p className="my-3 text-xs text-slate-500">{provider.data.last_test.message}</p>}

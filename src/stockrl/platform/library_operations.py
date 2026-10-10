@@ -9,6 +9,7 @@ from .operations_runtime import runtime
 class LibraryOperations:
     def __init__(self):
         self.lock=threading.Lock();self.active=False
+        self.cancelled=threading.Event()
         self.status_path=settings().state_dir/'library-job.json'
         self.catalog_path=settings().registry_file
 
@@ -16,10 +17,11 @@ class LibraryOperations:
         return dict(catalog=read_json(self.catalog_path),job={**read_json(self.status_path),'busy':self.active})
 
     def start(self,kind,payload):
-        if kind not in ('inspect','import','probe','load','unload','search','acquire','convert','optimize','apply'):
+        if kind not in ('inspect','import','probe','load','unload','search','acquire','convert','optimize','apply','compare'):
             raise ValueError('지원하는 Expert 작업을 선택하세요.')
         with self.lock:
             if self.active:raise ValueError('진행 중인 Expert 작업이 있습니다.')
+            self.cancelled.clear();runtime.cancel_inference.clear()
             self.active=True
             atomic_json(dict(stage='queued',kind=kind,started=time.time()),self.status_path)
             threading.Thread(target=self._run,args=(kind,payload),name='expert-library-operation',daemon=True).start()
@@ -27,9 +29,11 @@ class LibraryOperations:
 
     def _run(self,kind,payload):
         def progress(**values):
+            if self.cancelled.is_set():raise InterruptedError('사용자가 모델 작업 중지를 요청했습니다.')
             atomic_json(dict(kind=kind,**values),self.status_path)
         try:
             result=self._execute(kind,payload,progress)
+            if self.cancelled.is_set():raise InterruptedError('모델 작업 중지 요청을 반영했습니다. 이미 생성된 결과물은 보존합니다.')
             atomic_json(dict(stage='complete',kind=kind,result=result,finished=time.time()),self.status_path,
                 default=lambda x:x.tolist() if hasattr(x,'tolist') else str(x))
         except Exception as exc:
@@ -38,6 +42,16 @@ class LibraryOperations:
 
     def _execute(self,kind,payload,progress):
         cfg=settings();catalog=read_json(cfg.registry_file)
+        if kind=='compare':
+            from .expert_comparison import comparison_result,measure
+            keys=[payload['baseline'],payload['variant']];items={key:catalog['experts'][key] for key in keys}
+            if items[keys[0]]['input']!=items[keys[1]]['input'] or items[keys[0]]['feature_size']!=items[keys[1]]['feature_size']:
+                raise ValueError('동일한 입력 계약·출력 크기의 모델을 비교하세요.')
+            fixture=runtime.fixture(keys[0]);results=[]
+            for key in keys:
+                progress(stage='comparison',detail=key);results.append(measure(runtime,key,fixture))
+            result=comparison_result(items,results,fixture);catalog['comparison']=result
+            atomic_json(catalog,cfg.registry_file);return result
         if kind=='apply':
             from ..expert_registry_native import ExpertRegistry
             ExpertRegistry().select(payload['active'])

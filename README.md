@@ -13,7 +13,7 @@ FinRL-X와 FinRL, Stable-Baselines3의 원본 모듈을 호출합니다. 학습 
 | SAC·Adam·Loss·Replay | SB3 `SAC` 기본 구현 |
 | 저장·복원 | SB3 `save/load`, `save_replay_buffer/load_replay_buffer` |
 | 전략 출력·백테스트 | FinRL-X `StrategyResult / BacktestEngine` |
-| 화면 | Streamlit 기본 위젯 |
+| 화면 | f153957 React 디자인 복원 · Vite · TypeScript · Tailwind CSS · TanStack Table |
 
 공식 소스는 [FinRL-X](https://github.com/AI4Finance-Foundation/FinRL-Trading) 서브모듈과 설치된 [FinRL](https://github.com/AI4Finance-Foundation/FinRL), [SB3](https://stable-baselines3.readthedocs.io/en/master/modules/sac.html)입니다. `FinRL-X` 파일은 수정하지 않습니다.
 
@@ -46,7 +46,7 @@ ent_coef = "auto_0.1"
 
 1. Git 서브모듈을 포함해 내려받습니다: `git clone --recurse-submodules <저장소 주소>`.
 2. `설치.cmd`는 빠진 패키지를 설치합니다. 이미 설치된 배포판은 재설치·업그레이드하지 않습니다.
-3. `서버켜기.cmd`를 실행하고 <http://127.0.0.1:8766>을 엽니다.
+3. `서버켜기.cmd`를 실행하고 <http://127.0.0.1:8766>을 엽니다. FastAPI가 현재 SAC API와 React 빌드를 함께 제공합니다. 실행 스크립트는 설치된 도구로 타입 검사·빌드를 수행하고, 이 프로젝트의 서버 소유권을 확인해 기존 통합 서버를 재사용합니다. 패키지를 설치하거나 업그레이드하지 않습니다.
 4. 통화·종목과 Expert를 선택해 공식 SAC 학습을 시작합니다.
 
 ```powershell
@@ -68,6 +68,10 @@ $env:PYTHONUTF8="1"
 - `runtime/official`: 새 SAC·Replay·체크포인트·실행 결과.
 - `runtime/experts`: Expert 실제 추론 결과·실행기.
 - `src/stockrl`: 공식 함수 호출과 Expert 연결부.
+- `frontend/src/pages`: 학습·백테스트·Expert·데이터·모듈 조회 페이지.
+- `frontend/src/components`: 공통 버튼·표·로그·차트·자원 표시 컴포넌트.
+
+5173은 `frontend`에서 `npm run dev`로 실행하는 개발 서버 전용입니다. 개발 화면의 `/api`도 8766 통합 서버로 전달됩니다. 기존 루트 Streamlit 화면은 직접 실행이 비활성화되어 있으며 원문은 보존합니다. 공식 FinRL-X의 독립 예제 화면은 원본 상태로 유지합니다.
 
 GitHub에는 모델 가중치·가격 캐시·가상환경·실행 상태를 올리지 않습니다. 다른 PC에는 필요한 Expert와 가격 데이터를 별도로 준비합니다.
 

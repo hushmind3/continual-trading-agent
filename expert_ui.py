@@ -1,4 +1,6 @@
 """Expert-only user interface; no custom financial dashboard or learning settings."""
+# Legacy source retained for reference; React calls the same ExpertRegistry APIs.
+raise SystemExit("Streamlit Expert 화면은 비활성화되었습니다. React의 MoE 메뉴를 사용하세요.")
 import streamlit as st
 from stockrl.expert_registry_native import ExpertRegistry
 

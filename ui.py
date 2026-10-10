@@ -1,4 +1,6 @@
 """Native Streamlit controls for official APIs and frozen Expert parts."""
+# Legacy source retained for reference; React is the only project frontend.
+raise SystemExit("Streamlit 화면은 비활성화되었습니다. 서버켜기.cmd → http://127.0.0.1:8766")
 from pathlib import Path
 import sys,subprocess,os,json,zipfile
 import streamlit as st

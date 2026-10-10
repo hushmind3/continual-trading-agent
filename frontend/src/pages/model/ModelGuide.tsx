@@ -1,0 +1,2 @@
+import {HelpDisclosure} from '../../ui/HelpDisclosure';
+export function ModelGuide(){return <HelpDisclosure title="중앙 모델과 Expert · 무엇이 학습되나요?"><p>중앙 신경망은 공식 SB3 SACPolicy의 Actor·Twin Critic입니다. Frozen Expert의 가중치는 고정됩니다.</p><p>현재 FinRL 환경의 원본 관측을 평탄화하고 Expert 시장 예측과 매매 판단을 각각 평균·표준편차·최대 절댓값·성공 수로 요약한 8값을 더합니다.</p><p>독립 학습 Router/Fusion/Controller와 Champion 후보 승격은 현재 구현되어 있지 않습니다. 종목 구성이 달라지면 공식 환경의 행동 차원이 달라져 새 정책이 필요합니다.</p></HelpDisclosure>}

@@ -64,7 +64,8 @@ class GGUFExpert(nn.Module):
             response=self.query(dict(messages=[
                 dict(role='system',content='You are a frozen market analyst. Use only the observed prices. Return JSON: direction (-1 bearish to 1 bullish), confidence (0 to 1), risk (0 to 1). No future observations are given.'),
                 dict(role='user',content=json.dumps(dict(symbol=symbol,relative_prices=relative,sampling_seconds=data['sampling_seconds'])))],
-                response_format={'type':'json_schema','json_schema':{'name':'market_opinion','schema':SCHEMA}}))
+                response_format={'type':'json_schema','json_schema':{'name':'market_opinion','schema':SCHEMA}},
+                max_tokens=256))
             response.raise_for_status();value=json.loads(response.json()['choices'][0]['message']['content'])
             row=[float(value[k]) for k in ('direction','confidence','risk')]
             if not np.isfinite(row).all() or not -1<=row[0]<=1 or not all(0<=v<=1 for v in row[1:]):raise ValueError('GGUF 의견 출력이 입력 계약을 벗어났습니다.')

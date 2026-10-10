@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {FlaskConical,PackagePlus,Plus,Gauge,Search,WandSparkles,Play,Power} from 'lucide-react';
 import {useOperations} from '../../data/Operations';
 import {request} from '../../data/api';
@@ -12,7 +12,9 @@ import {expertFamilies,expertCategory,categoryNames} from './expertFamilies';
 
 const field='w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
- const {state,refresh}=useOperations();const lib:LibraryState|undefined=state?.library;
+ const {state,refresh}=useOperations();const [liveLibrary,setLiveLibrary]=useState<LibraryState>();
+ useEffect(()=>{let closed=false,timer:ReturnType<typeof setTimeout>;const poll=async()=>{try{const next=await request<LibraryState>('library');if(!closed)setLiveLibrary(next)}catch{}if(!closed)timer=setTimeout(()=>void poll(),2000)};void poll();return()=>{closed=true;clearTimeout(timer)}},[]);
+ const lib=liveLibrary??state?.library;
  const [open,setOpen]=useState(false),[source,setSource]=useState(''),[key,setKey]=useState(''),[slot,setSlot]=useState(''),[error,setError]=useState('');
  const [conversionId,setConversionId]=useState('');
  const [discoveryOpen,setDiscoveryOpen]=useState(false),[category,setCategory]=useState('all');

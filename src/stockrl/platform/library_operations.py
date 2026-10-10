@@ -59,6 +59,13 @@ class LibraryOperations:
                                 root=expert_id[:-len(suffix)];break
                     if root not in keys:keys.append(root)
             if not keys:raise ValueError('검사할 등록 Expert가 없습니다.' if kind=='probe_all' else '사용 중인 Expert가 없습니다.')
+            shared_frame=shared_account=None
+            if kind=='probe_all':
+                from ..framework import prices
+                shared_frame=prices('USD')
+                book=runtime.ledger().snapshot()['books']['USD']
+                shared_account={'currency':'USD','cash':book['cash'],'nav':book['equity'],
+                    'positions':{symbol:position['quantity'] for symbol,position in book['positions'].items()}}
             results=[]
             for index,key in enumerate(keys,1):
                 if self.cancelled.is_set():raise InterruptedError('Expert 일괄 작업 중지를 요청했습니다.')
@@ -70,7 +77,8 @@ class LibraryOperations:
                 was_loaded=bool(runtime.pool and key in runtime.pool.loaded)
                 try:
                     if kind=='probe_all':
-                        runtime.infer(key)
+                        fixture=runtime.fixture(key,frame=shared_frame,account=shared_account,all_batches=True)
+                        runtime.infer(key,fixture)
                     else:
                         self._execute('optimize',{'id':key,'goal':'memory','device':'auto'},progress)
                     results.append(dict(id=key,status='passed'))
@@ -80,6 +88,15 @@ class LibraryOperations:
                     results.append(dict(id=key,status='failed',detail=str(exc)))
                 finally:
                     if kind=='probe_all' and not was_loaded:runtime.unload(key)
+            if kind=='probe_all':
+                latest=read_json(cfg.registry_file)
+                for row in results:
+                    current=latest.get('experts',{}).get(row['id'])
+                    if current is not None and current.get('package')==experts[row['id']].get('package'):
+                        current['check']={'status':row['status'],
+                            'detail':row.get('detail','실제 입력 전체 묶음 추론·출력 계약 통과'),
+                            'tested':time.time()}
+                atomic_json(latest,cfg.registry_file)
             progress(stage=kind,completed=len(keys),total=len(keys),detail='전체 원본 Expert 처리 완료')
             return {'total':len(keys),'passed':sum(x['status']=='passed' for x in results),
                 'failed':sum(x['status']=='failed' for x in results),

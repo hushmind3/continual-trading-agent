@@ -22,13 +22,13 @@ export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
  const catalog=lib?.catalog,job=lib?.job,busy=Boolean(job?.busy),items=state?.experts.items??[];
  const families=expertFamilies(items),shown=families.filter(f=>category==='all'||expertCategory(f.base)===category);
  const candidate=job?.result?.experts?.find((e:any)=>e.id===key);
- const inspection=job?.kind==='probe_all'&&job.stage==='complete'?{finished:job.finished,reports:(job.result?.items??[]).map((r:any)=>({id:r.id,status:r.status==='passed'?'passed':'failed',detail:r.detail}))}:undefined;
+ const inspection=job?.kind==='probe_all'&&['complete','partial'].includes(job.stage??'')?{finished:job.finished,reports:(job.result?.items??[]).map((r:any)=>({id:r.id,status:r.status==='passed'?'passed':'failed',detail:r.detail}))}:undefined;
  const inspectionStatus=(item:typeof items[number])=>{
-  const result=job?.kind==='probe_all'&&job.stage==='complete'?job.result?.items?.find((r:any)=>r.id===item.id):undefined;
+  const result=job?.kind==='probe_all'&&['complete','partial'].includes(job.stage??'')?job.result?.items?.find((r:any)=>r.id===item.id):undefined;
   return result?.status==='passed'?'passed':result?.status==='failed'?'failed':item.check?.status??(item.inference?.status==='ready'?'passed':item.inference?.reason?'failed':undefined);
  };
  const inspectionDetailFor=(item:typeof items[number])=>{
-  const result=job?.kind==='probe_all'&&job.stage==='complete'?job.result?.items?.find((r:any)=>r.id===item.id):undefined;
+  const result=job?.kind==='probe_all'&&['complete','partial'].includes(job.stage??'')?job.result?.items?.find((r:any)=>r.id===item.id):undefined;
   return result?.detail??item.check?.detail??item.inference?.reason??(item.inference?.status==='ready'?'저장된 실제 추론 결과 통과':'검사 기록 없음');
  };
  const operation=async(kind:string,payload:unknown)=>{

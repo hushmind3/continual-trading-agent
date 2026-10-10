@@ -141,7 +141,10 @@ class OperationsRuntime:
 
     def expert_pool(self):
         from .assets import ExpertPool
-        signature=json.dumps(read_json(ROOT/'configs/experts.json'),sort_keys=True)
+        catalog=read_json(ROOT/'configs/experts.json')
+        # Test status updates do not change the loaded Expert weights or selection.
+        signature=json.dumps({'active':catalog.get('active',[]),
+            'packages':{key:item.get('package') for key,item in catalog.get('experts',{}).items()}},sort_keys=True)
         if self.pool and signature!=self.pool_signature:self.pool.close();self.pool=None
         if self.pool is None:
             cfg=settings();cfg.state_dir=ROOT/'runtime/experts'
@@ -161,23 +164,17 @@ class OperationsRuntime:
         with self.lock:
             if self.pool and key in self.pool.loaded:self.pool.release(key)
 
-    def fixture(self,key):
-        from .expert_packages import load_package
-        from .observations import native_input
-        cfg=settings();catalog=read_json(cfg.registry_file);item=catalog['experts'][key]
-        package=load_package(Path(cfg.expert_checkpoint),item['package'],verify=True)
-        currency='USD'
-        frame=prices(currency)
+    def fixture(self,key,*,frame=None,account=None,all_batches=False):
+        from .expert_inference import prepare_inputs
+        with self.lock:entry=self.expert_pool().entries[key]
+        if frame is None:frame=prices('USD')
         if frame.empty:raise ValueError('실제 USD 가격 데이터가 없습니다.')
-        frame=frame.sort_values('date');stamp=frame.date.max()
-        daily=frame[frame.date<pd.Timestamp(stamp).normalize()]
-        book=self.ledger().snapshot()['books'][currency]
-        snapshot={'symbols':sorted(frame.symbol.unique()),'as_of':str(stamp),
-            'stock_policy_history':daily.assign(date=daily.date.astype(str)).to_dict('records'),
-            'policy_account':{'currency':currency,'cash':book['cash'],'nav':book['equity'],
-                'positions':{s:p['quantity'] for s,p in book['positions'].items()}}}
-        batches=[None] if package['entry'].get('stock_policy') else native_input(package['entry']['backend'],frame,daily,str(stamp))
-        return {'input':batches[0],'snapshot':snapshot}
+        if account is None:
+            book=self.ledger().snapshot()['books']['USD']
+            account={'currency':'USD','cash':book['cash'],'nav':book['equity'],
+                     'positions':{symbol:position['quantity'] for symbol,position in book['positions'].items()}}
+        snapshot,batches=prepare_inputs(entry,frame,account)
+        return {'input':batches[0],'inputs':batches if all_batches else batches[:1],'snapshot':snapshot}
 
     def infer(self,key,fixture=None):
         self.inference_active+=1
@@ -185,17 +182,20 @@ class OperationsRuntime:
         finally:self.inference_active-=1
 
     def _infer(self,key,fixture=None):
-        fixture=fixture or self.fixture(key)
+        from .expert_inference import run_batches
+        fixture=fixture or self.fixture(key,all_batches=True)
         with self.lock:
-            pool=self.expert_pool();packet=pool.run(key,fixture['input'],fixture['snapshot'])
-            values=np.asarray(packet['native_output'],dtype=float)
-            if not np.isfinite(values).all():raise ValueError('Expert 출력에 NaN/Inf가 있습니다.')
-            packet['native_output']=values.tolist()
+            pool=self.expert_pool()
+            packets=run_batches(pool,key,fixture['snapshot'],fixture.get('inputs',[fixture['input']]))
+            values=np.concatenate([np.asarray(packet['native_output'],dtype=float).reshape(-1) for packet in packets])
+            symbols_checked=sum(len(packet['symbols']) for packet in packets)
             report=read_json(ROOT/'runtime/experts/status.json')
-            report.setdefault('experts',{})[key]={'status':'ready','as_of':fixture['snapshot']['as_of'],'output':values.reshape(-1).tolist()}
+            report.setdefault('experts',{})[key]={'status':'ready','as_of':fixture['snapshot']['as_of'],
+                'output':values.tolist(),'batches':len(packets),'symbols_checked':symbols_checked}
             report.update(as_of=fixture['snapshot']['as_of'],resources=pool.metrics)
             atomic_json(report,ROOT/'runtime/experts/status.json')
-            return {'packet':packet,'metrics':dict(pool.metrics.get(key,{}))}
+            return {'packet':packets[0],'metrics':dict(pool.metrics.get(key,{})),
+                'batches':len(packets),'symbols_checked':symbols_checked}
 
     def sac_decision(self):
         from ..framework import policy_files

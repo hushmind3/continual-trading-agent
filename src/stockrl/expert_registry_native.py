@@ -73,12 +73,12 @@ class ExpertRegistry:
 
     def outputs(self,frame,account,champion_ids=None):
         from .platform.assets import ExpertPool
-        from .platform.observations import native_input
+        from .platform.expert_inference import prepare_inputs,run_batches
         catalog=self.catalog();signature=json.dumps(catalog,sort_keys=True)
         if signature!=self.signature:
             self.close();self.last_outputs={};self.signature=signature
         if self.pool is None:self.pool=self.pool_provider() if self.pool_provider else ExpertPool(self.settings,keep_device=True,live=True)
-        stamp=str(frame.date.max());daily=frame[frame.date<pd.Timestamp(stamp).normalize()]
+        stamp=str(frame.date.max())
         groups={'market':[],'action':[]};champion_features={}
         selected=list(catalog.get('active',[])) if champion_ids is None else list(champion_ids)
         for key in selected:
@@ -86,11 +86,8 @@ class ExpertRegistry:
             try:
                 if not policy and cache_key in self.cache:packet=self.cache[cache_key]
                 else:
-                    snapshot={'symbols':sorted(frame.symbol.unique()),'as_of':stamp,'policy_account':account,
-                        'stock_policy_history':daily.assign(date=daily.date.astype(str)).to_dict('records')}
-                    if policy and account.get('currency','USD')!='USD':raise ValueError('이 Expert의 원본 계약은 USD 계좌입니다.')
-                    batches=[None] if policy else native_input(entry['backend'],frame,daily,stamp)
-                    packet=[self.pool.run(key,data,snapshot) for data in batches]
+                    snapshot,batches=prepare_inputs(entry,frame,account)
+                    packet=run_batches(self.pool,key,snapshot,batches)
                     if not policy:self.cache[cache_key]=packet
                 signals=[];native_features=[]
                 for batch in packet:

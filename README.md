@@ -40,7 +40,7 @@ src/stockrl/
     library_operations.py    기존 모델 도구의 비동기 API 연결부
     assets.py / expert_residency.py      기존 ExpertPool·RAM/VRAM 적재
     expert_packages.py / expert_contracts.py 패키지 검증·입력 계약
-    observations.py                     현재 원본 입력 생성
+    observations.py / expert_inference.py Expert 입력 생성·공통 추론 검증
     library_store.py / native_upgrade.py 패키지 조회·등록·동일 구조 가중치 연결
     expert_discovery.py / github_discovery.py / expert_search_metadata.py
     expert_acquisition.py               기존 검색·다운로드·패키지 자동 등록
@@ -126,7 +126,7 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 
 등록 경로: `/api/models` 파일 조회 → `library/inspect` 원본 계약 조회 → `library/import` 참조 등록 → 현재 Registry → `ExpertPool.get/run`. 외부 폴더의 기존 패키지는 참조를 등록하고 원본을 복사·수정하지 않습니다. 새로운 다운로드와 변환 결과는 기존 `expert-packages`의 별도 파일로 저장하며 원본과 구분됩니다.
 
-입력은 `observations.native_input`의 완료 가격 시계열/OHLCV 또는 `StockPolicyExpert.prepare_input`의 원본 종목·지표·USD 계좌입니다. Chronos/TimesFM의 기존 계약은 실제 SPY 일봉 초과수익률을 요구합니다. 출력 packet은 `native_output`, `symbols`, `as_of`, `layout`, `units`를 갖고 관측 요약에 전달됩니다. 입력 부족·형식 불일치·실패는 오류/실패 기록으로 표시하며 결과를 만들어 채우지 않습니다.
+입력은 `observations.native_input`의 완료 가격 시계열/OHLCV 또는 `StockPolicyExpert.prepare_input`의 원본 종목·지표·USD 계좌입니다. `expert_inference.prepare_inputs/run_batches`를 개별 검사·전체 검사·SAC 관측이 공유하며, 전체 검사는 입력의 모든 종목 묶음에 대해 출력 크기·유한값·종목 일치를 확인합니다. Chronos/TimesFM의 기존 계약은 실제 SPY 일봉 초과수익률을 요구합니다. 출력 packet은 `native_output`, `symbols`, `as_of`, `layout`, `units`를 갖고 관측 요약에 전달됩니다. 입력 부족·형식 불일치·실패는 오류/실패 기록으로 표시하며 결과를 만들어 채우지 않습니다.
 
 실행기는 기존 `NativeExpert`, `StockPolicyExpert`, `HfForecastExpert`, `GGUFExpert`입니다. Torch·Transformers·Chronos·TimesFM·bitsandbytes·Accelerate·safetensors 및 llama.cpp 외부 실행기가 필요합니다. `llama_engine.ensure_engine`의 기존 실행기 준비 경로는 `runtime/.../engines`입니다. GGUF 가중치를 다시 다운로드하는 기능과 실행기 준비는 서로 다릅니다.
 
@@ -178,7 +178,7 @@ GitHub에는 React 소스·FastAPI/백엔드·기존 연결 모듈·공개 Regis
 
 운영 화면에 `변경 적용 · 전체 점검`, `전체 시스템 시작`, `전체 시스템 중지`를 제공합니다.
 
-MoE 상세 검색 UI는 `f153957`의 금융 Expert 탐색·결과 카드(최근 3/6/12개월, 설치·호환 상태 필터, 원본 출시일·업데이트일·API/입력·중복 역할·근거)를 현재 `library/search`·`library/acquire`에 다시 연결했습니다. 개별 정밀도 대화창은 CPU/CUDA/자동 장치와 FP16/BF16/INT8/INT4/NF4 선택을 복구했습니다. 단순 `convert`는 후보 생성만 수행하고, 원본 품질 허용치와 동일 입력 비교는 기존 `library/optimize`에서 실행합니다. 결과의 실제 성공 여부는 백엔드 작업 기록으로 확인합니다. 기존 7개 메뉴와 공통 개별 제어를 유지합니다. 모델 비교 실행, 모델 폴더 열기, 모델 작업 중지, 공급원 연결 해제와 학습 화면의 백테스트 접근도 기존 함수로 연결했습니다. MoE의 등록 Expert 일괄 추론 검사(`probe_all`) 및 선택 Expert 일괄 양자화(`optimize_all`)는 기존 Expert 실행·변환 함수만 순차 호출하며, 개별 성공·실패·건너뜀 결과를 모델 작업 상태에 기록합니다.
+MoE 상세 검색 UI는 `f153957`의 금융 Expert 탐색·결과 카드(최근 3/6/12개월, 설치·호환 상태 필터, 원본 출시일·업데이트일·API/입력·중복 역할·근거)를 현재 `library/search`·`library/acquire`에 다시 연결했습니다. 개별 정밀도 대화창은 CPU/CUDA/자동 장치와 FP16/BF16/INT8/INT4/NF4 선택을 복구했습니다. 단순 `convert`는 후보 생성만 수행하고, 원본 품질 허용치와 동일 입력 비교는 기존 `library/optimize`에서 실행합니다. 결과의 실제 성공 여부는 백엔드 작업 기록으로 확인합니다. 기존 7개 메뉴와 공통 개별 제어를 유지합니다. 모델 비교 실행, 모델 폴더 열기, 모델 작업 중지, 공급원 연결 해제와 학습 화면의 백테스트 접근도 기존 함수로 연결했습니다. MoE의 등록 Expert 일괄 추론 검사(`probe_all`)는 가격 데이터를 1회 읽어 각 Expert의 전체 입력 묶음을 검사하고 개별 결과를 Registry `check`와 모델 작업 상태에 기록합니다(일부 실패 시 `partial`). 선택 Expert 일괄 양자화(`optimize_all`)는 기존 변환 함수를 순차 호출합니다.
 
 | 동작 | API / 실제 실행 경로 |
 | --- | --- |

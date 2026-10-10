@@ -39,6 +39,8 @@ def main():
         if job["resume"]:
             args.append("--resume")
         if job.get('output'):args.extend(['--output',str(root/job['output'])])
+        if job.get('champion_path'):args.extend(['--champion-path',job['champion_path']])
+        if job.get('champion_output'):args.extend(['--champion-output',job['champion_output']])
         sys.argv = args
         from .official_cli import main as official_main
         official_main()

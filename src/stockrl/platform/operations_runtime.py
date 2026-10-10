@@ -220,7 +220,12 @@ class OperationsRuntime:
         from stable_baselines3 import SAC
         from ..expert_registry_native import ExpertRegistry
         identity=read_json(files/'dataset.json')
-        env=training_environment(prices(identity['currency'],identity['symbols']),ExpertRegistry(self.expert_pool),training=False)
+        if identity.get('champion_file'):
+            from .sac_champion import load_spec
+            champion=load_spec(identity['champion_file']);registry=ExpertRegistry(champion=champion)
+            champion_ids=champion['identity']['champion_experts']
+        else:registry=ExpertRegistry(self.expert_pool);champion_ids=None
+        env=training_environment(prices(identity['currency'],identity['symbols']),registry,training=False,champion_ids=champion_ids)
         try:SAC.load(files/'sac.zip',env=env)
         finally:env.close()
 
@@ -232,14 +237,19 @@ class OperationsRuntime:
         if identity.get('environment')!='finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv':
             raise ValueError('현재 저장 SAC는 기존 환경의 파일입니다. 현재 원본 환경으로 학습한 정책이 필요합니다.')
         symbols=identity['symbols'];currency=identity['currency'];frame=prices(currency,symbols)
-        prepared=training_environment(frame,ExpertRegistry(self.expert_pool),training=False)
+        if identity.get('champion_file'):
+            from .sac_champion import load_spec
+            champion=load_spec(identity['champion_file']);registry=ExpertRegistry(champion=champion)
+            champion_ids=champion['identity']['champion_experts']
+        else:registry=ExpertRegistry(self.expert_pool);champion_ids=None
+        prepared=training_environment(frame,registry,training=False,champion_ids=champion_ids)
         raw=prepared.unwrapped
         # Use the official day constructor for latest-state inference, with identical environment arguments.
         latest=raw.__class__(df=raw.df,stock_dim=raw.stock_dim,hmax=raw.hmax,initial_amount=raw.initial_amount,
             transaction_cost_pct=raw.transaction_cost_pct,reward_scaling=raw.reward_scaling,
             state_space=raw.state_space,action_space=raw.stock_dim,tech_indicator_list=raw.tech_indicator_list,
             day=int(raw.df.index.max()))
-        wrapped=ExpertObservation(latest,prepared.registry,frame,symbols);wrapped.currency=currency
+        wrapped=ExpertObservation(latest,prepared.registry,frame,symbols,champion_ids=champion_ids);wrapped.currency=currency
         try:
             model=SAC.load(files/'sac.zip',env=wrapped)
             observation=wrapped.observation(latest.state)

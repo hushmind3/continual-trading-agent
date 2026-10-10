@@ -12,7 +12,12 @@ def main():
     parser.add_argument('--symbols',nargs='+')
     parser.add_argument('--resume',action='store_true',help='이번 공식 SAC 실행에서 생성한 정책과 Replay만 복원')
     parser.add_argument('--output',type=Path,help='기존 정책과 분리할 신규 SAC 결과 경로')
+    parser.add_argument('--champion-path',type=Path,help='통합 SAC Champion PT')
+    parser.add_argument('--champion-output',type=Path,help='학습 결과로 발행할 새 Champion PT')
     args=parser.parse_args();registry=ExpertRegistry()
+    if args.champion_path:
+        from .platform.sac_champion import load_spec
+        registry=ExpertRegistry(champion=load_spec(args.champion_path))
     if args.command=='experts':
         for key,item in registry.catalog()['experts'].items():print(key,item['name'],'active' if key in registry.catalog()['active'] else 'stored')
         return
@@ -32,7 +37,7 @@ def main():
         result.weights_history.to_csv(ROOT/'runtime/official/backtest_weights.csv')
         result.trades.to_csv(ROOT/'runtime/official/backtest_trades.csv')
         return
-    model=train(frame,registry,args.resume,args.output)
+    model=train(frame,registry,args.resume,args.output,args.champion_path,args.champion_output)
     print('Saved official SAC:',(args.output or ROOT/'runtime/official')/'sac.zip')
 
 

@@ -65,6 +65,14 @@ class RunRequest(BaseModel):
     currency: Literal["USD", "KRW"] = "USD"
     symbols: list[str] = Field(default_factory=list, max_length=1000)
     resume: bool = False
+    champion_path: str | None = None
+
+
+class ChampionRequest(BaseModel):
+    currency:Literal["USD","KRW"]="USD"
+    symbols:list[str]=Field(min_length=1,max_length=1000)
+    experts:list[str]=Field(default_factory=list,max_length=128)
+    source_path:str|None=None
 
 
 class Selection(BaseModel):
@@ -203,12 +211,17 @@ def model_state(settings,selected=None):
                     "rolling_days": settings["rolling_days"]}
         if not identity.get("symbols") or not identity.get("currency"):
             result["reasons"].append("저장 모델의 통화·종목 정보가 없습니다.")
-        if identity != expected:
+        is_champion=bool(identity.get("feature_extractor"))
+        if (not is_champion and identity != expected) or (is_champion and any(identity.get(k)!=v for k,v in expected.items())):
             result["reasons"].append("현재 SAC 설정·StockPortfolioEnv 식별 정보와 일치하지 않는 이전 저장본입니다.")
         for key in ("batch_size", "buffer_size", "learning_rate", "learning_starts"):
             if state.get(key) != settings["parameters"][key]:
                 result["reasons"].append(f"{key}: 저장값 {state.get(key)} / 현재값 {settings['parameters'][key]}")
-        if identity.get('symbols'):
+        if identity.get('symbols') and is_champion:
+            expected_shape=[identity.get('base_observation_dim',0)+64*len(identity.get('champion_experts',[]))+identity.get('account_feature_size',16)]
+            if result['observation_shape']!=expected_shape or result['action_shape']!=[len(identity['symbols'])]:
+                result['reasons'].append(f"통합 SAC Champion 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{len(identity['symbols'])}]")
+        elif identity.get('symbols'):
             from finrl import config
             count=len(identity['symbols']);expected_shape=[(count+len(config.INDICATORS))*count+8]
             if result['observation_shape']!=expected_shape or result['action_shape']!=[count]:
@@ -244,7 +257,7 @@ def saved_replay():
 
 
 def checkpoints(settings):
-    paths = ([RUNTIME/"sac.zip"] if (RUNTIME/"sac.zip").is_file() else []) + sorted((RUNTIME/"archives").glob("*/sac.zip")) + sorted((RUNTIME/"policies").glob("*/sac.zip"))
+    paths = ([RUNTIME/"sac.zip"] if (RUNTIME/"sac.zip").is_file() else []) + sorted((RUNTIME/"archives").glob("*/sac.zip")) + sorted((RUNTIME/"policies").glob("*/sac.zip")) + sorted((RUNTIME/"champions").glob("*/sac.zip"))
     items=[]
     for path in paths:
         try:
@@ -497,15 +510,30 @@ def preflight(req, command):
             errors.append(symbol + ": 공분산을 만들 관측이 252개보다 많아야 합니다.")
     settings = source_settings()
     model = model_state(settings)
-    if command == "backtest" or req.resume:
+    if req.champion_path:
+        from .platform.sac_champion import load_spec,MODEL_DIR
+        source=Path(req.champion_path).expanduser().resolve()
+        try:
+            if not source.is_relative_to(MODEL_DIR.resolve()) or not source.name.startswith('sac_champion_'):
+                raise ValueError('모델 폴더의 SAC Champion을 선택하세요.')
+            champion=load_spec(source);identity=champion['identity']
+            checkpoint=Path(champion['checkpoint'])
+            if not checkpoint.is_absolute():checkpoint=RUNTIME/checkpoint
+            if not checkpoint.is_file():raise ValueError('Champion의 SB3 학습 체크포인트가 없습니다.')
+            if identity.get('currency')!=req.currency or identity.get('symbols')!=symbols:
+                raise ValueError('선택한 Champion의 통화·종목 구성이 다릅니다.')
+        except (ValueError,OSError,KeyError,RuntimeError) as exc:
+            errors.append('SAC Champion: '+str(exc))
+    if (command == "backtest" or req.resume) and not req.champion_path:
         if not model["compatible"]:
             errors.extend(model["reasons"])
         if model["identity"].get("currency") != req.currency or model["identity"].get("symbols") != symbols:
             errors.append("저장 정책의 통화·종목 구성과 다릅니다.")
-    experts = expert_state()
-    for row in experts["items"]:
-        if row["active"] and not row["package_available"]:
-            errors.append(row["id"] + ": 활성 Expert 패키지가 없거나 크기가 다릅니다.")
+    if not req.champion_path:
+        experts = expert_state()
+        for row in experts["items"]:
+            if row["active"] and not row["package_available"]:
+                errors.append(row["id"] + ": 활성 Expert 패키지가 없거나 크기가 다릅니다.")
     if symbols and not errors:
         with sqlite3.connect(DB.as_uri() + "?mode=ro", uri=True) as connection:
             placeholders = ",".join("?" for _ in symbols)
@@ -547,7 +575,12 @@ def launch(command, req,preserve_output=False):
         job = {"id": job_id, "status": "starting", "command": command, "currency": req.currency,
                "symbols": checked["symbols"], "resume": req.resume, "started_at": now(),
                "log": f"jobs/{job_id}.log", "finished_at": None, "exit_code": None}
-        if preserve_output:job['output']='policies/'+job_id
+        if req.champion_path:
+            from .platform.sac_champion import _next_version
+            _,target=_next_version()
+            job.update(champion_path=str(Path(req.champion_path).expanduser().resolve()),
+                champion_output=str(target),output='champions/'+target.stem)
+        elif preserve_output:job['output']='policies/'+job_id
         (RUNTIME / "jobs").mkdir(exist_ok=True)
         env = os.environ.copy()
         env.update(PYTHONPATH=str(ROOT / "src"), PYTHONUTF8="1")
@@ -605,6 +638,80 @@ def collect(req:CollectionRequest):
         atomic_json(job,RUNTIME/"job.json")
         (RUNTIME/"training.pid").write_text(str(process.pid))
     return {"message":"FinRL-X 원본 가격 수집을 시작했습니다.","job":job}
+
+
+@app.get("/api/champions")
+def champions():
+    from .platform.sac_champion import list_champions
+    return {"items":list_champions()}
+
+
+def champion_environment(request):
+    from .framework import prices,training_environment
+    from .expert_registry_native import ExpertRegistry
+    frame=prices(request.currency,request.symbols)
+    if frame.empty:raise HTTPException(400,"선택 종목의 저장 가격을 찾지 못했습니다.")
+    registry=ExpertRegistry()
+    try:
+        env=training_environment(frame,registry,champion_ids=request.experts)
+        return env
+    except BaseException:
+        registry.close(cleanup=True)
+        raise
+
+
+@app.post("/api/champions/inspect")
+def champion_inspect(request:ChampionRequest):
+    from .platform.sac_champion import inspect
+    if len(request.symbols)!=len(set(request.symbols)) or len(request.experts)!=len(set(request.experts)):
+        raise HTTPException(400,"종목과 Expert는 중복 없이 선택하세요.")
+    request.symbols=sorted(request.symbols);request.experts=sorted(request.experts)
+    env=None
+    try:
+        env=champion_environment(request)
+        env.reset()
+        registry=env.registry
+        inference=[{"id":key,"status":value.get('status'),"reason":value.get('reason'),
+            "as_of":value.get('as_of'),"output_sample":value.get('output',[])[:8],
+            "resources":registry.pool.metrics.get(key,{}) if registry.pool else {}}
+            for key,value in registry.last_outputs.items()]
+        registry.close()
+        return inspect(request.currency,request.symbols,request.experts,env,inference)
+    except HTTPException:raise
+    except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
+    finally:
+        if env is not None:env.close()
+
+
+@app.post("/api/champions/create")
+def champion_create(request:ChampionRequest):
+    if job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")
+    if len(request.symbols)!=len(set(request.symbols)) or len(request.experts)!=len(set(request.experts)):
+        raise HTTPException(400,"종목과 Expert는 중복 없이 선택하세요.")
+    request.symbols=sorted(request.symbols);request.experts=sorted(request.experts)
+    from .platform.sac_champion import MODEL_DIR,create,load_spec
+    if request.source_path:
+        source=Path(request.source_path).expanduser().resolve()
+        if not source.is_relative_to(MODEL_DIR.resolve()) or not source.name.startswith("sac_champion_"):
+            raise HTTPException(400,"모델 폴더의 SAC Champion만 재조립할 수 있습니다.")
+        try:
+            previous=load_spec(source);identity=previous["identity"]
+            if identity.get("currency")!=request.currency or identity.get("symbols")!=sorted(request.symbols):
+                raise ValueError("기존 Champion과 통화·종목 구성이 달라 SAC Actor·Twin Critic을 호환 승계할 수 없습니다.")
+        except (ValueError,OSError,KeyError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
+    env=None
+    try:
+        env=champion_environment(request)
+        env.reset()
+        failures=[f"{key}: {value.get('reason','입력 또는 추론에 실패했습니다.')}" for key,value in env.registry.last_outputs.items() if value.get('status')!='ready']
+        if failures:raise HTTPException(400,"선택 Expert 추론 검사를 통과하지 못했습니다. "+"; ".join(failures))
+        env.registry.close()
+        result=create(request.currency,request.symbols,request.experts,env,request.source_path)
+        return result
+    except HTTPException:raise
+    except (ValueError,RuntimeError,OSError,KeyError,MemoryError,FileExistsError) as exc:raise HTTPException(400,str(exc)) from exc
+    finally:
+        if env is not None:env.close()
 
 
 @app.get("/api/checkpoint")

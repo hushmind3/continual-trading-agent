@@ -12,7 +12,7 @@ export interface Expert {
   representation?:string;executor?:string;backend?:string;category?:"forecast"|"trading"|"interpretation";
   parameters?:number;feature_size:number;weight_bytes?:number;quantized?:boolean;
   package:{file:string;bytes:number;sha256:string};
-  conversion?:{source_id:string;precision?:string;validation?:{passed?:boolean;relative_rmse?:number;max_relative_rmse?:number;action_agreement?:number;direction_agreement?:number;min_action_agreement?:number};comparison?:unknown};
+  conversion?:{source_id:string;precision?:string;original_tensor_bytes?:number;converted_tensor_bytes?:number;layers?:number;native_forward_layers?:number;validation?:{passed?:boolean;relative_rmse?:number;max_relative_rmse?:number;action_agreement?:number;direction_agreement?:number;min_action_agreement?:number};comparison?:unknown};
   input:{supported:boolean;pipeline:string;requires?:string[];universe?:string[];minimum_history?:number;reason?:string};
   inference?:{status:string;reason?:string;as_of?:string;output?:number[]};
   check?:{status:string;detail?:string;tested?:number;seconds?:number;metrics?:Record<string,unknown>};
@@ -46,7 +46,7 @@ export interface Snapshot {
   checkpoints:Checkpoint[];
   operations?:OperationsState;
   library?:{job:{busy:boolean;stage?:string;kind?:string;error?:string;detail?:string;result?:any;completed?:number;total?:number;finished?:number};
-    catalog:{active?:string[];experts?:Record<string,Expert>;comparison?:unknown;discovery?:{models:DiscoveryModel[];query?:string;keywords?:string[];errors?:{query:string;detail:string}[];scope?:string;recent_days?:number};optimizations?:Record<string,any>}};
+    catalog:{active?:string[];experts?:Record<string,Expert>;comparison?:unknown;discovery?:{models:DiscoveryModel[];query?:string;keywords?:string[];errors?:{query:string;detail:string}[];scope?:string;recent_days?:number};optimizations?:Record<string,any>;quantizations?:Record<string,any>}};
   automation?:AutomationState;
   capabilities:Record<string,{status:"supported"|"not_connected"|"removed"|"requires_configuration";reason:string;source:string}>;
 }

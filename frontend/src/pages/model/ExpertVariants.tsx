@@ -1,34 +1,22 @@
-import {useState} from 'react';
-import type {LibraryExpert,Optimization,Inspection} from '../../data/library';
+import type {LibraryExpert,Optimization} from '../../data/library';
 import {bytes,number,inspectionDetail} from '../../ui/format';
-import {versionResults} from './expertVersionResults';
-import {ExpertVersionEvidence} from './ExpertVersionEvidence';
-export function ExpertVariants({base,variants,selected,active,optimization,inspection,selectedForRemoval,selectedFailurePrecisions,onSelect,onToggleRemoval,onToggleFailure}:{base:LibraryExpert;variants:LibraryExpert[];selected:string;active:string[];optimization?:Optimization;inspection?:Inspection;selectedForRemoval:string[];selectedFailurePrecisions:string[];onSelect:(id:string)=>void;onToggleRemoval:(id:string)=>void;onToggleFailure:(precision:string)=>void}){
- const [evidence,setEvidence]=useState('');
- const results=versionResults(variants,optimization,inspection);
- const detail=results.find(r=>r.key===evidence);
+export function ExpertVariants({variants,quantization,legacyFailures,selectedIds,selectedFailurePrecisions,onToggle,onToggleFailure}:{variants:LibraryExpert[];quantization?:Optimization;legacyFailures?:Optimization;selectedIds:string[];selectedFailurePrecisions:string[];onToggle:(id:string)=>void;onToggleFailure:(precision:string)=>void}){
  const failures=new Map<string,string>();
- for(const row of optimization?.failures??[])if(!variants.some(item=>item.conversion?.precision===row.precision))failures.set(row.precision,row.detail);
- for(const [precision,attempt] of Object.entries(optimization?.attempts??{}))if(attempt.status==='failed'&&!variants.some(item=>item.conversion?.precision===precision))failures.set(precision,attempt.detail??'변환 실패');
- for(const report of optimization?.reports??[])if(report.passed===false&&report.status!=='skipped'&&!variants.some(item=>item.id===report.id)&&report.precision)failures.set(report.precision,report.reason??report.detail??'검사 실패');
- return <div className="min-w-0" onClick={e=>e.stopPropagation()}>
-  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-5" role="group" aria-label="Expert 정밀도 버전">
-   {results.map(v=>{const item=v.item!;const failed=['failed','rejected'].includes(v.inspection.status)||['failed','rejected'].includes(v.decision.status);return <div key={v.key} className={`min-w-0 rounded-xl p-2.5 text-xs ${selectedForRemoval.includes(item.id)?'bg-blue-50 ring-1 ring-blue-300':failed?'bg-amber-50/70':'bg-slate-50'}`}>
-    <label className="mb-2 flex cursor-pointer items-center gap-1.5 text-[11px] text-slate-500" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedForRemoval.includes(item.id)} onChange={()=>onToggleRemoval(item.id)} aria-label={`${item.name} ${v.label} 선택`}/>선택</label>
-    <button aria-pressed={item?.id===selected} onClick={()=>item?onSelect(item.id):setEvidence(v.key)} className="w-full text-left transition active:scale-95 focus-visible:rounded focus-visible:outline-2 focus-visible:outline-blue-500">
-     <span className={`block font-semibold ${item&&active.includes(item.id)?'text-emerald-700':'text-slate-700'}`}>{v.label}{item&&active.includes(item.id)?' · 사용':''}</span>
-     {(item||v.report?.bytes!=null)&&<span className="mt-1 block text-slate-400">{bytes(item?.weight_bytes??item?.package.bytes??v.report?.bytes)}</span>}
-     <span className={`mt-2 block ${v.inspection.status==='passed'?'text-emerald-700':failed?'text-amber-800':'text-slate-500'}`}>{v.inspection.label}</span>
-     {['failed','rejected'].includes(v.inspection.status)&&<span className="mt-1 line-clamp-3 block break-words text-[11px] leading-4 text-amber-800" title={inspectionDetail(v.inspection.detail)}>{inspectionDetail(v.inspection.detail)}</span>}
-     {item?.conversion?.validation&&<span className="mt-1 block text-slate-500">오차 {number((item.conversion.validation.relative_rmse??0)*100,3)}%</span>}
+ for(const record of [legacyFailures,quantization])for(const row of record?.failures??[])if(!variants.some(item=>item.conversion?.precision===row.precision))failures.set(row.precision,row.detail);
+ return <div className="min-w-0">
+  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-5" role="group" aria-label="Champion 조립용 모델 버전">
+   {variants.map(item=>{const selected=selectedIds.includes(item.id),conversion=item.conversion,report=quantization?.reports?.find(row=>row.id===item.id);const failed=report?.status==='failed'||!item.package_available;const label=item.executor==='llama_cpp'?item.representation??'GGUF 정밀도 미확인':conversion?.precision?.toUpperCase()??item.representation??'원본';return <div key={item.id} className={'min-w-0 rounded-xl p-2.5 text-xs '+(selected?'bg-blue-50 ring-1 ring-blue-300':failed?'bg-amber-50':'bg-slate-50')}>
+    <label className="mb-2 flex cursor-pointer items-center gap-2 text-slate-500"><input type="checkbox" checked={selected} onChange={()=>onToggle(item.id)} aria-label={item.name+' '+label+' 선택'}/>선택</label>
+    <button aria-pressed={selected} onClick={()=>onToggle(item.id)} className="w-full text-left focus-visible:outline-2 focus-visible:outline-blue-500">
+     <b className="block break-words text-slate-700">{label}</b><span className="mt-1 block text-slate-500">{bytes(item.weight_bytes??item.package.bytes)}</span>
+     <span className={'mt-2 block '+(failed?'text-rose-700':'text-emerald-700')}>{failed?'가중치 파일 확인 실패':item.quantized||conversion?.precision?.match(/^(int8|int4|nf4)$/)?'양자화 완료':conversion?'변환 완료':'원본'}</span>
+     {failed&&<span className="mt-1 block break-words text-rose-700">{inspectionDetail(report?.detail??'등록된 패키지 파일이 없거나 크기가 다릅니다.')}</span>}
+     {conversion?.original_tensor_bytes!=null&&<span className="mt-2 block text-slate-500">가중치 {bytes(conversion.original_tensor_bytes)} → {bytes(conversion.converted_tensor_bytes)}</span>}
+     {!!conversion?.layers&&<span className="mt-1 block text-slate-500">양자화 계층 {number(conversion.layers,0)}개</span>}
+     {report?.seconds!=null&&<span className="mt-1 block text-slate-500">처리 {number(report.seconds,2)}s</span>}
     </button>
-    <p className={`mt-2 text-xs ${v.decision.status==='selected'?'font-semibold text-blue-700':failed?'text-amber-800':'text-slate-500'}`}>{v.decision.label}</p>
-    {v.decision.status!=='pending'&&<p className="mt-1 line-clamp-3 break-words text-[11px] leading-4 text-slate-500" title={v.decision.detail}>{v.decision.detail}</p>}
-    <button className="mt-2 rounded py-1 text-xs text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-blue-500" onClick={()=>setEvidence(v.key)}>판단 근거</button>
    </div>})}
   </div>
-  {!!failures.size&&<div className="mt-2 space-y-1">{[...failures].map(([precision,reason])=><label key={precision} className="flex cursor-pointer items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><input type="checkbox" checked={selectedFailurePrecisions.includes(precision)} onChange={()=>onToggleFailure(precision)} aria-label={precision+' 실패 기록 선택'}/><span>{precision.toUpperCase()} 생성·검사 실패 · {inspectionDetail(reason)}</span></label>)}</div>}
-  <p className="mt-2 text-[11px] text-slate-400">현재 Registry에 실제 등록된 모델 버전만 표시합니다. 검사와 최적화 판단은 별도로 표시합니다.</p>
-  {detail&&<ExpertVersionEvidence name={base.name} result={detail} optimization={optimization} onSelect={onSelect} onClose={()=>setEvidence('')}/>}
+  {!!failures.size&&<div className="mt-2 space-y-1">{[...failures].map(([precision,reason])=><label key={precision} className="flex cursor-pointer items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800"><input type="checkbox" checked={selectedFailurePrecisions.includes(precision)} onChange={()=>onToggleFailure(precision)} aria-label={precision+' 실패 기록 선택'}/><span>{precision.toUpperCase()} 양자화 실패 · {inspectionDetail(reason)}</span></label>)}</div>}
  </div>;
 }

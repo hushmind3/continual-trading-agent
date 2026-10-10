@@ -62,13 +62,13 @@ class PackedLinear(nn.Module):
 
 
 def linear_layers(expert):
-    """Only ordinary untied Linear weights; embeddings/custom/functional attention stay native."""
+    """Include Linear subclasses while retaining their native forward rules."""
     storage={}
     for name,param in expert.named_parameters(remove_duplicate=False):
         storage.setdefault((param.untyped_storage().data_ptr(),param.storage_offset()),[]).append(name)
     result={}
     for name,module in expert.named_modules():
-        if type(module) is not nn.Linear:continue
+        if not isinstance(module,nn.Linear):continue
         parent=expert.get_submodule(name.rsplit('.',1)[0]) if '.' in name else expert
         if isinstance(parent,nn.MultiheadAttention):continue
         if len(storage[(module.weight.untyped_storage().data_ptr(),module.weight.storage_offset())])>1:continue
@@ -76,14 +76,42 @@ def linear_layers(expert):
     return result
 
 
+class NativeQuantizedWeight:
+    @property
+    def weight(self):
+        if self._quant_engine=='bitsandbytes':
+            from .nf4_linear import NF4Linear
+            return NF4Linear.weight.fget(self).to(self._native_weight_dtype)
+        return PackedLinear.decode(self,dtype=self._native_weight_dtype)
+
+    def quant_state(self):
+        from .nf4_linear import NF4Linear
+        return NF4Linear.quant_state(self)
+
+
+def restore_native_linear(original,state,spec):
+    native_type=type(original)
+    original._native_weight_dtype=original.weight.dtype
+    original._quant_engine=spec.get('engine','packed')
+    original.bits=spec['bits'];original.group_size=spec.get('group_size',64)
+    original._parameters.pop('weight')
+    original.__class__=type('Quantized'+native_type.__name__,(NativeQuantizedWeight,native_type),{})
+    names=('qweight','scales') if original._quant_engine!='bitsandbytes' else tuple(k for k in state if k=='qweight' or k.startswith('qs_'))
+    for name in names:original.register_buffer(name,state[name])
+    return original
+
+
 def restore_packed(model,state,layers,prefix=''):
     for name,spec in layers.items():
         if prefix and not name.startswith(prefix+'.'):continue
         local=name.removeprefix(prefix+'.') if prefix else name
         original=model.get_submodule(local)
-        if type(original) is not nn.Linear:raise ValueError('변환 패키지의 Linear 구조가 원본과 다릅니다: '+local)
+        if not isinstance(original,nn.Linear):raise ValueError('변환 패키지의 Linear 구조가 원본과 다릅니다: '+local)
         parent,_,child=local.rpartition('.')
-        if spec.get('engine')=='bitsandbytes':
+        if spec.get('native_forward'):
+            local_state={k.removeprefix(local+'.'):v for k,v in state.items() if k.startswith(local+'.')}
+            model.get_submodule(parent)._modules[child]=restore_native_linear(original,local_state,spec)
+        elif spec.get('engine')=='bitsandbytes':
             from .nf4_linear import replace_nf4
             local_state={k.removeprefix(local+'.'):v for k,v in state.items() if k.startswith(local+'.')}
             model.get_submodule(parent)._modules[child]=replace_nf4(original,local_state)

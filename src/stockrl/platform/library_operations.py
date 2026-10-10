@@ -18,7 +18,7 @@ class LibraryOperations:
         return dict(catalog=read_json(self.catalog_path),job={**read_json(self.status_path),'busy':self.active})
 
     def start(self,kind,payload):
-        if kind not in ('inspect','import','probe','probe_all','load','unload','remove','search','acquire','convert','optimize','optimize_all','apply','compare'):
+        if kind not in ('inspect','import','probe','probe_all','load','unload','remove','search','acquire','convert','quantize','quantize_all','optimize','optimize_all','apply','compare'):
             raise ValueError('지원하는 Expert 작업을 선택하세요.')
         with self.lock:
             if self.active:raise ValueError('진행 중인 Expert 작업이 있습니다.')
@@ -56,6 +56,69 @@ class LibraryOperations:
 
     def _execute(self,kind,payload,progress):
         cfg=settings();catalog=read_json(cfg.registry_file)
+        if kind=='quantize_all':
+            keys=list(dict.fromkeys(item.get('conversion',{}).get('source_id') or key for key,item in catalog.get('experts',{}).items()))
+            results=[]
+            for index,key in enumerate(keys):
+                progress(stage='quantize_all',completed=index,total=len(keys),detail=f'{index+1}/{len(keys)} · {key} 양자화')
+                try:result=self._execute('quantize',{'id':key,'device':payload.get('device','auto')},progress)
+                except InterruptedError:raise
+                except Exception as exc:result={'items':[{'id':key,'status':'failed','detail':str(exc)}]}
+                results.extend(result['items'])
+            return {'total':len(results),'created':sum(row['status']=='created' for row in results),
+                'existing':sum(row['status']=='existing' for row in results),'failed':sum(row['status']=='failed' for row in results),'items':results}
+        if kind=='quantize':
+            from .expert_packages import load_package
+            from .expert_conversion import convert
+            from .assets import ExpertPool
+            from .quantized_linear import linear_layers
+            key=payload['id'];entry=catalog.get('experts',{}).get(key)
+            if entry is None:raise ValueError('최초 원본 Expert가 Registry에 없습니다: '+key)
+            key=entry.get('conversion',{}).get('source_id') or key
+            entry=catalog['experts'].get(key)
+            if entry is None:raise ValueError('양자화에 필요한 최초 원본 Expert가 Registry에 없습니다: '+key)
+            package=load_package(cfg.model_dir/'expert_registry.json',entry['package'],verify=True)
+            if package.get('executor')=='llama_cpp':
+                from .expert_packages import package_path
+                from .gguf_format import file_type,precision_label
+                weight=package_path(cfg.model_dir/'expert_registry.json',package['weight_asset'])
+                kind=file_type(weight)
+                if kind in (0,1,32):raise ValueError('현재 GGUF는 '+precision_label(kind)+'입니다. 원본 GGUF 가져오기의 llama.cpp 양자화 경로를 사용해야 합니다.')
+                return {'total':1,'created':0,'existing':1,'failed':0,'items':[{'id':key,'status':'existing','precision':precision_label(kind),'bytes':weight.stat().st_size,'detail':'이미 양자화된 GGUF 파일입니다.'}]}
+            record={'stage':'running','started':time.time(),'reports':[],'attempts':{},'failures':[]};pool=None;targets=None
+            try:
+                for precision in payload.get('precisions',['int8','int4','nf4']):
+                    started=time.perf_counter();slot=key+'_'+precision
+                    record['attempts'][precision]={'status':'running','detail':'양자화 가중치 생성'}
+                    try:
+                        latest=read_json(cfg.registry_file)
+                        candidate=next((item for item in latest.get('experts',{}).values() if item.get('conversion',{}).get('source_id')==key and item.get('conversion',{}).get('precision')==precision),None)
+                        if candidate is not None:
+                            load_package(cfg.model_dir/'expert_registry.json',candidate['package'],verify=True)
+                            status='existing'
+                        else:
+                            if targets is None:
+                                pool=ExpertPool(cfg);targets=linear_layers(pool.get(key,structure_only=True))
+                            candidate=convert(cfg,latest,{'id':key,'slot':slot,'precision':precision,'device':payload.get('device','auto')},progress,package=package,targets=targets)
+                            status='created'
+                        row={'id':candidate['id'],'precision':precision,'status':status,'bytes':candidate.get('weight_bytes') or candidate['package']['bytes'],
+                            'package_bytes':candidate['package']['bytes'],'seconds':time.perf_counter()-started,'conversion':candidate.get('conversion',{}),
+                            'detail':'양자화 완료' if status=='created' else '기존 양자화 버전이 있습니다.'}
+                        latest=read_json(cfg.registry_file);latest['experts'][candidate['id']]=candidate
+                        record['attempts'][precision]={'status':'complete','detail':row['detail']}
+                    except InterruptedError:raise
+                    except Exception as exc:
+                        row={'id':slot,'precision':precision,'status':'failed','detail':str(exc),'seconds':time.perf_counter()-started}
+                        record['attempts'][precision]={'status':'failed','detail':str(exc)}
+                        record['failures'].append({'precision':precision,'detail':str(exc)})
+                        latest=read_json(cfg.registry_file)
+                    record['reports'].append(row);latest.setdefault('quantizations',{})[key]=record;atomic_json(latest,cfg.registry_file)
+                record.update(stage='partial' if record['failures'] else 'complete',finished=time.time())
+                latest=read_json(cfg.registry_file);latest.setdefault('quantizations',{})[key]=record;atomic_json(latest,cfg.registry_file)
+            finally:
+                if pool:pool.close()
+            return {'total':len(record['reports']),'created':sum(row['status']=='created' for row in record['reports']),
+                'existing':sum(row['status']=='existing' for row in record['reports']),'failed':len(record['failures']),'items':record['reports']}
         if kind in ('probe_all','optimize_all'):
             experts=catalog.get('experts',{})
             if kind=='probe_all':keys=list(experts)
@@ -155,22 +218,24 @@ class LibraryOperations:
             experts=catalog.get('experts',{})
             if not (ids or failure_records) or any(key not in experts for key in ids):raise ValueError('등록 모델 또는 실패 기록을 선택하세요.')
             optimizations=catalog.get('optimizations',{})
+            quantizations=catalog.get('quantizations',{})
             for row in failure_records:
-                if row.get('source_id') not in optimizations or row.get('precision') not in ('fp16','bf16','int8','int4','nf4'):
+                if row.get('source_id') not in set(optimizations)|set(quantizations) or row.get('precision') not in ('fp16','bf16','int8','int4','nf4'):
                     raise ValueError('현재 목록의 양자화 실패 기록을 선택하세요.')
             removed_precisions={(experts[key].get('conversion',{}).get('source_id'),experts[key].get('conversion',{}).get('precision')) for key in ids}
             removed_precisions.update((row['source_id'],row['precision']) for row in failure_records)
             for key in ids:runtime.unload(key)
             catalog['active']=[key for key in catalog.get('active',[]) if key not in ids]
             for key in ids:experts.pop(key)
-            for source,record in list(optimizations.items()):
+            for records,source,record in [(records,source,record) for records in (optimizations,quantizations) for source,record in list(records.items())]:
+                if source in ids:records.pop(source);continue
                 precisions={precision for root,precision in removed_precisions if root==source}
                 record['reports']=[row for row in record.get('reports',[]) if row.get('id') not in ids and row.get('precision') not in precisions]
                 record['failures']=[row for row in record.get('failures',[]) if row.get('precision') not in precisions]
                 record['attempts']={precision:value for precision,value in record.get('attempts',{}).items() if precision not in precisions}
                 for field in ('selected','previous'):
                     if record.get(field) in ids:record[field]=None
-                if not (record['reports'] or record['failures'] or record['attempts']):optimizations.pop(source)
+                if not (record['reports'] or record['failures'] or record['attempts']):records.pop(source)
             atomic_json(catalog,cfg.registry_file)
             return {'removed':ids,'removed_failures':failure_records,'model_files_preserved':True}
         if kind=='probe':

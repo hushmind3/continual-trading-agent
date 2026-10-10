@@ -48,14 +48,14 @@ def quality_check(item,comparison,payload):
     elif item['check'].get('status')=='quality_warning':item['check'].update(status='passed',detail='실제 추론·설정한 출력 차이 기준 통과')
 
 
-def convert(settings,catalog,payload,progress):
+def convert(settings,catalog,payload,progress,*,package=None,targets=None):
     key=payload.get('id');precision=payload.get('precision','fp16');slot=payload.get('slot','')
     if key not in catalog['experts']:raise ValueError('변환할 Expert를 선택하세요.')
     if precision not in PRECISIONS:raise ValueError('FP16/BF16/INT8/INT4/NF4 중에서 선택하세요.')
     if not re.fullmatch(r'[a-z][a-z0-9_]{0,79}',slot) or slot in dir(torch.nn.ModuleDict()):raise ValueError('올바른 새 슬롯 이름을 지정하세요.')
     if slot in catalog['experts']:raise ValueError('이미 등록된 슬롯 이름입니다.')
     item=catalog['experts'][key];model=settings.resolve(settings.expert_checkpoint)
-    package=load_package(model,item['package'],verify=True)
+    package=package if package is not None else load_package(model,item['package'],verify=True)
     if package.get('executor')=='llama_cpp':raise ValueError('GGUF는 원본의 검증된 저비트 파일을 사용합니다. PyTorch 정밀도 변환 대상이 아닙니다.')
     if package.get('quantization'):raise ValueError('재양자화 대신 원본 패키지에서 변환하세요.')
     root=model.parent/'expert-packages';total=sum(v.numel()*v.element_size() for v in package['state_dict'].values())
@@ -67,21 +67,25 @@ def convert(settings,catalog,payload,progress):
     used_cuda=device.startswith('cuda')
     if device.startswith('cuda'):torch.cuda.reset_peak_memory_stats()
     try:
-        targets={}
         if precision in ('int8','int4','nf4'):
             progress(stage='conversion_structure',detail='원본 구조에서 지원하는 Linear 계층 확인 중')
-            pool=ExpertPool(settings,extra_packages={key:item['package']});expert=pool.get(key,structure_only=True)
-            targets=linear_layers(expert)
-            if not targets:raise ValueError('양자화 가능한 untied Linear 계층이 없습니다. FP16/BF16 변환을 사용하세요.')
+            if targets is None:
+                pool=ExpertPool(settings,extra_packages={key:item['package']});expert=pool.get(key,structure_only=True)
+                targets=linear_layers(expert)
+            if not targets:raise ValueError('원본 구조에 양자화 가능한 Linear 계층이 없습니다. 공유 가중치 또는 기능형 연산 여부를 확인해야 합니다.')
+        else:targets={}
         converted={};cache={};count=len(weights)
         for index,(name,value) in enumerate(weights.items()):
             layer=name.removesuffix('.weight') if name.endswith('.weight') else None
             if layer in targets:
+                native_forward=type(targets[layer]) is not torch.nn.Linear
                 if precision=='nf4':
                     from .nf4_linear import pack_nf4
                     values=pack_nf4(value,device)
                     converted.update({layer+'.'+k:v for k,v in values.items()})
-                    quantization[layer]=dict(bits=4,engine='bitsandbytes',shape=list(value.shape));continue
+                    quantization[layer]=dict(bits=4,engine='bitsandbytes',shape=list(value.shape),native_forward=native_forward)
+                    if index%10==0 or index+1==count:progress(stage='converting',completed=index+1,total=count,detail=f'{device} · NF4 양자화 · {index+1}/{count} tensor')
+                    continue
                 bits=PRECISIONS[precision]
                 try:q,scales=pack_weight(value,bits,device=device)
                 except torch.cuda.OutOfMemoryError:
@@ -89,7 +93,7 @@ def convert(settings,catalog,payload,progress):
                     torch.cuda.empty_cache();device='cpu';choice.update(device='cpu',reason='CUDA 작업 여유가 줄어 나머지 변환을 CPU에서 수행')
                     q,scales=pack_weight(value,bits)
                 converted[layer+'.qweight']=q;converted[layer+'.scales']=scales
-                quantization[layer]=dict(bits=bits,group_size=64,shape=list(value.shape))
+                quantization[layer]=dict(bits=bits,group_size=64,shape=list(value.shape),native_forward=native_forward)
             elif value.is_floating_point() and precision in ('fp16','bf16'):
                 identity=(value.untyped_storage().data_ptr(),value.storage_offset(),tuple(value.shape),tuple(value.stride()))
                 if identity not in cache:
@@ -107,7 +111,8 @@ def convert(settings,catalog,payload,progress):
             'conversion':dict(source_id=key,source_sha256=item['package']['sha256'],precision=precision,
                 original_tensor_bytes=total,converted_tensor_bytes=stored,layers=len(quantization),
                 device_choice=choice,peak_vram_bytes=torch.cuda.max_memory_allocated() if used_cuda else 0,
-                execution='bitsandbytes NF4 native kernel' if precision=='nf4' else 'packed weights / bounded floating-point Linear' if quantization else 'native autocast')}
+                native_forward_layers=sum(bool(spec.get('native_forward')) for spec in quantization.values()),
+                execution='packed weights / original Linear subclass forward' if any(spec.get('native_forward') for spec in quantization.values()) else 'bitsandbytes NF4 native kernel' if precision=='nf4' else 'packed weights / bounded floating-point Linear' if quantization else 'native autocast')}
         if quantization:candidate['quantization']=quantization
         progress(stage='conversion_save',detail='변환 후보 저장 · 원본 유지')
         temporary=atomic_torch_save(candidate,root/(slot+'.pt'));checksum=digest(temporary)

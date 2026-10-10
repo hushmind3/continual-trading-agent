@@ -1,11 +1,10 @@
 import {ArrowRight,Boxes,Database,GraduationCap,Radio,Cpu} from 'lucide-react';
 import {useOperations} from '../data/Operations';
-import {Skeleton,Meter,Button} from '../ui/Primitives';
+import {Skeleton,Meter} from '../ui/Primitives';
 import {Panel,KeyValues} from '../ui/Panel';
 import {bytes,date,number} from '../ui/format';
 import {ServiceProgress} from '../ui/ServiceProgress';
 import {Capability} from '../ui/Capability';
-import {OperationsControls} from '../ui/OperationsControls';
 import {SystemControls} from '../ui/SystemControls';
 export function OperationsBoard(){const {state:s}=useOperations();if(!s)return <Skeleton/>;const r=s.resources;
  return <div className="space-y-6">
@@ -16,7 +15,5 @@ export function OperationsBoard(){const {state:s}=useOperations();if(!s)return <
   <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]"><section className="rounded-2xl bg-[#edf3ff] p-6"><h2 className="mb-5 flex items-center gap-2 text-sm font-bold"><Cpu size={17}/>실측 RAM · VRAM</h2><div className="grid gap-6 sm:grid-cols-2"><div><p className="text-xs text-slate-500">시스템 RAM</p><p className="my-3 text-xl font-bold">{bytes(r.ram_used_bytes)} <span className="text-xs font-normal text-slate-400">/ {bytes(r.ram_total_bytes)}</span></p><Meter value={r.ram_used_bytes/r.ram_total_bytes*100}/><p className="mt-2 text-xs text-slate-500">사용 가능 {bytes(r.ram_available_bytes)}</p></div><div><p className="text-xs text-slate-500">{r.gpu.name||'GPU 측정 없음'}</p><p className="my-3 text-xl font-bold">{bytes(r.gpu.used_bytes)} <span className="text-xs font-normal text-slate-400">/ {bytes(r.gpu.total_bytes)}</span></p>{r.gpu.total_bytes&&<Meter value={(r.gpu.used_bytes||0)/r.gpu.total_bytes*100} color="bg-violet-500"/>}<p className="mt-2 text-xs text-slate-500">GPU 사용률 {number(r.gpu.utilization_percent)}%</p></div></div><div className="mt-6 flex flex-wrap gap-6 border-t border-blue-200/40 pt-4 text-xs text-slate-500">CPU {number(r.cpu_percent)}% · 디스크 여유 {bytes(r.disk_free_bytes)}</div></section>
   <Panel title="경험 · 저장 정책" description="저장 파일 기준 · 실행 중 진행값과 구분"><div className="text-4xl font-bold">{number(s.model.updates,0)} <span className="text-sm font-normal text-slate-400">가중치 업데이트</span></div><KeyValues items={[['학습 단계',number(s.model.num_timesteps,0)],['Replay 보관 경험',number(s.model.replay_state.size,0)],['가격 관측',number(s.data.rows,0)],['마지막 정책 저장',date(s.model.file.modified)]]}/><a className="mt-4 block text-xs text-blue-600" href="#learning">Actor · Critic · 체크포인트 확인 →</a></Panel></div>
   <Panel title="현재 제공 기능" description="과거 화면과 현재 백엔드의 지원 여부"><div className="grid gap-3 sm:grid-cols-2"><Capability name="learning" label="SAC 학습"/><Capability name="expert_selection" label="Frozen Expert"/><Capability name="live_feed" label="실시간 시세"/><Capability name="paper_accounts" label="독립 가상계좌"/></div></Panel>
-  <OperationsControls/>
-  <div className="flex flex-wrap gap-3"><a href="#markets"><Button>종목·가격 조회</Button></a><a href="#portfolio"><Button>포트폴리오·백테스트</Button></a><a href="#connection"><Button>연결 상태 확인</Button></a></div>
  </div>;
 }

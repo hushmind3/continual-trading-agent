@@ -45,7 +45,7 @@ export interface Snapshot {
     processes:{role:string;pid:number;rss_bytes:number;cpu_percent:number;threads:number;read_bytes:number;write_bytes:number}[]};
   checkpoints:Checkpoint[];
   operations?:OperationsState;
-  library?:{job:{busy:boolean;stage?:string;kind?:string;error?:string;detail?:string;result?:any;completed?:number;total?:number};
+  library?:{job:{busy:boolean;stage?:string;kind?:string;error?:string;detail?:string;result?:any;completed?:number;total?:number;finished?:number};
     catalog:{active?:string[];experts?:Record<string,Expert>;comparison?:unknown;discovery?:{models:DiscoveryModel[];query?:string;keywords?:string[];errors?:{query:string;detail:string}[];scope?:string;recent_days?:number};optimizations?:Record<string,any>}};
   automation?:AutomationState;
   capabilities:Record<string,{status:"supported"|"not_connected"|"removed"|"requires_configuration";reason:string;source:string}>;

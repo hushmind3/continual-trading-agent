@@ -41,10 +41,11 @@ class Residency:
             if other!=key and other not in self.pinned:free+=self.offload(other)
         if free>=required:return 'cuda:0'
         # An oversized model streams only its overflow layers from RAM to GPU.
-        if self.pool.keep_device and weights>free and not hasattr(expert,'reference'):
+        gpu_budget=max(0,int(free-workspace))
+        if self.pool.keep_device and weights>gpu_budget and not hasattr(expert,'reference'):
             from accelerate import dispatch_model,infer_auto_device_map
             restore_host(expert)
-            budget=max(0,int(free));ram=max(0,int(psutil.virtual_memory().available))
+            budget=gpu_budget;ram=max(0,int(psutil.virtual_memory().available))
             classes=sorted({type(m).__name__ for m in expert.modules() if any(x in type(m).__name__ for x in ('Block','DecoderLayer','Attention'))})
             mapping=infer_auto_device_map(expert,max_memory={0:budget,'cpu':ram},no_split_module_classes=classes)
             if any(v=='disk' for v in mapping.values()):raise MemoryError('GPU와 RAM의 운영 여유 공간에 모델이 들어가지 않습니다.')

@@ -1,5 +1,5 @@
 import {useCallback,useState} from 'react';
-import {FolderOpen,Layers3,WandSparkles} from 'lucide-react';
+import {FolderOpen,Layers3} from 'lucide-react';
 import {useOperations} from '../data/Operations';
 import {request} from '../data/api';
 import type {Expert} from '../data/types';
@@ -9,10 +9,9 @@ import {ExpertInspector} from './model/ExpertInspector';
 import {ExpertComparison} from './model/ExpertComparison';
 import {ModelGuide} from './model/ModelGuide';
 import {ServiceProgress} from '../ui/ServiceProgress';
-import {SACChampionPanel} from './model/SACChampionPanel';
 
 export function ModelWorkspace(){
- const {state}=useOperations();const [inspect,setInspect]=useState<Expert|null>(null),[error,setError]=useState(''),[championOpen,setChampionOpen]=useState(false);
+ const {state}=useOperations();const [inspect,setInspect]=useState<Expert|null>(null),[error,setError]=useState('');
  const close=useCallback(()=>setInspect(null),[]);
  if(!state)return <Skeleton/>;
  const active=state.experts.active.length;
@@ -29,10 +28,8 @@ export function ModelWorkspace(){
    </div>
    <div className="flex flex-wrap gap-2">
     <Button onClick={()=>void request('model/open-directory',{}).catch(e=>setError(e.message))}><FolderOpen size={15}/>모델 폴더</Button>
-    <Button onClick={()=>setChampionOpen(value=>!value)}><WandSparkles size={15}/>SAC Champion 생성</Button>
    </div>
   </header>
-  {championOpen&&<SACChampionPanel items={state.data.instruments} active={state.experts.items}/>}
   <ModelGuide/>
   <section className="grid gap-4 rounded-xl bg-white p-4 sm:grid-cols-2"><div><h3 className="mb-3 text-sm font-semibold">Expert 실제 분석 진행</h3><ServiceProgress role="experts"/></div><div><h3 className="mb-3 text-sm font-semibold">SAC 학습 진행</h3><ServiceProgress role="learner"/></div></section>
   {error&&<ErrorMessage message={error}/>}

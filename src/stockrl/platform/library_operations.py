@@ -17,7 +17,7 @@ class LibraryOperations:
         return dict(catalog=read_json(self.catalog_path),job={**read_json(self.status_path),'busy':self.active})
 
     def start(self,kind,payload):
-        if kind not in ('inspect','import','probe','probe_all','load','unload','search','acquire','convert','optimize','optimize_all','apply','compare'):
+        if kind not in ('inspect','import','probe','probe_all','load','unload','remove','search','acquire','convert','optimize','optimize_all','apply','compare'):
             raise ValueError('지원하는 Expert 작업을 선택하세요.')
         with self.lock:
             if self.active:raise ValueError('진행 중인 Expert 작업이 있습니다.')
@@ -81,11 +81,14 @@ class LibraryOperations:
                         pool=runtime.expert_pool()
                         preferences=pool.settings.resources.expert_devices
                         pool.settings.resources.expert_devices={**preferences,key:'auto'}
-                        try:runtime.infer(key,fixture)
+                        try:inference=runtime.infer(key,fixture)
                         finally:pool.settings.resources.expert_devices=preferences
+                        result=dict(id=key,status='passed',metrics=inference.get('metrics'),
+                            seconds=inference.get('metrics',{}).get('inference_seconds'))
                     else:
                         self._execute('optimize',{'id':key,'goal':'memory','device':'auto'},progress)
-                    results.append(dict(id=key,status='passed'))
+                        result=dict(id=key,status='passed')
+                    results.append(result)
                 except InterruptedError:
                     raise
                 except Exception as exc:
@@ -99,7 +102,7 @@ class LibraryOperations:
                     if current is not None and current.get('package')==experts[row['id']].get('package'):
                         current['check']={'status':row['status'],
                             'detail':row.get('detail','실제 입력 전체 묶음 추론·출력 계약 통과'),
-                            'tested':time.time()}
+                            'tested':time.time(),**({'metrics':row['metrics'],'seconds':row['seconds']} if row.get('metrics') else {})}
                 atomic_json(latest,cfg.registry_file)
             progress(stage=kind,completed=len(keys),total=len(keys),detail='전체 원본 Expert 처리 완료')
             return {'total':len(keys),'passed':sum(x['status']=='passed' for x in results),
@@ -121,6 +124,15 @@ class LibraryOperations:
             return {'active':payload['active']}
         if kind=='load':return runtime.load(payload['id'])
         if kind=='unload':runtime.unload(payload['id']);return {'unloaded':payload['id']}
+        if kind=='remove':
+            ids=sorted(set(payload.get('ids',[])))
+            experts=catalog.get('experts',{})
+            if not ids or any(key not in experts for key in ids):raise ValueError('Registry에 있는 Expert를 선택하세요.')
+            for key in ids:runtime.unload(key)
+            catalog['active']=[key for key in catalog.get('active',[]) if key not in ids]
+            for key in ids:experts.pop(key)
+            atomic_json(catalog,cfg.registry_file)
+            return {'removed':ids,'model_files_preserved':True}
         if kind=='probe':return runtime.infer(payload['id'])
         if kind=='search':
             from .expert_discovery import search

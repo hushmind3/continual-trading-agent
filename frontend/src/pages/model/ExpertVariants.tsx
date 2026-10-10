@@ -3,13 +3,14 @@ import type {LibraryExpert,Optimization,Inspection} from '../../data/library';
 import {bytes,number,inspectionDetail} from '../../ui/format';
 import {versionResults} from './expertVersionResults';
 import {ExpertVersionEvidence} from './ExpertVersionEvidence';
-export function ExpertVariants({base,variants,selected,active,optimization,inspection,onSelect}:{base:LibraryExpert;variants:LibraryExpert[];selected:string;active:string[];optimization?:Optimization;inspection?:Inspection;onSelect:(id:string)=>void}){
+export function ExpertVariants({base,variants,selected,active,optimization,inspection,selectedForRemoval,onSelect,onToggleRemoval}:{base:LibraryExpert;variants:LibraryExpert[];selected:string;active:string[];optimization?:Optimization;inspection?:Inspection;selectedForRemoval:string[];onSelect:(id:string)=>void;onToggleRemoval:(id:string)=>void}){
  const [evidence,setEvidence]=useState('');
  const results=versionResults(base,variants,selected,active,optimization,inspection);
  const detail=results.find(r=>r.key===evidence);
  return <div className="min-w-0" onClick={e=>e.stopPropagation()}>
   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-5" role="group" aria-label="Expert 정밀도 버전">
    {results.map(v=>{const item=v.item;const failed=['failed','rejected'].includes(v.inspection.status)||['failed','rejected'].includes(v.decision.status);return <div key={v.key} className={`min-w-0 rounded-xl p-2.5 text-xs ${item?.id===selected?'bg-blue-50 ring-1 ring-blue-300':failed?'bg-amber-50/70':item?'bg-slate-50':'bg-slate-50/50 ring-1 ring-inset ring-slate-100'}`}>
+    {item&&<label className="mb-2 flex cursor-pointer items-center gap-1.5 text-[11px] text-slate-500" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedForRemoval.includes(item.id)} onChange={()=>onToggleRemoval(item.id)} aria-label={`${item.name} ${v.label} 선택`}/>관리 선택</label>}
     <button aria-pressed={item?.id===selected} onClick={()=>item?onSelect(item.id):setEvidence(v.key)} className="w-full text-left transition active:scale-95 focus-visible:rounded focus-visible:outline-2 focus-visible:outline-blue-500">
      <span className={`block font-semibold ${item&&active.includes(item.id)?'text-emerald-700':'text-slate-700'}`}>{v.label}{item&&active.includes(item.id)?' · 사용':''}</span>
      {(item||v.report?.bytes!=null)&&<span className="mt-1 block text-slate-400">{bytes(item?.weight_bytes??item?.package.bytes??v.report?.bytes)}</span>}

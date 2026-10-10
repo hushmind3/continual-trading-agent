@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {FlaskConical,PackagePlus,Plus,Gauge,Search,WandSparkles,Play,Power} from 'lucide-react';
+import {FlaskConical,PackagePlus,Plus,Gauge,Search,WandSparkles,Play,Power,Trash2} from 'lucide-react';
 import {useOperations} from '../../data/Operations';
 import {request} from '../../data/api';
 import {Button,Drawer,Empty,ErrorMessage,Meter,Status,Tabs} from '../../ui/Primitives';
@@ -9,6 +9,7 @@ import {ExpertConversion} from './ExpertConversion';
 import {ExpertDiscovery} from './ExpertDiscovery';
 import {ExpertVariants} from './ExpertVariants';
 import {expertFamilies,expertCategory,categoryNames} from './expertFamilies';
+import {SACChampionPanel} from './SACChampionPanel';
 
 const field='w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
@@ -19,6 +20,8 @@ export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
  const [conversionId,setConversionId]=useState('');
  const [discoveryOpen,setDiscoveryOpen]=useState(false),[category,setCategory]=useState('all');
  const [selectedVersions,setSelectedVersions]=useState<Record<string,string>>({});
+ const [selectedIds,setSelectedIds]=useState<string[]>([]);
+ const [championExperts,setChampionExperts]=useState<string[]|null>(null);
  const catalog=lib?.catalog,job=lib?.job,busy=Boolean(job?.busy),items=state?.experts.items??[];
  const families=expertFamilies(items),shown=families.filter(f=>category==='all'||expertCategory(f.base)===category);
  const candidate=job?.result?.experts?.find((e:any)=>e.id===key);
@@ -32,13 +35,18 @@ export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
   return result?.detail??item.check?.detail??item.inference?.reason??(item.inference?.status==='ready'?'저장된 실제 추론 결과 통과':'검사 기록 없음');
  };
  const operation=async(kind:string,payload:unknown)=>{
-  setError('');try{await request(`library/${kind}`,payload);await refresh()}catch(e){setError(e instanceof Error?e.message:'Expert 작업 실패')}
+  setError('');try{await request(`library/${kind}`,payload);await refresh();return true}catch(e){setError(e instanceof Error?e.message:'Expert 작업 실패');return false}
  };
+ const toggleManaged=(id:string)=>setSelectedIds(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
+ const excludeSelected=async()=>{const ids=new Set(selectedIds);if(await operation('apply',{active:(catalog?.active??[]).filter(id=>!ids.has(id))}))setSelectedIds([])};
+ const removeSelected=async()=>{if(await operation('remove',{ids:selectedIds}))setSelectedIds([])};
  return <section className="space-y-4">
   <header className="flex flex-wrap items-center justify-between gap-3">
    <div><h3 className="text-sm font-bold">Expert · 정밀도 버전</h3><p className="mt-1 text-xs text-slate-500">동일 Expert의 원본·FP16·BF16·INT8·INT4·NF4를 한 카드에 표시합니다. 전체 최적화는 등록된 원본 Expert별 후보를 생성하고 실제 출력 품질을 비교합니다.</p></div>
    <div className="flex flex-wrap gap-2"><Button disabled={busy||!families.some(f=>f.base.input.supported&&!f.base.conversion&&f.base.executor!=='llama_cpp')} busy={busy&&job?.kind==='optimize_all'} onClick={()=>void operation('optimize_all',{device:'auto'})}><WandSparkles size={16}/>전체 Expert 버전 생성·최적화</Button><Button disabled={busy||!items.length} busy={busy&&job?.kind==='probe_all'} onClick={()=>void operation('probe_all',{device:'auto'})}><FlaskConical size={16}/>등록 모델 실행 검사</Button><Button disabled={busy} onClick={()=>setDiscoveryOpen(true)}><Search size={16}/>금융 Expert 찾기</Button><Button disabled={busy} onClick={()=>setOpen(true)}><PackagePlus size={16}/>패키지 가져오기</Button></div>
   </header>
+  {!!selectedIds.length&&<div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-100 px-3 py-2"><span className="mr-1 text-xs font-semibold text-slate-600">{selectedIds.length}개 선택</span><Button tone="primary" className="px-3 py-2 text-xs" disabled={busy} onClick={()=>setChampionExperts(selectedIds)}><WandSparkles size={14}/>선택한 Expert로 SAC Champion 생성</Button><Button className="px-3 py-2 text-xs" disabled={busy||!selectedIds.some(id=>catalog?.active?.includes(id))} onClick={()=>void excludeSelected()}>SAC에서 제외</Button><Button tone="danger" className="px-3 py-2 text-xs" disabled={busy} onClick={()=>void removeSelected()}><Trash2 size={14}/>Registry에서 제거</Button><Button className="px-3 py-2 text-xs" disabled={busy} onClick={()=>setSelectedIds([])}>선택 해제</Button><span className="text-[11px] text-slate-500">Registry 제거 시 모델 파일은 디스크에 보존됩니다.</span></div>}
+  {championExperts&&state&&<SACChampionPanel key={championExperts.join('|')} items={state.data.instruments} active={state.experts.items} initialExpertIds={championExperts} onClose={()=>setChampionExperts(null)}/>}
   <div className="rounded-xl bg-blue-50 px-4 py-3 text-xs leading-6 text-blue-800">상태·검사·자원 정보는 현재 Registry와 Expert 실행 API 응답을 표시합니다. 검사 기록이 없는 모델은 미확인으로 구분합니다.</div>
   <div className="overflow-x-auto"><Tabs value={category} onChange={setCategory} items={[{id:'all',label:`전체 ${families.length}`},...Object.entries(categoryNames).map(([id,label])=>({id,label:`${label} ${families.filter(f=>expertCategory(f.base)===id).length}`}))]}/></div>
   {busy&&<div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800" aria-live="polite">
@@ -46,6 +54,7 @@ export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
    {!!job?.total&&<div className="mt-3"><Meter value={(job.completed??0)/job.total*100}/></div>}
   </div>}
   {!busy&&job?.stage==='complete'&&job.kind==='apply'&&<p className="text-xs text-emerald-700" role="status">Expert 구성이 Registry에 저장됐습니다.</p>}
+  {!busy&&job?.stage==='complete'&&job.kind==='remove'&&<p className="text-xs text-emerald-700" role="status">Registry에서 항목을 제거했습니다. 모델 파일은 보존했습니다.</p>}
   {!busy&&['probe_all','optimize_all'].includes(job?.kind??'')&&job?.result&&<details open className="rounded-xl bg-white px-4 py-3 text-xs text-slate-600"><summary role="status" className="cursor-pointer">{job.kind==='probe_all'?'전체 Expert 검사':'전체 Expert 버전 생성·최적화'} · 전체 {job.result.total} · 통과 {job.result.passed} · 실패 {job.result.failed} · 건너뜀 {job.result.skipped}</summary><ul className="mt-3 space-y-2">{job.result.items?.map((r:any)=><li key={r.id} className={r.status==='passed'?'text-emerald-700':r.status==='failed'?'text-rose-700':'text-amber-700'}>{r.id} · {r.status==='passed'?'완료':r.status==='failed'?'실패':'건너뜀'}{r.detail?`: ${inspectionDetail(r.detail)}`:''}</li>)}</ul></details>}
   {(error||job?.error)&&<ErrorMessage message={error||job?.error||''}/>}
   {!items.length?<Empty title="Expert 등록 항목이 없습니다." detail="Registry가 비어 있습니다. 기존 패키지를 가져오거나 금융 Expert를 검색할 수 있습니다."/>:<div className="space-y-2">
@@ -57,15 +66,13 @@ export function ExpertLibraryPanel({onInspect}:{onInspect:(id:string)=>void}){
      <p className="mt-2 text-xs font-semibold text-blue-700">{item.loaded?'적재 중':'미적재'}{resources?.device?` · ${String(resources.device)}`:''} · RAM {bytes(typeof ram==='number'?ram:undefined)} · VRAM {bytes(typeof vram==='number'?vram:undefined)}</p>
      {catalog?.optimizations?.[family.id]&&<p className="mt-2 text-xs text-blue-700">{catalog.optimizations[family.id].stage==='complete'?`최적 후보: ${catalog.optimizations[family.id].selected??'미지정'}`:catalog.optimizations[family.id].error??catalog.optimizations[family.id].stage}</p>}
     </div>
-    <ExpertVariants base={family.base} optimization={catalog?.optimizations?.[family.id]} variants={family.variants} selected={item.id} active={catalog?.active??[]} inspection={inspection} onSelect={id=>setSelectedVersions({...selectedVersions,[family.id]:id})}/>
+    <ExpertVariants base={family.base} optimization={catalog?.optimizations?.[family.id]} variants={family.variants} selected={item.id} active={catalog?.active??[]} inspection={inspection} selectedForRemoval={selectedIds} onToggleRemoval={toggleManaged} onSelect={id=>setSelectedVersions({...selectedVersions,[family.id]:id})}/>
     <div className="flex flex-wrap items-center gap-2" onClick={e=>e.stopPropagation()}>
      <Button disabled={busy||!family.base.input.supported||Boolean(family.base.conversion)||family.base.executor==='llama_cpp'} onClick={()=>void operation('optimize',{id:family.id,goal:'memory',device:'auto'})}><WandSparkles size={14}/>이 Expert 자동 양자화</Button>
-     <Button disabled={busy||!family.base.input.supported||Boolean(family.base.conversion)||family.base.executor==='llama_cpp'} aria-label={`${family.base.name} 정밀도 변환`} onClick={()=>setConversionId(family.base.id)}><Gauge size={14}/>변환</Button>
-     <Button disabled={busy||!item.package_available} onClick={()=>void operation(item.loaded?'unload':'load',{id:item.id})}><Power size={14}/>{item.loaded?'해제':'적재'}</Button>
+     <Button disabled={busy||!family.base.input.supported||Boolean(family.base.conversion)||family.base.executor==='llama_cpp'} aria-label={`${family.base.name} 정밀도 변환`} onClick={()=>setConversionId(family.base.id)}><Gauge size={14}/>정밀도 변환</Button>
+     <Button disabled={busy||!item.package_available} onClick={()=>void operation(item.loaded?'unload':'load',{id:item.id})}><Power size={14}/>{item.loaded?'메모리에서 내리기':'RAM/VRAM에 올리기'}</Button>
      <Button disabled={busy||!item.package_available||!item.input.supported} busy={busy&&job?.kind==='probe'&&job?.result?.id===item.id} onClick={()=>void operation('probe',{id:item.id})}><Play size={14}/>추론 실행</Button>
      {!included&&<Button tone="primary" disabled={busy||!usable} onClick={()=>void operation('apply',{active:[...(catalog?.active??[]).filter(k=>!family.variants.some(v=>v.id===k)),item.id]})}><Plus size={14}/>{activeVersion?'이 버전으로 교체':'사용'}</Button>}
-     {included&&<Button disabled={busy} onClick={()=>void operation('apply',{active:catalog?.active?.filter(k=>k!==item.id)})}>제외</Button>}
-     
     </div>
    </div></div>})}
   </div>}

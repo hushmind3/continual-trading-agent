@@ -17,7 +17,7 @@ class LibraryOperations:
         return dict(catalog=read_json(self.catalog_path),job={**read_json(self.status_path),'busy':self.active})
 
     def start(self,kind,payload):
-        if kind not in ('inspect','import','probe','load','unload','search','acquire','convert','optimize','apply','compare'):
+        if kind not in ('inspect','import','probe','probe_all','load','unload','search','acquire','convert','optimize','optimize_all','apply','compare'):
             raise ValueError('지원하는 Expert 작업을 선택하세요.')
         with self.lock:
             if self.active:raise ValueError('진행 중인 Expert 작업이 있습니다.')
@@ -34,7 +34,9 @@ class LibraryOperations:
         try:
             result=self._execute(kind,payload,progress)
             if self.cancelled.is_set():raise InterruptedError('모델 작업 중지 요청을 반영했습니다. 이미 생성된 결과물은 보존합니다.')
-            atomic_json(dict(stage='complete',kind=kind,result=result,finished=time.time()),self.status_path,
+            partial=isinstance(result,dict) and bool(result.get('failed',0))
+            atomic_json(dict(stage='partial' if partial else 'complete',kind=kind,result=result,
+                error=str(result['failed'])+'개 Expert 작업 실패' if partial else None,finished=time.time()),self.status_path,
                 default=lambda x:x.tolist() if hasattr(x,'tolist') else str(x))
         except Exception as exc:
             atomic_json(dict(stage='error',kind=kind,error=str(exc),finished=time.time()),self.status_path)
@@ -42,6 +44,33 @@ class LibraryOperations:
 
     def _execute(self,kind,payload,progress):
         cfg=settings();catalog=read_json(cfg.registry_file)
+        if kind in ('probe_all','optimize_all'):
+            keys=list(catalog.get('experts',{})) if kind=='probe_all' else list(catalog.get('active',[]))
+            if not keys:raise ValueError('검사할 등록 Expert가 없습니다.' if kind=='probe_all' else '사용 중인 Expert가 없습니다.')
+            results=[]
+            for index,key in enumerate(keys,1):
+                if self.cancelled.is_set():raise InterruptedError('Expert 일괄 작업 중지를 요청했습니다.')
+                progress(stage=kind,detail=f'{index}/{len(keys)} · {key}')
+                item=catalog['experts'][key]
+                if kind=='optimize_all' and (item.get('conversion') or item.get('executor')=='llama_cpp' or not item.get('input',{}).get('supported',False)):
+                    results.append(dict(id=key,status='skipped',detail='원본 변환 불가 또는 입력 미지원'))
+                    continue
+                was_loaded=bool(runtime.pool and key in runtime.pool.loaded)
+                try:
+                    if kind=='probe_all':
+                        runtime.infer(key)
+                    else:
+                        self._execute('optimize',{'id':key,'goal':'memory','device':'auto'},progress)
+                    results.append(dict(id=key,status='passed'))
+                except InterruptedError:
+                    raise
+                except Exception as exc:
+                    results.append(dict(id=key,status='failed',detail=str(exc)))
+                finally:
+                    if kind=='probe_all' and not was_loaded:runtime.unload(key)
+            return {'total':len(keys),'passed':sum(x['status']=='passed' for x in results),
+                'failed':sum(x['status']=='failed' for x in results),
+                'skipped':sum(x['status']=='skipped' for x in results),'items':results}
         if kind=='compare':
             from .expert_comparison import comparison_result,measure
             keys=[payload['baseline'],payload['variant']];items={key:catalog['experts'][key] for key in keys}

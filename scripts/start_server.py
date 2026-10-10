@@ -137,10 +137,10 @@ def main(apply_only=False):
             phase(stage,'변경 소스 확인','complete',f'{len(changed)}개 변경; 프론트 빌드 {frontend_changed}, 서버 갱신 {backend_changed or not live}')
             stage='preserve';phase(stage,'실행 중 작업 보존')
             active=blockers() if live else []
-            if active and (frontend_changed or backend_changed):
-                phase(stage,'실행 중 작업 보존','blocked',' · '.join(active)+'; 변경 적용 보류')
-                operation['status']='blocked';atomic_json(operation,APPLY);return
-            phase(stage,'실행 중 작업 보존','complete','기존 작업을 종료하지 않았습니다.')
+            if active and backend_changed:
+                phase(stage,'실행 중 작업 보존','complete',' · '.join(active)+'; 백엔드 재시작은 보류하고 프론트 변경만 적용할 수 있습니다.')
+            else:
+                phase(stage,'실행 중 작업 보존','complete','기존 작업을 종료하지 않았습니다.')
             stage='build';phase(stage,'React 변경 적용')
             if frontend_changed:
                 node=shutil.which('node');vite=FRONTEND/'node_modules/vite/bin/vite.js';tsc=FRONTEND/'node_modules/typescript/bin/tsc'
@@ -157,8 +157,18 @@ def main(apply_only=False):
             if live and restart:
                 active=blockers()
                 if active:
-                    phase(stage,'8766 서버 갱신','blocked',' · '.join(active)+'; 새 소스는 미적용')
-                    operation['status']='blocked';atomic_json(operation,APPLY);return
+                    phase(stage,'8766 서버 갱신','blocked',' · '.join(active)+'; 백엔드 새 소스 적용 보류')
+                    if frontend_changed:
+                        with urlopen(f'http://127.0.0.1:{PORT}/',timeout=10) as response:
+                            served=response.read().decode('utf8')
+                        if served!=(FRONTEND/'dist/index.html').read_text(encoding='utf8'):
+                            raise RuntimeError('프론트 빌드 후 8766에서 새 HTML을 확인하지 못했습니다.')
+                        atomic_json({**before,'sources':{**old,'frontend':groups['frontend']},
+                            'dist_sha256':hashlib.sha256((FRONTEND/'dist/index.html').read_bytes()).hexdigest(),
+                            'frontend_applied_at':time.time()},APPLIED)
+                    operation.update(status='blocked',applied=False,
+                        detail='프론트 변경 적용 완료; 백엔드 변경은 실행 중 작업 종료 후 적용 필요' if frontend_changed else '백엔드 변경 적용 보류')
+                    atomic_json(operation,APPLY);return
                 if 'src/stockrl/platform/system_operations.py' in old.get('backend',{}):
                     # Persist server approval waiting separately from running application work.
                     operation['status']='pending';phase(stage,'8766 서버 갱신','pending','서버 재시작 준비 승인 대기')

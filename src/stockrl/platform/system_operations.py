@@ -137,9 +137,9 @@ class SystemOperations:
             self.cancelled.clear();self.active=True
             runtime.cancel_inference.clear()
             self.value=dict(id=uuid.uuid4().hex,status='running',started_at=time.time(),stages=[],currencies=currencies or ['USD','KRW'])
-            phases=[('connection','인증 · 실제 시세 연결'),('accounts','KRW/USD 가상계좌 준비'),('experts','선택 Frozen Expert 적재')]
+            phases=[('accounts','KRW/USD 가상계좌 준비'),('experts','선택 Frozen Expert 적재')]
             for currency in self.value['currencies']:phases.extend([('policy-'+currency,currency+' SAC 정책 호환성'),('train-'+currency,currency+' 신규 SAC 학습')])
-            phases.append(('trading','실제 입력 추론 · 가상매매'))
+            phases.extend([('connection','인증 · 실제 시세 연결'),('trading','실제 입력 추론 · 가상매매')])
             self.value['stages']=[dict(id=key,title=title,status='pending') for key,title in phases]
             atomic_json(self.value,self.path)
             threading.Thread(target=self.run,name='system-start',daemon=True).start()
@@ -149,28 +149,7 @@ class SystemOperations:
         from .operations_runtime import runtime
         from .operations_settings import settings
         from ..provider_credentials import public_status,test_connection
-        key='connection';title='인증 · 실제 시세 연결'
         try:
-            self.phase(key,title);cfg=settings();provider=public_status(cfg.state_dir)
-            if provider.get('vault_error'):raise ValueError(provider['vault_error'])
-            if provider['provider']=='kiwoom':
-                if not provider['saved']:raise ValueError('키움 저장 인증 정보가 없습니다.')
-                tested=test_connection(cfg.state_dir)
-                if not tested['ok']:raise ValueError(tested['message'])
-            self.interrupted();runtime.command('feed',True)
-            # One existing collection cycle. Closed markets/errors remain visible, with no fabricated quotes.
-            while not runtime.feed_cycle.wait(1):
-                self.interrupted()
-                if runtime.status.get('error'):raise ValueError(runtime.status['error'])
-                if not runtime.controls['feed']:raise ValueError('시세 수신 작업이 중지됐습니다.')
-            self.interrupted()
-            if runtime.status.get('error'):raise ValueError(runtime.status['error'])
-            if provider['provider']=='kiwoom' and not (runtime.collector and runtime.collector.broker_status.get('connected') and runtime.collector.broker_status.get('last_message_utc')):
-                raise ValueError('키움 실제 시세 수신 미확인: '+str(runtime.collector.broker_status.get('last_error') if runtime.collector else '수신 작업 종료'))
-            if not runtime.status.get('last_received_at'):
-                metrics=read_json(cfg.state_dir/'live/live_feed_metrics.json')
-                raise ValueError('완료 시장 데이터 미수신: '+str(metrics.get('broker_error') or metrics.get('retrying_symbols') or '휴장·입력 없음; 기존 시세 상태 확인 필요'))
-            self.phase(key,title,'complete','실제 완료 바 수신 확인; '+provider['provider_name'])
             key='accounts';title='KRW/USD 가상계좌 준비';self.phase(key,title)
             runtime.ledger().save();self.phase(key,title,'complete','기존 잔고·보유·체결 원장 유지')
             self.interrupted();key='experts';title='선택 Frozen Expert 적재';self.phase(key,title)
@@ -221,8 +200,45 @@ class SystemOperations:
                 self.interrupted();runtime.check_policy(selected)
                 self.phase('policy-'+currency,currency+' SAC 정책 호환성','complete','원본 환경 관측·행동 계약으로 공식 SAC 로딩 확인: '+str(selected))
                 ready_policies[currency]=(selected/'sac.zip').relative_to(RUNTIME).as_posix()
+            # Stored-data SAC preparation is independent of a live market connection.
+            key='connection';title='인증 · 실제 시세 연결'
+            connection_error=None
+            try:
+                self.phase(key,title);cfg=settings();provider=public_status(cfg.state_dir)
+                if provider.get('vault_error'):raise ValueError(provider['vault_error'])
+                if provider['provider']=='kiwoom':
+                    if not provider['saved']:raise ValueError('키움 저장 인증 정보가 없습니다.')
+                    tested=test_connection(cfg.state_dir)
+                    if not tested['ok']:raise ValueError(tested['message'])
+                self.interrupted();runtime.command('feed',True)
+                # One existing collection cycle. Closed markets/errors remain visible, with no fabricated quotes.
+                while not runtime.feed_cycle.wait(1):
+                    self.interrupted()
+                    if runtime.status.get('error'):raise ValueError(runtime.status['error'])
+                    if not runtime.controls['feed']:raise ValueError('시세 수신 작업이 중지됐습니다.')
+                self.interrupted()
+                if runtime.status.get('error'):raise ValueError(runtime.status['error'])
+                if provider['provider']=='kiwoom' and not (runtime.collector and runtime.collector.broker_status.get('connected') and runtime.collector.broker_status.get('last_message_utc')):
+                    raise ValueError('키움 실제 시세 수신 미확인: '+str(runtime.collector.broker_status.get('last_error') if runtime.collector else '수신 작업 종료'))
+                if not runtime.status.get('last_received_at'):
+                    metrics=read_json(cfg.state_dir/'live/live_feed_metrics.json')
+                    raise ValueError('완료 시장 데이터 미수신: '+str(metrics.get('broker_error') or metrics.get('retrying_symbols') or '휴장·입력 없음; 기존 시세 상태 확인 필요'))
+                self.phase(key,title,'complete','실제 완료 바 수신 확인; '+provider['provider_name'])
+            except InterruptedError:
+                raise
+            except Exception as exc:
+                connection_error=str(exc)
+                runtime.command('feed',False)
+                self.phase(key,title,'blocked' if isinstance(exc,ValueError) else 'failed',connection_error)
+                failures.append('시세 수신: '+connection_error)
             self.interrupted();key='trading';title='실제 입력 추론 · 가상매매';self.phase(key,title)
             if not ready_policies:raise ValueError('준비된 SAC 정책이 없습니다. 통화별 준비 부족 사유를 확인하세요.')
+            if connection_error:
+                self.phase(key,title,'blocked','저장 데이터의 SAC 준비는 완료됐지만 실시간 시세 미수신으로 추론·가상매매를 시작하지 않았습니다.')
+                with self.lock:
+                    self.value.update(status='blocked',detail=' · '.join(failures),finished_at=time.time())
+                    atomic_json(self.value,self.path)
+                return
             with runtime.lock:
                 self.interrupted()
                 atomic_json(ready_policies,ROOT/'runtime/operations/policies.json')

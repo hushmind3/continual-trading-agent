@@ -118,9 +118,11 @@ class ExpertPool:
         if self.entries[key].get("stock_policy"):
             data = expert.prepare_input(snapshot)
             if data is None:
-                raise ValueError("기존 학습 종목 전체의 실제 일봉·계좌 또는 필수 지표가 부족합니다.")
+                from .observations import InputUnavailable
+                raise InputUnavailable("기존 학습 종목 전체의 실제 일봉·계좌 또는 필수 지표가 부족합니다.")
         if data is None:
-            raise ValueError("현재 시세에서 이 Expert의 원본 입력을 만들 수 없습니다.")
+            from .observations import InputUnavailable
+            raise InputUnavailable("현재 시세에서 이 Expert의 원본 입력을 만들 수 없습니다.")
         prior_peak = self.metrics.get(key, {}).get("peak_vram_bytes", 0)
         device=self.residency.device(key,expert,prior_peak)
         preference=self.settings.resources.expert_devices.get(key,'auto')
@@ -128,11 +130,25 @@ class ExpertPool:
         allocated_before=torch.cuda.memory_allocated() if device.startswith('cuda') else 0
         if device=='cpu':restore_host(expert)
         if preference=='cuda:0' and device=='cpu':raise MemoryError('CUDA 지정 실행에 필요한 VRAM 여유가 부족합니다.')
-        with torch.inference_mode():
-            floating=next((p.dtype for p in expert.parameters() if p.is_floating_point()),torch.float32)
-            reduced=floating in (torch.float16,torch.bfloat16)
-            with torch.autocast('cuda' if device.startswith('cuda') else 'cpu',dtype=floating if reduced else torch.bfloat16,enabled=reduced):
-                packet = expert(self.roots[key], {**data,'_tensor_output':getattr(self,'tensor_output',False)}, device)
+        try:
+            with torch.inference_mode():
+                floating=next((p.dtype for p in expert.parameters() if p.is_floating_point()),torch.float32)
+                reduced=floating in (torch.float16,torch.bfloat16)
+                with torch.autocast('cuda' if device.startswith('cuda') else 'cpu',dtype=floating if reduced else torch.bfloat16,enabled=reduced):
+                    packet = expert(self.roots[key], {**data,'_tensor_output':getattr(self,'tensor_output',False)}, device)
+        except Exception as exc:
+            metrics=self.metrics.setdefault(key,{})
+            now=time.time()
+            metrics.update(status='failed',error=str(exc),device=device,last_attempted_at=now,
+                inference_seconds=time.perf_counter()-started,rss_bytes=self.process.memory_info().rss,
+                peak_ram_bytes=getattr(self.process.memory_info(),'peak_wset',self.process.memory_info().rss))
+            if device.startswith('cuda'):
+                metrics.update(peak_workspace_bytes=max(metrics.get('peak_workspace_bytes',0),
+                    max(0,torch.cuda.max_memory_allocated()-allocated_before)),
+                    peak_vram_bytes=max(0,torch.cuda.max_memory_allocated()-allocated_before)+
+                    sum(p.numel()*p.element_size() for p in list(expert.parameters())+list(expert.buffers()) if p.is_cuda))
+            if hasattr(expert,'details'):metrics.update(expert.details)
+            raise
         if any(p.requires_grad or p.grad is not None for p in expert.parameters()):
             raise RuntimeError("Expert가 고정 가중치 상태를 벗어났습니다.")
         packet["expert"] = key

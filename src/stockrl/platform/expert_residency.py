@@ -32,7 +32,9 @@ class Residency:
         free,total=self.free()
         tensors=list(expert.parameters())+list(expert.buffers())
         weights=sum(p.numel()*p.element_size() for p in tensors)
-        if hasattr(expert,'reference'):weights=expert.reference['bytes']
+        if hasattr(expert,'reference'):
+            # llama.cpp decides how many layers fit on Vulkan; remaining layers stay RAM-backed.
+            return 'cuda:0'
         resident=any(p.is_cuda for p in tensors) or hasattr(expert,'child') and expert.child is not None and expert.device!='cpu'
         workspace=self.pool.metrics.get(key,{}).get('peak_workspace_bytes',0)
         required=workspace+(0 if resident else weights)

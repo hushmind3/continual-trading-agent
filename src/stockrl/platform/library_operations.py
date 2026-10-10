@@ -5,6 +5,7 @@ from pathlib import Path
 from ..state_io import atomic_json,read_json
 from .operations_settings import settings
 from .operations_runtime import runtime
+from .observations import InputUnavailable
 
 class LibraryOperations:
     def __init__(self):
@@ -75,6 +76,11 @@ class LibraryOperations:
                     results.append(dict(id=key,status='skipped',detail='원본 변환 불가 또는 입력 미지원'))
                     continue
                 was_loaded=bool(runtime.pool and key in runtime.pool.loaded)
+                started=time.perf_counter()
+                started_at=time.time()
+                if kind=='probe_all' and not item.get('input',{}).get('supported',False):
+                    results.append(dict(id=key,status='skipped',detail=item.get('input',{}).get('reason','입력 계약을 지원하지 않습니다.')))
+                    continue
                 try:
                     if kind=='probe_all':
                         fixture=runtime.fixture(key,frame=shared_frame,account=shared_account,all_batches=True)
@@ -91,8 +97,15 @@ class LibraryOperations:
                     results.append(result)
                 except InterruptedError:
                     raise
+                except InputUnavailable as exc:
+                    result=dict(id=key,status='skipped',detail=str(exc),seconds=time.perf_counter()-started)
+                    results.append(result)
                 except Exception as exc:
-                    results.append(dict(id=key,status='failed',detail=str(exc)))
+                    pool=runtime.pool
+                    current=dict(pool.metrics.get(key,{})) if pool else {}
+                    measured=max(current.get('last_completed_at',0),current.get('last_attempted_at',0))>started_at
+                    results.append(dict(id=key,status='failed',detail=str(exc),seconds=time.perf_counter()-started,
+                        **({'metrics':current} if measured else {})))
                 finally:
                     if kind=='probe_all' and not was_loaded:runtime.unload(key)
             if kind=='probe_all':
@@ -102,7 +115,7 @@ class LibraryOperations:
                     if current is not None and current.get('package')==experts[row['id']].get('package'):
                         current['check']={'status':row['status'],
                             'detail':row.get('detail','실제 입력 전체 묶음 추론·출력 계약 통과'),
-                            'tested':time.time(),**({'metrics':row['metrics'],'seconds':row['seconds']} if row.get('metrics') else {})}
+                            'tested':time.time(),**({'metrics':row['metrics'],'seconds':row.get('seconds')} if row.get('metrics') else {})}
                 atomic_json(latest,cfg.registry_file)
             progress(stage=kind,completed=len(keys),total=len(keys),detail='전체 원본 Expert 처리 완료')
             return {'total':len(keys),'passed':sum(x['status']=='passed' for x in results),

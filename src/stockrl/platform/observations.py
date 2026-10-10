@@ -3,13 +3,17 @@ import numpy as np
 import pandas as pd
 
 
+class InputUnavailable(ValueError):
+    """The Expert's declared input contract cannot be satisfied by current data."""
+
+
 def native_input(key, frame, daily, as_of, max_batch=8):
     source = frame
     intervals=frame.sort_values('date').groupby('symbol').date.diff().dt.total_seconds().dropna()
     units, seconds = "price", int(intervals[intervals>0].median()) if (intervals>0).any() else 86400
     if key in ("timesfm", "chronos"):
         if daily.empty or "SPY" not in set(daily.symbol):
-            raise ValueError("실제 SPY 일봉이 있어야 일별 초과수익률을 계산할 수 있습니다.")
+            raise InputUnavailable("실제 SPY 일봉이 있어야 일별 초과수익률을 계산할 수 있습니다.")
         ordered=daily.sort_values(["symbol","date"]).drop_duplicates(["symbol","date"],keep="last").copy()
         ordered["return"]=ordered.groupby("symbol").close.pct_change(fill_method=None)
         benchmark=ordered.loc[ordered.symbol=='SPY',["date","return"]].dropna().rename(columns={"return":"benchmark"})
@@ -44,5 +48,5 @@ def native_input(key, frame, daily, as_of, max_batch=8):
                     input_authenticity="point_in_time_market_feed")
         inputs.append(data)
     if not inputs:
-        raise ValueError("종목별 실제 관측이 32개 이상 필요합니다.")
+        raise InputUnavailable("종목별 실제 관측이 32개 이상 필요합니다.")
     return inputs

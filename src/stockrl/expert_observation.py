@@ -5,9 +5,10 @@ import pandas as pd
 
 
 class ExpertObservation(gym.ObservationWrapper):
-    def __init__(self,env,registry,frame,symbols,champion_ids=None):
+    def __init__(self,env,registry,frame,symbols,champion_ids=None,structure_only=False):
         super().__init__(env);self.registry=registry;self.frame=frame;self.symbols=symbols
         self.champion_ids=None if champion_ids is None else list(champion_ids)
+        self.structure_only=structure_only
         extra=8 if champion_ids is None else 64*len(champion_ids)+16
         self.dates=np.sort(frame.date.unique());self.assets=[]
         self.observation_space=gym.spaces.Box(
@@ -15,6 +16,7 @@ class ExpertObservation(gym.ObservationWrapper):
             np.concatenate([env.observation_space.high.reshape(-1),np.full(extra,np.inf)]).astype(np.float32),dtype=np.float32)
 
     def observation(self,value):
+        if self.structure_only:return np.zeros(self.observation_space.shape,dtype=np.float32)
         base=self.unwrapped;stamp=pd.Timestamp(base.data.date.iloc[0]);self.assets.append(float(base.portfolio_value))
         history=self.frame[self.frame.date<=stamp]
         nav=max(float(base.portfolio_value),1e-9)

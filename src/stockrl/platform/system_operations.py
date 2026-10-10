@@ -66,7 +66,9 @@ def check_system():
     check('framework','FinRL-X · FinRL · SB3',framework)
     def policy():
         value=api.model_state(api.source_settings())
-        return ('complete','현재 정책 식별·구조·Replay 메타데이터 호환; 추론 미실행') if value['compatible'] else ('blocked',' · '.join(value['reasons']))
+        if not value['policy_compatible']:return 'blocked','SAC 관측·행동 구조 비호환: '+' · '.join(value['structure_reasons'])
+        if not value['compatible']:return 'blocked','정책 구조는 호환; 이어 학습 상태 미충족: '+' · '.join(value['resume_reasons'])
+        return 'complete','현재 SAC 구조·이어 학습 Replay 호환; Expert 추론·시세 수신과 별도 확인'
     check('policy','SAC 체크포인트 · Replay',policy)
     check('models','외부 모델 폴더',lambda:('complete',str(cfg.model_dir)) if cfg.model_dir.is_dir() else ('blocked','모델 폴더 없음: '+str(cfg.model_dir)))
     def experts():

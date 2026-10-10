@@ -72,7 +72,6 @@ class ChampionRequest(BaseModel):
     currency:Literal["USD","KRW"]="USD"
     symbols:list[str]=Field(min_length=1,max_length=1000)
     experts:list[str]=Field(default_factory=list,max_length=128)
-    source_path:str|None=None
 
 
 class Selection(BaseModel):
@@ -194,9 +193,11 @@ def model_state(settings,selected=None):
     replay = selected / "replay.pkl"
     identity = read_json(selected / "dataset.json")
     result = {"file": file_info(path), "replay": file_info(replay), "identity": identity,
-              "compatible": False, "reasons": [], "num_timesteps": None, "updates": None}
+              "compatible": False, "policy_compatible":False,"structure_reasons":[],"resume_reasons":[],
+              "reasons": [], "num_timesteps": None, "updates": None}
     if not path.is_file():
         result["reasons"].append("저장된 정책이 없습니다.")
+        result["structure_reasons"].append("저장된 정책이 없습니다.")
         return result
     try:
         with zipfile.ZipFile(path) as archive:
@@ -206,32 +207,36 @@ def model_state(settings,selected=None):
                       action_shape=state.get("action_space", {}).get("_shape"),
                       parameters={k: state.get(k) for k in settings["parameters"]},
                       policy_kwargs=state.get("policy_kwargs"))
-        expected = {"currency": identity.get("currency"), "symbols": identity.get("symbols"),
-                    "sac_example": settings["parameters"], "environment": settings["environment"],
-                    "rolling_days": settings["rolling_days"]}
+        structure_reasons=result['structure_reasons'];resume_reasons=result['resume_reasons']
         if not identity.get("symbols") or not identity.get("currency"):
-            result["reasons"].append("저장 모델의 통화·종목 정보가 없습니다.")
+            structure_reasons.append("저장 모델의 통화·종목 정보가 없습니다.")
         is_champion=bool(identity.get("feature_extractor"))
-        if (not is_champion and identity != expected) or (is_champion and any(identity.get(k)!=v for k,v in expected.items())):
-            result["reasons"].append("현재 SAC 설정·StockPortfolioEnv 식별 정보와 일치하지 않는 이전 저장본입니다.")
+        if identity.get('environment')!=settings['environment'] or identity.get('rolling_days')!=settings['rolling_days']:
+            structure_reasons.append("StockPortfolioEnv 식별 정보가 현재 환경과 다릅니다.")
+        if is_champion and identity.get('feature_extractor')!='stockrl.platform.sac_champion.ChampionExtractor':
+            structure_reasons.append("Champion 관측 특성 추출기가 현재 SAC 구조와 다릅니다.")
         for key in ("batch_size", "buffer_size", "learning_rate", "learning_starts"):
             if state.get(key) != settings["parameters"][key]:
-                result["reasons"].append(f"{key}: 저장값 {state.get(key)} / 현재값 {settings['parameters'][key]}")
+                resume_reasons.append(f"{key}: 저장값 {state.get(key)} / 현재값 {settings['parameters'][key]}")
         if identity.get('symbols') and is_champion:
             expected_shape=[identity.get('base_observation_dim',0)+64*len(identity.get('champion_experts',[]))+identity.get('account_feature_size',16)]
             if result['observation_shape']!=expected_shape or result['action_shape']!=[len(identity['symbols'])]:
-                result['reasons'].append(f"통합 SAC Champion 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{len(identity['symbols'])}]")
+                structure_reasons.append(f"통합 SAC Champion 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{len(identity['symbols'])}]")
         elif identity.get('symbols'):
             from finrl import config
             count=len(identity['symbols']);expected_shape=[(count+len(config.INDICATORS))*count+8]
             if result['observation_shape']!=expected_shape or result['action_shape']!=[count]:
-                result['reasons'].append(f"원본 환경+Expert 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{count}]")
-        result['policy_compatible']=not result['reasons']
+                structure_reasons.append(f"원본 환경+Expert 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{count}]")
+        result['policy_compatible']=not structure_reasons
         if not replay.is_file():
-            result["reasons"].append("이어 학습에 필요한 Replay 파일이 없습니다.")
+            resume_reasons.append("이어 학습에 필요한 Replay 파일이 없습니다.")
+        result['structure_reasons']=structure_reasons
+        result['resume_reasons']=resume_reasons
+        result['reasons']=structure_reasons+resume_reasons
         result["compatible"] = not result["reasons"]
     except (OSError, KeyError, ValueError, zipfile.BadZipFile) as exc:
         result["reasons"].append("정책 파일 읽기 실패: " + str(exc))
+        result["structure_reasons"].append("정책 파일 읽기 실패: " + str(exc))
     return result
 
 
@@ -525,8 +530,9 @@ def preflight(req, command):
         except (ValueError,OSError,KeyError,RuntimeError) as exc:
             errors.append('SAC Champion: '+str(exc))
     if (command == "backtest" or req.resume) and not req.champion_path:
-        if not model["compatible"]:
-            errors.extend(model["reasons"])
+        compatible=model["compatible"] if req.resume else model["policy_compatible"]
+        if not compatible:
+            errors.extend(model["reasons"] if req.resume else model["structure_reasons"])
         if model["identity"].get("currency") != req.currency or model["identity"].get("symbols") != symbols:
             errors.append("저장 정책의 통화·종목 구성과 다릅니다.")
     if not req.champion_path:
@@ -646,44 +652,24 @@ def champions():
     return {"items":list_champions()}
 
 
-def champion_environment(request):
-    from .framework import prices,training_environment
-    from .expert_registry_native import ExpertRegistry
-    frame=prices(request.currency,request.symbols)
-    if frame.empty:raise HTTPException(400,"선택 종목의 저장 가격을 찾지 못했습니다.")
-    registry=ExpertRegistry()
-    try:
-        env=training_environment(frame,registry,champion_ids=request.experts)
-        return env
-    except BaseException:
-        registry.close(cleanup=True)
-        raise
-
-
 @app.post("/api/champions/create")
 def champion_create(request:ChampionRequest):
     if job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")
     if len(request.symbols)!=len(set(request.symbols)) or len(request.experts)!=len(set(request.experts)):
         raise HTTPException(400,"종목과 Expert는 중복 없이 선택하세요.")
     request.symbols=sorted(request.symbols);request.experts=sorted(request.experts)
-    from .platform.sac_champion import MODEL_DIR,create,load_spec
-    if request.source_path:
-        source=Path(request.source_path).expanduser().resolve()
-        if not source.is_relative_to(MODEL_DIR.resolve()) or not source.name.startswith("sac_champion_"):
-            raise HTTPException(400,"모델 폴더의 SAC Champion만 재조립할 수 있습니다.")
-        try:
-            previous=load_spec(source);identity=previous["identity"]
-            if identity.get("currency")!=request.currency or identity.get("symbols")!=sorted(request.symbols):
-                raise ValueError("기존 Champion과 통화·종목 구성이 달라 SAC Actor·Twin Critic을 호환 승계할 수 없습니다.")
-        except (ValueError,OSError,KeyError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
+    instruments=read_json(ROOT/"configs/instruments.json").get("instruments",[])
+    markets={item["symbol"]:item for item in instruments}
+    valid_markets=("KRX","KOSDAQ") if request.currency=="KRW" else ("US","NASDAQ","NYSE","NYSEARCA","AMEX")
+    invalid=[symbol for symbol in request.symbols if symbol not in markets or markets[symbol].get("market") not in valid_markets or markets[symbol].get("asset_class") not in ("equity","etf")]
+    if invalid:raise HTTPException(400,"선택 시장의 등록 주식·ETF가 아닙니다: "+", ".join(invalid))
+    from .platform.sac_champion import create
+    from .framework import champion_structure_environment
+    from .expert_registry_native import ExpertRegistry
     env=None
     try:
-        env=champion_environment(request)
-        env.reset()
-        failures=[f"{key}: {value.get('reason','입력 또는 추론에 실패했습니다.')}" for key,value in env.registry.last_outputs.items() if value.get('status')!='ready']
-        if failures:raise HTTPException(400,"선택 Expert 추론 검사를 통과하지 못했습니다. "+"; ".join(failures))
-        env.registry.close()
-        result=create(request.currency,request.symbols,request.experts,env,request.source_path)
+        env=champion_structure_environment(request.currency,request.symbols,ExpertRegistry(),request.experts)
+        result=create(request.currency,request.symbols,request.experts,env)
         return result
     except HTTPException:raise
     except (ValueError,RuntimeError,OSError,KeyError,MemoryError,FileExistsError) as exc:raise HTTPException(400,str(exc)) from exc

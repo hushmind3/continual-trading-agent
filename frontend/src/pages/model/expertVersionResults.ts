@@ -39,6 +39,7 @@ export function versionResults(base:LibraryExpert,variants:LibraryExpert[],selec
   const detail=tested?.detail??check?.detail??inferred?.reason??(inferred?.status==='ready'?'저장된 실제 추론 결과 통과':undefined);
   const inspected=(!item?{label:report?'파일 정리됨':'미생성',detail:report?'최적화 판단은 보존 · 현재 패키지 없음':'변환되지 않았거나 변환에 실패해 현재 패키지가 없습니다.',status:'absent'}:
    status==='passed'?{label:tested?'전체 검사 통과':'추론 검사 통과',detail:detail??'실제 입력 추론 통과',status:'passed'}:
+   status==='skipped'?{label:'입력 부족 · 검사 건너뜀',detail:detail??'현재 실제 입력 계약을 충족하지 못했습니다.',status:'skipped'}:
    status==='quality_warning'?{label:'출력 기준 초과',detail:detail??'허용 오차 초과',status:'rejected'}:
    status==='failed'?{label:'추론 검사 실패',detail:inspectionDetail(detail??'추론 실패'),status:'failed'}:
    {label:'미검사 / 검사 대기',detail:detail??'아직 실제 검사를 완료하지 않았습니다.',status:'pending'});

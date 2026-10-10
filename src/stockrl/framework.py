@@ -71,6 +71,26 @@ def training_environment(frame,registry,training=True,champion_ids=None):
     return wrapped
 
 
+def champion_structure_environment(currency,symbols,registry,champion_ids):
+    """Build the official FinRL/SB3 spaces without requiring market history or running Experts."""
+    import numpy as np
+    import pandas as pd
+    from finrl import config
+    from finrl.meta.env_portfolio_allocation.env_portfolio import StockPortfolioEnv
+    from .expert_observation import ExpertObservation
+    symbols=list(symbols);count=len(symbols);stamp=pd.Timestamp('2000-01-01')
+    data={'date':[stamp]*count,'tic':symbols,'close':[1.]*count,'cov_list':[np.eye(count)]*count}
+    data.update({name:[0.]*count for name in config.INDICATORS})
+    frame=pd.DataFrame(data);frame.index=0
+    env=StockPortfolioEnv(df=frame,stock_dim=count,hmax=100,initial_amount=1000000,
+        transaction_cost_pct=0.001,reward_scaling=1e-4,state_space=count,
+        action_space=count,tech_indicator_list=config.INDICATORS)
+    wrapped=ExpertObservation(env,registry,frame.rename(columns={'tic':'symbol'}),symbols,
+        champion_ids=champion_ids,structure_only=True)
+    wrapped.currency=currency
+    return wrapped
+
+
 def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None):
     from stable_baselines3 import SAC
     from finrl.agents.stablebaselines3.models import DRLAgent

@@ -219,13 +219,10 @@ class OperationsRuntime:
     def _check_policy(self,files):
         from stable_baselines3 import SAC
         from ..expert_registry_native import ExpertRegistry
+        from ..framework import champion_structure_environment
         identity=read_json(files/'dataset.json')
-        if identity.get('champion_file'):
-            from .sac_champion import load_spec
-            champion=load_spec(identity['champion_file']);registry=ExpertRegistry(champion=champion)
-            champion_ids=champion['identity']['champion_experts']
-        else:registry=ExpertRegistry(self.expert_pool);champion_ids=None
-        env=training_environment(prices(identity['currency'],identity['symbols']),registry,training=False,champion_ids=champion_ids)
+        champion_ids=identity.get('champion_experts') if identity.get('feature_extractor') else None
+        env=champion_structure_environment(identity['currency'],identity['symbols'],ExpertRegistry(),champion_ids)
         try:SAC.load(files/'sac.zip',env=env)
         finally:env.close()
 

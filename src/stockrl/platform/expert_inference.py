@@ -2,24 +2,24 @@
 import numpy as np
 import pandas as pd
 
-from .observations import native_input
+from .observations import InputUnavailable,native_input
 
 
 def prepare_inputs(entry, frame, account):
     if frame.empty:
-        raise ValueError('실제 가격 데이터가 없습니다.')
+        raise InputUnavailable('실제 가격 데이터가 없습니다.')
     frame=frame.sort_values('date')
     stamp=str(frame.date.max())
     daily=frame[frame.date<pd.Timestamp(stamp).normalize()]
     policy=bool(entry.get('stock_policy'))
     if policy and account.get('currency','USD')!='USD':
-        raise ValueError('이 Expert의 원본 계약은 USD 계좌입니다.')
+        raise InputUnavailable('이 Expert의 원본 계약은 USD 계좌입니다.')
     snapshot={'symbols':sorted(frame.symbol.unique()),'as_of':stamp,'policy_account':account}
     if policy:
         snapshot['stock_policy_history']=daily.assign(date=daily.date.astype(str)).to_dict('records')
     batches=[None] if policy else native_input(entry['backend'],frame,daily,stamp)
     if not batches:
-        raise ValueError('Expert 추론 입력 묶음이 없습니다.')
+        raise InputUnavailable('Expert 추론 입력 묶음이 없습니다.')
     return snapshot,batches
 
 

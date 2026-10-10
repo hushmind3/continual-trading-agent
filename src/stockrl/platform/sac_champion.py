@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import hashlib
-import copy
 import json
 import shutil
 from pathlib import Path
@@ -238,36 +237,6 @@ def _counts(model, expert_counts):
         "total_logical_parameters": int(central + integration + sum(v["logical_parameters"] for v in expert_counts.values()))}
 
 
-def _copy_compatible(source, target):
-    old = source if isinstance(source,dict) else source.policy.state_dict()
-    new = target.policy.state_dict()
-    copied, skipped = [], []
-    for key, value in new.items():
-        if key in old and old[key].shape == value.shape:
-            value.copy_(old[key]); copied.append(key)
-        else:
-            skipped.append(key)
-    target.policy.load_state_dict(new)
-    return copied, skipped
-
-
-def _transfer_optimizer(source_optimizer, target_optimizer, source_module, target_module):
-    old = source_optimizer.state_dict();new = target_optimizer.state_dict()
-    if len(old["param_groups"]) != len(new["param_groups"]):return 0
-    old_named=dict(source_module.named_parameters());new_named=dict(target_module.named_parameters());moved=0
-    for old_group,new_group in zip(old["param_groups"],new["param_groups"]):
-        old_ids=old_group["params"];new_ids=new_group["params"]
-        old_names=list(old_named);new_names=list(new_named)
-        if len(old_ids)!=len(old_names) or len(new_ids)!=len(new_names):return moved
-        for old_id,new_id,old_name,new_name in zip(old_ids,new_ids,old_names,new_names):
-            if old_name!=new_name or old_name not in old_named or new_name not in new_named or old_named[old_name].shape!=new_named[new_name].shape:continue
-            state=old["state"].get(old_id)
-            if state is None:continue
-            target_optimizer.state[new_named[new_name]]={key:value.detach().clone().to(new_named[new_name].device) if torch.is_tensor(value) else copy.deepcopy(value) for key,value in state.items()}
-            moved+=1
-    return moved
-
-
 def _next_paths(version, stem=None):
     model_path = MODEL_DIR / f"sac_champion_{version:03d}.pt"
     run_id = model_path.stem
@@ -277,8 +246,7 @@ def _next_paths(version, stem=None):
     return model_path, directory, run_id
 
 
-def create(currency, symbols, active, env, source_path=None):
-    from stable_baselines3 import SAC
+def create(currency, symbols, active, env):
     from finrl.agents.stablebaselines3.models import DRLAgent
     if not symbols:
         raise ValueError("SAC Champion의 시장과 종목을 지정해야 합니다.")
@@ -295,46 +263,22 @@ def create(currency, symbols, active, env, source_path=None):
     _, params, _ = sac_example()
     agent = DRLAgent(env=env)
     model = agent.get_model("sac", model_kwargs=dict(params), policy_kwargs=kwargs)
-    copied, skipped = [], list(model.policy.state_dict());optimizer_state_count=0;replay_transferred=False;source_data=None
-    source_state=None;previous=None
-    if source_path:
-        source_path = Path(source_path)
-        if source_path.is_file():
-            source_data=load_spec(source_path)
-            source_checkpoint=Path(source_data['checkpoint'])
-            if not source_checkpoint.is_absolute():source_checkpoint=ROOT/'runtime/official'/source_checkpoint
-            try:previous = SAC.load(source_checkpoint, device="cpu")
-            except RuntimeError as exc:
-                if "state_dict" not in str(exc):raise
-                source_state=source_data.get('policy_state',{})
-                copied,skipped = _copy_compatible(source_state, model)
-                model.num_timesteps=int(source_data.get('training',{}).get('num_timesteps',0))
-                model._n_updates=int(source_data.get('training',{}).get('updates',0))
-            else:
-                copied, skipped = _copy_compatible(previous, model)
-                if previous.log_ent_coef is not None and model.log_ent_coef is not None and previous.log_ent_coef.shape==model.log_ent_coef.shape:
-                    with torch.no_grad():model.log_ent_coef.copy_(previous.log_ent_coef.to(model.log_ent_coef.device))
-                optimizer_state_count += _transfer_optimizer(previous.actor.optimizer,model.actor.optimizer,previous.actor,model.actor)
-                optimizer_state_count += _transfer_optimizer(previous.critic.optimizer,model.critic.optimizer,previous.critic,model.critic)
-                if previous.ent_coef_optimizer is not None and model.ent_coef_optimizer is not None:
-                    old_alpha=previous.log_ent_coef;new_alpha=model.log_ent_coef
-                    if old_alpha is not None and new_alpha is not None and old_alpha.shape==new_alpha.shape:
-                        old=previous.ent_coef_optimizer.state_dict();new=model.ent_coef_optimizer.state_dict()
-                        for old_group,new_group in zip(old['param_groups'],new['param_groups']):
-                            for old_id,new_id in zip(old_group['params'],new_group['params']):
-                                if old_id in old['state']:
-                                    model.ent_coef_optimizer.state[new_alpha]={k:v.detach().clone().to(new_alpha.device) if torch.is_tensor(v) else copy.deepcopy(v) for k,v in old['state'][old_id].items()};optimizer_state_count+=1
-                model.num_timesteps=int(previous.num_timesteps)
-                model._n_updates=int(previous._n_updates)
-                model._episode_num=int(getattr(previous,'_episode_num',0))
-            replay_path=source_checkpoint.parent/'replay.pkl'
-            same_experts=(source_data.get('expert_package_digests')=={key:catalog['experts'][key]['package']['sha256'] for key in active}
-                and source_data.get('identity',{}).get('champion_experts')==active)
-            source_obs=source_data.get('identity',{}).get('base_observation_dim',0)+EXPERT_FEATURES*len(active)+16
-            source_actions=len(source_data.get('identity',{}).get('symbols',[]))
-            spaces_match=(source_obs==int(np.prod(model.observation_space.shape)) and source_actions==int(np.prod(model.action_space.shape)))
-            if same_experts and replay_path.is_file() and spaces_match:
-                model.load_replay_buffer(replay_path);replay_transferred=True
+    expected_observation=base_dim+EXPERT_FEATURES*len(active)+16
+    expected_action=len(symbols)
+    if tuple(model.observation_space.shape)!=(expected_observation,) or tuple(model.action_space.shape)!=(expected_action,):
+        raise ValueError(f"SAC 구조 공간 불일치: 관측 {model.observation_space.shape} / 행동 {model.action_space.shape}; 기대 ({expected_observation},) / ({expected_action},)")
+    observation=torch.zeros((1,expected_observation),device=model.device)
+    with torch.inference_mode():
+        action,_=model.actor.action_log_prob(observation)
+        critics=model.critic(observation,action)
+        target_critics=model.critic_target(observation,action)
+    if action.shape!=(1,expected_action) or len(critics)!=2 or len(target_critics)!=2:
+        raise ValueError("SAC Actor 또는 Twin Critic 출력 구조가 맞지 않습니다.")
+    if not torch.isfinite(action).all() or any(not torch.isfinite(value).all() or value.shape!=(1,1) for value in (*critics,*target_critics)):
+        raise ValueError("SAC Actor/Twin Critic 출력에 비유한 값 또는 잘못된 차원이 있습니다.")
+    sac_spaces={"observation_shape":list(model.observation_space.shape),"action_shape":list(model.action_space.shape),
+        "actor_action_shape":list(action.shape),"twin_critic_output_shapes":[list(value.shape) for value in critics],
+        "target_twin_critic_output_shapes":[list(value.shape) for value in target_critics]}
     directory.mkdir(parents=True)
     model_path.parent.mkdir(parents=True, exist_ok=True)
     identity['champion_file']=str(model_path)
@@ -343,7 +287,7 @@ def create(currency, symbols, active, env, source_path=None):
     atomic_json(identity, directory / "dataset.json")
     parameter_counts = _counts(model, expert_counts)
     output = {"format": "finrlx_compositional_sac_champion_v1", "version": number,
-        "trained": bool(source_data and source_data.get("trained")), "created_at": __import__("datetime").datetime.now().astimezone().isoformat(),
+        "trained": False, "created_at": __import__("datetime").datetime.now().astimezone().isoformat(),
         "identity": identity, "roles": roles, "expert_packages": packages,
         "expert_package_digests": {key:catalog['experts'][key]['package']['sha256'] for key in active},
         "moe_architecture": {"market_hidden_size": kwargs["features_extractor_kwargs"]["hidden_size"],
@@ -356,12 +300,10 @@ def create(currency, symbols, active, env, source_path=None):
             "expert_native_output_features": EXPERT_FEATURES, "account_context_features": 16,
             "sac_feature_size": kwargs["features_extractor_kwargs"]["base_dim"]+
                 kwargs["features_extractor_kwargs"]["hidden_size"]+kwargs["features_extractor_kwargs"]["policy_dim"]},
-        "expert_counts": expert_counts, "parameters": parameter_counts,
+        "expert_counts": expert_counts, "parameters": parameter_counts,"sac_spaces":sac_spaces,
         "training": {"num_timesteps":int(model.num_timesteps),"updates":int(model._n_updates)},
         "policy_state": {key:value.detach().cpu() for key,value in model.policy.state_dict().items()}, "checkpoint": f"champions/{model_path.stem}/sac.zip",
-        "transfer": {"copied_policy_tensors": copied, "initialized_policy_tensors": skipped,
-                     "optimizer_state": f"호환 Actor/Critic/Entropy optimizer state {optimizer_state_count}개 승계" if optimizer_state_count else "미승계: 호환 Optimizer state가 없거나 구조가 달라졌습니다.",
-                     "replay": "기존 Replay 승계" if replay_transferred else "미승계: Expert ID·가중치 checksum, 관측·행동 공간이 모두 같지 않거나 Replay 파일이 없습니다."},
+        "transfer": {"optimizer_state":"신규 SAC 정책으로 초기화","replay":"신규 빈 Replay Buffer"},
         "original_pro": original}
     try:
         temporary = model_path.with_suffix(".partial")
@@ -371,7 +313,7 @@ def create(currency, symbols, active, env, source_path=None):
         shutil.rmtree(directory, ignore_errors=True)
         raise
     return {"name": model_path.name, "path": str(model_path), "checkpoint": output["checkpoint"],"file_bytes":model_path.stat().st_size,
-        "trained": output["trained"], "parameters": parameter_counts,"training":output["training"],
+        "trained": output["trained"], "parameters": parameter_counts,"training":output["training"],"sac_spaces":sac_spaces,
         "transfer": output["transfer"], "identity": identity}
 
 

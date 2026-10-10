@@ -9,7 +9,7 @@ export function ExpertVariants({base,variants,selected,active,optimization,inspe
  const detail=results.find(r=>r.key===evidence);
  return <div className="min-w-0" onClick={e=>e.stopPropagation()}>
   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-5" role="group" aria-label="Expert 정밀도 버전">
-   {results.map(v=>{const item=v.item;const failed=['failed','rejected'].includes(v.inspection.status)||['failed','rejected'].includes(v.decision.status);return <div key={v.key} className={`min-w-0 rounded-xl p-2.5 text-xs ${item?.id===selected?'bg-blue-50 ring-1 ring-blue-300':failed?'bg-amber-50/70':item?'bg-slate-50':'bg-slate-50/50 ring-1 ring-inset ring-slate-100'}`}>
+   {results.filter(v=>v.item).map(v=>{const item=v.item!;const failed=['failed','rejected'].includes(v.inspection.status)||['failed','rejected'].includes(v.decision.status);return <div key={v.key} className={`min-w-0 rounded-xl p-2.5 text-xs ${item.id===selected?'bg-blue-50 ring-1 ring-blue-300':failed?'bg-amber-50/70':'bg-slate-50'}`}>
     {item&&<label className="mb-2 flex cursor-pointer items-center gap-1.5 text-[11px] text-slate-500" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedForRemoval.includes(item.id)} onChange={()=>onToggleRemoval(item.id)} aria-label={`${item.name} ${v.label} 선택`}/>관리 선택</label>}
     <button aria-pressed={item?.id===selected} onClick={()=>item?onSelect(item.id):setEvidence(v.key)} className="w-full text-left transition active:scale-95 focus-visible:rounded focus-visible:outline-2 focus-visible:outline-blue-500">
      <span className={`block font-semibold ${item&&active.includes(item.id)?'text-emerald-700':'text-slate-700'}`}>{v.label}{item&&active.includes(item.id)?' · 사용':''}</span>
@@ -23,7 +23,7 @@ export function ExpertVariants({base,variants,selected,active,optimization,inspe
     <button className="mt-2 rounded py-1 text-xs text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-blue-500" onClick={()=>setEvidence(v.key)}>판단 근거</button>
    </div>})}
   </div>
-  <p className="mt-2 text-[11px] text-slate-400">현재 검사와 마지막 최적화 판단은 별도 표시 · 미생성·탈락·정리된 버전도 포함</p>
+  <p className="mt-2 text-[11px] text-slate-400">현재 Registry에 실제 등록된 모델 버전만 표시합니다. 검사와 최적화 판단은 별도로 표시합니다.</p>
   {detail&&<ExpertVersionEvidence name={base.name} result={detail} optimization={optimization} onSelect={onSelect} onClose={()=>setEvidence('')}/>}
  </div>;
 }

@@ -36,6 +36,7 @@ class GGUFExpert(nn.Module):
         self.log_dir=tempfile.TemporaryDirectory(prefix='stockrl-llama-');self.log_path=Path(self.log_dir.name)/'engine.log'
         args=[str(engine),'-m',str(self.path),'--host','127.0.0.1','--port',str(port),
             '--log-file',str(self.log_path)]
+        if device.startswith('cuda'):args.extend(['-ngl','999'])
         self.child=subprocess.Popen(args,stdout=self.log,stderr=self.log,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         while True:
             if getattr(self,'cancelled',lambda:False)():self.close();raise InterruptedError('MoE 정지 요청')

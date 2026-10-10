@@ -78,7 +78,11 @@ class LibraryOperations:
                 try:
                     if kind=='probe_all':
                         fixture=runtime.fixture(key,frame=shared_frame,account=shared_account,all_batches=True)
-                        runtime.infer(key,fixture)
+                        pool=runtime.expert_pool()
+                        preferences=pool.settings.resources.expert_devices
+                        pool.settings.resources.expert_devices={**preferences,key:'auto'}
+                        try:runtime.infer(key,fixture)
+                        finally:pool.settings.resources.expert_devices=preferences
                     else:
                         self._execute('optimize',{'id':key,'goal':'memory','device':'auto'},progress)
                     results.append(dict(id=key,status='passed'))

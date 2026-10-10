@@ -660,29 +660,6 @@ def champion_environment(request):
         raise
 
 
-@app.post("/api/champions/inspect")
-def champion_inspect(request:ChampionRequest):
-    from .platform.sac_champion import inspect
-    if len(request.symbols)!=len(set(request.symbols)) or len(request.experts)!=len(set(request.experts)):
-        raise HTTPException(400,"종목과 Expert는 중복 없이 선택하세요.")
-    request.symbols=sorted(request.symbols);request.experts=sorted(request.experts)
-    env=None
-    try:
-        env=champion_environment(request)
-        env.reset()
-        registry=env.registry
-        inference=[{"id":key,"status":value.get('status'),"reason":value.get('reason'),
-            "as_of":value.get('as_of'),"output_sample":value.get('output',[])[:8],
-            "resources":registry.pool.metrics.get(key,{}) if registry.pool else {}}
-            for key,value in registry.last_outputs.items()]
-        registry.close()
-        return inspect(request.currency,request.symbols,request.experts,env,inference)
-    except HTTPException:raise
-    except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
-    finally:
-        if env is not None:env.close()
-
-
 @app.post("/api/champions/create")
 def champion_create(request:ChampionRequest):
     if job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")

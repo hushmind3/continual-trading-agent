@@ -375,30 +375,6 @@ def create(currency, symbols, active, env, source_path=None):
         "transfer": output["transfer"], "identity": identity}
 
 
-def inspect(currency, symbols, active, env=None, inference=None):
-    catalog, _, expert_counts, roles = _expert_payload(active)
-    original = _original_report()
-    estimated=None
-    if env is not None:
-        from finrl.agents.stablebaselines3.models import DRLAgent
-        _, params, _ = sac_example();base_dim=int(np.prod(env.unwrapped.observation_space.shape))
-        identity=_candidate_identity(currency,symbols,active,base_dim)
-        model=DRLAgent(env=env).get_model('sac',model_kwargs=dict(params),policy_kwargs=_policy_kwargs(identity,roles,original))
-        estimated=_counts(model,expert_counts)
-    return {"original": original, "experts": [{"id": key, "name": catalog["experts"][key].get("name", key),
-            "role": roles[key], **expert_counts[key]} for key in active],
-        "expert_counts": expert_counts, "roles": roles,
-        "candidate_filename": _next_version()[1].name,
-        "source_central_parameters": original.get("central_tensor_parameters"),
-        "estimated_parameters": estimated,
-        "inference": inference or [],
-        "symbols": list(symbols), "currency": currency,
-        "resource": {"ram_available": __import__("psutil").virtual_memory().available,
-            "vram_available": int(torch.cuda.mem_get_info()[0]) if torch.cuda.is_available() else 0,
-            "device": "cuda" if torch.cuda.is_available() else "cpu"},
-        "note": "예상 파라미터는 현재 FinRL 환경의 실제 shape와 SB3 SAC Tensor를 기준으로 계산합니다."}
-
-
 def list_champions():
     result = []
     for path in sorted(MODEL_DIR.glob("sac_champion_*.pt")):

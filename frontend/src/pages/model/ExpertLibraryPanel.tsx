@@ -3,7 +3,7 @@ import {PackagePlus,Search,WandSparkles,Trash2,Square} from 'lucide-react';
 import {useOperations} from '../../data/Operations';
 import {request} from '../../data/api';
 import {Button,Drawer,Empty,ErrorMessage,Meter,Tabs} from '../../ui/Primitives';
-import {bytes,number,inspectionDetail} from '../../ui/format';
+import {bytes,number,inspectionDetail,percent} from '../../ui/format';
 import {ExpertDiscovery} from './ExpertDiscovery';
 import {ExpertVariants} from './ExpertVariants';
 import {expertFamilies,expertCategory,categoryNames} from './expertFamilies';
@@ -42,7 +42,7 @@ export function ExpertLibraryPanel(){
    {!!job?.total&&<div className="mt-3"><Meter value={(job.completed??0)/job.total*100}/></div>}
   </div>}
   {!busy&&job?.stage==='complete'&&job.kind==='remove'&&<p className="text-xs text-emerald-700" role="status">선택한 등록 항목·실패 기록을 제거했습니다. 모델 파일은 보존했습니다.</p>}
-  {!busy&&['quantize','quantize_all'].includes(job?.kind??'')&&job?.result&&<details open className="rounded-xl bg-white px-4 py-3 text-xs text-slate-600"><summary className="cursor-pointer">양자화 결과 · 새로 생성 {job.result.created??0} · 기존 버전 {job.result.existing??0} · 실패 {job.result.failed??0}</summary><ul className="mt-3 space-y-2">{job.result.items?.map((row:any)=><li key={row.id} className={row.status==='failed'?'text-rose-700':'text-emerald-700'}>{row.id} · {row.precision?.toUpperCase()} · {row.status==='failed'?'실패':row.status==='existing'?'기존 파일 있음':'생성 완료'}{row.bytes!=null?' · '+bytes(row.bytes):''}{row.seconds!=null?' · '+number(row.seconds,2)+'s':''}{row.detail?' · '+inspectionDetail(row.detail):''}</li>)}</ul></details>}
+  {!busy&&['quantize','quantize_all'].includes(job?.kind??'')&&job?.result&&<details open className="rounded-xl bg-white px-4 py-3 text-xs text-slate-600"><summary className="cursor-pointer">양자화 결과 · 새로 생성 {job.result.created??0} · 기존 버전 {job.result.existing??0} · 생성 실패 {job.result.failed??0} · 출력 비교 {job.result.compared??0} · 비교 실패 {job.result.comparison_failed??0} · 비교 불가 {job.result.comparison_unavailable??0}</summary><ul className="mt-3 space-y-2">{job.result.items?.map((row:any)=><li key={row.id} className={row.status==='failed'?'text-rose-700':row.comparison_error?'text-amber-800':'text-emerald-700'}>{row.id} · {row.precision?.toUpperCase()} · {row.status==='failed'?'생성 실패':row.status==='existing'?'기존 파일 있음':'생성 완료'}{row.bytes!=null?' · '+bytes(row.bytes):''}{row.seconds!=null?' · '+number(row.seconds,2)+'s':''}{row.detail?' · '+inspectionDetail(row.detail):''}{row.comparison_status==='measured'&&<span className="block">원본 비교 완료 · 상대 RMSE {percent(row.relative_rmse)}{row.action_agreement!=null?' · 판단 일치 '+percent(row.action_agreement):''}{row.direction_agreement!=null?' · 방향 일치 '+percent(row.direction_agreement):''}</span>}{row.comparison_error&&<span className="block">원본 비교 {row.comparison_status==='failed'?'실패':'불가'} · {inspectionDetail(row.comparison_error)}</span>}</li>)}</ul></details>}
   {(error||job?.error)&&<ErrorMessage message={error||job?.error||''}/>}
   {!items.length?<Empty title="Expert 등록 항목이 없습니다." detail="Registry가 비어 있습니다. 기존 패키지를 가져오거나 금융 Expert를 검색할 수 있습니다."/>:<div className="space-y-2">
    {shown.map((family,index)=>{const kind=expertCategory(family.base),selectedVersions=family.variants.filter(item=>selectedIds.includes(item.id)).map(item=>item.id),failures=selectedFailures.filter(row=>row.source_id===family.id);return <div key={family.id}>

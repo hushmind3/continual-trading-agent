@@ -42,6 +42,7 @@ def comparison_result(items,results,fixture):
             direction=forecast_directions(packet,inputs[index])
             if direction is not None:directions[side].extend(direction)
     a,b=[np.concatenate([np.asarray(packet['native_output'],float).reshape(-1) for packet in group]) for group in packets]
+    if not a.size or not all(np.isfinite(value).all() for value in (a,b)):raise ValueError('원본·변환본 비교 출력이 비어 있거나 NaN/Inf가 있습니다.')
     delta=b-a;agreement=None;direction=None
     if base['role']=='action':
         action_a,action_b=[np.concatenate([np.asarray(packet['native_output'],float).reshape(len(packet['symbols']),-1) for packet in group]) for group in packets]

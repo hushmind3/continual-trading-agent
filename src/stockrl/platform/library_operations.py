@@ -36,7 +36,7 @@ class LibraryOperations:
         try:
             result=self._execute(kind,payload,progress)
             if self.cancelled.is_set():raise InterruptedError('모델 작업 중지 요청을 반영했습니다. 이미 생성된 결과물은 보존합니다.')
-            partial=isinstance(result,dict) and bool(result.get('failed',0) or result.get('skipped',0))
+            partial=isinstance(result,dict) and bool(result.get('failed',0) or result.get('skipped',0) or result.get('comparison_failed',0) or result.get('comparison_unavailable',0))
             atomic_json(dict(stage='partial' if partial else 'complete',kind=kind,result=result,started=started,
                 error=(result.get('detail') or str(result['failed'])+'개 모델 작업 실패') if result.get('failed') else None,finished=time.time()),self.status_path,
                 default=lambda x:x.tolist() if hasattr(x,'tolist') else str(x))
@@ -53,6 +53,56 @@ class LibraryOperations:
                     atomic_json(latest,self.catalog_path)
             atomic_json(dict(stage='error',kind=kind,error=str(exc),finished=time.time()),self.status_path)
         finally:self.active=False
+
+    def _compare_quantized(self,base,item,progress,cache):
+        from .expert_comparison import comparison_result,measure
+        from .expert_optimizer import measurement_summary
+        import random,numpy as np,torch
+        key=item['id'];cfg=settings();catalog=read_json(cfg.registry_file)
+        if not base or base==key or base not in catalog.get('experts',{}):
+            return dict(comparison_status='no_original',comparison_error='비양자화 원본이 등록되어 있지 않아 원본 출력과 비교할 수 없습니다.')
+        progress(stage='quantization_compare',detail=f'{base} ↔ {key} · 동일 입력 원본 출력 비교')
+        started=time.perf_counter()
+        with runtime.lock:
+            pool=runtime.expert_pool();was_loaded=key in pool.loaded
+            preferences=pool.settings.resources.expert_devices
+            pool.settings.resources.expert_devices={**preferences,base:cache.get('device','auto'),key:cache.get('device','auto')}
+            numpy_state=np.random.get_state();python_state=random.getstate()
+            try:
+                if cache.get('error'):raise cache['error']
+                if catalog['experts'][base]['input']!=item['input'] or catalog['experts'][base].get('feature_size',item['feature_size'])!=item['feature_size']:
+                    raise ValueError('원본·변환본 입력 계약 또는 출력 차원이 다릅니다.')
+                with torch.random.fork_rng(devices=list(range(torch.cuda.device_count())) if torch.cuda.is_available() else []):
+                    if 'baseline' not in cache:
+                        try:
+                            cache['release_base']=base not in pool.loaded
+                            pool.get(base)
+                            cache['fixture']=runtime.fixture(base,all_batches=True)
+                            cache['rng']=(torch.random.get_rng_state(),torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],np.random.get_state(),random.getstate())
+                            cache['baseline']=measure(runtime,base,cache['fixture'])
+                        except Exception as exc:
+                            cache['error']=exc;raise
+                    pool.get(key)
+                    cpu,cuda,numpy_rng,python_rng=cache['rng']
+                    torch.random.set_rng_state(cpu)
+                    if cuda:torch.cuda.set_rng_state_all(cuda)
+                    np.random.set_state(numpy_rng);random.setstate(python_rng)
+                    variant=measure(runtime,key,cache['fixture'])
+                    compared=comparison_result({base:catalog['experts'][base],key:item},[cache['baseline'],variant],cache['fixture'])
+                summary={k:v for k,v in compared.items() if k not in ('baseline','variant')}
+                summary.update(baseline_id=base,baseline_sha256=catalog['experts'][base]['package']['sha256'],variant_sha256=item['package']['sha256'],
+                    measured_at=time.time(),baseline=measurement_summary(compared['baseline']),variant=measurement_summary(compared['variant']),paired_random_state=True)
+                item['conversion']={**(item.get('conversion') or {}),'comparison':summary}
+                return dict(comparison_status='measured',comparison_seconds=time.perf_counter()-started,comparison=summary,
+                    **{key:summary[key] for key in ('relative_rmse','rmse','mean_absolute_error','max_absolute_error','action_agreement','direction_agreement','input_as_of')})
+            except InterruptedError:raise
+            except Exception as exc:
+                unavailable=isinstance(exc,InputUnavailable) or str(exc)=='실제 USD 가격 데이터가 없습니다.'
+                return dict(comparison_status='input_unavailable' if unavailable else 'failed',comparison_error=str(exc),comparison_seconds=time.perf_counter()-started)
+            finally:
+                np.random.set_state(numpy_state);random.setstate(python_state)
+                pool.settings.resources.expert_devices=preferences
+                if not was_loaded:runtime.unload(key)
 
     def _execute(self,kind,payload,progress):
         cfg=settings();catalog=read_json(cfg.registry_file)
@@ -72,7 +122,10 @@ class LibraryOperations:
                 except Exception as exc:result={'items':[{'id':key,'status':'failed','detail':str(exc)}]}
                 results.extend(result['items'])
             return {'total':len(results),'created':sum(row['status']=='created' for row in results),
-                'existing':sum(row['status']=='existing' for row in results),'failed':sum(row['status']=='failed' for row in results),'items':results}
+                'existing':sum(row['status']=='existing' for row in results),'failed':sum(row['status']=='failed' for row in results),
+                'compared':sum(row.get('comparison_status')=='measured' for row in results),
+                'comparison_failed':sum(row.get('comparison_status')=='failed' for row in results),
+                'comparison_unavailable':sum(row.get('comparison_status') in ('input_unavailable','no_original') for row in results),'items':results}
         if kind=='quantize':
             from .expert_packages import load_package
             from .expert_conversion import convert
@@ -90,24 +143,30 @@ class LibraryOperations:
                 import re
                 label=precision_label(kind);bits=re.search(r'(?:I?Q)(\d+)',label)
                 precision='int'+bits.group(1) if bits else label
-                row={'id':key,'status':'existing','precision':precision,'representation':label,'bytes':weight.stat().st_size,'detail':'이미 양자화된 GGUF 파일입니다. '+label}
+                row={'id':key,'status':'existing','precision':precision,'representation':label,'bytes':weight.stat().st_size,'detail':'이미 양자화된 GGUF 파일입니다. '+label,
+                    'comparison_status':'no_original','comparison_error':'등록된 GGUF는 이미 양자화된 파일이며 비교할 비양자화 원본이 없습니다.'}
                 latest=read_json(cfg.registry_file)
                 latest.setdefault('quantizations',{})[key]={'stage':'complete','finished':time.time(),'reports':[row],'attempts':{},'failures':[]}
                 atomic_json(latest,cfg.registry_file)
-                return {'total':1,'created':0,'existing':1,'failed':0,'items':[row]}
+                return {'total':1,'created':0,'existing':1,'failed':0,'compared':0,'comparison_unavailable':1,'items':[row]}
             if package.get('quantization'):
                 conversion=package.get('conversion') or {}
                 row={'id':key,'status':'existing','precision':conversion.get('precision'),'bytes':entry.get('weight_bytes') or entry['package']['bytes'],
                     'conversion':conversion,'detail':'이미 양자화된 가중치입니다. 다른 정밀도는 비양자화 원본에서 생성하세요.'}
-                latest=read_json(cfg.registry_file)
-                latest.setdefault('quantizations',{})[key]={'stage':'complete','finished':time.time(),'reports':[row],'attempts':{},'failures':[]}
+                source=conversion.get('source_id');cache={'device':payload.get('device','auto')}
+                try:row.update(self._compare_quantized(source,entry,progress,cache))
+                finally:
+                    if cache.get('release_base'):runtime.unload(source)
+                latest=read_json(cfg.registry_file);latest['experts'][key]=entry
+                latest.setdefault('quantizations',{})[key]={'stage':'complete' if row['comparison_status']=='measured' else 'partial','finished':time.time(),'reports':[row],'attempts':{},'failures':[]}
                 atomic_json(latest,cfg.registry_file)
-                return {'total':1,'created':0,'existing':1,'failed':0,'items':[row]}
+                return {'total':1,'created':0,'existing':1,'failed':0,'compared':int(row['comparison_status']=='measured'),
+                    'comparison_failed':int(row['comparison_status']=='failed'),'comparison_unavailable':int(row['comparison_status'] in ('input_unavailable','no_original')),'items':[row]}
             source=(package.get('conversion') or {}).get('source_id') or (entry.get('conversion') or {}).get('source_id')
             if source in catalog['experts'] and source!=key:
                 key=source;entry=catalog['experts'][key]
                 package=load_package(cfg.model_dir/'expert_registry.json',entry['package'],verify=True)
-            record={'stage':'running','started':time.time(),'reports':[],'attempts':{},'failures':[]};pool=None;targets=None
+            record={'stage':'running','started':time.time(),'reports':[],'attempts':{},'failures':[]};pool=None;targets=None;comparison_cache={'device':payload.get('device','auto')}
             try:
                 for precision in payload.get('precisions',['int8','int4','nf4']):
                     started=time.perf_counter();slot=key+'_'+precision
@@ -129,6 +188,9 @@ class LibraryOperations:
                         row={'id':candidate['id'],'precision':precision,'status':status,'bytes':candidate.get('weight_bytes') or candidate['package']['bytes'],
                             'package_bytes':candidate['package']['bytes'],'seconds':time.perf_counter()-started,'conversion':candidate.get('conversion',{}),
                             'detail':'양자화 완료' if status=='created' else '기존 양자화 버전이 있습니다.'}
+                        latest=read_json(cfg.registry_file);latest['experts'][candidate['id']]=candidate;atomic_json(latest,cfg.registry_file)
+                        row.update(self._compare_quantized(key,candidate,progress,comparison_cache))
+                        row['conversion']=candidate.get('conversion',{})
                         latest=read_json(cfg.registry_file);latest['experts'][candidate['id']]=candidate
                         record['attempts'][precision]={'status':'complete','detail':row['detail']}
                     except InterruptedError:raise
@@ -138,12 +200,16 @@ class LibraryOperations:
                         record['failures'].append({'precision':precision,'detail':str(exc)})
                         latest=read_json(cfg.registry_file)
                     record['reports'].append(row);latest.setdefault('quantizations',{})[key]=record;atomic_json(latest,cfg.registry_file)
-                record.update(stage='partial' if record['failures'] else 'complete',finished=time.time())
+                record.update(stage='partial' if record['failures'] or any(row.get('comparison_status')!='measured' for row in record['reports']) else 'complete',finished=time.time())
                 latest=read_json(cfg.registry_file);latest.setdefault('quantizations',{})[key]=record;atomic_json(latest,cfg.registry_file)
             finally:
                 if pool:pool.close()
+                if comparison_cache.get('release_base'):runtime.unload(key)
             return {'total':len(record['reports']),'created':sum(row['status']=='created' for row in record['reports']),
-                'existing':sum(row['status']=='existing' for row in record['reports']),'failed':len(record['failures']),'items':record['reports']}
+                'existing':sum(row['status']=='existing' for row in record['reports']),'failed':len(record['failures']),
+                'compared':sum(row.get('comparison_status')=='measured' for row in record['reports']),
+                'comparison_failed':sum(row.get('comparison_status')=='failed' for row in record['reports']),
+                'comparison_unavailable':sum(row.get('comparison_status') in ('input_unavailable','no_original') for row in record['reports']),'items':record['reports']}
         if kind in ('probe_all','optimize_all'):
             experts=catalog.get('experts',{})
             if kind=='probe_all':keys=list(experts)

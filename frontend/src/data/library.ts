@@ -10,6 +10,7 @@ export interface DiscoveredExpert {
 export interface OptimizationReport {
   id:string;precision?:string;status?:string;passed?:boolean;eligible?:boolean;bytes?:number;seconds?:number;reason?:string;detail?:string;
   score?:number;relative_rmse?:number;action_agreement?:number|null;direction_agreement?:number|null;
+  comparison_status?:string;comparison_error?:string;comparison_seconds?:number;input_as_of?:string;rmse?:number;mean_absolute_error?:number;max_absolute_error?:number;
   measurement?:{cold_seconds?:number;warm_median_seconds?:number;metrics?:{device?:string;peak_ram_bytes?:number;peak_vram_bytes?:number}};
 }
 export interface Optimization {stage?:string;goal?:string;selected?:string;previous?:string;input_as_of?:string;started?:number;finished?:number;reports?:OptimizationReport[];attempts?:Record<string,{status?:string;detail?:string}>;failures?:{precision:string;detail:string}[];detail?:string;error?:string;applied?:boolean}

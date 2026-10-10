@@ -1,7 +1,22 @@
+import {LockKeyhole} from 'lucide-react';
 import type {Expert} from '../../data/types';
-import {Drawer,Status} from '../../ui/Primitives';
-import {KeyValues} from '../../ui/Panel';
+import {Drawer,Empty} from '../../ui/Primitives';
 import {bytes,date,number} from '../../ui/format';
-export function ExpertInspector({expert:e,close}:{expert:Expert|null;close:()=>void}){
- return <Drawer title={e?.name||'Expert 상세'} open={!!e} onClose={close}>{e&&<div className="space-y-5"><Status tone={e.inference?.status==='ready'?'good':e.inference?.reason?'warn':'idle'}>{e.inference?.status||'추론 기록 없음'}</Status><KeyValues items={[['역할',e.role==='action'?'매매 판단':'시장 분석'],['정밀도',e.representation],['실행기',e.executor||e.backend],['패키지',e.package_available?'파일·크기 확인됨':'없음 / 불일치'],['파일 크기',bytes(e.package.bytes)],['가중치 크기',bytes(e.weight_bytes)],['최소 관측',number(e.input.minimum_history,0)],['필수 입력',e.input.requires?.join(' · ')],['필수 종목',e.input.universe?.join(', ')||'입력 생성기 기준'],['결과 기준 시점',date(e.inference?.as_of)],['원본 경로',e.package_path],['SHA256',e.package.sha256]]}/>{e.inference?.reason&&<p className="rounded-xl bg-amber-50 p-4 text-xs leading-6 text-amber-800">{e.inference.reason}</p>}<h3 className="text-sm font-bold">실제 추론 출력</h3><pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-xs">{e.inference?.output?JSON.stringify(e.inference.output,null,2):'출력 기록 없음'}</pre><h3 className="text-sm font-bold">현재 API 모델 적재</h3><Status tone={e.loaded?'good':'idle'}>{e.loaded?'현재 프로세스에 적재됨':'현재 프로세스에 적재되지 않음'}</Status><KeyValues items={Object.entries(e.current_resources||{}).map(([k,v])=>[k,typeof v==='object'?JSON.stringify(v):String(v)])}/><h3 className="text-sm font-bold">마지막 추론·RAM·VRAM 측정 기록</h3><KeyValues items={Object.entries(e.resources).map(([k,v])=>[k,typeof v==='object'?JSON.stringify(v):String(v)])}/><p className="text-xs leading-6 text-slate-400">이 측정값은 마지막 Expert 실행의 기록입니다. 현재 프로세스가 모델을 적재하고 있다는 의미로 사용하지 않습니다.</p></div>}</Drawer>;
+export function ExpertInspector({expert,close}:{expert:Expert|null;close:()=>void}){
+ const inference=expert?.inference;
+ return <Drawer title={expert?.name??'Expert'} open={Boolean(expert)} onClose={close}>
+  {expert&&<div className="space-y-6">
+   <div className="rounded-2xl bg-violet-50 p-5"><div className="flex items-center gap-2 text-sm font-semibold text-violet-700"><LockKeyhole size={16}/>Frozen Expert · 고정 가중치</div><p className="mt-2 text-sm leading-6 text-violet-700/70">현재 SAC 시스템에서 Expert는 고정된 입력 분석기입니다. 중앙 MoE 정책 학습은 제공되지 않습니다.</p></div>
+   {expert.input.reason&&<p className="text-sm text-amber-700">입력 연결 상태: {expert.input.reason}</p>}
+   <dl className="grid grid-cols-2 gap-x-4 gap-y-5 text-sm">
+    <Detail label="모델 파일" value={expert.package_available?'사용 가능':'파일 없음'}/><Detail label="적재 상태" value={expert.loaded?'적재 중':'미적재'}/>
+    <Detail label="파라미터" value={number(expert.parameters,0)}/><Detail label="장치" value={String(expert.current_resources?.device??expert.resources?.device??'미확인')}/>
+    <Detail label="RAM" value={bytes(Number(expert.current_resources?.ram_bytes??expert.resources?.ram_bytes??0))}/><Detail label="VRAM" value={bytes(Number(expert.current_resources?.vram_bytes??expert.resources?.vram_bytes??0))}/>
+    <Detail label="최근 입력 시각" value={date(inference?.as_of)}/><Detail label="추론 상태" value={inference?.status??'기록 없음'}/>
+   </dl>
+   <section className="space-y-2"><h3 className="text-sm font-semibold">입력 계약</h3><p className="text-xs leading-5 text-slate-500">{expert.input.requires?.join(' · ')??expert.input.reason??'입력 정보 없음'}</p>{(expert.input.universe?.length??0)>0&&<p className="text-xs text-slate-500">종목: {(expert.input.universe??[]).join(' · ')}</p>}</section>
+   <details className="border-t border-slate-100 pt-4"><summary className="cursor-pointer text-sm font-medium text-slate-500">실제 추론 결과 · 진단</summary>{inference?.reason&&<p className="mt-3 text-xs text-amber-700">{inference.reason}</p>}{inference?.output?<pre className="mt-3 max-h-96 overflow-auto rounded-xl bg-slate-950 p-4 text-[11px] leading-5 text-slate-300">{JSON.stringify(inference.output,null,2)}</pre>:<Empty title="저장된 실제 출력이 없습니다."/>}<p className="mt-2 font-mono text-xs text-slate-400">{expert.id}</p></details>
+  </div>}
+ </Drawer>;
 }
+function Detail({label,value}:{label:string;value:string}){return <div><dt className="mb-1 text-xs text-slate-400">{label}</dt><dd className="font-medium tabular-nums">{value}</dd></div>}

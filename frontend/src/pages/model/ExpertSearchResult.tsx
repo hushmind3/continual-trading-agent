@@ -1,12 +1,12 @@
 import {Download,ExternalLink} from 'lucide-react';
-import type {DiscoveryModel} from '../../data/types';
+import type {DiscoveredExpert} from '../../data/library';
 import {Button,Status} from '../../ui/Primitives';
 import {bytes,calendarDate,number} from '../../ui/format';
 
-export function ExpertSearchResult({item,busy,registered,active,onDownload}:{item:DiscoveryModel;busy:boolean;registered:boolean;active:boolean;onDownload:()=>void}){
+export function ExpertSearchResult({item,busy,onDownload}:{item:DiscoveredExpert;busy:boolean;onDownload:()=>void}){
  const installed=Boolean(item.installed_versions?.length);
  return <article className="space-y-3 rounded-xl border border-slate-100 bg-white p-4">
-  <div className="flex items-start justify-between gap-3"><a href={item.url} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-2 break-all text-sm font-semibold text-blue-800">{item.repository}<ExternalLink size={13} className="shrink-0"/></a><Status tone={active?'good':registered||item.same_weights?'neutral':item.compatible?'good':'warn'}>{active?'현재 사용 구성에 적용됨':registered?'등록됨 · Expert 목록에서 선택 가능':item.same_weights?'동일 가중치 보유':installed?'다른 버전 보유':item.compatible?'검사 가능':'입력·실행기 확인 필요'}</Status></div>
+  <div className="flex items-start justify-between gap-3"><a href={item.url} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-2 break-all text-sm font-semibold text-blue-800">{item.repository}<ExternalLink size={13} className="shrink-0"/></a><Status tone={item.same_weights?'neutral':item.compatible?'good':'warn'}>{item.same_weights?'동일 가중치 보유':installed?'다른 버전 보유':item.compatible?'검사 가능':'입력·실행기 확인 필요'}</Status></div>
   <p className="text-xs text-slate-400">{item.source??'Hugging Face'} · {item.domain}{item.source!=='GitHub'?` · 다운로드 ${number(item.downloads,0)}`:''}</p>
   <div className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
    <p><span className="text-slate-400">가중치 파일 </span>{bytes(item.bytes)}</p>
@@ -30,6 +30,6 @@ export function ExpertSearchResult({item,busy,registered,active,onDownload}:{ite
    {item.input_evidence?.snippets?.map((line,index)=><blockquote key={index} className="border-l-2 border-slate-200 pl-3">{line}</blockquote>)}
    {!item.requirements_verified&&<p className="text-amber-700">문서 단서는 입력 계약의 검증 결과가 아닙니다. 실행기·입력 연결이 확인되기 전에는 추가할 수 없습니다.</p>}
   </div></details>
-  <Button disabled={busy||!item.compatible||item.same_weights||registered} tone="primary" onClick={onDownload}><Download size={14}/>{active?'이미 적용됨':registered?'이미 등록됨':'다운로드 · 검사 · 자동 사용'}</Button>
+  <Button disabled={busy||!item.compatible||item.same_weights} tone="primary" onClick={onDownload}><Download size={14}/>다운로드 · 등록 · 구성 추가</Button>
  </article>;
 }

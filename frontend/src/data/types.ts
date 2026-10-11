@@ -29,6 +29,7 @@ export interface Snapshot {
   architecture:"finrl-unified-v3";updated_at:string;
   views?:Record<string,{data:unknown;error:string;updated_at:number|null}>;
   state_revision?:number;module_errors?:Record<string,string>;resident_models?:{path:string;algorithm:string;device:string;loads:number;reuse:number}[];
+  module_updated_at?:Record<string,number>;
   settings:{
     parameters:Record<string,string|number|boolean>;steps_per_run:number;environment:string;
     environment_args:Record<string,number>;covariance_lookback:number;rolling_days:number[];

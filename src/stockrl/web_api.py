@@ -23,10 +23,11 @@ import psutil
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
 from .framework import ROOT,CASH_ENVIRONMENT,policy_files,policy_checkpoint,sac_example,finrlx,finrl_file,champion_structure_environment
-from .state_io import atomic_json, read_json
+from .state_io import atomic_json, read_json, update_json
 from .platform.resources import ResourceMonitor
 from .platform.system_operations import system,apply_state,apply_running,start_apply,busy,check_system
 from .platform.operations_runtime import runtime
@@ -40,6 +41,7 @@ DB = ROOT / "data/finrl_trading.db"
 MODEL_DIR = Path.home() / "Desktop/모델"
 ENVIRONMENT = CASH_ENVIRONMENT
 app = FastAPI(title="FinRL local workspace", version="2")
+app.add_middleware(GZipMiddleware)
 FRONTEND_DIST = ROOT / "frontend/dist"
 app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets"), check_dir=False), name="react-assets")
 launch_lock = threading.Lock()
@@ -468,12 +470,12 @@ def state_view(path):
     providers={
         'algorithms':(algorithms,lambda:()),
         'finrl':(finrl_workspace,lambda:state_stamp(official/'job.json',*(official/'framework-jobs').glob('*/result.json'))),
-        'framework':(framework_catalog,lambda:state_stamp(config/'local/operations.json',*(official/'framework-jobs').glob('*/result.json'))),
-        'framework/providers':(framework_providers,lambda:state_stamp(config/'local/operations.json')),
-        'connections':(connections,lambda:state_stamp(config/'local/operations.json')),
-        'provider':(provider,lambda:state_stamp(config/'local/operations.json')),
+        'framework':(framework_catalog,None),
+        'framework/providers':(framework_providers,None),
+        'connections':(connections,None),
+        'provider':(provider,None),
         'settings':(operational_settings,lambda:state_stamp(config/'local/operations.json')),
-        'models':(model_files,lambda:state_stamp(MODEL_DIR,config/'experts.json')),
+        'models':(model_files,lambda:state_stamp(config/'experts.json',*MODEL_DIR.rglob('*'))),
         'champions':(champions,lambda:state_stamp(*MODEL_DIR.glob('sac_champion_*.pt'))),
         'logs':(logs,lambda:state_stamp(*(official/name for name in ('api.stderr.log','api.stdout.log','server.stderr.log','training.log')))),
     }
@@ -488,7 +490,7 @@ def state_view(path):
         providers[key]=(lambda:price_history(symbol,limit),state_stamp(DB,DB.with_name(DB.name+'-wal')))
     if key not in providers:raise ValueError('등록되지 않은 통합 상태 항목입니다: '+key)
     loader,signature=providers[key];name='view:'+path
-    data=system.state_value(name,loader,signature() if callable(signature) else signature)
+    data=system.state_value(name,loader,signature)
     return {'data':data,'error':system.state_errors.get(name,''),'updated_at':system.state_updates.get(name)}
 
 
@@ -500,32 +502,43 @@ def state(views:str='[]',refresh_views:bool=False):
     except (ValueError,TypeError) as exc:raise HTTPException(400,str(exc)) from exc
     if refresh_views:system.invalidate_states()
     settings=system.state_value('settings',source_settings,())
-    db=system.state_value('data',database,state_stamp(DB,DB.with_name(DB.name+'-wal'),ROOT/'configs/instruments.json'))
+    db=system.state_value('data',database,lambda:state_stamp(DB,DB.with_name(DB.name+'-wal'),ROOT/'configs/instruments.json'))
     job=system.state_value('job',job_state)
-    folder=policy_files();model_signature=state_stamp(policy_checkpoint(folder),folder/'dataset.json',folder/'replay.pkl')
     def saved_model():
+        folder=policy_files()
+        if settings is None:raise RuntimeError('공식 설정 조회 실패: '+system.state_errors.get('settings',''))
         value=model_state(settings,folder);value['replay_state']=saved_replay();return value
+    def model_signature():
+        folder=policy_files()
+        return state_stamp(RUNTIME/'active-checkpoint.json',ROOT/'runtime/operations/policies.json',policy_checkpoint(folder),folder/'dataset.json',folder/'replay.pkl')
     model=system.state_value('model',saved_model,model_signature)
-    experts=system.state_value('experts',expert_state,state_stamp(ROOT/'configs/experts.json',ROOT/'runtime/experts/status.json',*(ROOT/'runtime/experts/champions').glob('*/status.json')))
-    experts={**experts,'observation_connection':{'size':64*len(model['identity'].get('champion_experts',experts['active']))+16,'configured':True,'recorded':bool(experts.get('as_of')),
-        'last_success':{role:sum(1 for row in experts['items'] if row['active'] and row.get('inference') and row['inference'].get('status')=='ready' and row.get('role')==role) for role in ('market','action')}}}
-    currencies=[policy_files(currency) for currency in ('KRW','USD')]
-    models=system.state_value('models_by_currency',lambda:currency_models(settings),state_stamp(*(file for root in currencies for file in (policy_checkpoint(root),root/'dataset.json',root/'replay.pkl'))))
-    evaluations=system.state_value('evaluation',evaluation,state_stamp(evaluation_root()/'backtest.csv',evaluation_root()/'backtest_metrics.json'))
-    revisions=system.state_value('checkpoints',lambda:checkpoints(settings),state_stamp(*(RUNTIME.glob('*.zip')),*(RUNTIME/'policies').glob('*/*.zip'),*(RUNTIME/'champions').glob('*/*.zip'),*(RUNTIME/'archives').glob('*/*.zip')))
+    def connected_experts():
+        experts=expert_state()
+        return {**experts,'observation_connection':{'size':64*len((model or {}).get('identity',{}).get('champion_experts',experts['active']))+16,'configured':model is not None,'recorded':bool(experts.get('as_of')),
+            'last_success':{role:sum(1 for row in experts['items'] if row['active'] and row.get('inference') and row['inference'].get('status')=='ready' and row.get('role')==role) for role in ('market','action')}}}
+    experts=system.state_value('experts',connected_experts)
+    def currency_signature():
+        currencies=[policy_files(currency) for currency in ('KRW','USD')]
+        return state_stamp(ROOT/'runtime/operations/policies.json',RUNTIME/'active-checkpoint.json',*(file for root in currencies for file in (policy_checkpoint(root),root/'dataset.json',root/'replay.pkl')))
+    models=system.state_value('models_by_currency',lambda:currency_models(settings),currency_signature)
+    evaluations=system.state_value('evaluation',evaluation,lambda:state_stamp(evaluation_root()/'backtest.csv',evaluation_root()/'backtest_metrics.json'))
+    def checkpoint_signature():
+        files=[*RUNTIME.glob('*.zip'),*(RUNTIME/'policies').glob('*/*.zip'),*(RUNTIME/'champions').glob('*/*.zip'),*(RUNTIME/'archives').glob('*/*.zip')]
+        return state_stamp(*files,*(file.parent/'dataset.json' for file in files))
+    revisions=system.state_value('checkpoints',lambda:checkpoints(settings),checkpoint_signature)
     operations_state=system.state_value('operations',runtime.snapshot)
-    library=system.state_value('library',library_manager.snapshot,state_stamp(library_manager.catalog_path,library_manager.status_path)+(library_manager.active,))
+    library=system.state_value('library',library_manager.snapshot)
     automation=system.state_value('automation',lambda:{'apply':apply_state(),'system':system.snapshot()})
     selected={}
     for path in dict.fromkeys(requested):
         try:selected[path]=state_view(path)
-        except (ValueError,OSError,RuntimeError) as exc:selected[path]={'data':None,'error':str(exc),'updated_at':None}
-    workers={'learner':{'pid':job.get('pid'),'alive':job['running']}}
+        except Exception as exc:selected[path]={'data':None,'error':str(exc),'updated_at':None}
+    workers={'learner':{'pid':(job or {}).get('pid'),'alive':(job or {}).get('running',False)}}
     resources=system.state_value('resources',lambda:resource_monitor.snapshot(workers))
     return {'architecture':'finrl-unified-v3','updated_at':now(),'settings':settings,'model':model,'data':db,'experts':experts,'job':job,
-        'evaluation':evaluations,'models_by_currency':models,'checkpoints':revisions,'capabilities':capabilities(),
+        'evaluation':evaluations,'models_by_currency':models,'checkpoints':revisions,'capabilities':system.state_value('capabilities',capabilities,()),
         'operations':operations_state,'library':library,'automation':automation,'resources':resources,'views':selected,
-        'state_revision':system.state_revision,'module_errors':dict(system.state_errors),'resident_models':system.resident_models()}
+        'state_revision':system.state_revision,'module_errors':dict(system.state_errors),'module_updated_at':dict(system.state_updates),'resident_models':system.resident_models()}
 
 
 def connections():
@@ -682,7 +695,8 @@ def start_job(job):
         process=subprocess.Popen([sys.executable,'-m','stockrl.job_worker',job['id']],cwd=ROOT,env=env,
             stdout=output,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     job.update(pid=process.pid,process_created=psutil.Process(process.pid).create_time())
-    children[job['id']]=process;atomic_json(job,RUNTIME/'job.json')
+    children[job['id']]=process
+    update_json(RUNTIME/'job.json',lambda current:{**current,**job} if current.get('id')!=job['id'] else {**job,**current,'pid':job['pid'],'process_created':job['process_created']})
     (RUNTIME/'training.pid').write_text(str(process.pid))
     return job
 
@@ -847,7 +861,7 @@ def stop():
             except psutil.Error:
                 pass
         job.update(status="stopped", finished_at=now(), detail="사용자가 중단했습니다. 정상 종료 전 새 가중치는 저장되지 않습니다.")
-        atomic_json(job, RUNTIME / "job.json")
+        update_json(RUNTIME/'job.json',lambda current:{**current,'status':job['status'],'finished_at':job['finished_at'],'detail':job['detail']} if current.get('id')==job['id'] else None)
         return {"message": job["detail"]}
 
 
@@ -1007,11 +1021,13 @@ def restore_checkpoint(request:dict):
     settings=source_settings()
     if identity.get("environment")!=settings["environment"] or identity.get('algorithm','sac')!=path.stem or identity.get("sac_example")!=sac_example(path.stem)[1]:
         raise HTTPException(400,"현재 FinRL 환경·알고리즘·설정과 호환되지 않는 정책입니다.")
-    try:loaded=runtime.check_policy(path.parent,load=True)
-    except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
-    atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
-    selection_path=ROOT/'runtime/operations/policies.json'
-    selected=read_json(selection_path);selected[identity['currency']]=path.relative_to(RUNTIME).as_posix();atomic_json(selected,selection_path)
+    with runtime.lock:
+        try:loaded=runtime.check_policy(path.parent,load=True)
+        except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
+        atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
+        selection_path=ROOT/'runtime/operations/policies.json'
+        update_json(selection_path,lambda selected:{**selected,identity['currency']:path.relative_to(RUNTIME).as_posix()})
+        system.release_models(keep=system.selected_models())
     return {"message":"해당 FinRL 정책을 선택하고 중앙 정책을 실제 로드했습니다. 학습·시세·매매는 시작하지 않았습니다.","policy":loaded}
 
 
@@ -1071,3 +1087,4 @@ def open_model_directory():
 @app.on_event("shutdown")
 def close_operations():
     runtime.close()
+    system.close_models()

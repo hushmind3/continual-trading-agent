@@ -117,7 +117,9 @@ class SystemOperations:
         path=Path(path).resolve()
         if not path.is_relative_to(ROOT.resolve()):return
         name=path.relative_to(ROOT).as_posix()
-        with self.state_lock:self.source_results[name]=value
+        with self.state_lock:
+            self.source_results[name]=value
+            self.state_signatures.clear()
     def publish(self,name,value,signature=None):
         with self.state_lock:
             self.states[name]=deepcopy(value);self.state_signatures[name]=signature
@@ -126,14 +128,16 @@ class SystemOperations:
     def state_value(self,name,loader,signature=None):
         with self.state_lock:lock=self.state_loader_locks.setdefault(name,threading.RLock())
         with lock:
-            with self.state_lock:
-                if signature is not None and name in self.states and self.state_signatures.get(name)==signature:return self.states[name]
-            try:return self.publish(name,loader(),signature)
+            try:
+                signature=signature() if callable(signature) else signature
+                with self.state_lock:
+                    if signature is not None and name not in self.state_errors and name in self.states and self.state_signatures.get(name)==signature:return self.states[name]
+                return self.publish(name,loader(),signature)
             except Exception as exc:
                 with self.state_lock:
-                    self.state_errors[name]=str(exc);self.state_updates[name]=time.time();self.state_signatures[name]=signature
-                    self.states.setdefault(name,None)
-                    return self.states[name]
+                    self.state_errors[name]=str(exc);self.state_revision+=1
+                    self.state_signatures.pop(name,None)
+                    return self.states.get(name)
     def invalidate_states(self):
         with self.state_lock:self.state_signatures.clear()
     def model(self,path,algorithm,environment=None):
@@ -144,13 +148,34 @@ class SystemOperations:
         with self.model_lock:
             key=str(path);entry=self.model_cache.get(key)
             if entry is None or entry['signature']!=signature:
+                loads=1+(entry['loads'] if entry else 0)
+                self.model_cache.pop(key,None);entry=None
+                self.release_models(keep=self.selected_models()|{key})
                 model=MODELS[algorithm].load(path,env=environment)
-                entry={'model':model,'signature':signature,'algorithm':algorithm,'loads':1+(entry['loads'] if entry else 0),'reuse':0}
+                entry={'model':model,'signature':signature,'algorithm':algorithm,'loads':loads,'reuse':0}
                 self.model_cache[key]=entry
             else:
                 entry['reuse']+=1
                 if environment is not None:entry['model'].set_env(environment)
+            entry['last_used']=time.monotonic()
             return entry['model']
+    def selected_models(self):
+        return {str((RUNTIME/path).resolve()) for path in read_json(ROOT/'runtime/operations/policies.json').values()}
+    def release_models(self,keep=()):
+        # Retain approved policies and the currently requested model; release older transient uses.
+        with self.model_lock:
+            for key in sorted(self.model_cache,key=lambda key:self.model_cache[key].get('last_used',0)):
+                if key not in keep:del self.model_cache[key]
+        import gc
+        gc.collect()
+        import torch
+        if torch.cuda.is_available():torch.cuda.empty_cache()
+    def close_models(self):
+        with self.model_lock:
+            self.model_cache.clear()
+            for entry in self.registry_cache.values():entry['registry'].close(cleanup=True)
+            self.registry_cache.clear()
+        self.release_models()
     def expert_registry(self,folder,pool_provider):
         from ..expert_registry_native import ExpertRegistry
         from .sac_champion import load_spec
@@ -163,6 +188,8 @@ class SystemOperations:
             entry=self.registry_cache.get(key)
             if entry is None or entry['signature']!=signature:
                 registry=ExpertRegistry(champion=load_spec(champion_path)) if champion_path else ExpertRegistry(pool_provider)
+                for old in list(self.registry_cache):
+                    if old!=key and old[1]==key[1]:self.registry_cache.pop(old)['registry'].close(cleanup=True)
                 if entry:entry['registry'].close(cleanup=True)
                 entry={'registry':registry,'signature':signature};self.registry_cache[key]=entry
             return entry['registry']
@@ -243,46 +270,9 @@ class SystemOperations:
                     self.phase(key,title,'complete','사용자가 선택한 운영 모델 로드: '+str(path))
                     self.phase('train-'+currency,currency+' 신규 SAC 학습','complete','선택 모델 유지; 자동 대체·새 학습 없음')
                     continue
-                symbols=[row['symbol'] for row in api.database()['instruments'] if row['eligible'] and row['currency']==currency and (not cfg.symbols or row['symbol'] in cfg.symbols)] if cfg.symbols else []
-                if cfg.symbols and not symbols:
-                    reason='운영 설정에서 선택한 '+currency+' 종목이 없습니다.';failures.append(reason);self.phase(key,title,'blocked',reason);continue
-                request=api.RunRequest(currency=currency,symbols=symbols)
-                checked=api.preflight(request,'train')
-                rows=[policy_files(),*[RUNTIME/row['path'] for row in api.checkpoints(api.source_settings())]]
-                selected=None
-                for path in rows:
-                    folder=path.parent if path.suffix=='.zip' else path
-                    model=api.model_state(api.source_settings(),folder)
-                    if model.get('policy_compatible',model['compatible']) and model['identity'].get('currency')==currency and model['identity'].get('symbols')==checked['symbols']:
-                        selected=folder;break
-                if selected is None:
-                    if not checked['ok']:
-                        reason=' · '.join(checked['errors']);failures.append(currency+': '+reason);self.phase(key,title,'blocked',reason);continue
-                    self.phase(key,title,'blocked','호환 정책 없음; 기존 파일 보존 후 신규 학습 준비')
-                    key='train-'+currency;title=currency+' 신규 SAC 학습';self.phase(key,title)
-                    current=api.job_state()
-                    if current['running']:
-                        self.phase(key,title,'blocked','기존 개별 학습/평가/수집을 보존합니다. 종료 후 다시 시작하세요.');failures.append(currency+': 기존 작업 실행 중');continue
-                    self.interrupted();launched=api.launch('train',request,preserve_output=True)['job']
-                    while True:
-                        self.interrupted();job=api.job_state()
-                        self.phase(key,title,detail=f"작업 {launched['id']} · {job['status']}",job_id=launched['id'],log=job.get('log'))
-                        if job.get('id')!=launched['id']:raise ValueError('개별 명령이 학습 작업을 교체했습니다. 자동 절차를 종료합니다.')
-                        if not job['running']:
-                            if job['status']!='succeeded':raise ValueError(job.get('detail') or '신규 학습 실패; '+job.get('log',''))
-                            break
-                        self.cancelled.wait(1)
-                    selected=RUNTIME/launched['output'];model=api.model_state(api.source_settings(),selected)
-                    if not model['compatible']:raise ValueError('신규 정책 호환성 실패: '+' · '.join(model['reasons']))
-                    self.phase(key,title,'complete','별도 정책·Replay 저장 및 호환 확인: '+str(selected))
-                else:
-                    self.phase(key,title,'complete','기존 정책 사용: '+str(selected))
-                    self.phase('train-'+currency,currency+' 신규 SAC 학습','complete','호환 정책 재사용; 신규 학습 생략')
-                # Validate official observation/action contracts through the existing loader, no prediction/training here.
-                self.interrupted();runtime.check_policy(selected,load=True)
-                self.phase('policy-'+currency,currency+' SAC 정책 호환성','complete','원본 환경 관측·행동 계약으로 공식 SAC 로딩 확인: '+str(selected))
-                from ..framework import policy_checkpoint
-                ready_policies[currency]=policy_checkpoint(selected).relative_to(RUNTIME).as_posix()
+                reason=currency+' 운영 정책 미승인: 모델 선택 화면에서 저장 정책을 직접 승인하세요.'
+                failures.append(reason);self.phase(key,title,'blocked',reason)
+                self.phase('train-'+currency,currency+' 신규 SAC 학습','blocked','자동 학습·운영 승격 없음; 학습과 정책 승인은 별도 명령입니다.')
             # Stored-data SAC preparation is independent of a live market connection.
             key='connection';title='인증 · 실제 시세 연결'
             connection_error=None
@@ -324,7 +314,6 @@ class SystemOperations:
                 return
             with runtime.lock:
                 self.interrupted()
-                atomic_json(ready_policies,ROOT/'runtime/operations/policies.json')
                 runtime.command('paper',True);runtime.command('engine',True)
             runtime.sac_decision()
             report=read_json(ROOT/'runtime/experts/status.json')

@@ -5,7 +5,7 @@ import time
 import traceback
 from datetime import datetime, timezone
 from .framework import ROOT
-from .state_io import read_json, atomic_json
+from .state_io import read_json, atomic_json, update_json
 
 
 def main():
@@ -18,8 +18,8 @@ def main():
         time.sleep(0.1)
     else:
         raise RuntimeError("작업 정보를 읽지 못했습니다.")
-    job["status"] = "running"
-    atomic_json(job, root / "job.json")
+    job=update_json(root/'job.json',lambda current:{**current,'status':'running'} if current.get('id')==job_id and current.get('status')=='starting' else None)
+    if job.get('id')!=job_id or job.get('status')!='running':return
     exit_code = 0
     try:
         if job['command']=='framework':
@@ -53,11 +53,7 @@ def main():
         from .official_cli import main as official_main
         official_main()
         if job["command"]=="train":
-            checkpoint=(job['output']+'/' if job.get('output') else '')+job.get('algorithm','sac')+'.zip'
-            atomic_json({"path":checkpoint},root/"active-checkpoint.json")
-            selected=read_json(ROOT/'runtime/operations/policies.json')
-            selected[job['currency']]=checkpoint
-            atomic_json(selected,ROOT/'runtime/operations/policies.json')
+            print('학습 결과 저장 완료. 운영 반영은 모델 선택 화면에서 직접 승인하세요.',flush=True)
     except BaseException:
         exit_code = 1
         traceback.print_exc()
@@ -68,12 +64,13 @@ def main():
             failed.update(action=job['action'],module=row[2],function=row[3],status='failed',error=str(sys.exc_info()[1]))
             atomic_json(failed,result_path)
     finally:
-        current = read_json(root / "job.json")
-        if current.get("id") == job_id and current.get("status") != "stopped":
+        def finished(current):
+            if current.get('id')!=job_id or current.get('status')=='stopped':return None
             if job.get('result') is not None:current['result']=job['result']
             current.update(status="succeeded" if exit_code == 0 else "failed", exit_code=exit_code,
                            finished_at=datetime.now(timezone.utc).isoformat())
-            atomic_json(current, root / "job.json")
+            return current
+        update_json(root/'job.json',finished)
     raise SystemExit(exit_code)
 
 

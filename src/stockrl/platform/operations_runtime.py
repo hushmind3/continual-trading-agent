@@ -238,7 +238,8 @@ class OperationsRuntime:
         self.inference_active+=1
         try:
             selected=read_json(ROOT/'runtime/operations/policies.json')
-            files=[(ROOT/'runtime/official'/path).resolve().parent for path in selected.values()] if selected else [policy_files()]
+            if not selected:raise ValueError('운영 정책 미승인: 모델 선택 화면에서 직접 승인하세요.')
+            files=[(ROOT/'runtime/official'/path).resolve().parent for path in selected.values()]
             with self.lock:
                 self.decisions=[]
                 for folder in files:

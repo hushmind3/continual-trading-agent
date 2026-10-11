@@ -49,7 +49,7 @@ ACTIONS={
 def action_list():
     return [{'id':key,'name':row[0],'menu':row[1],'module':row[2] or '요청에서 선택한 공식 모듈','function':row[3],
              'fields':row[4],'defaults':{'currency':'USD'},
-             'api':'/api/framework/'+key,'stop_api':'/api/stop'} for key,row in ACTIONS.items()]
+             'api':'/api','operation':'framework/'+key,'stop_api':'/api','stop_operation':'stop'} for key,row in ACTIONS.items()]
 
 
 def serialize(value):
@@ -82,6 +82,9 @@ def validate_native_call(parameters):
         fields=item.get('parameters',{}).get(callable_name,[])
         missing=[field['name'] for field in fields if field['required'] and field['name'] not in value]
         if missing:raise ValueError(callable_name+' 필수 인자: '+', '.join(missing)+'; 공식 인자 양식을 사용하세요.')
+        for field in fields:
+            if field['name'] in value and field.get('annotation')=='str' and not isinstance(value[field['name']],str):
+                raise ValueError(callable_name+'.'+field['name']+'는 공식 계약상 문자열입니다. 객체 변환 태그 대신 실제 문자열을 전달하세요.')
         contract=item.get('keyword_contracts',{}).get(callable_name)
         if contract:
             unexpected=set(value)-{field['name'] for field in fields}
@@ -557,6 +560,8 @@ def stock_workflow(action,parameters,output):
                 start=next(i for i,node in enumerate(body) if isinstance(node,ast.FunctionDef) and node.name=='process_df_for_mvo')
                 end=next(i for i,node in enumerate(body) if isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='df_result_a2c' for t in node.targets))
                 namespace={'np':np,'pd':pd,'train':training,'trade':trade,'TRADE_START_DATE':data['settings']['trade_start'],'TRADE_END_DATE':data['settings']['trade_end']}
+                imports=[node for node in body[:start] if isinstance(node,(ast.Import,ast.ImportFrom))]
+                exec(compile(ast.Module(body=imports,type_ignores=[]),str(source['path']),'exec'),namespace)
                 exec(compile(ast.Module(body=body[start:end],type_ignores=[]),str(source['path']),'exec'),namespace)
                 scale=settings['initial_amount']/defaults['initial_amount']
                 curves['mvo']=namespace['MVO_result']['Mean Var']*scale;curves['dji']=namespace['dji']['close']*scale
@@ -572,7 +577,7 @@ def stock_workflow(action,parameters,output):
 def source_catalog():
     """Inventory every real Python source, without executing package import side effects."""
     finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    roots=[('stockrl',ROOT/'src/stockrl'),('FinRL-X',ROOT/'FinRL-X/src'),('FinRL',finrl_root)]
+    roots=[('stockrl',ROOT/'backend/stockrl'),('FinRL-X',ROOT/'FinRL-X/src'),('FinRL',finrl_root)]
     items=[]
     for framework,root in roots:
         for path in sorted(root.rglob('*.py')):
@@ -621,6 +626,7 @@ def source_catalog():
 
 
 def catalog():
+    from .system_operations import system
     items=[dict(item) for item in source_catalog()];by_id={item['id']:item for item in items}
     roots={row[2]:[key] for key,row in ACTIONS.items() if row[2]}
     for item in items:
@@ -644,10 +650,11 @@ def catalog():
         for target in edges.get(queue.pop(),[]):
             if target not in connected:connected.add(target);queue.append(target)
     verified={};failed={}
-    for result_file in (ROOT/'runtime/official/framework-jobs').glob('*/result.json'):
+    for result_file in sorted((ROOT/'runtime/official/framework-jobs').glob('*/result.json'),key=lambda path:path.stat().st_mtime_ns):
         record=read_json(result_file)
         if record.get('error'):
             failed[record.get('module')]=record['error'];continue
+        failed.pop(record.get('module'),None)
         for module,names in record.get('executed_functions',{}).items():verified.setdefault(module,[]).extend(names)
         if record.get('module'):verified.setdefault(record['module'],[]).append(record.get('function'))
     for item in items:
@@ -658,13 +665,20 @@ def catalog():
         native=public and item['framework'] in ('FinRL-X','FinRL') and not item['path'].startswith('FinRL-X/web/')
         item['backend_connected']=item['id'] in connected or native
         item['frontend']=bool(item['actions']) or native or item['id'] in connected
-        item['native_api']='/api/framework/native_call' if native else None
+        item['native_api']='/api' if native else None
+        item['native_operation']='framework/native_call' if native else None
+        imported=system.states.get('import:'+item['id'])
+        import_error=system.state_errors.get('import:'+item['id'])
+        item['imported']=bool(imported and imported.get('imported'))
+        item['import_error']=import_error
         item['verified_functions']=sorted(set(verified.get(item['id'],[])))
         external=any(word in item['id'].lower() for word in ('alpaca','wrds','eodhd','joinquant','sinopac','shioaji','tushare','ibkr','fxmacro','quantconnect'))
-        if item['verified_functions']:item.update(status='연결·정상 작동',reason='표시된 함수의 실제 실행 결과가 있습니다. 다른 함수까지 검증한 것은 아닙니다.')
+        if import_error:item.update(status='미연결',reason='백엔드 import 실패: '+import_error)
+        elif item['verified_functions']:item.update(status='연결·정상 작동',reason='표시된 함수의 실제 실행 결과가 있습니다. 다른 함수까지 검증한 것은 아닙니다.')
         elif external:item.update(status='외부 인증 필요',reason='공식 공급원·계정 인증과 해당 입력 계약이 필요합니다. 다른 공급원으로 대체하지 않습니다.')
         elif item['backend_connected']:item.update(status='연결·실행 미확인',reason='원본 공개 callable 실행 API 또는 연결 모듈의 내부 의존성입니다. 필요한 원본 입력·객체·의존성을 갖춰 실행해야 합니다.')
         elif item['path'].startswith('FinRL-X/web/'):item.update(status='미연결',reason='사용자 지시로 Streamlit 화면은 이식·실행에서 제외합니다.')
         elif not public:item.update(status='미연결',reason='독립 실행 함수가 없는 패키지 초기화·상수 모듈 또는 소스 해석 오류입니다. 상위 공식 모듈의 import 경로로 사용됩니다.')
         else:item.update(status='미연결',reason='원본 입력·의존성 및 공개 실행 경로를 확인해야 합니다.')
+        if item['imported']:item['reason']='백엔드 import 완료. '+item['reason']
     return {'items':items,'actions':action_list(),'counts':{status:sum(item['status']==status for item in items if item['framework']!='stockrl') for status in ('연결·정상 작동','연결·실행 미확인','미연결','외부 인증 필요')}}

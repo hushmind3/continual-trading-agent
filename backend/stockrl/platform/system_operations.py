@@ -1,10 +1,11 @@
 """Shared CMD/React orchestration of existing operations; no learner implementation."""
 import os,subprocess,sys,threading,time,uuid
 from pathlib import Path
+from datetime import datetime,timezone
 import psutil
 from copy import deepcopy
 from ..framework import ROOT,policy_files
-from ..state_io import atomic_json,read_json
+from ..state_io import atomic_json,read_json,update_json
 
 RUNTIME=ROOT/'runtime/official'
 
@@ -23,10 +24,9 @@ def apply_running(value=None):
     except (psutil.Error,KeyError):return False
 
 def start_apply():
-    from ..web_api import launch_lock
-    with launch_lock:
+    with system.job_lock:
         if apply_running():return apply_state()
-        env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'src'),PYTHONUTF8='1')
+        env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1')
         RUNTIME.mkdir(parents=True,exist_ok=True)
         with (RUNTIME/'apply-launch.log').open('ab') as output:
             child=subprocess.Popen([sys.executable,str(ROOT/'scripts/start_server.py'),'--apply-only'],cwd=ROOT,env=env,
@@ -37,11 +37,10 @@ def start_apply():
         return value
 
 def busy():
-    from ..web_api import job_state
     from .operations_runtime import runtime
     from .library_operations import library
     items=[]
-    if job_state()['running']:items.append('실행 중인 SAC/백테스트/수집 작업')
+    if system.job_state()['running']:items.append('실행 중인 SAC/백테스트/수집 작업')
     if runtime.thread and runtime.thread.is_alive():items.append('실행 중인 시세 수신')
     if runtime.controls['paper']:items.append('활성 가상매매')
     if runtime.controls['engine'] or runtime.inference_active:items.append('활성 추론')
@@ -97,6 +96,7 @@ def check_system():
         value=runtime.status
         if value.get('error'):return 'failed',value['error']
         if runtime.controls['feed'] and value.get('last_received_at'):return 'complete','실제 완료 바 수신 기록: '+str(value.get('last_as_of'))
+        if not runtime.controls['feed']:return 'pending','시세 수신 중지 상태; 시작 명령 전에는 실제 수신을 확인하지 않습니다.'
         return 'blocked','시세 수신 '+value['status']+'; 현재 수신은 확인하지 않음'
     check('feed','실제 시장 데이터 수신',feed)
     check('workers','현재 작업 상태',lambda:('complete',' · '.join(busy()) or '실행 중 운영 작업 없음; 상태만 조회'))
@@ -105,6 +105,7 @@ def check_system():
 class SystemOperations:
     def __init__(self):
         self.path=ROOT/'runtime/operations/system.json';self.lock=threading.RLock()
+        self.job_lock=threading.RLock();self.job_process=None
         self.active=False;self.cancelled=threading.Event();self.restarting=False
         self.value=read_json(self.path,{'status':'pending','stages':[]})
         self.state_lock=threading.RLock();self.model_lock=threading.RLock()
@@ -113,6 +114,77 @@ class SystemOperations:
         self.model_cache={};self.registry_cache={};self.expert_pool=None;self.expert_pool_signature=None
         from ..state_io import subscribe_updates
         subscribe_updates(self.module_update)
+    def process_for(self,job):
+        try:
+            process = psutil.Process(int(job["pid"]))
+            if job.get("process_created") and abs(process.create_time() - job["process_created"]) > 0.1:
+                return None
+            if process.is_running() and any(x in " ".join(process.cmdline()) for x in ("stockrl.job_worker", "stockrl.official_cli")):
+                return process
+        except (psutil.Error, KeyError, ValueError):
+            pass
+        return None
+
+    def job_state(self):
+        job = read_json(RUNTIME / "job.json")
+        if self.job_process and self.job_process.poll() is not None:self.job_process=None
+        process = self.process_for(job) if job else None
+        if job.get("status") in ("starting", "running") and not process:
+            job["status"] = "unknown"
+            job["detail"] = "프로세스가 종료됐지만 완료 기록이 없습니다. 로그를 확인하세요."
+        result = {**job, "running": process is not None, "log_text": ""}
+        name = job.get("log", "training.log")
+        path = RUNTIME / name
+        if path.is_file() and path.resolve().is_relative_to(RUNTIME.resolve()):
+            with path.open("rb") as stream:
+                stream.seek(max(0, path.stat().st_size - 32000))
+                result["log_text"] = stream.read().decode("utf8", errors="replace")
+        import re
+        measured={}
+        for key,value in re.findall(r"\|\s*([a-z_]+)\s*\|\s*([-+\deE.]+)\s*\|",result["log_text"]):
+            try: measured[key]=float(value)
+            except ValueError: pass
+        result["measurements"]=measured
+        return result
+
+    def start_job(self,job):
+        with self.job_lock:
+            RUNTIME.mkdir(parents=True,exist_ok=True);(RUNTIME/'jobs').mkdir(exist_ok=True)
+            env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1')
+            from .framework_operations import provider_environment
+            env.update(provider_environment())
+            with (RUNTIME/job['log']).open('w',encoding='utf8') as output:
+                process=subprocess.Popen([sys.executable,'-m','stockrl.job_worker',job['id']],cwd=ROOT,env=env,
+                    stdout=output,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            job.update(pid=process.pid,process_created=psutil.Process(process.pid).create_time())
+            self.job_process=process
+            update_json(RUNTIME/'job.json',lambda current:{**current,**job} if current.get('id')!=job['id'] else {**job,**current,'pid':job['pid'],'process_created':job['process_created']})
+            (RUNTIME/'training.pid').write_text(str(process.pid))
+            return job
+
+    def stop_job(self):
+        with self.job_lock:
+            job = read_json(RUNTIME / "job.json")
+            process = self.process_for(job)
+            if not process:
+                raise RuntimeError( "실행 중인 작업이 없습니다.")
+            descendants = process.children(recursive=True)
+            for child in reversed(descendants):
+                try:
+                    child.terminate()
+                except psutil.Error:
+                    pass
+            process.terminate()
+            psutil.wait_procs([*descendants, process], timeout=3)
+            for child in [*descendants, process]:
+                try:
+                    if child.is_running():
+                        child.kill()
+                except psutil.Error:
+                    pass
+            job.update(status="stopped", finished_at=datetime.now(timezone.utc).isoformat(), detail="사용자가 중단했습니다. 정상 종료 전 새 가중치는 저장되지 않습니다.")
+            update_json(RUNTIME/'job.json',lambda current:{**current,'status':job['status'],'finished_at':job['finished_at'],'detail':job['detail']} if current.get('id')==job['id'] else None)
+            return {"message": job["detail"]}
     def module_update(self,path,value):
         path=Path(path).resolve()
         if not path.is_relative_to(ROOT.resolve()):return
@@ -140,6 +212,26 @@ class SystemOperations:
                     return self.states.get(name)
     def invalidate_states(self):
         with self.state_lock:self.state_signatures.clear()
+    def connect_modules(self):
+        import importlib
+        from ..framework import finrl_file,finrlx
+        modules={
+            'stockrl':['live_feed','platform.kiwoom_data','platform.assets','platform.expert_inference','platform.expert_conversion','platform.sac_champion'],
+            'FinRL':['meta.env_portfolio_optimization.env_portfolio_optimization','meta.env_stock_trading.env_stocktrading','meta.preprocessor.preprocessors','meta.preprocessor.yahoodownloader','agents.stablebaselines3.models'],
+            'FinRL-X':['strategies.rl_model','backtest.backtest_engine','data.data_fetcher','data.trading_calendar']}
+        result={}
+        for framework,names in modules.items():
+            for name in names:
+                key=framework+':'+name
+                def load(framework=framework,name=name):
+                    if framework=='FinRL-X':module=finrlx(name)
+                    elif framework=='FinRL' and name.startswith('meta.env_portfolio_optimization.'):
+                        module=finrl_file(name.replace('.','/')+'.py')
+                    else:module=importlib.import_module(('finrl' if framework=='FinRL' else 'stockrl')+'.'+name)
+                    return {'imported':True,'file':getattr(module,'__file__',None)}
+                value=self.state_value('import:'+key,load,())
+                result[key]={**(value or {'imported':False}),'error':self.state_errors.get('import:'+key,'')}
+        return result
     def model(self,path,algorithm,environment=None):
         from finrl.agents.stablebaselines3.models import MODELS
         path=Path(path).resolve()
@@ -161,11 +253,13 @@ class SystemOperations:
             return entry['model']
     def selected_models(self):
         return {str((RUNTIME/path).resolve()) for path in read_json(ROOT/'runtime/operations/policies.json').values()}
-    def release_models(self,keep=()):
+    def release_models(self,keep=(),force=False):
         # Retain approved policies and the currently requested model; release older transient uses.
+        released=False
         with self.model_lock:
             for key in sorted(self.model_cache,key=lambda key:self.model_cache[key].get('last_used',0)):
-                if key not in keep:del self.model_cache[key]
+                if key not in keep:del self.model_cache[key];released=True
+        if not released and not force:return
         import gc
         gc.collect()
         import torch
@@ -175,11 +269,11 @@ class SystemOperations:
             self.model_cache.clear()
             for entry in self.registry_cache.values():entry['registry'].close(cleanup=True)
             self.registry_cache.clear()
-        self.release_models()
-    def expert_registry(self,folder,pool_provider):
+        self.release_models(force=True)
+    def expert_registry(self,folder,pool_provider,champion=None,champion_path=None):
         from ..expert_registry_native import ExpertRegistry
         from .sac_champion import load_spec
-        folder=Path(folder).resolve();identity=read_json(folder/'dataset.json');champion_path=identity.get('champion_file')
+        folder=Path(folder).resolve();identity=read_json(folder/'dataset.json');champion_path=champion_path or identity.get('champion_file')
         signature=None
         if champion_path:
             path=Path(champion_path).resolve();stamp=path.stat();signature=(str(path),stamp.st_mtime_ns,stamp.st_size)
@@ -187,7 +281,7 @@ class SystemOperations:
         with self.model_lock:
             entry=self.registry_cache.get(key)
             if entry is None or entry['signature']!=signature:
-                registry=ExpertRegistry(champion=load_spec(champion_path)) if champion_path else ExpertRegistry(pool_provider)
+                registry=ExpertRegistry(champion=champion if champion is not None else load_spec(champion_path)) if champion_path else ExpertRegistry(pool_provider)
                 for old in list(self.registry_cache):
                     if old!=key and old[1]==key[1]:self.registry_cache.pop(old)['registry'].close(cleanup=True)
                 if entry:entry['registry'].close(cleanup=True)
@@ -223,7 +317,7 @@ class SystemOperations:
         with self.lock:
             if self.active:return self.snapshot()
             from .operations_runtime import runtime
-            if self.value.get('status')=='complete' and all(runtime.controls.values()) and self.value.get('currencies')==(currencies or ['USD','KRW']):return self.snapshot()
+            if self.value.get('status')=='complete' and all(runtime.controls[name] for name in ('feed','paper','engine')) and self.value.get('currencies')==(currencies or ['USD','KRW']):return self.snapshot()
             if apply_running() or self.restarting:raise ValueError('변경 적용이 끝난 후 운영을 시작하세요.')
             if library.active:raise ValueError('현재 모델 작업이 끝난 후 전체 시작을 요청하세요.')
             self.cancelled.clear();self.active=True
@@ -316,6 +410,8 @@ class SystemOperations:
                 self.interrupted()
                 runtime.command('paper',True);runtime.command('engine',True)
             runtime.sac_decision()
+            pending=[currency for currency in ready_policies if runtime.status.get('policy_inputs',{}).get(currency,{}).get('status')!='ready']
+            if pending:raise ValueError('선택 종목의 실제 가격 행렬이 준비되지 않아 추론을 실행하지 않았습니다: '+', '.join(pending))
             report=read_json(ROOT/'runtime/experts/status.json')
             failures.extend(expert+': '+str(row.get('reason','Expert 추론 실패')) for expert,row in report.get('experts',{}).items() if expert in catalog.get('active',[]) and row.get('status')!='ready')
             self.phase(key,title,'complete',', '.join(ready_policies)+' 실제 가격·Expert 관측으로 SAC 판단 실행; 이후 완료 바에서 기존 가상체결. 실제 증권 주문 미전송')
@@ -329,10 +425,9 @@ class SystemOperations:
     def stop(self):
         from .operations_runtime import runtime
         from .library_operations import library
-        from ..web_api import job_state,stop
         self.cancel();library.cancelled.set();runtime.cancel_inference.set()
         runtime.command('learning',False);runtime.command('engine',False);runtime.command('paper',False);runtime.command('feed',False)
-        if job_state()['running']:stop()
+        if system.job_state()['running']:stop()
         if runtime.account:runtime.account.save()
         pending=bool(runtime.inference_active or library.active or runtime.thread and runtime.thread.is_alive() or self.active)
         self.phase('stop','전체 시스템 중지','running' if pending else 'complete','현재 추론/수신 작업 종료 대기' if pending else '운영 중지; 서버·모델·계좌 파일 유지')

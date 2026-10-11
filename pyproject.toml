@@ -13,4 +13,4 @@ dependencies = ["numpy>=1.26", "pandas>=2.1", "torch>=2.14", "psutil>=5.9", "req
 teachers = ["stable-baselines3>=2.3", "sb3-contrib>=2.3", "gymnasium>=0.29", "scikit-learn>=1.2", "stockstats>=0.6"]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["backend"]

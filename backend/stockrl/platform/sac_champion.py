@@ -316,15 +316,25 @@ def create(currency, symbols, active, env):
         "transfer": output["transfer"], "identity": identity,"moe_architecture":output["moe_architecture"],"expert_counts":expert_counts}
 
 
+def champion_info(path):
+    from .system_operations import system
+    path=Path(path).resolve();stamp=path.stat()
+    def load():
+        data=load_spec(path)
+        return {"name":path.name,"path":str(path),"version":data.get('version'),
+            "trained":data.get('trained',False),"parameters":data.get('parameters',{}),
+            "identity":data.get('identity',{}),"checkpoint":data.get('checkpoint'),"training":data.get('training',{}),
+            "file_bytes":stamp.st_size,"sac_spaces":data.get('sac_spaces',{}),"moe_architecture":data.get('moe_architecture',{}),"expert_counts":data.get('expert_counts',{})}
+    value=system.state_value('champion:'+str(path),load,(stamp.st_mtime_ns,stamp.st_size))
+    if system.state_errors.get('champion:'+str(path)):raise ValueError(system.state_errors['champion:'+str(path)])
+    return value
+
+
 def list_champions():
     result = []
     for path in sorted(MODEL_DIR.glob("sac_champion_*.pt")):
         try:
-            data = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
-            result.append({"name": path.name, "path": str(path), "version": data.get("version"),
-                "trained": data.get("trained", False), "parameters": data.get("parameters", {}),
-                "identity": data.get("identity", {}), "checkpoint": data.get("checkpoint"),"training":data.get("training",{}),
-                "file_bytes": path.stat().st_size,"sac_spaces":data.get("sac_spaces",{}),"moe_architecture":data.get("moe_architecture",{}),"expert_counts":data.get("expert_counts",{})})
+            result.append(champion_info(path))
         except (OSError, ValueError, RuntimeError):
             continue
     return result
@@ -337,8 +347,9 @@ def load_spec(path):
     return data
 
 
-def save_trained_champion(source_path, model, target_path, checkpoint_dir):
-    data = load_spec(source_path)
+def save_trained_champion(source_path, model, target_path, checkpoint_dir,spec=None):
+    data = dict(spec if spec is not None else load_spec(source_path))
+    data['identity']=dict(data['identity'])
     data['identity']['champion_file']=str(target_path)
     data["policy_state"] = {key:value.detach().cpu() for key,value in model.policy.state_dict().items()}
     data["trained"] = True

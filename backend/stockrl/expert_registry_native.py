@@ -2,6 +2,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 import json
+import hashlib
 import time
 import numpy as np
 import pandas as pd
@@ -91,14 +92,15 @@ class ExpertRegistry:
             if self.pool is not shared:self.cache.clear();self.pool=shared
         elif self.pool is None:self.pool=ExpertPool(self.settings,keep_device=True,live=True)
         stamp=str(frame.date.max());features={};errors=[]
+        input_signature=hashlib.blake2b(pd.util.hash_pandas_object(frame,index=True).values.tobytes()+json.dumps(account,sort_keys=True,default=str).encode()).digest()
         for key in selected:
             try:
-                entry=self.pool.entries[key];cache_key=(key,stamp)
-                if not entry.get('stock_policy') and cache_key in self.cache:packets=self.cache[cache_key]
+                entry=self.pool.entries[key];cache_key=(key,account.get('currency'));cached=self.cache.get(cache_key)
+                if not entry.get('stock_policy') and cached and cached[0]==input_signature:packets=cached[1]
                 else:
                     snapshot,batches=prepare_inputs(entry,frame,account)
                     packets=run_batches(self.pool,key,snapshot,batches)
-                    if not entry.get('stock_policy'):self.cache[cache_key]=packets
+                    if not entry.get('stock_policy'):self.cache[cache_key]=(input_signature,packets)
                 native=np.concatenate([np.asarray(packet['native_output'],dtype=np.float64).reshape(-1) for packet in packets])
                 if not native.size or not np.isfinite(native).all():raise ValueError('실제 Expert 출력이 비었거나 NaN·Inf가 있습니다.')
                 transformed=np.sign(native)*np.log1p(np.abs(native))

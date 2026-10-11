@@ -8,9 +8,7 @@ import math
 import os
 import re
 import sqlite3
-import subprocess
 import sys
-import threading
 import time
 import uuid
 import zipfile
@@ -19,7 +17,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-import psutil
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
 from starlette.routing import Route, Match
 from fastapi.responses import FileResponse, JSONResponse
@@ -56,10 +53,8 @@ class UnifiedAPI:
 app.router.routes.append(Route('/api',UnifiedAPI(),methods=['GET','POST']))
 FRONTEND_DIST = ROOT / "frontend/dist"
 app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets"), check_dir=False), name="react-assets")
-launch_lock = threading.Lock()
 resource_monitor = ResourceMonitor(ROOT)
 database_cache = {"stamp": None, "value": None}
-children = {}
 
 
 @app.middleware("http")
@@ -95,7 +90,7 @@ async def local_writes(request: Request, call_next):
     }:
         return JSONResponse({"detail": "로컬 화면에서 요청하세요."}, status_code=403)
     if method!='GET':
-        allowed_stop=path in ('/api/stop','/api/system/stop','/api/system/prepare-restart')
+        allowed_stop=path in ('/api/stop','/api/system/stop','/api/system/prepare-restart','/api/library/stop') or path.startswith('/api/controls/') and parameters.get('enabled') is False
         if (apply_running() or system.restarting) and not allowed_stop and path!='/api/system/apply':
             return JSONResponse({'detail':'변경 적용/서버 갱신 중입니다. 기존 작업은 보존합니다.'},status_code=409)
         conflict=path in ('/api/train','/api/backtest','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/framework/') or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
@@ -267,7 +262,9 @@ def model_state(settings,selected=None):
             if isinstance(value,(str,int,float,bool)) and key!='action_noise' and state.get(key) != value:
                 resume_reasons.append(f"{key}: 저장값 {state.get(key)} / 현재값 {value}")
         if identity.get('symbols') and (is_champion or identity.get('observation_contract')=='expert-observation-v1'):
-            expected_shape=[identity.get('base_observation_dim',0)+64*len(identity.get('champion_experts',[]))+identity.get('account_feature_size',16)]
+            env_args=settings['environment_args']
+            base_dim=len(env_args['features'])*len(identity['symbols'])*env_args['time_window']
+            expected_shape=[base_dim+64*len(identity.get('champion_experts',[]))+16]
             if result['observation_shape']!=expected_shape or result['action_shape']!=[action_count]:
                 structure_reasons.append(f"통합 SAC Champion 관측/행동 크기 불일치: 저장 {result['observation_shape']}/{result['action_shape']} / 현재 {expected_shape}/[{action_count}] (현금 포함)")
         else:structure_reasons.append('현재 Expert 관측 계약의 식별 정보가 없습니다. 신규 정책으로 생성하세요.')
@@ -385,46 +382,8 @@ def expert_state():
             "reported": file_info(ROOT / "runtime/experts/status.json").get("modified")}
 
 
-def process_for(job):
-    try:
-        process = psutil.Process(int(job["pid"]))
-        if job.get("process_created") and abs(process.create_time() - job["process_created"]) > 0.1:
-            return None
-        if process.is_running() and any(x in " ".join(process.cmdline()) for x in ("stockrl.job_worker", "stockrl.official_cli")):
-            return process
-    except (psutil.Error, KeyError, ValueError):
-        pass
-    return None
 
 
-def job_state():
-    job = read_json(RUNTIME / "job.json")
-    if not job:
-        try:
-            pid = int((RUNTIME / "training.pid").read_text())
-            process = process_for({"pid": pid})
-            if process:
-                job = {"pid": pid, "status": "running", "command": "legacy", "log": "training.log"}
-        except (OSError, ValueError):
-            pass
-    process = process_for(job) if job else None
-    if job.get("status") in ("starting", "running") and not process:
-        job["status"] = "unknown"
-        job["detail"] = "프로세스가 종료됐지만 완료 기록이 없습니다. 로그를 확인하세요."
-    result = {**job, "running": process is not None, "log_text": ""}
-    name = job.get("log", "training.log")
-    path = RUNTIME / name
-    if path.is_file() and path.resolve().is_relative_to(RUNTIME.resolve()):
-        with path.open("rb") as stream:
-            stream.seek(max(0, path.stat().st_size - 32000))
-            result["log_text"] = stream.read().decode("utf8", errors="replace")
-    import re
-    measured={}
-    for key,value in re.findall(r"\|\s*([a-z_]+)\s*\|\s*([-+\deE.]+)\s*\|",result["log_text"]):
-        try: measured[key]=float(value)
-        except ValueError: pass
-    result["measurements"]=measured
-    return result
 
 
 def evaluation_root(currency=None):
@@ -537,9 +496,10 @@ def state(views:str='[]',refresh_views:bool=False):
         if not isinstance(requested,list) or not all(isinstance(path,str) for path in requested):raise ValueError('상태 항목 목록이 필요합니다.')
     except (ValueError,TypeError) as exc:raise HTTPException(400,str(exc)) from exc
     if refresh_views:system.invalidate_states()
+    imports=system.connect_modules()
     settings=system.state_value('settings',source_settings,())
     db=system.state_value('data',database,lambda:state_stamp(DB,DB.with_name(DB.name+'-wal'),ROOT/'configs/instruments.json'))
-    job=system.state_value('job',job_state)
+    job=system.state_value('job',system.job_state)
     def saved_model():
         folder=policy_files()
         if settings is None:raise RuntimeError('공식 설정 조회 실패: '+system.state_errors.get('settings',''))
@@ -574,7 +534,7 @@ def state(views:str='[]',refresh_views:bool=False):
     return {'architecture':'finrl-unified-v3','updated_at':now(),'settings':settings,'model':model,'data':db,'experts':experts,'job':job,
         'evaluation':evaluations,'models_by_currency':models,'checkpoints':revisions,'capabilities':system.state_value('capabilities',capabilities,()),
         'operations':operations_state,'library':library,'automation':automation,'resources':resources,'views':selected,
-        'state_revision':system.state_revision,'module_errors':dict(system.state_errors),'module_updated_at':dict(system.state_updates),'resident_models':system.resident_models()}
+        'state_revision':system.state_revision,'module_errors':dict(system.state_errors),'module_updated_at':dict(system.state_updates),'resident_models':system.resident_models(),'imports':imports}
 
 
 def connections():
@@ -645,12 +605,14 @@ def preflight(req, command):
     if req.champion_path and req.algorithm!='sac':errors.append('선택한 Champion은 SAC 정책입니다. SAC를 선택하세요.')
     if req.resume and model['identity'].get('algorithm','sac')!=req.algorithm:errors.append('이어 학습 알고리즘이 저장 정책과 다릅니다.')
     if req.champion_path:
-        from .platform.sac_champion import load_spec,MODEL_DIR
+        from .platform.sac_champion import champion_info,MODEL_DIR
         source=Path(req.champion_path).expanduser().resolve()
         try:
             if not source.is_relative_to(MODEL_DIR.resolve()) or not source.name.startswith('sac_champion_'):
                 raise ValueError('모델 폴더의 SAC Champion을 선택하세요.')
-            champion=load_spec(source);identity=champion['identity']
+            champion=champion_info(source);identity=champion['identity']
+            if identity.get('environment')!=CASH_ENVIRONMENT:
+                raise ValueError('현재 PortfolioOptimizationEnv와 다른 Champion입니다. MoE에서 현재 환경으로 생성하세요.')
             checkpoint=Path(champion['checkpoint'])
             if not checkpoint.is_absolute():checkpoint=RUNTIME/checkpoint
             if not checkpoint.is_file():raise ValueError('Champion의 SB3 학습 체크포인트가 없습니다.')
@@ -669,25 +631,24 @@ def preflight(req, command):
         for row in experts["items"]:
             if row["active"] and not row["package_available"]:
                 errors.append(row["id"] + ": 활성 Expert 패키지가 없거나 크기가 다릅니다.")
+    periods=None
     if symbols and not errors:
-        with sqlite3.connect(DB.as_uri() + "?mode=ro", uri=True) as connection:
-            placeholders = ",".join("?" for _ in symbols)
-            dates = [r[0] for r in connection.execute(f"SELECT DISTINCT date FROM price_data WHERE ticker IN ({placeholders}) ORDER BY date", symbols)]
-        from pandas import Timedelta, to_datetime
-        dates = to_datetime(dates, utc=True)
-        trade = dates.max() + Timedelta(days=1)
-        after_covariance = dates
-        train_count = int(((after_covariance >= trade - Timedelta(days=1095)) & (after_covariance < trade - Timedelta(days=365))).sum())
-        test_count = int(((after_covariance >= trade - Timedelta(days=365)) & (after_covariance < trade)).sum())
-        if train_count < 2 and command == "train":
-            errors.append("공식 rolling 학습 구간에 데이터가 부족합니다.")
-        if test_count < 2:
-            errors.append("rolling 평가 구간에 데이터가 부족합니다.")
-        periods = {"training_observations": train_count, "test_observations": test_count,
-                   "trade_date": str(trade), "train_start": str(trade-Timedelta(days=1095)),
-                   "train_end_exclusive": str(trade-Timedelta(days=365))}
-    else:
-        periods = None
+        from .framework import prices,validate_price_panel
+        from pandas import Timedelta,to_datetime
+        frame=prices(req.currency,symbols)
+        if frame.empty:errors.append('학습·추론 모듈이 사용하는 실제 저장 가격이 없습니다.')
+        else:
+            dates=to_datetime(frame.date,utc=True);trade=dates.max()+Timedelta(days=1)
+            train_mask=(dates>=trade-Timedelta(days=1095))&(dates<trade-Timedelta(days=365))
+            test_mask=(dates>=trade-Timedelta(days=365))&(dates<trade)
+            train_count=int(dates[train_mask].nunique());test_count=int(dates[test_mask].nunique())
+            if train_count<2 and command=='train':errors.append('공식 rolling 학습 구간에 데이터가 부족합니다.')
+            if test_count<2:errors.append('rolling 평가 구간에 데이터가 부족합니다.')
+            for label,mask in ([('학습',train_mask)] if command=='train' else [])+[('평가',test_mask)]:
+                try:validate_price_panel(frame[mask],symbols)
+                except ValueError as exc:errors.append(label+': '+str(exc))
+            periods={'training_observations':train_count,'test_observations':test_count,'trade_date':str(trade),
+                'train_start':str(trade-Timedelta(days=1095)),'train_end_exclusive':str(trade-Timedelta(days=365))}
     return {"ok": not errors, "errors": errors, "symbols": symbols, "currency": req.currency, "periods": periods,
             "mode": "이어 학습" if req.resume else "새 학습" if command == "train" else "백테스트",
             "steps_per_run": req.total_timesteps or steps}
@@ -699,8 +660,8 @@ def check(command: Literal["train", "backtest"], req: RunRequest):
 
 
 def launch(command, req,preserve_output=False):
-    with launch_lock:
-        if job_state()["running"]:
+    with system.job_lock:
+        if system.job_state()["running"]:
             raise HTTPException(409, "학습 또는 평가가 실행 중입니다.")
         checked = preflight(req, command)
         if not checked["ok"]:
@@ -718,23 +679,10 @@ def launch(command, req,preserve_output=False):
             job.update(champion_path=str(Path(req.champion_path).expanduser().resolve()),
                 champion_output=str(target),output='champions/'+target.stem)
         elif command=='train' or preserve_output:job['output']='policies/'+job_id
-        start_job(job)
+        system.start_job(job)
         return {"message": "학습을 시작했습니다." if command == "train" else "백테스트를 시작했습니다.", "job": job}
 
 
-def start_job(job):
-    RUNTIME.mkdir(parents=True,exist_ok=True);(RUNTIME/'jobs').mkdir(exist_ok=True)
-    env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'src'),PYTHONUTF8='1')
-    from .platform.framework_operations import provider_environment
-    env.update(provider_environment())
-    with (RUNTIME/job['log']).open('w',encoding='utf8') as output:
-        process=subprocess.Popen([sys.executable,'-m','stockrl.job_worker',job['id']],cwd=ROOT,env=env,
-            stdout=output,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-    job.update(pid=process.pid,process_created=psutil.Process(process.pid).create_time())
-    children[job['id']]=process
-    update_json(RUNTIME/'job.json',lambda current:{**current,**job} if current.get('id')!=job['id'] else {**job,**current,'pid':job['pid'],'process_created':job['process_created']})
-    (RUNTIME/'training.pid').write_text(str(process.pid))
-    return job
 
 
 def framework_catalog():
@@ -767,10 +715,10 @@ def framework_task(action:str,parameters:dict):
     if action=='native_call':
         try:validate_native_call(parameters)
         except (ValueError,TypeError,KeyError) as exc:raise HTTPException(400,str(exc)) from exc
-    with launch_lock:
-        if job_state()['running']:raise HTTPException(409,'현재 공식 작업 종료 후 실행하세요.')
+    with system.job_lock:
+        if system.job_state()['running']:raise HTTPException(409,'현재 공식 작업 종료 후 실행하세요.')
         job_id=uuid.uuid4().hex
-        job=start_job({'id':job_id,'command':'framework','action':action,'parameters':parameters,
+        job=system.start_job({'id':job_id,'command':'framework','action':action,'parameters':parameters,
             'currency':parameters.get('currency','USD'),'symbols':parameters.get('symbols',[]),'resume':False,
             'status':'starting','started_at':now(),'log':f'jobs/{job_id}.log','output':'framework-jobs/'+job_id})
     return {'message':ACTIONS[action][0]+' 실행을 시작했습니다.','job':job}
@@ -817,8 +765,8 @@ def collect(req:CollectionRequest):
     info=connections()
     if info["data"]["status"]!="configured":
         raise HTTPException(409,info["data"]["reason"])
-    with launch_lock:
-        if job_state()["running"]:
+    with system.job_lock:
+        if system.job_state()["running"]:
             raise HTTPException(409,"다른 작업을 마친 뒤 수집하세요.")
         RUNTIME.mkdir(parents=True,exist_ok=True)
         job_id=uuid.uuid4().hex
@@ -826,7 +774,7 @@ def collect(req:CollectionRequest):
         job={"id":job_id,"command":"collect","status":"starting","started_at":now(),
              "symbols":sorted(set(req.symbols)),"currency":"USD","resume":False,
              "start_date":req.start_date,"end_date":req.end_date,"log":f"jobs/{job_id}.log"}
-        start_job(job)
+        system.start_job(job)
     return {"message":"FinRL-X 원본 가격 수집을 시작했습니다.","job":job}
 
 
@@ -837,7 +785,7 @@ def champions():
 
 @private_api.post("/api/champions/create")
 def champion_create(request:ChampionRequest):
-    if job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")
+    if system.job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")
     from .platform.operations_settings import settings
     current=read_json(policy_files()/"dataset.json")
     recent=read_json(RUNTIME/"job.json")
@@ -880,55 +828,37 @@ def checkpoint_download(path:str):
 
 @private_api.post("/api/stop")
 def stop():
-    with launch_lock:
-        job = read_json(RUNTIME / "job.json")
-        process = process_for(job)
-        if not process:
-            raise HTTPException(409, "실행 중인 작업이 없습니다.")
-        descendants = process.children(recursive=True)
-        for child in reversed(descendants):
-            try:
-                child.terminate()
-            except psutil.Error:
-                pass
-        process.terminate()
-        psutil.wait_procs([*descendants, process], timeout=3)
-        for child in [*descendants, process]:
-            try:
-                if child.is_running():
-                    child.kill()
-            except psutil.Error:
-                pass
-        job.update(status="stopped", finished_at=now(), detail="사용자가 중단했습니다. 정상 종료 전 새 가중치는 저장되지 않습니다.")
-        update_json(RUNTIME/'job.json',lambda current:{**current,'status':job['status'],'finished_at':job['finished_at'],'detail':job['detail']} if current.get('id')==job['id'] else None)
-        return {"message": job["detail"]}
+    try:return system.stop_job()
+    except RuntimeError as exc:raise HTTPException(409,str(exc)) from exc
 
 
 @private_api.post("/api/experts/select")
 def select(req: Selection):
-    with launch_lock:
-        if job_state()["running"]:
-            raise HTTPException(409, "실행을 마친 뒤 Expert 구성을 변경하세요.")
-        try:
-            ExpertRegistry().select(sorted(set(req.active)))
-        except (ValueError, OSError) as exc:
-            raise HTTPException(400, str(exc)) from exc
-    return {"message": "Expert 선택을 저장했습니다."}
+    with system.job_lock:
+        with system.job_lock:
+            if system.job_state()["running"]:
+                raise HTTPException(409, "실행을 마친 뒤 Expert 구성을 변경하세요.")
+            try:
+                ExpertRegistry().select(sorted(set(req.active)))
+            except (ValueError, OSError) as exc:
+                raise HTTPException(400, str(exc)) from exc
+        return {"message": "Expert 선택을 저장했습니다."}
 
 
 @private_api.post("/api/experts/register")
 def register(req: Registration):
-    with launch_lock:
-        if job_state()["running"]:
-            raise HTTPException(409, "실행을 마친 뒤 패키지를 등록하세요.")
-        registry = read_json(ROOT / "configs/experts.json")
-        if req.slot in registry.get("experts", {}):
-            raise HTTPException(409, "이미 사용 중인 슬롯 이름입니다. 다른 이름으로 등록하세요.")
-        try:
-            ExpertRegistry().register(req.path, req.slot)
-        except (ValueError, RuntimeError, OSError, KeyError) as exc:
-            raise HTTPException(400, str(exc)) from exc
-    return {"message": "Expert 패키지를 등록했습니다."}
+    with system.job_lock:
+        with system.job_lock:
+            if system.job_state()["running"]:
+                raise HTTPException(409, "실행을 마친 뒤 패키지를 등록하세요.")
+            registry = read_json(ROOT / "configs/experts.json")
+            if req.slot in registry.get("experts", {}):
+                raise HTTPException(409, "이미 사용 중인 슬롯 이름입니다. 다른 이름으로 등록하세요.")
+            try:
+                ExpertRegistry().register(req.path, req.slot)
+            except (ValueError, RuntimeError, OSError, KeyError) as exc:
+                raise HTTPException(400, str(exc)) from exc
+        return {"message": "Expert 패키지를 등록했습니다."}
 
 
 class ControlRequest(BaseModel):
@@ -1028,7 +958,7 @@ def save_operational_settings(values:dict):
 @private_api.post("/api/library/{kind}")
 def library_job(kind:str,payload:dict):
     if kind=='stop':return stop_library()
-    if job_state()["running"] and kind not in ("search","inspect"):
+    if system.job_state()["running"] and kind not in ("search","inspect"):
         raise HTTPException(409,"현재 SAC 작업 종료 후 모델 구성을 변경하세요.")
     try:return library_manager.start(kind,payload)
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
@@ -1052,22 +982,23 @@ def model_files():
 
 @private_api.post("/api/checkpoints/restore")
 def restore_checkpoint(request:dict):
-    if job_state()["running"]:raise HTTPException(409,"현재 학습 작업 종료 후 복원하세요.")
-    path=(RUNTIME/request.get("path","")).resolve()
-    if not path.is_relative_to(RUNTIME.resolve()) or path.suffix!='.zip' or path.stem not in MODELS or not path.is_file():
-        raise HTTPException(400,"저장된 FinRL 정책 버전을 선택하세요.")
-    identity=read_json(path.parent/"dataset.json")
-    settings=source_settings()
-    if identity.get("environment")!=settings["environment"] or identity.get('algorithm','sac')!=path.stem or identity.get("sac_example")!=sac_example(path.stem)[1]:
-        raise HTTPException(400,"현재 FinRL 환경·알고리즘·설정과 호환되지 않는 정책입니다.")
-    with runtime.lock:
-        try:loaded=runtime.check_policy(path.parent,load=True)
-        except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
-        atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
-        selection_path=ROOT/'runtime/operations/policies.json'
-        update_json(selection_path,lambda selected:{**selected,identity['currency']:path.relative_to(RUNTIME).as_posix()})
-        system.release_models(keep=system.selected_models())
-    return {"message":"해당 FinRL 정책을 선택하고 중앙 정책을 실제 로드했습니다. 학습·시세·매매는 시작하지 않았습니다.","policy":loaded}
+    with system.job_lock:
+        if system.job_state()["running"]:raise HTTPException(409,"현재 학습 작업 종료 후 복원하세요.")
+        path=(RUNTIME/request.get("path","")).resolve()
+        if not path.is_relative_to(RUNTIME.resolve()) or path.suffix!='.zip' or path.stem not in MODELS or not path.is_file():
+            raise HTTPException(400,"저장된 FinRL 정책 버전을 선택하세요.")
+        identity=read_json(path.parent/"dataset.json")
+        settings=source_settings()
+        if identity.get("environment")!=settings["environment"] or identity.get('algorithm','sac')!=path.stem or identity.get("sac_example")!=sac_example(path.stem)[1]:
+            raise HTTPException(400,"현재 FinRL 환경·알고리즘·설정과 호환되지 않는 정책입니다.")
+        with runtime.lock:
+            try:loaded=runtime.check_policy(path.parent,load=True)
+            except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
+            atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
+            selection_path=ROOT/'runtime/operations/policies.json'
+            update_json(selection_path,lambda selected:{**selected,identity['currency']:path.relative_to(RUNTIME).as_posix()})
+            system.release_models(keep=system.selected_models())
+        return {"message":"해당 FinRL 정책을 선택하고 중앙 정책을 실제 로드했습니다. 학습·시세·매매는 시작하지 않았습니다.","policy":loaded}
 
 
 
@@ -1084,7 +1015,7 @@ def restart_blockers():
 
 @private_api.post('/api/system/prepare-restart')
 def prepare_restart():
-    with launch_lock:
+    with system.job_lock:
         blockers=busy()
         if blockers:raise HTTPException(409,' · '.join(blockers))
         system.restarting=True

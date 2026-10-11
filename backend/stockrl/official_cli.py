@@ -16,11 +16,12 @@ def main():
     parser.add_argument('--output',type=Path,help='기존 정책과 분리할 신규 SAC 결과 경로')
     parser.add_argument('--champion-path',type=Path,help='통합 SAC Champion PT')
     parser.add_argument('--champion-output',type=Path,help='학습 결과로 발행할 새 Champion PT')
-    args=parser.parse_args();registry=ExpertRegistry()
+    args=parser.parse_args();registry=ExpertRegistry();champion=None
     try:
-        if args.champion_path:
+        if args.champion_path and args.command=='train':
             from .platform.sac_champion import load_spec
-            registry=ExpertRegistry(champion=load_spec(args.champion_path))
+            champion=load_spec(args.champion_path)
+            registry=ExpertRegistry(champion=champion)
         if args.command=='experts':
             for key,item in registry.catalog()['experts'].items():print(key,item['name'],'active' if key in registry.catalog()['active'] else 'stored')
             return
@@ -30,7 +31,7 @@ def main():
         if args.command=='backtest':
             destination=args.output or ROOT/'runtime/official/backtests'/args.currency
             destination.mkdir(parents=True,exist_ok=True)
-            result=backtest(frame,registry,args.currency);print(result.to_metrics_dataframe().to_string())
+            result=backtest(frame,registry,args.currency,args.champion_path);print(result.to_metrics_dataframe().to_string())
             result.portfolio_values.to_csv(destination/'backtest.csv')
             # Persist official engine metrics for the HTTP/UI adapter.
             from .state_io import atomic_json
@@ -42,7 +43,7 @@ def main():
             result.weights_history.to_csv(destination/'backtest_weights.csv')
             result.trades.to_csv(destination/'backtest_trades.csv')
             return
-        model=train(frame,registry,args.resume,args.output,args.champion_path,args.champion_output,args.algorithm,args.total_timesteps)
+        model=train(frame,registry,args.resume,args.output,args.champion_path,args.champion_output,args.algorithm,args.total_timesteps,champion=champion)
         print('Saved FinRL policy:',(args.output or ROOT/'runtime/official')/(args.algorithm+'.zip'))
 
     finally:

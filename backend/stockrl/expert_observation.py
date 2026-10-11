@@ -40,7 +40,6 @@ class ExpertObservation(gym.ObservationWrapper):
         return np.concatenate([np.asarray(value,dtype=np.float32).reshape(-1),signals,account_features])
 
     def reset(self,**kwargs):self.assets=[];return super().reset(**kwargs)
-    def close(self):return super().close()
 
     @property
     def df(self):

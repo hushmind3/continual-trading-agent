@@ -8,7 +8,7 @@ from urllib.error import HTTPError
 import psutil
 ROOT=Path(__file__).resolve().parents[1]
 FRONTEND=ROOT/'frontend';RUNTIME=ROOT/'runtime/official';PORT=8766
-sys.path.insert(0,str(ROOT/'src'))
+sys.path.insert(0,str(ROOT/'backend'))
 from stockrl.state_io import read_json,atomic_json
 APPLY=RUNTIME/'apply.json';APPLIED=RUNTIME/'applied-sources.json'
 
@@ -91,7 +91,7 @@ def sources():
     groups={name:{} for name in ('frontend','backend','launcher','configuration')}
     for name in sorted(names):
         if name.startswith('frontend/src/') or name in ('frontend/index.html','frontend/package.json','frontend/package-lock.json','frontend/tsconfig.json','frontend/vite.config.ts'):group='frontend'
-        elif name.startswith('src/stockrl/') and name.endswith('.py') or name.startswith('requirements/'):group='backend'
+        elif name.startswith('backend/stockrl/') and name.endswith('.py') or name.startswith('requirements/'):group='backend'
         elif name.startswith('scripts/') and name.endswith('.py') or name=='서버켜기.cmd':group='launcher'
         elif name in ('configs/experts.json','configs/instruments.json'):group='configuration'
         else:continue
@@ -169,15 +169,14 @@ def main(apply_only=False,skip_build=False,skip_checks=False):
                     operation.update(status='blocked',applied=False,
                         detail='프론트 변경 적용 완료; 백엔드 변경은 실행 중 작업 종료 후 적용 필요' if frontend_changed else '백엔드 변경 적용 보류')
                     atomic_json(operation,APPLY);return
-                if 'src/stockrl/platform/system_operations.py' in old.get('backend',{}):
+                if any(name.endswith('/stockrl/platform/system_operations.py') for name in old.get('backend',{})):
                     # Persist server approval waiting separately from running application work.
                     operation['status']='pending';phase(stage,'8766 서버 갱신','pending','서버 재시작 준비 승인 대기')
                     api('system/prepare-restart',{})
-                    api('state')  # The unified snapshot awaits existing account/model locks.
                     operation['status']='running';phase(stage,'8766 서버 갱신')
             if restart:
                 for record in current:stop_verified(record)
-                env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'src'),PYTHONUTF8='1',STOCKRL_APPLY_ID=operation['id'])
+                env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_APPLY_ID=operation['id'])
                 with (RUNTIME/'server.stdout.log').open('ab') as output,(RUNTIME/'server.stderr.log').open('ab') as errors:
                     child=subprocess.Popen([sys.executable,'-m','uvicorn','stockrl.web_api:app','--host','127.0.0.1','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
                 for _ in range(100):

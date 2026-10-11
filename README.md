@@ -25,7 +25,7 @@ frontend/
   package.json / package-lock.json / vite.config.ts / tsconfig.json
   dist/                       운영 빌드 산출물, Git 제외
   node_modules/               설치 의존성, Git 제외
-src/stockrl/
+backend/stockrl/
   web_api.py                  FastAPI + React 정적 제공
   __main__.py / official_cli.py CLI → 현재 프레임워크 함수
   framework.py                FinRL-X·FinRL·SB3 호출, 선택한 정책 경로
@@ -167,7 +167,7 @@ SAC 자동 판단은 `OperationsRuntime.sac_decision` → 현재 원본 환경/E
 - 개발: `frontend/start.cmd` 또는 `npm run dev` → 5173. 5173은 운영 런처에서 실행하지 않습니다.
 
 ```powershell
-$env:PYTHONPATH="src"
+$env:PYTHONPATH="backend"
 $env:PYTHONUTF8="1"
 .\.venv\Scripts\python.exe -m stockrl train --currency USD --symbols AAPL MSFT
 .\.venv\Scripts\python.exe -m stockrl train --currency USD --symbols AAPL MSFT --resume
@@ -213,7 +213,7 @@ MoE 화면은 등록 모델의 실제 버전 선택과 SAC Champion 조립에 �
 
 React의 상태 조회·버튼 명령·파일 다운로드는 단일 `/api` 통로로 전달합니다. JSON 요청은 `POST /api`에 `{operation, payload}`를 보내며, 이미지·파일은 같은 `/api`의 GET 요청에 `operation`과 `payload`를 전달합니다. 실행 기능은 백엔드 내부 라우터에서 원래 모듈 함수를 호출하고 개별 `/api/...` 경로는 공개하지 않습니다. 서버 적용 스크립트도 동일 통로를 사용합니다.
 
-통합 JSON 응답은 클라이언트가 지원하면 gzip으로 압축합니다. 통합 상태는 모듈 조회 실패 시 마지막 성공 값과 `module_errors`·`module_updated_at`을 함께 반환하고 다음 요청에서 재시도합니다. 초기 실패는 해당 값이 `null`이며 관련 화면에 오류를 표시합니다. 외부 인증·실행 상태는 매 요청에서 조회하며 저장 모델과 정책 목록은 관련 파일 변경으로 갱신합니다. 승인 정책과 마지막 작업 모델만 캐시에 유지하고 이전 작업 모델은 오래된 사용 순서로 해제합니다. 정책 승인 변경과 서버 종료에도 모델 캐시를 정리합니다. 학습 프로세스의 메모리는 API 서버와 별개입니다. 환경 종료는 환경만 닫고 공유 Expert Registry를 유지합니다. Registry와 모델 해제는 통합 관리자가 담당하며 CLI 종료도 동일 정리 경로를 사용합니다. 공식 callable의 필수 인자·인자명은 작업 프로세스를 만들기 전에 확인하고 오류를 화면에 반환합니다. JSON 기록은 파일별 프로세스 잠금과 고유 임시 파일로 직렬화하고 작업 시작·완료·중지는 잠금 안에서 읽고 갱신합니다.
+통합 JSON 응답은 클라이언트가 지원하면 gzip으로 압축합니다. 통합 상태는 모듈 조회 실패 시 마지막 성공 값과 `module_errors`·`module_updated_at`을 함께 반환하고 다음 요청에서 재시도합니다. 초기 실패는 해당 값이 `null`이며 관련 화면에 오류를 표시합니다. 외부 인증·실행 상태는 매 요청에서 조회하며 저장 모델과 정책 목록은 관련 파일 변경으로 갱신합니다. 승인 정책과 마지막 작업 모델만 캐시에 유지하고 이전 작업 모델은 오래된 사용 순서로 해제합니다. 정책 승인 변경과 서버 종료에도 모델 캐시를 정리합니다. 학습 프로세스의 메모리는 API 서버와 별개입니다. 환경 종료는 환경만 닫고 공유 Expert Registry를 유지합니다. Registry와 모델 해제는 통합 관리자가 담당하며 CLI 종료도 동일 정리 경로를 사용합니다. 공식 callable의 필수 인자·인자명은 작업 프로세스를 만들기 전에 확인하고 오류를 화면에 반환합니다. 단일 상태 요청에서 필요한 FinRL·FinRL-X·Expert·시세 모듈의 실제 백엔드 import를 연결하고 성공 결과를 재사용합니다. `imports`는 import 결과를 표시하며 실행 성공과 구분합니다. 과거 실패는 최신 같은 모듈 작업의 성공 뒤에 현재 오류로 남기지 않습니다. 엔진·지속학습 시작은 승인 정책의 통화·경로·공식 환경·공간 계약을 먼저 확인합니다. 모델 적재 표시는 통합 관리자의 실제 캐시를 기준으로 하고, 의도적으로 중지된 시세는 실행 대기로 구분합니다. JSON 기록은 파일별 프로세스 잠금과 고유 임시 파일로 직렬화하고 작업 시작·완료·중지는 잠금 안에서 읽고 갱신합니다.
 
 운영 풀에 적재한 Expert는 기존 `ExpertRegistry`에 pool provider를 전달해 관측 추론에서 공유합니다. 기존 출력 요약·환경·관측 차원은 그대로입니다. 개별 제어가 자동 시작과 충돌하면 자동 절차는 중단 사유를 표시하고 사용자 명령을 우선합니다. 전체 중지는 기존 학습 중지와 시세/추론/가상체결 중지를 사용하며, 진행 중인 네이티브 연산의 종료 대기와 실제 중지 완료를 구분합니다. 실제 증권사 주문은 호출하지 않습니다.
 
@@ -246,3 +246,18 @@ FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합
 연결 메뉴의 FMP·Alpaca·WRDS 값은 기존 OS keyring에 저장하고 공식 작업의 원본 환경변수로 전달합니다. 저장 여부와 인증·시세 성공은 구분합니다. 기타 공급원은 원본 생성자·외부 설정 계약을 요구합니다. Expert 최적화·변환·허용 기준은 기존 `library` API와 연결했고 모델 폴더 목록은 통합 상태의 models 항목을 사용합니다.
 
 이미 빌드한 화면을 적용하고 추가 검증을 생략하도록 기존 `scripts/start_server.py.main`에 `skip_build`, `skip_checks` 선택 인자를 추가했습니다. 기존 기본 실행 동작은 동일합니다.
+
+
+## 백엔드 배치와 소유권
+
+자체 Python 코드는 `backend/stockrl/`에 모읍니다. React는 `frontend/`, 공식 보조 원본은 `FinRL-X/`, 저장 상태·작업 결과는 기존 `runtime/`, 데이터와 모델 자산은 기존 경로를 사용합니다. Python 모듈 이름 `stockrl.*`은 유지합니다.
+
+- `web_api.py`: 단일 통로·요청 검증·응답 전달
+- `platform/system_operations.py`: 통합 상태·정책 캐시·Registry·작업 프로세스·실행 및 중지
+- `platform/operations_runtime.py`: 시세·추론·계좌 실행; 학습 작업은 통합 관리자에 전달
+- `framework.py`: 공식 환경·학습·백테스트 계약
+- `state_io.py`: 프로세스 간 상태 기록
+
+상태 조회는 통합 관리자의 모듈 캐시를 사용하고 정책 변경은 공통 작업 잠금으로 직렬화합니다. 잠금 순서는 작업→운영→모델로 맞춥니다. 선택한 Champion은 백테스트에 실제 전달하며 학습의 로딩·등록·저장에서는 한 번 읽은 Spec을 공유합니다. Champion 목록·검사는 가중치를 보관하지 않고 파일 버전별 메타데이터만 재사용합니다. Expert 결과 캐시는 입력·계좌가 같을 때만 재사용하고 통화·Expert별 마지막 입력만 유지합니다.
+
+학습 전 검사는 실제 학습·추론이 읽는 동일 가격 모듈로 rolling 구간의 종목별 가격 행렬을 확인합니다. 누락 가격을 만들거나 종목을 자동 제외하지 않습니다. 추론은 선택 종목의 최신 바가 모두 도착할 때까지 대기하고 통화별 처리 시각으로 중복 판단을 막습니다.

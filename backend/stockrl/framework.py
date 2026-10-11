@@ -56,6 +56,16 @@ def sac_example(algorithm='sac'):
     return function,dict(MODEL_KWARGS[algorithm]),steps
 
 
+def validate_price_panel(frame,symbols):
+    if frame.empty:raise ValueError('공식 환경에 전달할 실제 가격 구간이 비어 있습니다.')
+    counts=frame.groupby('date').symbol.agg(['size','nunique'])
+    invalid=counts[(counts['size']!=len(symbols))|(counts['nunique']!=len(symbols))]
+    if not invalid.empty:
+        stamp=invalid.index[0];present=set(frame.loc[frame.date==stamp,'symbol'])
+        missing=sorted(set(symbols)-present)
+        raise ValueError(f'PortfolioOptimizationEnv 가격 행렬이 불완전한 날짜 {len(invalid)}개: {stamp}; 누락 종목 {missing}; 행 {int(invalid.iloc[0]["size"])} / 필요 {len(symbols)}. 실제 가격을 준비하거나 학습 종목을 직접 선택하세요.')
+
+
 def training_environment(frame,registry,training=True,champion_ids=None):
     import pandas as pd
     example=finrlx('strategies.rl_model');trade_date=frame.date.max()+pd.Timedelta(days=1)
@@ -63,6 +73,7 @@ def training_environment(frame,registry,training=True,champion_ids=None):
         frame.rename(columns={'symbol':'tic'}),'date',pd.Timedelta(days=365),pd.Timedelta(days=1095),trade_date)
     prepared=prepared.rename(columns={'tic':'symbol'})
     if prepared.empty:raise ValueError('공식 rolling 구간에 PortfolioOptimizationEnv 가격 입력이 없습니다.')
+    validate_price_panel(prepared,sorted(frame.symbol.unique()))
     active=list(registry.catalog().get('active',[])) if champion_ids is None else list(champion_ids)
     wrapped=cash_environment(prepared,registry,sorted(prepared.symbol.unique()),active)
     wrapped.frame=frame
@@ -79,14 +90,14 @@ def champion_structure_environment(currency,symbols,registry,champion_ids):
     return wrapped
 
 
-def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None,algorithm='sac',total_timesteps=None):
+def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None,algorithm='sac',total_timesteps=None,champion=None):
     from finrl.agents.stablebaselines3.models import DRLAgent
     from .platform.system_operations import system
     example,parameters,steps=sac_example(algorithm)
     steps=steps if total_timesteps is None else int(total_timesteps)
     if steps<1:raise ValueError('학습 단계는 1 이상이어야 합니다.')
     from .platform.sac_champion import load_spec
-    champion = load_spec(champion_path) if champion_path else None
+    if champion is None and champion_path:champion=load_spec(champion_path)
     if champion and algorithm!='sac':raise ValueError('선택한 Champion은 SAC 정책입니다. SAC 알고리즘에서 사용하세요.')
     champion_ids = champion.get('identity',{}).get('champion_experts') if champion else None
     from .state_io import read_json,atomic_json
@@ -133,7 +144,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
         atomic_json(identity,root/'dataset.json')
         if champion and champion_output:
             from .platform.sac_champion import save_trained_champion
-            save_trained_champion(champion_path,model,Path(champion_output),root)
+            save_trained_champion(champion_path,model,Path(champion_output),root,spec=champion)
         print('학습 완료:',model.num_timesteps,'관측,',getattr(model,'_n_updates',None),'업데이트',flush=True)
     finally:env.close()
     return model
@@ -157,16 +168,25 @@ def prices(currency='USD',symbols=None):
     return data
 
 
-def backtest(frame,registry,currency=None):
+def backtest(frame,registry,currency=None,champion_path=None):
     """Convert original environment holdings to the official StrategyResult API."""
     import pandas as pd
     from .platform.system_operations import system
     saved=policy_files(currency)
+    champion=None
+    if champion_path:
+        from .platform.sac_champion import load_spec
+        champion=load_spec(champion_path)
+        checkpoint=Path(champion['checkpoint'])
+        if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/official'/checkpoint
+        checkpoint=checkpoint.resolve()
+        if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()) or not checkpoint.is_file():raise ValueError('선택한 Champion의 실제 운영 폴더 체크포인트가 필요합니다.')
+        saved=checkpoint.parent
     from .state_io import read_json
     identity=read_json(saved/'dataset.json')
     if identity.get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경 정책은 백테스트하지 않습니다.')
     if identity.get('champion_file'):
-        registry=system.expert_registry(saved,None)
+        registry=system.expert_registry(saved,None,champion=champion,champion_path=champion_path)
         champion_ids=identity['champion_experts']
     else:champion_ids=None
     env=training_environment(frame,registry,training=False,champion_ids=identity.get('champion_experts',[]))

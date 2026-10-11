@@ -20,7 +20,7 @@ class OperationsRuntime:
         self.controls={'feed':False,'paper':False,'engine':False,'learning':False}
         self.learning_pending=[];self.learning_job=None
         self.collector=None;self.thread=None
-        self.account=None;self.quotes={};self.decisions=[];self.last_policy_date=None
+        self.account=None;self.quotes={};self.decisions=[];self.last_policy_dates={}
         self.status={'status':'stopped','error':None}
         self.policy_models={}
         self.feed_cycle=threading.Event();self.cancel_inference=threading.Event();self.inference_active=0
@@ -33,18 +33,29 @@ class OperationsRuntime:
     def snapshot(self):
         with self.lock:
             account=self.ledger().snapshot()
+            resident={row['path'] for row in system.resident_models()}
             return {'controls':self.controls.copy(),'account':account,'quotes':self.quotes.copy(),
                 'decisions':self.decisions,'feed':dict(self.status),
                 'broker':dict(self.collector.broker_status) if self.collector else {},
                 'pool':system.expert_pool.catalog() if system.expert_pool else [],
                 'settings':read_json(ROOT/'configs/local/operations.json'),
-                'policies':{currency:{'path':path,'loaded':self.policy_models.get(currency,{}).get('path')==path,
+                'policies':{currency:{'path':path,'loaded':self.policy_models.get(currency,{}).get('path')==path and str((ROOT/'runtime/official'/path).resolve()) in resident,
                     **{key:value for key,value in self.policy_models.get(currency,{}).items() if key not in ('model','path','signature')}}
                     for currency,path in read_json(ROOT/'runtime/operations/policies.json').items()}}
 
     def command(self,name,enabled):
+        if name=='engine' and not enabled:self.cancel_inference.set()
         with self.lock:
             if name not in self.controls:raise ValueError('feed / paper / engine 제어를 선택하세요.')
+            if name in ('engine','learning') and enabled:
+                policies=read_json(ROOT/'runtime/operations/policies.json')
+                if not policies:raise ValueError('운영 정책을 모델 선택 화면에서 직접 승인하세요.')
+                for currency,path in policies.items():
+                    checkpoint=(ROOT/'runtime/official'/path).resolve()
+                    if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('승인 정책 경로가 운영 폴더 밖입니다.')
+                    identity=read_json(checkpoint.parent/'dataset.json')
+                    if identity.get('currency')!=currency or policy_checkpoint(checkpoint.parent)!=checkpoint:raise ValueError('승인 정책 경로·통화 정보가 다릅니다.')
+                    self._check_policy(checkpoint.parent,load=True)
             if name=='feed':
                 if enabled and not self.controls['feed']:
                     if self.thread and self.thread.is_alive():raise ValueError('이전 시세 수신 작업이 종료 중입니다.')
@@ -64,10 +75,13 @@ class OperationsRuntime:
                     self.status['learning_status']='완료 시세 대기' if enabled else '중지'
                     if not enabled:
                         self.learning_pending.clear()
-                        from .. import web_api as api
-                        job=api.job_state()
-                        if job.get('running') and job.get('id')==self.learning_job:api.stop()
-            return self.controls.copy()
+
+            result=self.controls.copy()
+        if name=='learning' and not enabled:
+            with system.job_lock:
+                job=system.job_state()
+                if job.get('running') and job.get('id')==self.learning_job:system.stop_job()
+        return result
 
     def run(self):
         collector=None
@@ -126,31 +140,32 @@ class OperationsRuntime:
                 self.ledger().process_bar(panel,0,self.controls['paper'])
                 self.ledger().save()
                 self.status.update(last_as_of=str(stamp),received_symbols=len(self.quotes))
-            if self.controls['engine'] and self.last_policy_date!=str(stamp):
+            if self.controls['engine']:
                 try:self.sac_decision()
                 except Exception as exc:self.status['policy_error']=str(exc)
-                self.last_policy_date=str(stamp)
             if self.controls['learning']:self.queue_learning(symbols)
 
     def queue_learning(self,symbols):
-        from .. import web_api as api
-        from ..framework import policy_files
-        policies=read_json(ROOT/'runtime/operations/policies.json')
-        if not policies:
-            self.status['learning_error']='운영 모델을 선택·로드한 뒤 지속학습을 켜세요.';return
-        for currency,path in policies.items():
-            identity=read_json((ROOT/'runtime/official'/path).parent/'dataset.json')
-            if set(identity.get('symbols',[]))&set(symbols) and currency not in self.learning_pending:self.learning_pending.append(currency)
-        if api.job_state()['running'] or not self.learning_pending:return
-        currency=self.learning_pending.pop(0)
-        try:
-            identity=read_json(policy_files(currency)/'dataset.json')
-            request=api.RunRequest(currency=currency,symbols=identity['symbols'],algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
-            result=api.launch('train',request,preserve_output=True)
-            self.learning_job=result['job']['id']
-            self.status.update(learning_status=identity.get('algorithm','sac').upper()+' 이어 학습 실행',learning_job=self.learning_job)
-            self.status.pop('learning_error',None)
-        except Exception as exc:self.status.update(learning_status='학습 요청 실패',learning_error=str(exc))
+        with system.job_lock,self.lock:
+            if not self.controls['learning']:return
+            from .. import web_api as api
+            from ..framework import policy_files
+            policies=read_json(ROOT/'runtime/operations/policies.json')
+            if not policies:
+                self.status['learning_error']='운영 모델을 선택·로드한 뒤 지속학습을 켜세요.';return
+            for currency,path in policies.items():
+                identity=read_json((ROOT/'runtime/official'/path).parent/'dataset.json')
+                if set(identity.get('symbols',[]))&set(symbols) and currency not in self.learning_pending:self.learning_pending.append(currency)
+            if system.job_state()['running'] or not self.learning_pending:return
+            currency=self.learning_pending.pop(0)
+            try:
+                identity=read_json(policy_files(currency)/'dataset.json')
+                request=api.RunRequest(currency=currency,symbols=identity['symbols'],algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
+                result=api.launch('train',request,preserve_output=True)
+                self.learning_job=result['job']['id']
+                self.status.update(learning_status=identity.get('algorithm','sac').upper()+' 이어 학습 실행',learning_job=self.learning_job)
+                self.status.pop('learning_error',None)
+            except Exception as exc:self.status.update(learning_status='학습 요청 실패',learning_error=str(exc))
 
     def manual_order(self,symbol,currency,action,quantity):
         from ..paper_account import _currency
@@ -268,7 +283,7 @@ class OperationsRuntime:
             if load:
                 file=policy_checkpoint(files);stat=file.stat()
                 self.policy_models[identity['currency']]={**info,'signature':(stat.st_mtime_ns,stat.st_size)}
-                self.last_policy_date=None
+                self.last_policy_dates.pop(identity['currency'],None)
             return info
         finally:env.close()
 
@@ -278,6 +293,14 @@ class OperationsRuntime:
         if identity.get('environment')!=CASH_ENVIRONMENT:
             raise ValueError('현재 저장 SAC는 기존 환경의 파일입니다. 현재 원본 환경으로 학습한 정책이 필요합니다.')
         symbols=identity['symbols'];currency=identity['currency'];frame=prices(currency,symbols)
+        if frame.empty:
+            self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'실제 저장 가격이 없습니다.'}
+            return
+        input_stamp=str(frame.date.max());latest_rows=frame[frame.date==frame.date.max()]
+        if len(latest_rows)!=len(symbols) or latest_rows.symbol.nunique()!=len(symbols):
+            self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','as_of':input_stamp,'missing_symbols':sorted(set(symbols)-set(latest_rows.symbol))}
+            return
+        if self.last_policy_dates.get(currency)==input_stamp:return
         registry=system.expert_registry(files,self.expert_pool);champion_ids=identity.get('champion_experts',[])
         prepared=training_environment(frame,registry,training=False,champion_ids=champion_ids)
         latest=prepared.unwrapped.gym_env
@@ -313,6 +336,8 @@ class OperationsRuntime:
                 self.ledger().save()
                 self.decisions.extend({'symbol':s,'currency':currency,'target_weight':float(weight),'as_of':stamp} for s,weight in zip(symbols,weights))
                 self.decisions.append({'symbol':'CASH','currency':currency,'target_weight':cash_weight,'as_of':stamp,'cash_action':cash_enabled})
+                self.last_policy_dates[currency]=input_stamp
+                self.status.setdefault('policy_inputs',{})[currency]={'status':'ready','as_of':stamp}
                 self.status.pop('policy_error',None)
         finally:
             wrapped.close()

@@ -64,8 +64,9 @@ def main():
         if job['command']=='framework':
             from .platform.framework_operations import ACTIONS
             row=ACTIONS[job['action']]
-            atomic_json({'action':job['action'],'module':row[2],'function':row[3],
-                'error':str(sys.exc_info()[1])},root/job['output']/'result.json')
+            result_path=root/job['output']/'result.json';failed=read_json(result_path)
+            failed.update(action=job['action'],module=row[2],function=row[3],status='failed',error=str(sys.exc_info()[1]))
+            atomic_json(failed,result_path)
     finally:
         current = read_json(root / "job.json")
         if current.get("id") == job_id and current.get("status") != "stopped":

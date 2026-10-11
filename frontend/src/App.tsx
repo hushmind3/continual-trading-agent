@@ -1,17 +1,17 @@
 import {FrameworkWorkspace} from "./pages/FrameworkWorkspace";
+import {FinrlWorkspace} from "./pages/FinrlWorkspace";
 import { useEffect, useState } from "react";
 import { Shell } from "./shell/Shell";
 import { OperationsBoard } from "./pages/OperationsBoard";
 import { ModelWorkspace } from "./pages/ModelWorkspace";
 import { MarketScanner } from "./pages/MarketScanner";
 import { PortfolioWorkspace } from "./pages/PortfolioWorkspace";
-import { TrainingWorkspace } from "./pages/TrainingWorkspace";
 import { ConnectionSettings } from "./pages/ConnectionSettings";
 import { Diagnostics } from "./pages/Diagnostics";
 
 export function route(hash: string) {
-  const name = hash.replace(/^#/, "") || "control";
-  return ["control","moe","markets","portfolio","learning","connection","system","frameworks"].includes(name) ? name : "control";
+  const name = hash.replace(/^#/, "") || "finrl";
+  return ["finrl","control","moe","markets","portfolio","learning","connection","system","frameworks"].includes(name) ? name : "finrl";
 }
 export default function App() {
   const [active, setActive] = useState(() => route(location.hash));
@@ -21,14 +21,14 @@ export default function App() {
     return () => window.removeEventListener("hashchange", changed);
   }, []);
   const page =
-    active === "frameworks" ? (<FrameworkWorkspace />) : active === "moe" ? (
+    active === "finrl" ? (<FinrlWorkspace key={active}/>) : active === "frameworks" ? (<FrameworkWorkspace />) : active === "moe" ? (
       <ModelWorkspace />
     ) : active === "markets" ? (
       <MarketScanner />
     ) : active === "portfolio" ? (
       <PortfolioWorkspace />
     ) : active === "learning" ? (
-      <TrainingWorkspace />
+      <FinrlWorkspace key={active}/>
     ) : active === "connection" ? (
       <ConnectionSettings />
     ) : active === "system" ? (

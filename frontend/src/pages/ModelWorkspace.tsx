@@ -6,6 +6,7 @@ import {request} from '../data/api';
 import {Button,ErrorMessage,Skeleton} from '../ui/Primitives';
 import {ExpertLibraryPanel} from './model/ExpertLibraryPanel';
 import {ModelGuide} from './model/ModelGuide';
+import {TrainingWorkspace} from './TrainingWorkspace';
 
 export function ModelWorkspace(){
  const {state}=useOperations();const [error,setError]=useState(''),[source,setSource]=useState('');
@@ -24,5 +25,6 @@ export function ModelWorkspace(){
   <ModelGuide/>
   {error&&<ErrorMessage message={error}/>}
   <ExpertLibraryPanel initialSource={source}/><ModelFiles onPick={setSource}/>
+  <details className="rounded-2xl border border-slate-200 bg-white p-5"><summary className="cursor-pointer text-sm font-semibold">Frozen Expert · SAC Champion 학습</summary><div className="mt-5"><TrainingWorkspace/></div></details>
  </div>;
 }

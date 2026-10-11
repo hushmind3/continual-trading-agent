@@ -652,6 +652,13 @@ def framework_catalog():
     return catalog()
 
 
+@app.get('/api/finrl')
+def finrl_workspace():
+    from .platform.framework_operations import stock_state
+    try:return stock_state()
+    except (ValueError,OSError,RuntimeError) as exc:raise HTTPException(503,str(exc)) from exc
+
+
 @app.get('/api/framework/providers')
 def framework_providers():
     from .platform.framework_operations import provider_status
@@ -686,10 +693,12 @@ def framework_result(job_id:str,kind:Literal['json','csv']='json'):
     return FileResponse(path,filename=path.name)
 
 
-@app.get('/api/framework/artifact/{job_id}/{filename}')
+@app.get('/api/framework/artifact/{job_id}/{filename:path}')
 def framework_artifact(job_id:str,filename:str):
-    if not re.fullmatch('[0-9a-f]{32}',job_id) or not re.fullmatch(r'figure_[0-9]+\.png',filename):raise HTTPException(400,'결과 경로가 유효하지 않습니다.')
-    path=RUNTIME/'framework-jobs'/job_id/filename
+    if not re.fullmatch('[0-9a-f]{32}',job_id):raise HTTPException(400,'결과 경로가 유효하지 않습니다.')
+    folder=(RUNTIME/'framework-jobs'/job_id).resolve();path=(folder/filename).resolve()
+    recorded=read_json(folder/'result.json').get('files',[])
+    if not path.is_relative_to(folder) or (filename not in recorded and not re.fullmatch(r'figure_[0-9]+\.png',filename)):raise HTTPException(400,'기록된 결과 파일만 열 수 있습니다.')
     if not path.is_file():raise HTTPException(404,'실제 생성된 그림 파일이 없습니다.')
     return FileResponse(path)
 

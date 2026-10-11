@@ -4,6 +4,7 @@ import {useOperations} from "../data/Operations";
 import {Button,Drawer,Empty,ErrorMessage,Status} from "../ui/Primitives";
 import {date} from "../ui/format";
 export const navigation=[
+  {hash:"finrl",name:"FinRL",icon:ChartCandlestick},
   {hash:"control",name:"운영",icon:Activity},{hash:"moe",name:"MoE",icon:Boxes},
   {hash:"markets",name:"시장",icon:ChartCandlestick},{hash:"portfolio",name:"계좌",icon:Wallet},
   {hash:"learning",name:"학습",icon:GraduationCap},{hash:"connection",name:"연결",icon:Link2},
@@ -17,7 +18,7 @@ export function Shell({active,children}:{active:string;children:ReactNode}) {
   return <div className="min-h-dvh bg-[#f4f6fa] text-slate-900">
     <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/95 backdrop-blur-xl">
       <div className="mx-auto flex min-h-16 max-w-[1500px] flex-wrap items-center justify-between gap-x-5 gap-y-3 px-4 py-3 sm:px-7 lg:flex-nowrap">
-        <a href="#control" className="flex shrink-0 items-center gap-2.5 font-bold tracking-tight"><span className="grid size-8 place-items-center rounded-xl bg-blue-600 text-white"><Activity size={19}/></span><span>FinRL<span className="ml-2 text-xs font-medium text-slate-400">FinRL-X 확장</span></span></a>
+        <a href="#finrl" className="flex shrink-0 items-center gap-2.5 font-bold tracking-tight"><span className="grid size-8 place-items-center rounded-xl bg-blue-600 text-white"><Activity size={19}/></span><span>FinRL<span className="ml-2 text-xs font-medium text-slate-400">SB3 · FinRL-X 보조</span></span></a>
         <nav aria-label="주요 화면" className="order-3 grid w-full grid-cols-4 gap-1 sm:flex sm:w-auto sm:flex-1 sm:justify-center lg:order-2">{navigation.map(({hash,name,icon:Icon})=><a key={hash} href={'#'+hash} aria-current={active===hash?'page':undefined} className={'flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition hover:bg-slate-50 '+(active===hash?'bg-blue-50 text-blue-700':'text-slate-500')}><Icon size={16}/>{name}</a>)}</nav>
         <div className="order-2 flex items-center gap-3 lg:order-3"><span className="hidden items-center gap-1.5 text-xs text-slate-400 sm:flex"><LockKeyhole size={13}/>실주문 미연결</span><Status tone={error?'bad':state?'good':'idle'}>{error?'연결 끊김':state?'서버 연결':'연결 중'}</Status><Button className="!bg-transparent !px-2" aria-label={'알림 '+issues.length+'개'} onClick={()=>setAlerts(true)}><Bell size={18}/></Button></div>
       </div>

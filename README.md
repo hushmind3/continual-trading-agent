@@ -1,6 +1,10 @@
-# FinRL-X · FinRL · SB3 SAC + React
+# FinRL · SB3 + React — FinRL-X 보조
 
-현재 구현의 구조 설명은 이 README에 통합합니다. React는 `f1539571604f23a05f47761b25fc0448d1a12db5`의 흰색 테마·공통 컴포넌트를 사용하고 공식 모듈 실행 메뉴를 추가했습니다. 과거 커밋으로 백엔드를 되돌리지 않았습니다. 가상계좌·시세·모델 도구의 기존 소스만 복구하고 현재 API에 연결했습니다. 프로젝트의 과거 PPO 학습기를 복구하지 않았습니다. 공식 FinRL 원형 워크플로는 원본 main의 기본 Elegantrl PPO를 별도 작업에서 실행할 수 있으며 운영 SAC 모델을 자동 교체하지 않습니다. Frozen Expert에 포함된 PPO 정책의 추론은 SAC 학습기와 별개입니다.
+기본 화면 `#finrl`은 설치된 FinRL 커밋의 공식 2026 Stock Trading 예제를 데이터 → 강화학습 → 백테스트 흐름으로 제공합니다. `#learning`도 같은 원형 화면의 학습 단계로 연결합니다. React는 FastAPI 설정·상태·결과를 표시하며 FinRL·SB3의 import와 실행은 백엔드에서 수행합니다. FinRL-X의 추가 데이터·전략 기능과 Frozen Expert·SAC Champion 도구는 보조 메뉴에서 제공합니다.
+
+주 화면은 `/api/finrl`에서 실제 예제 설정을 읽고 기존 `/api/framework/stock_data`, `/api/framework/stock_train`, `/api/framework/stock_backtest` 및 작업 중지 API를 사용합니다. 데이터는 YahooDownloader·FeatureEngineer·data_split, 학습은 StockTradingEnv·DRLAgent로 실행합니다. 원본의 A2C/DDPG/PPO/TD3/SAC 실행 플래그, 모델별 20,000단계와 예제별 모델 설정을 읽습니다. 백테스트는 DRL_prediction과 원본 예제의 MVO·DJIA 계산을 사용하며 실제 결과가 생성된 뒤 표·그래프·파일을 표시합니다.
+
+원본 예제 세 파일은 설치 Git 커밋에 고정하여 `runtime/official/finrl-source/`에서 읽으며 수정하지 않습니다. 작업별 CSV·학습 모델·비교 그래프는 기존 `runtime/official/framework-jobs/{job_id}/`에 저장합니다. Frozen Expert 정책 학습은 MoE 화면의 보조 도구로 제공하며 원형 StockTradingEnv 결과와 PortfolioOptimizationEnv Champion을 호환 정책으로 표시하지 않습니다.
 
 ## 폴더와 진입점
 

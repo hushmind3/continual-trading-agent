@@ -1,4 +1,10 @@
 import type {Expert} from './types';
+export interface Champion {
+  name:string;path:string;checkpoint:string;trained:boolean;file_bytes:number;
+  identity:{currency:string;symbols:string[];champion_experts:string[]};parameters:Record<string,number>;
+  sac_spaces?:Record<string,unknown>;moe_architecture?:Record<string,number>;expert_counts?:Record<string,Record<string,number>>;
+  training?:{num_timesteps:number;updates:number};
+}
 export type LibraryExpert=Expert;
 export interface DiscoveredExpert {
   id:string;repository:string;compatible:boolean;same_weights?:boolean;detail?:string;bytes?:number;url:string;

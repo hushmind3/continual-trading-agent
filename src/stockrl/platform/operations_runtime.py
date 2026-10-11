@@ -19,6 +19,7 @@ class OperationsRuntime:
         self.collector=None;self.thread=None;self.pool=None;self.pool_signature=None
         self.account=None;self.quotes={};self.decisions=[];self.last_policy_date=None
         self.status={'status':'stopped','error':None}
+        self.policy_models={}
         self.feed_cycle=threading.Event();self.cancel_inference=threading.Event();self.inference_active=0
 
     def ledger(self):
@@ -33,7 +34,10 @@ class OperationsRuntime:
                 'decisions':self.decisions,'feed':dict(self.status),
                 'broker':dict(self.collector.broker_status) if self.collector else {},
                 'pool':self.pool.catalog() if self.pool else [],
-                'settings':read_json(ROOT/'configs/local/operations.json')}
+                'settings':read_json(ROOT/'configs/local/operations.json'),
+                'policies':{currency:{'path':path,'loaded':self.policy_models.get(currency,{}).get('path')==path,
+                    **{key:value for key,value in self.policy_models.get(currency,{}).items() if key not in ('model','path','signature')}}
+                    for currency,path in read_json(ROOT/'runtime/operations/policies.json').items()}}
 
     def command(self,name,enabled):
         with self.lock:
@@ -212,19 +216,34 @@ class OperationsRuntime:
                     self._sac_decision(folder)
         finally:self.inference_active-=1
 
-    def check_policy(self,files):
+    def check_policy(self,files,*,load=False):
         self.inference_active+=1
-        try:return self._check_policy(files)
+        try:
+            with self.lock:return self._check_policy(files,load=load)
         finally:self.inference_active-=1
 
-    def _check_policy(self,files):
+    def _check_policy(self,files,*,load=False):
         from stable_baselines3 import SAC
         from ..expert_registry_native import ExpertRegistry
         from ..framework import champion_structure_environment
         identity=read_json(files/'dataset.json')
         champion_ids=identity.get('champion_experts') if identity.get('feature_extractor') else None
-        env=champion_structure_environment(identity['currency'],identity['symbols'],ExpertRegistry(),champion_ids)
-        try:SAC.load(files/'sac.zip',env=env)
+        registry=ExpertRegistry()
+        if identity.get('champion_file'):
+            from .sac_champion import load_spec
+            champion=load_spec(identity['champion_file']);registry=ExpertRegistry(champion=champion)
+            champion_ids=champion['identity']['champion_experts']
+        env=champion_structure_environment(identity['currency'],identity['symbols'],registry,champion_ids)
+        try:
+            model=SAC.load(files/'sac.zip',env=env)
+            info={'path':(files/'sac.zip').relative_to(ROOT/'runtime/official').as_posix(),'device':str(model.device),
+                'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
+                'num_timesteps':int(model.num_timesteps),'updates':int(model._n_updates)}
+            if load:
+                file=files/'sac.zip';stat=file.stat()
+                self.policy_models[identity['currency']]={**info,'model':model,'signature':(stat.st_mtime_ns,stat.st_size)}
+                self.last_policy_date=None
+            return info
         finally:env.close()
 
     def _sac_decision(self,files):
@@ -249,7 +268,15 @@ class OperationsRuntime:
             day=int(raw.df.index.max()))
         wrapped=ExpertObservation(latest,prepared.registry,frame,symbols,champion_ids=champion_ids);wrapped.currency=currency
         try:
-            model=SAC.load(files/'sac.zip',env=wrapped)
+            file=files/'sac.zip';stat=file.stat();path=file.relative_to(ROOT/'runtime/official').as_posix()
+            cached=self.policy_models.get(currency,{})
+            if cached.get('path')==path and cached.get('signature')==(stat.st_mtime_ns,stat.st_size):
+                model=cached['model'];model.set_env(wrapped)
+            else:
+                model=SAC.load(file,env=wrapped)
+                self.policy_models[currency]={'path':path,'model':model,'signature':(stat.st_mtime_ns,stat.st_size),
+                    'device':str(model.device),'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
+                    'num_timesteps':int(model.num_timesteps),'updates':int(model._n_updates)}
             observation=wrapped.observation(latest.state)
             action,_=model.predict(observation,deterministic=True)
             weights=latest.softmax_normalization(action)

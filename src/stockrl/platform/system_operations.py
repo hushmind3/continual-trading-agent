@@ -157,12 +157,27 @@ class SystemOperations:
             self.interrupted();key='experts';title='선택 Frozen Expert 적재';self.phase(key,title)
             if not cfg.model_dir.is_dir():raise ValueError('모델 폴더 없음: '+str(cfg.model_dir))
             catalog=read_json(cfg.registry_file)
-            for expert in catalog.get('active',[]):
+            selected_policies=read_json(ROOT/'runtime/operations/policies.json')
+            embedded_models=all(read_json((RUNTIME/selected_policies.get(currency,'')).parent/'dataset.json').get('champion_file') for currency in self.value['currencies'])
+            preload=[] if embedded_models else catalog.get('active',[])
+            for expert in preload:
                 self.interrupted();self.phase(key,title,detail=expert);runtime.load(expert)
-            self.phase(key,title,'complete',f"사용자 선택 {len(catalog.get('active',[]))}개 적재; 선택 구성 유지")
+            self.phase(key,title,'complete','선택 Champion의 Frozen Expert는 추론 시 내부 구성으로 사용합니다.' if embedded_models else f"사용자 선택 {len(preload)}개 적재; 선택 구성 유지")
             ready_policies={};failures=[]
             for currency in self.value['currencies']:
                 self.interrupted();key='policy-'+currency;title=currency+' SAC 정책 호환성';self.phase(key,title)
+                if selected_policies.get(currency):
+                    path=(RUNTIME/selected_policies[currency]).resolve()
+                    try:
+                        if not path.is_relative_to(RUNTIME.resolve()) or path.name!='sac.zip' or read_json(path.parent/'dataset.json').get('currency')!=currency:
+                            raise ValueError('선택한 운영 정책의 경로 또는 통화가 다릅니다.')
+                        runtime.check_policy(path.parent,load=True)
+                    except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:
+                        reason=currency+' 선택 모델 로딩 실패: '+str(exc);failures.append(reason);self.phase(key,title,'blocked',reason);continue
+                    ready_policies[currency]=path.relative_to(RUNTIME).as_posix()
+                    self.phase(key,title,'complete','사용자가 선택한 운영 모델 로드: '+str(path))
+                    self.phase('train-'+currency,currency+' 신규 SAC 학습','complete','선택 모델 유지; 자동 대체·새 학습 없음')
+                    continue
                 symbols=[row['symbol'] for row in api.database()['instruments'] if row['eligible'] and row['currency']==currency and (not cfg.symbols or row['symbol'] in cfg.symbols)] if cfg.symbols else []
                 if cfg.symbols and not symbols:
                     reason='운영 설정에서 선택한 '+currency+' 종목이 없습니다.';failures.append(reason);self.phase(key,title,'blocked',reason);continue
@@ -199,7 +214,7 @@ class SystemOperations:
                     self.phase(key,title,'complete','기존 정책 사용: '+str(selected))
                     self.phase('train-'+currency,currency+' 신규 SAC 학습','complete','호환 정책 재사용; 신규 학습 생략')
                 # Validate official observation/action contracts through the existing loader, no prediction/training here.
-                self.interrupted();runtime.check_policy(selected)
+                self.interrupted();runtime.check_policy(selected,load=True)
                 self.phase('policy-'+currency,currency+' SAC 정책 호환성','complete','원본 환경 관측·행동 계약으로 공식 SAC 로딩 확인: '+str(selected))
                 ready_policies[currency]=(selected/'sac.zip').relative_to(RUNTIME).as_posix()
             # Stored-data SAC preparation is independent of a live market connection.

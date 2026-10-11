@@ -1,4 +1,6 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
+import type {Champion} from '../../data/library';
+import {ChampionSpec} from '../../ui/ChampionSpec';
 import {PackagePlus,Search,WandSparkles,Trash2,Square} from 'lucide-react';
 import {useOperations} from '../../data/Operations';
 import {request} from '../../data/api';
@@ -9,14 +11,15 @@ import {ExpertVariants} from './ExpertVariants';
 import {expertFamilies,expertCategory,categoryNames} from './expertFamilies';
 
 const field='w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
-type ChampionResult={name:string;path:string;identity:{currency:string;symbols:string[];champion_experts:string[]}};
 export function ExpertLibraryPanel(){
  const {state,refresh}=useOperations();const lib=state?.library;
  const [open,setOpen]=useState(false),[source,setSource]=useState(''),[key,setKey]=useState(''),[slot,setSlot]=useState(''),[error,setError]=useState('');
  const [discoveryOpen,setDiscoveryOpen]=useState(false),[category,setCategory]=useState('all');
- const [selectedIds,setSelectedIds]=useState<string[]>(()=>state?.experts.active??[]);
+ const [selectedIds,setSelectedIds]=useState<string[]>(()=>{const saved=sessionStorage.getItem('finrl-x.champion.selection');return saved?JSON.parse(saved):state?.experts.active??[]});
  const [selectedFailures,setSelectedFailures]=useState<{source_id:string;precision:string}[]>([]);
- const [creating,setCreating]=useState(false),[championResult,setChampionResult]=useState<ChampionResult|null>(null);
+ const [creating,setCreating]=useState(false),[championResult,setChampionResult]=useState<Champion|null>(()=>{const saved=sessionStorage.getItem('finrl-x.champion.result');return saved?JSON.parse(saved):null});
+ useEffect(()=>{sessionStorage.setItem('finrl-x.champion.selection',JSON.stringify(selectedIds))},[selectedIds]);
+ useEffect(()=>{if(championResult)sessionStorage.setItem('finrl-x.champion.result',JSON.stringify(championResult))},[championResult]);
  const catalog=lib?.catalog,job=lib?.job,busy=Boolean(job?.busy)||creating,items=state?.experts.items??[];
  const chosenExperts=selectedIds;
  const families=expertFamilies(items),shown=families.filter(f=>category==='all'||expertCategory(f.base)===category);
@@ -26,7 +29,7 @@ export function ExpertLibraryPanel(){
  };
  const toggleManaged=(id:string)=>setSelectedIds(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
  const toggleFailure=(source_id:string,precision:string)=>setSelectedFailures(current=>current.some(row=>row.source_id===source_id&&row.precision===precision)?current.filter(row=>row.source_id!==source_id||row.precision!==precision):[...current,{source_id,precision}]);
- const createChampion=async()=>{setError('');setChampionResult(null);setCreating(true);try{setChampionResult(await request<ChampionResult>('champions/create',{experts:chosenExperts}));await refresh()}catch(e){setError(e instanceof Error?e.message:'SAC Champion 생성 실패')}finally{setCreating(false)}};
+ const createChampion=async()=>{setError('');setCreating(true);try{setChampionResult(await request<Champion>('champions/create',{experts:[...chosenExperts]}));await refresh()}catch(e){setError(e instanceof Error?e.message:'SAC Champion 생성 실패')}finally{setCreating(false)}};
  const removeExpert=async(ids:string[],failures:{source_id:string;precision:string}[]=[])=>{if(!(ids.length+failures.length))return;if(await operation('remove',{ids,failures})){setSelectedIds(current=>current.filter(id=>!ids.includes(id)));setSelectedFailures(current=>current.filter(row=>!failures.some(removed=>removed.source_id===row.source_id&&removed.precision===row.precision)))}};
  const removeSelected=()=>removeExpert(selectedIds,selectedFailures);
  return <section className="space-y-4">
@@ -35,7 +38,7 @@ export function ExpertLibraryPanel(){
    <div className="flex flex-wrap gap-2"><Button tone="primary" disabled={busy} busy={creating} onClick={()=>void createChampion()}><WandSparkles size={16}/>SAC Champion 생성 · {chosenExperts.length}개</Button><Button disabled={busy||!items.length} busy={Boolean(job?.busy)&&job?.kind==='quantize_all'} onClick={()=>void operation('quantize_all',{device:'auto'})}><WandSparkles size={16}/>전체 양자화</Button><Button disabled={busy} onClick={()=>setDiscoveryOpen(true)}><Search size={16}/>금융 Expert 찾기</Button><Button disabled={busy} onClick={()=>setOpen(true)}><PackagePlus size={16}/>패키지 가져오기</Button>{job?.busy&&<Button tone="danger" onClick={()=>void operation('stop',{})}><Square size={16}/>작업 중지</Button>}</div>
   </header>
   {!!(selectedIds.length+selectedFailures.length)&&<div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-100 px-3 py-2"><span className="mr-1 text-xs font-semibold text-slate-600">{selectedIds.length}개 모델 · 실패 기록 {selectedFailures.length}개 선택</span><Button tone="danger" className="px-3 py-2 text-xs" disabled={busy} onClick={()=>void removeSelected()}><Trash2 size={14}/>선택 항목 삭제</Button><Button className="px-3 py-2 text-xs" disabled={busy} onClick={()=>{setSelectedIds([]);setSelectedFailures([])}}>선택 해제</Button><span className="text-[11px] text-slate-500">Registry·실패 기록에서 제거하며 모델 파일은 보존합니다.</span></div>}
-  {championResult&&<p role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{championResult.name} 생성 완료 · 미학습 · {championResult.identity.currency} {championResult.identity.symbols.join(', ')} · Expert {championResult.identity.champion_experts.length}개 · {championResult.path}</p>}
+  {championResult&&<section role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-emerald-800"><p className="mb-3 text-sm font-semibold">Champion 생성 결과 · Expert 선택 유지</p><ChampionSpec model={championResult}/></section>}
   <div className="overflow-x-auto"><Tabs value={category} onChange={setCategory} items={[{id:'all',label:`전체 ${families.length}`},...Object.entries(categoryNames).map(([id,label])=>({id,label:`${label} ${families.filter(f=>expertCategory(f.base)===id).length}`}))]}/></div>
   {busy&&<div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800" aria-live="polite">
    <p>{creating?'선택 모델로 SAC Champion 생성 중':job?.detail??'Expert 작업 진행 중'}</p>

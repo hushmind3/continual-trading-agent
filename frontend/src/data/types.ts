@@ -54,6 +54,7 @@ export interface Preflight {ok:boolean;errors:string[];symbols:string[];currency
 export interface ResultTable {columns:string[];rows:Record<string,unknown>[];total:number}
 export interface Connections {api:{status:string};data:{status:string;source:string|null;available_sources:string[];reason?:string};brokers:{name:string;status:string;reason:string}[]}
 export interface OperationsState {
+  policies?:Partial<Record<Currency,{path:string;loaded:boolean;device?:string;observation_shape?:number[];action_shape?:number[];num_timesteps?:number;updates?:number}>>;
   controls:{feed:boolean;paper:boolean;engine:boolean};
   account:{books:Record<Currency,{initial_cash:number;cash:number;equity:number;net_pnl:number;
     holdings_value:number;fees:number;realized_pnl:number;trade_count:number;

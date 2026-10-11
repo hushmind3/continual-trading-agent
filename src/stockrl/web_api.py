@@ -923,12 +923,12 @@ def restore_checkpoint(request:dict):
     if identity.get("environment")!=settings["environment"] or identity.get("sac_example")!=settings["parameters"]:
         raise HTTPException(400,"현재 공식 SAC 환경·예제와 호환되지 않는 이전 정책입니다.")
     from .platform.operations_runtime import runtime
-    runtime.check_policy(path.parent)
+    try:loaded=runtime.check_policy(path.parent,load=True)
+    except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
     atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
     selection_path=ROOT/'runtime/operations/policies.json'
-    if selection_path.is_file():
-        selected=read_json(selection_path);selected[identity['currency']]=path.relative_to(RUNTIME).as_posix();atomic_json(selected,selection_path)
-    return {"message":"기존 가중치 파일을 변경하지 않고 해당 SAC 버전을 선택했습니다."}
+    selected=read_json(selection_path);selected[identity['currency']]=path.relative_to(RUNTIME).as_posix();atomic_json(selected,selection_path)
+    return {"message":"해당 SAC 버전을 선택하고 중앙 정책을 실제 로드했습니다. 학습·시세·매매는 시작하지 않았습니다.","policy":loaded}
 
 
 @app.get('/api/system/status')

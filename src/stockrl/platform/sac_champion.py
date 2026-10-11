@@ -313,7 +313,7 @@ def create(currency, symbols, active, env):
         raise
     return {"name": model_path.name, "path": str(model_path), "checkpoint": output["checkpoint"],"file_bytes":model_path.stat().st_size,
         "trained": output["trained"], "parameters": parameter_counts,"training":output["training"],"sac_spaces":sac_spaces,
-        "transfer": output["transfer"], "identity": identity}
+        "transfer": output["transfer"], "identity": identity,"moe_architecture":output["moe_architecture"],"expert_counts":expert_counts}
 
 
 def list_champions():
@@ -324,7 +324,7 @@ def list_champions():
             result.append({"name": path.name, "path": str(path), "version": data.get("version"),
                 "trained": data.get("trained", False), "parameters": data.get("parameters", {}),
                 "identity": data.get("identity", {}), "checkpoint": data.get("checkpoint"),"training":data.get("training",{}),
-                "file_bytes": path.stat().st_size})
+                "file_bytes": path.stat().st_size,"sac_spaces":data.get("sac_spaces",{}),"moe_architecture":data.get("moe_architecture",{}),"expert_counts":data.get("expert_counts",{})})
         except (OSError, ValueError, RuntimeError):
             continue
     return result

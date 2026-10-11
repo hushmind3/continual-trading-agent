@@ -98,7 +98,6 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     root=Path(output) if output is not None else ROOT/'runtime/official'
     if not root.resolve().is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('정책 출력은 기존 runtime/official 내부에 저장합니다.')
     root.mkdir(parents=True,exist_ok=True)
-    from .state_io import read_json,atomic_json
     saved=policy_files(env.currency)
     identity={'currency':env.currency,'symbols':env.symbols,'algorithm':algorithm,'sac_example':parameters,'environment':CASH_ENVIRONMENT,'rolling_days':[1095,365]}
     from .platform.sac_champion import _candidate_identity,_policy_kwargs,_original_report
@@ -165,15 +164,11 @@ def backtest(frame,registry,currency=None):
     saved=policy_files(currency)
     from .state_io import read_json
     identity=read_json(saved/'dataset.json')
-    if identity.get('champion_file'):
-        from .platform.sac_champion import load_spec
-        registry.close()
-        champion=load_spec(identity['champion_file'])
-        from .expert_registry_native import ExpertRegistry
-        registry=ExpertRegistry(champion=champion)
-        champion_ids=champion['identity']['champion_experts']
-    else:champion_ids=None
     if identity.get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경 정책은 백테스트하지 않습니다.')
+    if identity.get('champion_file'):
+        registry=system.expert_registry(saved,None)
+        champion_ids=identity['champion_experts']
+    else:champion_ids=None
     env=training_environment(frame,registry,training=False,champion_ids=identity.get('champion_experts',[]))
     try:
         if identity.get('currency')!=env.currency or identity.get('symbols')!=env.symbols:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다.')

@@ -110,16 +110,16 @@ class SystemOperations:
         self.state_lock=threading.RLock();self.model_lock=threading.RLock()
         self.states={};self.state_signatures={};self.state_errors={};self.state_updates={};self.state_revision=0
         self.state_loader_locks={}
-        self.model_cache={};self.registry_cache={};self.source_results={};self.expert_pool=None;self.expert_pool_signature=None
+        self.model_cache={};self.registry_cache={};self.expert_pool=None;self.expert_pool_signature=None
         from ..state_io import subscribe_updates
         subscribe_updates(self.module_update)
     def module_update(self,path,value):
         path=Path(path).resolve()
         if not path.is_relative_to(ROOT.resolve()):return
-        name=path.relative_to(ROOT).as_posix()
         with self.state_lock:
-            self.source_results[name]=value
-            self.state_signatures.clear()
+            for name,signature in list(self.state_signatures.items()):
+                if isinstance(signature,tuple) and any(isinstance(row,tuple) and row and row[0]==str(path) for row in signature):
+                    self.state_signatures.pop(name,None)
     def publish(self,name,value,signature=None):
         with self.state_lock:
             self.states[name]=deepcopy(value);self.state_signatures[name]=signature

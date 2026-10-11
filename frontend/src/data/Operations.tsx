@@ -15,7 +15,7 @@ export function OperationsProvider({children}:{children:ReactNode}) {
     lastSelection.current=selection;
     const run=(async()=>{
       try{
-        const next=await request<Snapshot>('state?views='+encodeURIComponent(selection)+(force?'&refresh_views=true':''));
+        const next=await request<Snapshot>('state',{views:selection,refresh_views:force});
         if(next.architecture!=='finrl-unified-v3')throw new Error('통합 상태 API가 아닌 서버에 연결되어 있습니다.');
         if(alive.current){setState(next);setError('');}
       }catch(e){if(alive.current)setError(e instanceof Error?e.message:'연결 실패');}

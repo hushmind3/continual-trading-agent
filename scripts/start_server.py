@@ -57,8 +57,8 @@ def stop_verified(record):
 
 
 def api(path,body=None,timeout=30):
-    request=Request(f'http://127.0.0.1:{PORT}/api/'+path,
-        data=json.dumps(body).encode() if body is not None else None,
+    request=Request(f'http://127.0.0.1:{PORT}/api',
+        data=json.dumps({'operation':path,'payload':body or {}}).encode(),
         headers={'Content-Type':'application/json'})
     with urlopen(request,timeout=timeout) as response:return json.load(response)
 

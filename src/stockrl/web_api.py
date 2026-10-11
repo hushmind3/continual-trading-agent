@@ -20,7 +20,8 @@ from pathlib import Path
 from typing import Literal
 
 import psutil
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
+from starlette.routing import Route, Match
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
@@ -41,7 +42,18 @@ DB = ROOT / "data/finrl_trading.db"
 MODEL_DIR = Path.home() / "Desktop/모델"
 ENVIRONMENT = CASH_ENVIRONMENT
 app = FastAPI(title="FinRL local workspace", version="2")
-app.add_middleware(GZipMiddleware)
+private_api=APIRouter()
+class UnifiedAPI:
+    async def __call__(self,scope,receive,send):
+        route,forwarded,body=scope['state']['api_dispatch']
+        received=False
+        async def payload():
+            nonlocal received
+            if received:return await receive()
+            received=True
+            return {'type':'http.request','body':body,'more_body':False}
+        await route.handle(forwarded,payload,send)
+app.router.routes.append(Route('/api',UnifiedAPI(),methods=['GET','POST']))
 FRONTEND_DIST = ROOT / "frontend/dist"
 app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets"), check_dir=False), name="react-assets")
 launch_lock = threading.Lock()
@@ -52,22 +64,45 @@ children = {}
 
 @app.middleware("http")
 async def local_writes(request: Request, call_next):
+    path=request.url.path;method=request.method
+    if path=='/api':
+        from urllib.parse import urlencode
+        try:
+            if method=='GET':
+                operation=request.query_params.get('operation','');parameters=json.loads(request.query_params.get('payload','{}'))
+            else:
+                envelope=await request.json();operation=envelope.get('operation','');parameters=envelope.get('payload',{})
+            if not isinstance(operation,str) or not operation or not isinstance(parameters,dict):raise ValueError('operation과 payload 객체를 전달하세요.')
+            path='/api/'+operation;matched=None
+            for internal_method in (('GET',) if method=='GET' else ('POST','GET')):
+                forwarded={**request.scope,'path':path,'raw_path':path.encode('utf-8'),'method':internal_method,
+                    'query_string':urlencode(parameters,doseq=True).encode() if internal_method=='GET' else b''}
+                for route in private_api.routes:
+                    match,child=route.matches(forwarded)
+                    if match==Match.FULL:matched=(route,{**forwarded,**child});break
+                if matched:break
+            if not matched:return JSONResponse({'detail':'등록되지 않은 백엔드 명령입니다.'},status_code=404)
+            method=matched[1]['method'];body=json.dumps(parameters,ensure_ascii=False).encode('utf-8') if method=='POST' else b''
+            matched[1]['headers']=[(key,value) for key,value in request.scope['headers'] if key.lower() not in (b'content-length',b'content-type')]+[(b'content-type',b'application/json'),(b'content-length',str(len(body)).encode())]
+            request.state.api_dispatch=(*matched,body)
+        except (ValueError,TypeError,AttributeError) as exc:return JSONResponse({'detail':str(exc)},status_code=400)
+    elif path.startswith('/api/'):
+        return JSONResponse({'detail':'단일 /api 통로를 사용하세요.'},status_code=404)
     origin = request.headers.get("origin")
-    if request.method != "GET" and origin and origin not in {
+    if method != "GET" and origin and origin not in {
         "http://127.0.0.1:5173", "http://localhost:5173",
         "http://127.0.0.1:8766", "http://localhost:8766"
     }:
         return JSONResponse({"detail": "로컬 화면에서 요청하세요."}, status_code=403)
-    if request.method!='GET':
-        allowed_stop=request.url.path in ('/api/stop','/api/system/stop','/api/system/prepare-restart')
-        if (apply_running() or system.restarting) and not allowed_stop and request.url.path!='/api/system/apply':
+    if method!='GET':
+        allowed_stop=path in ('/api/stop','/api/system/stop','/api/system/prepare-restart')
+        if (apply_running() or system.restarting) and not allowed_stop and path!='/api/system/apply':
             return JSONResponse({'detail':'변경 적용/서버 갱신 중입니다. 기존 작업은 보존합니다.'},status_code=409)
-        path=request.url.path
         conflict=path in ('/api/train','/api/backtest','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/framework/') or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
         if conflict:
             system.cancel()
     response=await call_next(request)
-    if request.method!='GET':system.invalidate_states()
+    if method!='GET':system.invalidate_states()
     return response
 
 
@@ -221,10 +256,11 @@ def model_state(settings,selected=None):
         if not identity.get("symbols") or not identity.get("currency"):
             structure_reasons.append("저장 모델의 통화·종목 정보가 없습니다.")
         is_champion=bool(identity.get("feature_extractor"))
-        cash_enabled=identity.get('environment')==CASH_ENVIRONMENT
         action_count=len(identity.get('symbols',[]))+1
-        if identity.get('environment')!=CASH_ENVIRONMENT or identity.get('rolling_days')!=settings['rolling_days']:
-            structure_reasons.append("PortfolioOptimizationEnv 식별 정보가 현재 환경과 다릅니다.")
+        if identity.get('environment')!=CASH_ENVIRONMENT:
+            structure_reasons.append(f"환경 비호환: 저장 {identity.get('environment')} / 현재 {CASH_ENVIRONMENT}")
+        if identity.get('rolling_days')!=settings['rolling_days']:
+            structure_reasons.append(f"rolling 구간 비호환: 저장 {identity.get('rolling_days')} / 현재 {settings['rolling_days']}")
         if is_champion and identity.get('feature_extractor')!='stockrl.platform.sac_champion.ChampionExtractor':
             structure_reasons.append("Champion 관측 특성 추출기가 현재 SAC 구조와 다릅니다.")
         for key,value in parameters.items():
@@ -233,7 +269,7 @@ def model_state(settings,selected=None):
         if identity.get('symbols') and (is_champion or identity.get('observation_contract')=='expert-observation-v1'):
             expected_shape=[identity.get('base_observation_dim',0)+64*len(identity.get('champion_experts',[]))+identity.get('account_feature_size',16)]
             if result['observation_shape']!=expected_shape or result['action_shape']!=[action_count]:
-                structure_reasons.append(f"통합 SAC Champion 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{len(identity['symbols'])}]")
+                structure_reasons.append(f"통합 SAC Champion 관측/행동 크기 불일치: 저장 {result['observation_shape']}/{result['action_shape']} / 현재 {expected_shape}/[{action_count}] (현금 포함)")
         else:structure_reasons.append('현재 Expert 관측 계약의 식별 정보가 없습니다. 신규 정책으로 생성하세요.')
         result['policy_compatible']=not structure_reasons
         if issubclass(MODELS[algorithm],OffPolicyAlgorithm) and not replay.is_file():
@@ -416,7 +452,7 @@ def evaluation(currency:Literal['KRW','USD']|None=None):
             "report": read_json(root / "backtest_metrics.json")}
 
 
-@app.get("/api/health")
+@private_api.get("/api/health")
 def health():
     return {"ok": True, "service": "finrlx-react-sac", "project": str(ROOT.resolve()), "pid": os.getpid(),"deployment_id":os.environ.get('STOCKRL_APPLY_ID')}
 
@@ -494,7 +530,7 @@ def state_view(path):
     return {'data':data,'error':system.state_errors.get(name,''),'updated_at':system.state_updates.get(name)}
 
 
-@app.get('/api/state')
+@private_api.get('/api/state')
 def state(views:str='[]',refresh_views:bool=False):
     try:
         requested=json.loads(views)
@@ -576,7 +612,7 @@ def price_history(symbol: str, limit: int = Query(300, ge=1, le=2000)):
     return {"symbol": symbol, "rows": [dict(row) for row in reversed(rows)]}
 
 
-@app.get("/api/download/{name}")
+@private_api.get("/api/download/{name}")
 def download(name: Literal["backtest.csv", "backtest_metrics.json", "backtest_weights.csv", "backtest_trades.csv", "sac.zip", "dataset.json"],currency:Literal['KRW','USD']|None=None):
     path = (policy_files(currency) if name in ('sac.zip','dataset.json') else evaluation_root(currency)) / name
     if not path.is_file():
@@ -657,7 +693,7 @@ def preflight(req, command):
             "steps_per_run": req.total_timesteps or steps}
 
 
-@app.post("/api/preflight/{command}")
+@private_api.post("/api/preflight/{command}")
 def check(command: Literal["train", "backtest"], req: RunRequest):
     return preflight(req, command)
 
@@ -717,17 +753,20 @@ def framework_providers():
     return provider_status()
 
 
-@app.post('/api/framework/providers/{provider}')
+@private_api.post('/api/framework/providers/{provider}')
 def framework_provider_save(provider:str,values:dict):
     from .platform.framework_operations import save_provider
     try:return save_provider(provider,values)
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
 
 
-@app.post('/api/framework/{action}')
+@private_api.post('/api/framework/{action}')
 def framework_task(action:str,parameters:dict):
-    from .platform.framework_operations import ACTIONS
+    from .platform.framework_operations import ACTIONS,validate_native_call
     if action not in ACTIONS:raise HTTPException(404,'등록된 공식 실행 기능이 아닙니다.')
+    if action=='native_call':
+        try:validate_native_call(parameters)
+        except (ValueError,TypeError,KeyError) as exc:raise HTTPException(400,str(exc)) from exc
     with launch_lock:
         if job_state()['running']:raise HTTPException(409,'현재 공식 작업 종료 후 실행하세요.')
         job_id=uuid.uuid4().hex
@@ -737,7 +776,7 @@ def framework_task(action:str,parameters:dict):
     return {'message':ACTIONS[action][0]+' 실행을 시작했습니다.','job':job}
 
 
-@app.get('/api/framework/result/{job_id}')
+@private_api.get('/api/framework/result/{job_id}')
 def framework_result(job_id:str,kind:Literal['json','csv']='json'):
     if not re.fullmatch('[0-9a-f]{32}',job_id):raise HTTPException(400,'작업 ID가 유효하지 않습니다.')
     path=RUNTIME/'framework-jobs'/job_id/('result.'+kind)
@@ -745,7 +784,7 @@ def framework_result(job_id:str,kind:Literal['json','csv']='json'):
     return FileResponse(path,filename=path.name)
 
 
-@app.get('/api/framework/artifact/{job_id}/{filename:path}')
+@private_api.get('/api/framework/artifact/{job_id}/{filename:path}')
 def framework_artifact(job_id:str,filename:str):
     if not re.fullmatch('[0-9a-f]{32}',job_id):raise HTTPException(400,'결과 경로가 유효하지 않습니다.')
     folder=(RUNTIME/'framework-jobs'/job_id).resolve();path=(folder/filename).resolve()
@@ -755,17 +794,17 @@ def framework_artifact(job_id:str,filename:str):
     return FileResponse(path)
 
 
-@app.post("/api/train")
+@private_api.post("/api/train")
 def train(req: RunRequest):
     return launch("train", req)
 
 
-@app.post("/api/backtest")
+@private_api.post("/api/backtest")
 def backtest(req: RunRequest):
     return launch("backtest", req)
 
 
-@app.post("/api/collect")
+@private_api.post("/api/collect")
 def collect(req:CollectionRequest):
     try:
         if datetime.fromisoformat(req.start_date)>datetime.fromisoformat(req.end_date):
@@ -796,7 +835,7 @@ def champions():
     return {"items":list_champions()}
 
 
-@app.post("/api/champions/create")
+@private_api.post("/api/champions/create")
 def champion_create(request:ChampionRequest):
     if job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")
     from .platform.operations_settings import settings
@@ -831,7 +870,7 @@ def champion_create(request:ChampionRequest):
         if env is not None:env.close()
 
 
-@app.get("/api/checkpoint")
+@private_api.get("/api/checkpoint")
 def checkpoint_download(path:str):
     target=(RUNTIME/path).resolve()
     if not target.is_relative_to(RUNTIME.resolve()) or target.suffix!='.zip' or target.stem not in MODELS or not target.exists():
@@ -839,7 +878,7 @@ def checkpoint_download(path:str):
     return FileResponse(target,filename=target.parent.name+'-'+target.name)
 
 
-@app.post("/api/stop")
+@private_api.post("/api/stop")
 def stop():
     with launch_lock:
         job = read_json(RUNTIME / "job.json")
@@ -865,7 +904,7 @@ def stop():
         return {"message": job["detail"]}
 
 
-@app.post("/api/experts/select")
+@private_api.post("/api/experts/select")
 def select(req: Selection):
     with launch_lock:
         if job_state()["running"]:
@@ -877,7 +916,7 @@ def select(req: Selection):
     return {"message": "Expert 선택을 저장했습니다."}
 
 
-@app.post("/api/experts/register")
+@private_api.post("/api/experts/register")
 def register(req: Registration):
     with launch_lock:
         if job_state()["running"]:
@@ -912,13 +951,13 @@ class CredentialRequest(BaseModel):
 
 
 
-@app.post("/api/controls/{name}")
+@private_api.post("/api/controls/{name}")
 def operation_control(name:Literal["feed","paper","engine","learning"],request:ControlRequest):
     try:return {"controls":runtime.command(name,request.enabled)}
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
 
 
-@app.post("/api/orders")
+@private_api.post("/api/orders")
 def paper_order(request:OrderRequest):
     try:return runtime.manual_order(request.symbol,request.currency,request.action,request.quantity)
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
@@ -930,7 +969,7 @@ def provider():
     return public_status(settings().state_dir)
 
 
-@app.post("/api/provider/connect")
+@private_api.post("/api/provider/connect")
 def connect_provider(request:CredentialRequest):
     from .provider_credentials import connect_credentials
     from .platform.operations_settings import settings
@@ -939,7 +978,7 @@ def connect_provider(request:CredentialRequest):
     except (ValueError,RuntimeError,OSError) as exc:raise HTTPException(400,str(exc))
 
 
-@app.post("/api/provider/test")
+@private_api.post("/api/provider/test")
 def check_provider(request:CredentialRequest):
     from .provider_credentials import test_connection
     from .platform.operations_settings import settings
@@ -947,7 +986,7 @@ def check_provider(request:CredentialRequest):
     except (ValueError,RuntimeError,OSError) as exc:raise HTTPException(400,str(exc))
 
 
-@app.post("/api/provider/public")
+@private_api.post("/api/provider/public")
 def public_feed():
     if runtime.controls['feed']:raise HTTPException(409,'시세 수신을 중지한 뒤 공급원을 변경하세요.')
     from .provider_credentials import _write_settings,read_settings
@@ -957,7 +996,7 @@ def public_feed():
     return {"message":"기존 공개 시세 공급원을 선택했습니다."}
 
 
-@app.post('/api/provider/disconnect')
+@private_api.post('/api/provider/disconnect')
 def disconnect_provider():
     runtime.command('feed',False)
     return {'message':'시세 연결 중지를 요청했습니다. 저장된 인증 정보는 유지합니다.'}
@@ -970,7 +1009,7 @@ def operational_settings():
             "expert_devices":current.resources.expert_devices,"sac_readonly":source_settings()}
 
 
-@app.post("/api/settings")
+@private_api.post("/api/settings")
 def save_operational_settings(values:dict):
     from .platform.operations_settings import update
     if set(values)-{"risk","data","symbols","expert_devices"}:raise HTTPException(400,"운영 설정만 변경할 수 있습니다. SAC 설정은 원본값을 사용합니다.")
@@ -986,7 +1025,7 @@ def save_operational_settings(values:dict):
 
 
 
-@app.post("/api/library/{kind}")
+@private_api.post("/api/library/{kind}")
 def library_job(kind:str,payload:dict):
     if kind=='stop':return stop_library()
     if job_state()["running"] and kind not in ("search","inspect"):
@@ -1011,7 +1050,7 @@ def model_files():
     return {"root":str(MODEL_DIR),"files":rows}
 
 
-@app.post("/api/checkpoints/restore")
+@private_api.post("/api/checkpoints/restore")
 def restore_checkpoint(request:dict):
     if job_state()["running"]:raise HTTPException(409,"현재 학습 작업 종료 후 복원하세요.")
     path=(RUNTIME/request.get("path","")).resolve()
@@ -1033,17 +1072,17 @@ def restore_checkpoint(request:dict):
 
 
 
-@app.post('/api/system/apply')
+@private_api.post('/api/system/apply')
 def apply_changes():
     return start_apply()
 
 
-@app.get('/api/system/blockers')
+@private_api.get('/api/system/blockers')
 def restart_blockers():
     return {'items':busy()}
 
 
-@app.post('/api/system/prepare-restart')
+@private_api.post('/api/system/prepare-restart')
 def prepare_restart():
     with launch_lock:
         blockers=busy()
@@ -1053,12 +1092,12 @@ def prepare_restart():
     return {'ready':True}
 
 
-@app.get('/api/system/check')
+@private_api.get('/api/system/check')
 def system_check():
     return check_system()
 
 
-@app.post('/api/system/start')
+@private_api.post('/api/system/start')
 def start_system(values:dict):
     currencies=values.get('currencies',['USD','KRW'])
     if not currencies or not set(currencies)<= {'USD','KRW'}:raise HTTPException(400,'USD/KRW 운영 통화를 선택하세요.')
@@ -1066,7 +1105,7 @@ def start_system(values:dict):
     except ValueError as exc:raise HTTPException(409,str(exc))
 
 
-@app.post('/api/system/stop')
+@private_api.post('/api/system/stop')
 def stop_system():
     return system.stop()
 
@@ -1076,7 +1115,7 @@ def stop_library():
     return {'message':'모델 작업 중지를 요청했습니다. 진행 중 연산은 종료 상태를 확인하세요.'}
 
 
-@app.post('/api/model/open-directory')
+@private_api.post('/api/model/open-directory')
 def open_model_directory():
     if not MODEL_DIR.is_dir():raise HTTPException(404,'실제 모델 폴더가 없습니다.')
     if os.name!='nt':raise HTTPException(400,'현재 폴더 열기는 Windows에서 제공합니다.')
@@ -1088,3 +1127,5 @@ def open_model_directory():
 def close_operations():
     runtime.close()
     system.close_models()
+
+app.add_middleware(GZipMiddleware)

@@ -1,5 +1,6 @@
 """Official framework catalog and task adapters, executed by the existing job worker."""
 from __future__ import annotations
+from urllib.parse import quote
 import ast
 import dataclasses
 import importlib.util
@@ -68,17 +69,52 @@ def serialize(value):
     return str(value)
 
 
+def validate_native_call(parameters):
+    target=parameters.get('module');name=parameters.get('callable','')
+    item=next((item for item in source_catalog() if item['id']==target),None)
+    if not item or item['framework'] not in ('FinRL-X','FinRL'):raise ValueError('공식 소스에 존재하는 모듈을 선택하세요.')
+    if item['path'].startswith('FinRL-X/web/'):raise ValueError('Streamlit 화면 모듈은 실행하지 않습니다.')
+    if name not in item['functions'] or any(part.startswith('_') for part in name.split('.')):raise ValueError('공식 공개 함수·클래스·메서드를 선택하세요.')
+    if name.rsplit('.',1)[-1]=='remove_all_files':raise ValueError('영구 삭제 함수는 실행하지 않습니다.')
+    def check(callable_name,value):
+        if isinstance(value,str):value=json.loads(value or '{}')
+        if not isinstance(value,dict):raise ValueError(callable_name+' 인자는 JSON 객체여야 합니다.')
+        fields=item.get('parameters',{}).get(callable_name,[])
+        missing=[field['name'] for field in fields if field['required'] and field['name'] not in value]
+        if missing:raise ValueError(callable_name+' 필수 인자: '+', '.join(missing)+'; 공식 인자 양식을 사용하세요.')
+        contract=item.get('keyword_contracts',{}).get(callable_name)
+        if contract:
+            unexpected=set(value)-{field['name'] for field in fields}
+            if unexpected and not contract['variadic']:raise ValueError(callable_name+'에 없는 인자: '+', '.join(sorted(unexpected)))
+            positional=set(value)&set(contract['positional_only'])
+            if positional:raise ValueError('위치 전용 인자는 JSON 키로 호출할 수 없습니다: '+', '.join(sorted(positional)))
+        return value
+    steps=parameters.get('steps',[])
+    if isinstance(steps,str):steps=json.loads(steps or '[]')
+    if not isinstance(steps,list):raise ValueError('메서드 연결은 JSON 배열이어야 합니다.')
+    parts=name.split('.')
+    if steps:
+        check(parts[0]+'.__init__',parameters.get('init_kwargs',{}))
+        for step in steps:
+            if not isinstance(step,dict):raise ValueError('메서드 연결 항목은 JSON 객체여야 합니다.')
+            method=step.get('method','');full=parts[0]+'.'+method
+            if full not in item['functions'] or method.startswith('_'):raise ValueError('공식 공개 메서드를 선택하세요: '+full)
+            check(full,step.get('kwargs',{}))
+    else:
+        fields=name if name in item.get('parameters',{}) else name+'.__init__'
+        check(fields,parameters.get('kwargs',{}))
+        if len(parts)==2 and item.get('keyword_contracts',{}).get(name,{}).get('instance'):
+            check(parts[0]+'.__init__',parameters.get('init_kwargs',{}))
+    return item
+
+
 def native_call(parameters,output):
     """Invoke an explicitly selected public upstream callable without replacing its code."""
     import inspect
     import numpy as np
     import pandas as pd
-    target=parameters.get('module');name=parameters.get('callable','')
-    item=next((item for item in source_catalog() if item['id']==target),None)
-    if not item or item['framework'] not in ('FinRL-X','FinRL'):raise ValueError('공식 소스에 존재하는 모듈을 선택하세요.')
-    if item['path'].startswith('FinRL-X/web/'):raise ValueError('Streamlit 화면 모듈은 이식·실행하지 않습니다.')
-    if name not in item['functions'] or any(part.startswith('_') for part in name.split('.')):raise ValueError('원본에 선언된 공개 함수·클래스·메서드를 선택하세요.')
-    if name.rsplit('.',1)[-1] in ('remove_all_files',):raise ValueError('영구 삭제 함수는 휴지통 정책에 따라 실행하지 않습니다.')
+    item=validate_native_call(parameters)
+    target=parameters['module'];name=parameters['callable']
     module_name=target.split(':',1)[1]
     module=finrlx(module_name) if item['framework']=='FinRL-X' else finrl_file(module_name.replace('.','/')+'.py')
     def arguments(key):
@@ -416,7 +452,7 @@ def stock_state():
             for row in record.get('model_states',{}).values():
                 if row.get('status') in ('running','queued'):row['status']='stopped' if status=='stopped' else 'interrupted'
         record['artifacts']=[{'name':name,'bytes':(path.parent/name).stat().st_size,
-            'url':'/api/framework/artifact/'+path.parent.name+'/'+name} for name in record.get('files',[]) if (path.parent/name).is_file()]
+            'url':'/api?operation='+quote('framework/artifact/'+path.parent.name+'/'+name,safe='')} for name in record.get('files',[]) if (path.parent/name).is_file()]
         record.pop('executed_functions',None);runs[action].append(record)
     return {'defaults':defaults,'runs':runs}
 
@@ -546,8 +582,11 @@ def source_catalog():
                 with tokenize.open(path) as source:tree=ast.parse(source.read())
             except (UnicodeError,SyntaxError) as exc:
                 items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':str(exc),'functions':[],'imports':[],'calls':[]});continue
-            functions=[];signatures={};parameters={};imports=[];calls=[]
-            def arguments(node):
+            functions=[];signatures={};parameters={};imports=[];calls=[];keyword_contracts={}
+            def arguments(node,full_name=None):
+                keyword_contracts[full_name or node.name]={'variadic':node.args.kwarg is not None,
+                    'positional_only':[arg.arg for arg in node.args.posonlyargs if arg.arg not in ('self','cls')],
+                    'instance':bool(node.args.args and node.args.args[0].arg=='self')}
                 positional=[*node.args.posonlyargs,*node.args.args]
                 defaults=[None]*(len(positional)-len(node.args.defaults))+node.args.defaults
                 fields=[]
@@ -571,9 +610,9 @@ def source_catalog():
                     functions.append(node.name)
                     for child in node.body:
                         if isinstance(child,(ast.FunctionDef,ast.AsyncFunctionDef)):
-                            key=node.name+'.'+child.name;functions.append(key);signatures[key]=ast.unparse(child.args);parameters[key]=arguments(child)
+                            key=node.name+'.'+child.name;functions.append(key);signatures[key]=ast.unparse(child.args);parameters[key]=arguments(child,key)
             items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':ast.get_docstring(tree),
-                          'functions':functions,'signatures':signatures,'parameters':parameters,'imports':sorted(set(imports)),'calls':sorted(set(calls))})
+                          'functions':functions,'signatures':signatures,'parameters':parameters,'keyword_contracts':keyword_contracts,'imports':sorted(set(imports)),'calls':sorted(set(calls))})
     script=ROOT/'FinRL-X/deploy.sh'
     if script.is_file():items.append({'id':'FinRL-X:deploy','path':'FinRL-X/deploy.sh','framework':'FinRL-X',
         'description':'공식 배포 스크립트의 데이터 준비 및 전략 실행 절차','functions':[],

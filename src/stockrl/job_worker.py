@@ -20,7 +20,7 @@ def main():
         raise RuntimeError("작업 정보를 읽지 못했습니다.")
     job=update_json(root/'job.json',lambda current:{**current,'status':'running'} if current.get('id')==job_id and current.get('status')=='starting' else None)
     if job.get('id')!=job_id or job.get('status')!='running':return
-    exit_code = 0
+    exit_code = 0;failure=None
     try:
         if job['command']=='framework':
             from .platform.framework_operations import execute,preview
@@ -55,7 +55,7 @@ def main():
         if job["command"]=="train":
             print('학습 결과 저장 완료. 운영 반영은 모델 선택 화면에서 직접 승인하세요.',flush=True)
     except BaseException:
-        exit_code = 1
+        exit_code = 1;failure=str(sys.exc_info()[1])
         traceback.print_exc()
         if job['command']=='framework':
             from .platform.framework_operations import ACTIONS
@@ -67,6 +67,7 @@ def main():
         def finished(current):
             if current.get('id')!=job_id or current.get('status')=='stopped':return None
             if job.get('result') is not None:current['result']=job['result']
+            if failure:current.update(error=failure,detail=failure)
             current.update(status="succeeded" if exit_code == 0 else "failed", exit_code=exit_code,
                            finished_at=datetime.now(timezone.utc).isoformat())
             return current

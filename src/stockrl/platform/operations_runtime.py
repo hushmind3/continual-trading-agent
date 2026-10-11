@@ -257,8 +257,8 @@ class OperationsRuntime:
     def _check_policy(self,files,*,load=False):
         identity=read_json(files/'dataset.json')
         champion_ids=identity.get('champion_experts',[])
-        registry=system.expert_registry(files,self.expert_pool)
         if identity.get('environment')!=CASH_ENVIRONMENT:raise ValueError('PortfolioOptimizationEnv 정책이 필요합니다. 구형 정책을 실행하지 않습니다.')
+        registry=system.expert_registry(files,self.expert_pool)
         env=champion_structure_environment(identity['currency'],identity['symbols'],registry,champion_ids)
         try:
             model=system.model(policy_checkpoint(files),identity.get('algorithm','sac'),env)

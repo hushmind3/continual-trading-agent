@@ -2,9 +2,9 @@
 
 기본 화면 `#markets`는 데이터 준비·시장 조회, `#learning`은 학습, `#backtest`는 백테스트를 제공합니다. 메뉴와 지연 로딩은 Shell의 라우트 목록에서 관리하고 App.tsx는 화면별 import를 하지 않습니다. React는 FastAPI 설정·상태·결과를 표시하며 FinRL·SB3의 import와 실행은 백엔드에서 수행합니다. FinRL-X의 추가 데이터·전략 기능과 Frozen Expert·SAC Champion 도구는 보조 메뉴에서 제공합니다.
 
-모든 프론트 JSON 상태 조회는 `/api/state` 한 요청으로 수행하며 기존 `/api/framework/stock_data`, `/api/framework/stock_train`, `/api/framework/stock_backtest` 및 작업 중지 API를 사용합니다. 데이터는 YahooDownloader·FeatureEngineer·data_split, 학습은 StockTradingEnv·DRLAgent로 실행합니다. 원본의 A2C/DDPG/PPO/TD3/SAC 실행 플래그, 모델별 20,000단계와 예제별 모델 설정을 읽습니다. 백테스트는 DRL_prediction과 원본 예제의 MVO·DJIA 계산을 사용하며 실제 결과가 생성된 뒤 표·그래프·파일을 표시합니다.
+모든 프론트 JSON 상태 조회는 `/api`의 `state` 요청 한 요청으로 수행하며 기존 `/api/framework/stock_data`, `/api/framework/stock_train`, `/api/framework/stock_backtest` 및 작업 중지 API를 사용합니다. 데이터는 YahooDownloader·FeatureEngineer·data_split, 학습은 StockTradingEnv·DRLAgent로 실행합니다. 원본의 A2C/DDPG/PPO/TD3/SAC 실행 플래그, 모델별 20,000단계와 예제별 모델 설정을 읽습니다. 백테스트는 DRL_prediction과 원본 예제의 MVO·DJIA 계산을 사용하며 실제 결과가 생성된 뒤 표·그래프·파일을 표시합니다.
 
-통합 소유자는 기존 `SystemOperations.system`입니다. 각 모듈의 JSON 결과 갱신을 보관하고 파일 버전이 바뀐 상태만 다시 계산합니다. `/api/state`는 현재 화면이 사용하는 조회 항목과 전체 운영·작업·모델·자원 상태를 함께 반환합니다. 조회 선택자는 공통 Context를 구독하며 개별 GET·별도 폴링을 하지 않습니다. 명령은 기존 POST API, 파일 전송은 결과 다운로드 경로를 사용합니다.
+통합 소유자는 기존 `SystemOperations.system`입니다. 각 모듈의 JSON 결과 갱신을 보관하고 파일 버전이 바뀐 상태만 다시 계산합니다. `/api`의 `state` 요청는 현재 화면이 사용하는 조회 항목과 전체 운영·작업·모델·자원 상태를 함께 반환합니다. 조회 선택자는 공통 Context를 구독하며 개별 GET·별도 폴링을 하지 않습니다. 명령은 기존 POST API, 파일 전송은 결과 다운로드 경로를 사용합니다.
 
 정책 인스턴스는 프로세스 내에서 체크포인트 절대 경로·파일 버전·알고리즘으로 캐시하며 변경 없는 모델은 재사용합니다. Champion Registry와 기본 ExpertPool도 재사용합니다. 신규 학습·작업은 기존 격리 프로세스를 유지하므로 학습 중인 가중치를 운영 추론에 공유하지 않습니다. 운영 제어는 운영 메뉴, 현재 작업 중지는 공통 헤더에서 한 번 제공합니다.
 
@@ -79,7 +79,7 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 
 ## React → FastAPI → 실제 모듈
 
-`main.tsx` → `OperationsProvider` → `App.tsx` → 화면 컴포넌트 순서입니다. `data/api.ts`의 `request()`가 `/api`를 호출하고 `OperationsProvider`가 `/api/state`를 주기적으로 읽습니다. 공통 상태에는 저장 정책·가격·동결 추론·자원·가상계좌·모델 작업 상태가 포함됩니다. 상태 조회는 학습·거래·다운로드를 시작하지 않습니다.
+`main.tsx` → `OperationsProvider` → `App.tsx` → 화면 컴포넌트 순서입니다. `data/api.ts`의 `request()`가 `/api`를 호출하고 `OperationsProvider`가 `/api`의 `state` 요청를 주기적으로 읽습니다. 공통 상태에는 저장 정책·가격·동결 추론·자원·가상계좌·모델 작업 상태가 포함됩니다. 상태 조회는 학습·거래·다운로드를 시작하지 않습니다.
 
 운영 8766은 `web_api.react_index()`와 `/assets`에서 `frontend/dist`를 제공합니다. 개발 5173은 Vite이며 `vite.config.ts`가 `/api`를 8766에 전달합니다.
 
@@ -195,7 +195,7 @@ MoE 화면은 등록 모델의 실제 버전 선택과 SAC Champion 조립에 �
 | 동작 | API / 실제 실행 경로 |
 | --- | --- |
 | 변경 적용·점검 | POST `/api/system/apply` → `start_apply` → 별도 일회성 `scripts/start_server.py --apply-only` |
-| 진행 상태 | GET `/api/state`의 automation 항목 → `apply.json` + `SystemOperations.snapshot`; 재시작 전후 기록 유지 |
+| 진행 상태 | GET `/api`의 `state` 요청의 automation 항목 → `apply.json` + `SystemOperations.snapshot`; 재시작 전후 기록 유지 |
 | 전체 연결 점검 | GET `/api/system/check` → 기존 설정·정책 메타데이터·Registry·원장·공급원·프로세스 조회 |
 | 전체 시작 | POST `/api/system/start` → `SystemOperations.start/run`; CMD도 같은 API 호출 |
 | 전체 중지 | POST `/api/system/stop` → 기존 runtime.command + 기존 SAC stop; 관리 서버 유지 |
@@ -211,7 +211,9 @@ MoE 화면은 등록 모델의 실제 버전 선택과 SAC Champion 조립에 �
 
 학습 결과는 `runtime/official/policies/{job_id}/`에 별도 저장하며 자동으로 운영 정책에 승격하지 않습니다. 운영 화면의 `선택 정책 승인·로드`가 기존 `checkpoints/restore` API를 통해 직접 승인한 통화별 정책만 `runtime/operations/policies.json`에 기록합니다. 전체 시작과 추론은 승인된 정책만 사용하며, 정책 미승인은 오류로 표시합니다. 수수료·슬리피지·기간 외 검증·MDD·Sharpe 등의 자동 성과 합격 기준은 설정하지 않았습니다.
 
-통합 JSON 응답은 클라이언트가 지원하면 gzip으로 압축합니다. 통합 상태는 모듈 조회 실패 시 마지막 성공 값과 `module_errors`·`module_updated_at`을 함께 반환하고 다음 요청에서 재시도합니다. 초기 실패는 해당 값이 `null`이며 관련 화면에 오류를 표시합니다. 외부 인증·실행 상태는 매 요청에서 조회하며 저장 모델과 정책 목록은 관련 파일 변경으로 갱신합니다. 승인 정책과 마지막 작업 모델만 캐시에 유지하고 이전 작업 모델은 오래된 사용 순서로 해제합니다. 정책 승인 변경과 서버 종료에도 모델 캐시를 정리합니다. 학습 프로세스의 메모리는 API 서버와 별개입니다. JSON 기록은 파일별 프로세스 잠금과 고유 임시 파일로 직렬화하고 작업 시작·완료·중지는 잠금 안에서 읽고 갱신합니다.
+React의 상태 조회·버튼 명령·파일 다운로드는 단일 `/api` 통로로 전달합니다. JSON 요청은 `POST /api`에 `{operation, payload}`를 보내며, 이미지·파일은 같은 `/api`의 GET 요청에 `operation`과 `payload`를 전달합니다. 실행 기능은 백엔드 내부 라우터에서 원래 모듈 함수를 호출하고 개별 `/api/...` 경로는 공개하지 않습니다. 서버 적용 스크립트도 동일 통로를 사용합니다.
+
+통합 JSON 응답은 클라이언트가 지원하면 gzip으로 압축합니다. 통합 상태는 모듈 조회 실패 시 마지막 성공 값과 `module_errors`·`module_updated_at`을 함께 반환하고 다음 요청에서 재시도합니다. 초기 실패는 해당 값이 `null`이며 관련 화면에 오류를 표시합니다. 외부 인증·실행 상태는 매 요청에서 조회하며 저장 모델과 정책 목록은 관련 파일 변경으로 갱신합니다. 승인 정책과 마지막 작업 모델만 캐시에 유지하고 이전 작업 모델은 오래된 사용 순서로 해제합니다. 정책 승인 변경과 서버 종료에도 모델 캐시를 정리합니다. 학습 프로세스의 메모리는 API 서버와 별개입니다. 환경 종료는 환경만 닫고 공유 Expert Registry를 유지합니다. Registry와 모델 해제는 통합 관리자가 담당하며 CLI 종료도 동일 정리 경로를 사용합니다. 공식 callable의 필수 인자·인자명은 작업 프로세스를 만들기 전에 확인하고 오류를 화면에 반환합니다. JSON 기록은 파일별 프로세스 잠금과 고유 임시 파일로 직렬화하고 작업 시작·완료·중지는 잠금 안에서 읽고 갱신합니다.
 
 운영 풀에 적재한 Expert는 기존 `ExpertRegistry`에 pool provider를 전달해 관측 추론에서 공유합니다. 기존 출력 요약·환경·관측 차원은 그대로입니다. 개별 제어가 자동 시작과 충돌하면 자동 절차는 중단 사유를 표시하고 사용자 명령을 우선합니다. 전체 중지는 기존 학습 중지와 시세/추론/가상체결 중지를 사용하며, 진행 중인 네이티브 연산의 종료 대기와 실제 중지 완료를 구분합니다. 실제 증권사 주문은 호출하지 않습니다.
 

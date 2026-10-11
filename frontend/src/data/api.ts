@@ -1,11 +1,12 @@
+export function apiUrl(operation:string,payload:Record<string,unknown>={}) {
+  return '/api?'+new URLSearchParams({operation,payload:JSON.stringify(payload)}).toString();
+}
 export async function request<T>(path: string, body?: unknown): Promise<T> {
-  if(body===undefined&&!/^state(?:\?|$)/.test(path))throw new Error('상태 조회는 통합 상태 선택자를 사용하세요.');
-  const response = await fetch(`/api/${path}`, {
-    method: body === undefined ? "GET" : "POST",
+  const response = await fetch('/api', {
+    method: "POST",
     cache: "no-store",
-    headers:
-      body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({operation:path,payload:body??{}}),
   });
   const data = await response
     .json()

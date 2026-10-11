@@ -11,6 +11,8 @@ def main():
     parser.add_argument('--currency',choices=['USD','KRW'],default='USD')
     parser.add_argument('--symbols',nargs='+')
     parser.add_argument('--resume',action='store_true',help='이번 공식 SAC 실행에서 생성한 정책과 Replay만 복원')
+    parser.add_argument('--algorithm',default='sac',help='설치된 FinRL MODELS의 알고리즘')
+    parser.add_argument('--total-timesteps',type=int)
     parser.add_argument('--output',type=Path,help='기존 정책과 분리할 신규 SAC 결과 경로')
     parser.add_argument('--champion-path',type=Path,help='통합 SAC Champion PT')
     parser.add_argument('--champion-output',type=Path,help='학습 결과로 발행할 새 Champion PT')
@@ -39,8 +41,8 @@ def main():
         result.weights_history.to_csv(destination/'backtest_weights.csv')
         result.trades.to_csv(destination/'backtest_trades.csv')
         return
-    model=train(frame,registry,args.resume,args.output,args.champion_path,args.champion_output)
-    print('Saved official SAC:',(args.output or ROOT/'runtime/official')/'sac.zip')
+    model=train(frame,registry,args.resume,args.output,args.champion_path,args.champion_output,args.algorithm,args.total_timesteps)
+    print('Saved FinRL policy:',(args.output or ROOT/'runtime/official')/(args.algorithm+'.zip'))
 
 
 if __name__=='__main__':main()

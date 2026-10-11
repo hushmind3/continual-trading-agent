@@ -67,6 +67,8 @@ class RunRequest(BaseModel):
     symbols: list[str] = Field(default_factory=list, max_length=1000)
     resume: bool = False
     champion_path: str | None = None
+    algorithm: str = 'sac'
+    total_timesteps: int | None = Field(default=None,ge=1)
 
 
 class ChampionRequest(BaseModel):
@@ -92,6 +94,15 @@ class CollectionRequest(BaseModel):
 
 def now():
     return datetime.now(timezone.utc).isoformat()
+
+
+@app.get('/api/algorithms')
+def algorithms():
+    from finrl.agents.stablebaselines3.models import MODELS
+    from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
+    from .framework import sac_example
+    return {'default':'sac','items':[{'name':name,'parameters':sac_example(name)[1],
+        'steps_per_run':sac_example(name)[2],'uses_replay':issubclass(model,OffPolicyAlgorithm)} for name,model in MODELS.items()]}
 
 
 def file_info(path):
@@ -183,11 +194,14 @@ def database():
 
 
 def model_state(settings,selected=None):
-    from .framework import policy_files
+    from .framework import policy_files,policy_checkpoint,sac_example
+    from finrl.agents.stablebaselines3.models import MODELS
+    from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
     selected=Path(selected) if selected is not None else policy_files()
-    path = selected / "sac.zip"
+    path = policy_checkpoint(selected)
     replay = selected / "replay.pkl"
     identity = read_json(selected / "dataset.json")
+    algorithm=identity.setdefault('algorithm','sac');parameters=sac_example(algorithm)[1]
     result = {"file": file_info(path), "replay": file_info(replay), "identity": identity,
               "compatible": False, "policy_compatible":False,"structure_reasons":[],"resume_reasons":[],
               "reasons": [], "num_timesteps": None, "updates": None}
@@ -201,7 +215,7 @@ def model_state(settings,selected=None):
         result.update(num_timesteps=state.get("num_timesteps"), updates=state.get("_n_updates"),
                       observation_shape=state.get("observation_space", {}).get("_shape"),
                       action_shape=state.get("action_space", {}).get("_shape"),
-                      parameters={k: state.get(k) for k in settings["parameters"]},
+                      parameters={k: state.get(k) for k in parameters},
                       policy_kwargs=state.get("policy_kwargs"))
         structure_reasons=result['structure_reasons'];resume_reasons=result['resume_reasons']
         if not identity.get("symbols") or not identity.get("currency"):
@@ -213,16 +227,16 @@ def model_state(settings,selected=None):
             structure_reasons.append("PortfolioOptimizationEnv 식별 정보가 현재 환경과 다릅니다.")
         if is_champion and identity.get('feature_extractor')!='stockrl.platform.sac_champion.ChampionExtractor':
             structure_reasons.append("Champion 관측 특성 추출기가 현재 SAC 구조와 다릅니다.")
-        for key in ("batch_size", "buffer_size", "learning_rate", "learning_starts"):
-            if state.get(key) != settings["parameters"][key]:
-                resume_reasons.append(f"{key}: 저장값 {state.get(key)} / 현재값 {settings['parameters'][key]}")
-        if identity.get('symbols') and is_champion:
+        for key,value in parameters.items():
+            if isinstance(value,(str,int,float,bool)) and key!='action_noise' and state.get(key) != value:
+                resume_reasons.append(f"{key}: 저장값 {state.get(key)} / 현재값 {value}")
+        if identity.get('symbols') and (is_champion or identity.get('observation_contract')=='expert-observation-v1'):
             expected_shape=[identity.get('base_observation_dim',0)+64*len(identity.get('champion_experts',[]))+identity.get('account_feature_size',16)]
             if result['observation_shape']!=expected_shape or result['action_shape']!=[action_count]:
                 structure_reasons.append(f"통합 SAC Champion 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{len(identity['symbols'])}]")
-        else:structure_reasons.append('통합 MoE SAC 특성 추출기 식별 정보가 없습니다. 신규 정책으로 생성하세요.')
+        else:structure_reasons.append('현재 Expert 관측 계약의 식별 정보가 없습니다. 신규 정책으로 생성하세요.')
         result['policy_compatible']=not structure_reasons
-        if not replay.is_file():
+        if issubclass(MODELS[algorithm],OffPolicyAlgorithm) and not replay.is_file():
             resume_reasons.append("이어 학습에 필요한 Replay 파일이 없습니다.")
         result['structure_reasons']=structure_reasons
         result['resume_reasons']=resume_reasons
@@ -246,6 +260,10 @@ def replay_metadata(path_string, modified, size):
 
 def saved_replay():
     from .framework import policy_files
+    from finrl.agents.stablebaselines3.models import MODELS
+    from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
+    identity=read_json(policy_files()/'dataset.json')
+    if not issubclass(MODELS[identity.get('algorithm','sac')],OffPolicyAlgorithm):return {'status':'not_used'}
     path = policy_files() / "replay.pkl"
     if not path.exists():
         return {"status":"missing"}
@@ -256,14 +274,18 @@ def saved_replay():
 
 
 def checkpoints(settings):
-    paths = ([RUNTIME/"sac.zip"] if (RUNTIME/"sac.zip").is_file() else []) + sorted((RUNTIME/"archives").glob("*/sac.zip")) + sorted((RUNTIME/"policies").glob("*/sac.zip")) + sorted((RUNTIME/"champions").glob("*/sac.zip"))
+    from finrl.agents.stablebaselines3.models import MODELS
+    from .framework import sac_example
+    paths = list(RUNTIME.glob('*.zip')) + sorted((RUNTIME/"archives").glob("*/*.zip")) + sorted((RUNTIME/"policies").glob("*/*.zip")) + sorted((RUNTIME/"champions").glob("*/*.zip"))
     items=[]
     for path in paths:
+        if path.stem not in MODELS:continue
         try:
             with zipfile.ZipFile(path) as archive:
                 data=json.loads(archive.read("data"))
             identity=read_json(path.parent/"dataset.json")
-            compatible=identity.get("environment")==settings["environment"] and identity.get("sac_example")==settings["parameters"]
+            identity.setdefault('algorithm',path.stem)
+            compatible=identity.get("environment")==settings["environment"] and identity.get('algorithm','sac')==path.stem and identity.get("sac_example")==sac_example(path.stem)[1]
             items.append({"name":path.parent.name if path.parent!=RUNTIME else "현재 정책",
                           "path":path.relative_to(RUNTIME).as_posix(),"file":file_info(path),
                           "num_timesteps":data.get("num_timesteps"),"updates":data.get("_n_updates"),
@@ -275,7 +297,7 @@ def checkpoints(settings):
 
 def capabilities():
     return {
-        "learning":{"status":"supported","reason":"원본 train_sac · SB3 SAC 시작·중단·동일 정책 이어 학습","source":"stockrl.framework.train"},
+        "learning":{"status":"supported","reason":"FinRL DRLAgent · SB3 알고리즘 선택·학습·중단·동일 정책 이어 학습 · 기본 SAC","source":"stockrl.framework.train"},
         "expert_selection":{"status":"supported","reason":"Frozen Expert 등록·선택·같은 모델 정밀도 교체·해제","source":"stockrl.expert_registry_native.ExpertRegistry"},
         "collection":{"status":"supported","reason":"FinRL-X FMP 가격 수집 모듈. API 인증이 있어야 원격 수집 가능합니다.","source":"FinRL-X/src/data/data_fetcher.py::fetch_price_data"},
         "paper_accounts":{"status":"supported","reason":"원본 PaperAccount의 KRW/USD 독립 잔고·보유·체결·손익 기능이 연결되어 있습니다.","source":"stockrl.paper_account.PaperAccount"},
@@ -527,6 +549,11 @@ def preflight(req, command):
     settings = source_settings()
     from .framework import policy_files
     model = model_state(settings,policy_files(req.currency)) if command=='backtest' or req.resume else model_state(settings)
+    from .framework import sac_example
+    try:_,_,steps=sac_example(req.algorithm)
+    except ValueError as exc:errors.append(str(exc));steps=settings['steps_per_run']
+    if req.champion_path and req.algorithm!='sac':errors.append('선택한 Champion은 SAC 정책입니다. SAC를 선택하세요.')
+    if req.resume and model['identity'].get('algorithm','sac')!=req.algorithm:errors.append('이어 학습 알고리즘이 저장 정책과 다릅니다.')
     if req.champion_path:
         from .platform.sac_champion import load_spec,MODEL_DIR
         source=Path(req.champion_path).expanduser().resolve()
@@ -573,7 +600,7 @@ def preflight(req, command):
         periods = None
     return {"ok": not errors, "errors": errors, "symbols": symbols, "currency": req.currency, "periods": periods,
             "mode": "이어 학습" if req.resume else "새 학습" if command == "train" else "백테스트",
-            "steps_per_run": settings["steps_per_run"]}
+            "steps_per_run": req.total_timesteps or steps}
 
 
 @app.post("/api/preflight/{command}")
@@ -593,6 +620,7 @@ def launch(command, req,preserve_output=False):
         job = {"id": job_id, "status": "starting", "command": command, "currency": req.currency,
                "symbols": checked["symbols"], "resume": req.resume, "started_at": now(),
                "log": f"jobs/{job_id}.log", "finished_at": None, "exit_code": None}
+        job.update(algorithm=req.algorithm,total_timesteps=req.total_timesteps)
         if command=='backtest':job['output']='backtests/'+req.currency
         elif req.champion_path:
             from .platform.sac_champion import _next_version
@@ -748,9 +776,10 @@ def champion_create(request:ChampionRequest):
 @app.get("/api/checkpoint")
 def checkpoint_download(path:str):
     target=(RUNTIME/path).resolve()
-    if not target.is_relative_to(RUNTIME.resolve()) or target.name!="sac.zip" or not target.exists():
+    from finrl.agents.stablebaselines3.models import MODELS
+    if not target.is_relative_to(RUNTIME.resolve()) or target.suffix!='.zip' or target.stem not in MODELS or not target.exists():
         raise HTTPException(404,"정책 파일이 없습니다.")
-    return FileResponse(target,filename=target.parent.name+"-sac.zip")
+    return FileResponse(target,filename=target.parent.name+'-'+target.name)
 
 
 @app.post("/api/stop")
@@ -947,21 +976,23 @@ def model_files():
 
 @app.post("/api/checkpoints/restore")
 def restore_checkpoint(request:dict):
-    if job_state()["running"]:raise HTTPException(409,"현재 SAC 작업 종료 후 복원하세요.")
+    if job_state()["running"]:raise HTTPException(409,"현재 학습 작업 종료 후 복원하세요.")
     path=(RUNTIME/request.get("path","")).resolve()
-    if not path.is_relative_to(RUNTIME.resolve()) or path.name!="sac.zip" or not path.is_file():
-        raise HTTPException(400,"저장된 SAC 버전을 선택하세요.")
+    from finrl.agents.stablebaselines3.models import MODELS
+    from .framework import sac_example
+    if not path.is_relative_to(RUNTIME.resolve()) or path.suffix!='.zip' or path.stem not in MODELS or not path.is_file():
+        raise HTTPException(400,"저장된 FinRL 정책 버전을 선택하세요.")
     identity=read_json(path.parent/"dataset.json")
     settings=source_settings()
-    if identity.get("environment")!=settings["environment"] or identity.get("sac_example")!=settings["parameters"]:
-        raise HTTPException(400,"현재 공식 SAC 환경·예제와 호환되지 않는 이전 정책입니다.")
+    if identity.get("environment")!=settings["environment"] or identity.get('algorithm','sac')!=path.stem or identity.get("sac_example")!=sac_example(path.stem)[1]:
+        raise HTTPException(400,"현재 FinRL 환경·알고리즘·설정과 호환되지 않는 정책입니다.")
     from .platform.operations_runtime import runtime
     try:loaded=runtime.check_policy(path.parent,load=True)
     except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
     atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
     selection_path=ROOT/'runtime/operations/policies.json'
     selected=read_json(selection_path);selected[identity['currency']]=path.relative_to(RUNTIME).as_posix();atomic_json(selected,selection_path)
-    return {"message":"해당 SAC 버전을 선택하고 중앙 정책을 실제 로드했습니다. 학습·시세·매매는 시작하지 않았습니다.","policy":loaded}
+    return {"message":"해당 FinRL 정책을 선택하고 중앙 정책을 실제 로드했습니다. 학습·시세·매매는 시작하지 않았습니다.","policy":loaded}
 
 
 @app.get('/api/system/status')

@@ -41,12 +41,13 @@ def finrl_file(relative):
     return module
 
 
-def sac_example():
+def sac_example(algorithm='sac'):
     import inspect
-    from finrl.agents.stablebaselines3.models import DRLAgent,MODEL_KWARGS
+    from finrl.agents.stablebaselines3.models import DRLAgent,MODEL_KWARGS,MODELS
+    if algorithm not in MODELS:raise ValueError('FinRL에서 지원하지 않는 알고리즘입니다: '+algorithm)
     function=DRLAgent.train_model
     steps=inspect.signature(function).parameters['total_timesteps'].default
-    return function,dict(MODEL_KWARGS['sac']),steps
+    return function,dict(MODEL_KWARGS[algorithm]),steps
 
 
 def training_environment(frame,registry,training=True,champion_ids=None):
@@ -72,11 +73,15 @@ def champion_structure_environment(currency,symbols,registry,champion_ids):
     return wrapped
 
 
-def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None):
-    from stable_baselines3 import SAC
-    from finrl.agents.stablebaselines3.models import DRLAgent
+def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None,algorithm='sac',total_timesteps=None):
+    from finrl.agents.stablebaselines3.models import DRLAgent,MODELS
+    example,parameters,steps=sac_example(algorithm)
+    steps=steps if total_timesteps is None else int(total_timesteps)
+    if steps<1:raise ValueError('학습 단계는 1 이상이어야 합니다.')
+    learner=MODELS[algorithm]
     from .platform.sac_champion import load_spec
     champion = load_spec(champion_path) if champion_path else None
+    if champion and algorithm!='sac':raise ValueError('선택한 Champion은 SAC 정책입니다. SAC 알고리즘에서 사용하세요.')
     champion_ids = champion.get('identity',{}).get('champion_experts') if champion else None
     from .state_io import read_json,atomic_json
     currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in frame.symbol.unique()) else 'USD'
@@ -84,42 +89,47 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     if resume and read_json(policy_files(currency)/'dataset.json').get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경의 정책은 실행하지 않습니다. 현금 정책을 새로 학습하세요.')
     champion_ids=list(registry.catalog().get('active',[])) if champion_ids is None else champion_ids
     env=training_environment(frame,registry,champion_ids=champion_ids)
-    example,parameters,steps=sac_example()
     root=Path(output) if output is not None else ROOT/'runtime/official'
     if not root.resolve().is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('정책 출력은 기존 runtime/official 내부에 저장합니다.')
     root.mkdir(parents=True,exist_ok=True)
     from .state_io import read_json,atomic_json
     saved=policy_files(env.currency)
-    identity={'currency':env.currency,'symbols':env.symbols,'sac_example':parameters,'environment':CASH_ENVIRONMENT,'rolling_days':[1095,365]}
+    identity={'currency':env.currency,'symbols':env.symbols,'algorithm':algorithm,'sac_example':parameters,'environment':CASH_ENVIRONMENT,'rolling_days':[1095,365]}
     from .platform.sac_champion import _candidate_identity,_policy_kwargs,_original_report
-    identity.update(_candidate_identity(env.currency,env.symbols,champion_ids,int(__import__('numpy').prod(env.unwrapped.observation_space.shape)),CASH_ENVIRONMENT))
+    base_dim=int(__import__('numpy').prod(env.unwrapped.observation_space.shape))
+    if algorithm=='sac':identity.update(_candidate_identity(env.currency,env.symbols,champion_ids,base_dim,CASH_ENVIRONMENT))
+    else:identity.update(champion_experts=champion_ids,base_observation_dim=base_dim,account_feature_size=16,observation_contract='expert-observation-v1')
     if champion:
         identity.update(champion['identity'])
         if champion_output:identity['champion_file']=str(Path(champion_output))
     try:
-        if resume and read_json(saved/'dataset.json')!=identity:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다. 새 학습으로 시작하세요.')
+        if resume:
+            previous=read_json(saved/'dataset.json');previous.setdefault('algorithm','sac')
+            if previous!=identity:raise ValueError('저장된 정책과 알고리즘·통화·종목·Expert 구성이 다릅니다. 새 학습으로 시작하세요.')
         agent=DRLAgent(env=env)
-        print('FinRL-X 원본 SAC 예제:',parameters,'단계:',steps,flush=True)
+        print('FinRL DRLAgent ·',algorithm.upper(),parameters,'단계:',steps,flush=True)
         if champion:
             checkpoint=Path(champion['checkpoint'])
             if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/official'/checkpoint
-            model=SAC.load(checkpoint,env=env)
+            model=learner.load(checkpoint,env=env)
             if (checkpoint.parent/'replay.pkl').is_file():model.load_replay_buffer(checkpoint.parent/'replay.pkl')
-            model=agent.train_model(model=model,tb_log_name='sac',total_timesteps=steps)
+            model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
         elif resume:
-            model=SAC.load(saved/'sac.zip',env=env);model.load_replay_buffer(saved/'replay.pkl')
-            model=agent.train_model(model=model,tb_log_name='sac',total_timesteps=steps)
+            model=learner.load(policy_checkpoint(saved),env=env)
+            if hasattr(model,'load_replay_buffer'):model.load_replay_buffer(saved/'replay.pkl')
+            model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
         else:
             roles={key:registry.catalog()['experts'][key]['role'] for key in champion_ids}
-            model=agent.get_model('sac',model_kwargs=dict(parameters),policy_kwargs=_policy_kwargs(identity,roles,_original_report()))
-            model=agent.train_model(model=model,tb_log_name='sac',total_timesteps=steps)
-        model.save(root/'sac')
-        model.save_replay_buffer(root/'replay.pkl')
+            kwargs={'policy_kwargs':_policy_kwargs(identity,roles,_original_report())} if algorithm=='sac' else {}
+            model=agent.get_model(algorithm,model_kwargs=dict(parameters),**kwargs)
+            model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
+        model.save(root/algorithm)
+        if hasattr(model,'save_replay_buffer'):model.save_replay_buffer(root/'replay.pkl')
         atomic_json(identity,root/'dataset.json')
         if champion and champion_output:
             from .platform.sac_champion import save_trained_champion
             save_trained_champion(champion_path,model,Path(champion_output),root)
-        print('학습 완료:',model.num_timesteps,'관측,',model._n_updates,'업데이트',flush=True)
+        print('학습 완료:',model.num_timesteps,'관측,',getattr(model,'_n_updates',None),'업데이트',flush=True)
     finally:env.close()
     return model
 
@@ -145,7 +155,7 @@ def prices(currency='USD',symbols=None):
 def backtest(frame,registry,currency=None):
     """Convert original environment holdings to the official StrategyResult API."""
     import pandas as pd
-    from stable_baselines3 import SAC
+    from finrl.agents.stablebaselines3.models import MODELS
     saved=policy_files(currency)
     from .state_io import read_json
     identity=read_json(saved/'dataset.json')
@@ -161,7 +171,7 @@ def backtest(frame,registry,currency=None):
     env=training_environment(frame,registry,training=False,champion_ids=identity.get('champion_experts',[]))
     try:
         if identity.get('currency')!=env.currency or identity.get('symbols')!=env.symbols:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다.')
-        model=SAC.load(saved/'sac.zip',env=env)
+        model=MODELS[identity.get('algorithm','sac')].load(policy_checkpoint(saved),env=env)
         from finrl.agents.stablebaselines3.models import DRLAgent
         observation,_=env.reset();raw=env.unwrapped.gym_env;rows=[]
         while not raw._terminal:
@@ -171,7 +181,7 @@ def backtest(frame,registry,currency=None):
             rows.append({'date':raw._info['end_time'],**dict(zip(env.symbols,allocation[1:])), 'CASH':float(allocation[0])})
             if terminal or truncated:break
         weights=pd.DataFrame(rows).set_index('date')
-        result=finrlx('strategies.base_strategy').StrategyResult('Official SAC',weights)
+        result=finrlx('strategies.base_strategy').StrategyResult('FinRL '+identity.get('algorithm','sac').upper(),weights)
         module=finrlx('backtest.backtest_engine')
         config=module.BacktestConfig(str(frame.date.min().date()),str(frame.date.max().date()))
         selected=frame[frame.date.isin(env.unwrapped.gym_env._sorted_times)]
@@ -190,6 +200,15 @@ def policy_files(currency=None):
     selection={'path':selected} if selected else read_json(root/'active-checkpoint.json')
     if not selection:return root
     path=(root/selection['path']).resolve()
-    if not path.is_relative_to(root.resolve()) or path.name!='sac.zip':
+    from finrl.agents.stablebaselines3.models import MODELS
+    if not path.is_relative_to(root.resolve()) or path.suffix!='.zip' or path.stem not in MODELS:
         raise ValueError('기존 SAC 체크포인트 경로가 유효하지 않습니다.')
     return path.parent
+
+
+def policy_checkpoint(folder):
+    from .state_io import read_json
+    from finrl.agents.stablebaselines3.models import MODELS
+    algorithm=read_json(Path(folder)/'dataset.json').get('algorithm','sac')
+    if algorithm not in MODELS:raise ValueError('저장된 정책의 FinRL 알고리즘을 확인할 수 없습니다.')
+    return Path(folder)/(algorithm+'.zip')

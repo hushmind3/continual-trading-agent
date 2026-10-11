@@ -36,12 +36,14 @@ def main():
             return
         if job["command"] == "train" and not job.get('output'):
             backup = root / "archives" / job_id
-            for name in ("sac.zip", "replay.pkl", "dataset.json"):
+            for name in (job.get('algorithm','sac')+'.zip', "replay.pkl", "dataset.json"):
                 if (root / name).is_file():
                     backup.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(root / name, backup / name)
-            print("학습 저장 전: 이전 SAC·Replay는 archives에 보관합니다.", flush=True)
+            print("학습 저장 전: 이전 정책·Replay는 archives에 보관합니다.", flush=True)
         args = ["stockrl", job["command"], "--currency", job["currency"], "--symbols", *job["symbols"]]
+        args.extend(['--algorithm',job.get('algorithm','sac')])
+        if job.get('total_timesteps') is not None:args.extend(['--total-timesteps',str(job['total_timesteps'])])
         if job["resume"]:
             args.append("--resume")
         if job.get('output'):args.extend(['--output',str(root/job['output'])])
@@ -51,9 +53,10 @@ def main():
         from .official_cli import main as official_main
         official_main()
         if job["command"]=="train":
-            atomic_json({"path":job['output']+'/sac.zip' if job.get('output') else 'sac.zip'},root/"active-checkpoint.json")
+            checkpoint=(job['output']+'/' if job.get('output') else '')+job.get('algorithm','sac')+'.zip'
+            atomic_json({"path":checkpoint},root/"active-checkpoint.json")
             selected=read_json(ROOT/'runtime/operations/policies.json')
-            selected[job['currency']]=job['output']+'/sac.zip' if job.get('output') else 'sac.zip'
+            selected[job['currency']]=checkpoint
             atomic_json(selected,ROOT/'runtime/operations/policies.json')
     except BaseException:
         exit_code = 1

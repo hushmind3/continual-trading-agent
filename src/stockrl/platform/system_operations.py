@@ -171,7 +171,8 @@ class SystemOperations:
                 if selected_policies.get(currency):
                     path=(RUNTIME/selected_policies[currency]).resolve()
                     try:
-                        if not path.is_relative_to(RUNTIME.resolve()) or path.name!='sac.zip' or read_json(path.parent/'dataset.json').get('currency')!=currency:
+                        from ..framework import policy_checkpoint
+                        if not path.is_relative_to(RUNTIME.resolve()) or path!=policy_checkpoint(path.parent) or read_json(path.parent/'dataset.json').get('currency')!=currency:
                             raise ValueError('선택한 운영 정책의 경로 또는 통화가 다릅니다.')
                         runtime.check_policy(path.parent,load=True)
                     except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:
@@ -218,7 +219,8 @@ class SystemOperations:
                 # Validate official observation/action contracts through the existing loader, no prediction/training here.
                 self.interrupted();runtime.check_policy(selected,load=True)
                 self.phase('policy-'+currency,currency+' SAC 정책 호환성','complete','원본 환경 관측·행동 계약으로 공식 SAC 로딩 확인: '+str(selected))
-                ready_policies[currency]=(selected/'sac.zip').relative_to(RUNTIME).as_posix()
+                from ..framework import policy_checkpoint
+                ready_policies[currency]=policy_checkpoint(selected).relative_to(RUNTIME).as_posix()
             # Stored-data SAC preparation is independent of a live market connection.
             key='connection';title='인증 · 실제 시세 연결'
             connection_error=None

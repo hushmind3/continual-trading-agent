@@ -143,10 +143,10 @@ class OperationsRuntime:
         currency=self.learning_pending.pop(0)
         try:
             identity=read_json(policy_files(currency)/'dataset.json')
-            request=api.RunRequest(currency=currency,symbols=identity['symbols'],resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
+            request=api.RunRequest(currency=currency,symbols=identity['symbols'],algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
             result=api.launch('train',request,preserve_output=True)
             self.learning_job=result['job']['id']
-            self.status.update(learning_status='SAC 이어 학습 실행',learning_job=self.learning_job)
+            self.status.update(learning_status=identity.get('algorithm','sac').upper()+' 이어 학습 실행',learning_job=self.learning_job)
             self.status.pop('learning_error',None)
         except Exception as exc:self.status.update(learning_status='학습 요청 실패',learning_error=str(exc))
 
@@ -252,7 +252,8 @@ class OperationsRuntime:
         finally:self.inference_active-=1
 
     def _check_policy(self,files,*,load=False):
-        from stable_baselines3 import SAC
+        from finrl.agents.stablebaselines3.models import MODELS
+        from ..framework import policy_checkpoint
         from ..expert_registry_native import ExpertRegistry
         from ..framework import champion_structure_environment
         identity=read_json(files/'dataset.json')
@@ -266,19 +267,20 @@ class OperationsRuntime:
         if identity.get('environment')!=CASH_ENVIRONMENT:raise ValueError('PortfolioOptimizationEnv 정책이 필요합니다. 구형 정책을 실행하지 않습니다.')
         env=champion_structure_environment(identity['currency'],identity['symbols'],registry,champion_ids)
         try:
-            model=SAC.load(files/'sac.zip',env=env)
-            info={'path':(files/'sac.zip').relative_to(ROOT/'runtime/official').as_posix(),'device':str(model.device),
+            model=MODELS[identity.get('algorithm','sac')].load(policy_checkpoint(files),env=env)
+            info={'path':policy_checkpoint(files).relative_to(ROOT/'runtime/official').as_posix(),'algorithm':identity.get('algorithm','sac'),'device':str(model.device),
                 'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
-                'num_timesteps':int(model.num_timesteps),'updates':int(model._n_updates)}
+                'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
             if load:
-                file=files/'sac.zip';stat=file.stat()
+                file=policy_checkpoint(files);stat=file.stat()
                 self.policy_models[identity['currency']]={**info,'model':model,'signature':(stat.st_mtime_ns,stat.st_size)}
                 self.last_policy_date=None
             return info
         finally:env.close()
 
     def _sac_decision(self,files):
-        from stable_baselines3 import SAC
+        from finrl.agents.stablebaselines3.models import MODELS
+        from ..framework import policy_checkpoint
         from ..expert_registry_native import ExpertRegistry
         from ..expert_observation import ExpertObservation
         identity=read_json(files/'dataset.json')
@@ -298,15 +300,15 @@ class OperationsRuntime:
         latest._state,latest._info=latest._get_state_and_info_from_time_index(latest._time_index)
         wrapped=prepared
         try:
-            file=files/'sac.zip';stat=file.stat();path=file.relative_to(ROOT/'runtime/official').as_posix()
+            file=policy_checkpoint(files);stat=file.stat();path=file.relative_to(ROOT/'runtime/official').as_posix()
             cached=self.policy_models.get(currency,{})
             if cached.get('path')==path and cached.get('signature')==(stat.st_mtime_ns,stat.st_size):
                 model=cached['model'];model.set_env(wrapped)
             else:
-                model=SAC.load(file,env=wrapped)
-                self.policy_models[currency]={'path':path,'model':model,'signature':(stat.st_mtime_ns,stat.st_size),
+                model=MODELS[identity.get('algorithm','sac')].load(file,env=wrapped)
+                self.policy_models[currency]={'path':path,'algorithm':identity.get('algorithm','sac'),'model':model,'signature':(stat.st_mtime_ns,stat.st_size),
                     'device':str(model.device),'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
-                    'num_timesteps':int(model.num_timesteps),'updates':int(model._n_updates)}
+                    'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
             book=self.ledger().snapshot()['books'][currency]
             wrapped.live_account={'currency':currency,'nav':book['equity'],'cash':book['cash'],
                 'positions':{symbol:row['quantity'] for symbol,row in book['positions'].items()}}

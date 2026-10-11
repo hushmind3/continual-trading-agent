@@ -35,7 +35,7 @@ export interface Snapshot {
     versions:Record<string,string>;
   };
   models_by_currency?:Record<Currency,Snapshot['model']>;
-  model:{file:FileState;replay:FileState;identity:{currency?:Currency;symbols?:string[]};compatible:boolean;reasons:string[];
+  model:{file:FileState;replay:FileState;identity:{currency?:Currency;symbols?:string[];algorithm?:string};compatible:boolean;reasons:string[];
     num_timesteps:number|null;updates:number|null;observation_shape?:number[];action_shape?:number[];
     parameters?:Record<string,unknown>;replay_state:{status:string;error?:string;size?:number;capacity?:number;position?:number;full?:boolean;n_envs?:number;array_bytes?:number}};
   data:{path?:string;error:string|null;rows:number;tickers:number;start?:string;end?:string;instruments:Instrument[]};

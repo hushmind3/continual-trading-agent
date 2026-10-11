@@ -54,12 +54,15 @@ configs/local/                 인증 공급원·운영 설정 (Git 제외)
 requirements/operations.txt     Python 의존성
 scripts/start_server.py         통합 서버 실행·소유권 확인
 scripts/install_windows.py      기존 누락 의존성 설치 스크립트
+scripts/codex_fix_receiver.py    GitHub Issue → 격리된 로컬 Codex exec
+scripts/register_codex_fix_receiver.ps1 Windows 5분·로그인 수신 작업 등록
 서버켜기.cmd                   8766 운영 진입점
 FinRL-X/                       공식 FinRL-Trading Git 서브모듈, 수정하지 않음
 data/                          실제 가격 DB, Git 제외
 runtime/official/              SAC·Replay·작업·체크포인트·백테스트, Git 제외
 runtime/experts/               동결 추론 결과·외부 실행기, Git 제외
 runtime/operations/            가상원장·시세 수신·모델 도구 작업 상태, Git 제외
+runtime/codex-fix-receiver/     수신 설정·실행 상태·오류·CLI 로그, Git 제외
 results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제외
 휴지통/                        폐기 전용, 코드와 연결하지 않음, Git 제외
 ```
@@ -206,3 +209,13 @@ MoE 화면은 등록 모델의 실제 버전 선택과 SAC Champion 조립에 �
 시장·운영 화면의 시세 수신·자동 판단·가상매매 버튼은 상단에 배치합니다. 운영 화면의 `코드 변경 적용`은 기존 React 빌드·8766 서버 갱신·연결 상태 조회이며 오류 자동 복구가 아닙니다. `자동 운영 시작`은 기존 system/start 절차로, 호환 정책 준비(정책이 없으면 SAC 학습) 이후 시세 수신·판단·가상매매를 시작합니다. 개별 제어와 실행 결과는 같은 상단 운영 패널에 표시합니다.
 
 운영의 실시간 SAC 지속학습 버튼은 완료 시세가 저장되는 기존 `accept` 경로에서 선택 통화의 SAC 이어 학습 작업을 요청합니다. 기존 공식 설정·Replay 복원 경로를 사용하며 진행 중 작업은 대기하고 새 정책/Champion 버전으로 저장합니다. 끄기와 전체 중지는 이 버튼으로 시작한 학습만 중지합니다. 실제 시세·학습 성공은 런타임 상태·작업 로그로 확인해야 합니다. KRW/USD 학습·백테스트는 통화별 선택 정책을 사용하며 백테스트 결과는 `runtime/official/backtests/{currency}`에 분리합니다. 평가 조회·거래/가중치 표·다운로드에도 통화를 전달합니다. 기존 전역 결과 파일과 체크포인트는 보존합니다.
+
+## GitHub 수정 지시 수신기
+
+Windows PowerShell에서 `scripts/register_codex_fix_receiver.ps1`을 실행하면 로그인 시 및 5분마다 `CodexFix-continual-trading-agent` 작업이 실행됩니다. 같은 작업은 중복 실행하지 않습니다. 기존 로컬 Codex CLI와 ChatGPT 로그인을 사용하며 API 키 인증은 실행하지 않습니다. GitHub 인증은 기존 Git Credential Manager에서 읽고 토큰을 파일에 저장하지 않습니다.
+
+`hushmind3/continual-trading-agent`의 열린 Issue 중 제목에 `[Codex-Fix]`가 있고 작성자가 저장소 소유자·현재 인증 사용자·저장소 협업자인 지시만 처리합니다. Issue별로 `~/.codex/issue-fixes/continual-trading-agent/`에 최신 main의 별도 체크아웃을 만들고 `codex exec`를 실행합니다. 사용자 Codex 설정 파일은 변경하지 않으며 설정된 모델·추론 수준·Windows sandbox backend만 실행에 전달합니다. 작업은 `workspace-write` sandbox 안에서 실행됩니다.
+
+수신기는 변경 파일을 확인하여 AGENTS·설정·공식 프레임워크·모델·데이터·Replay·인증 파일 변경을 거부합니다. 승인된 소스 변경만 커밋하고 일반 push로 main에 반영한 뒤 결과 댓글과 함께 Issue를 닫습니다. 실패한 동일 제목·본문은 자동 재시도하지 않으며 오류를 기록하고 Issue를 열어 둡니다. 지시 본문을 변경하면 새 지시로 처리됩니다. 동시 main 변경으로 push가 거부돼도 강제 push·reset하지 않습니다. 원래 프로젝트의 미커밋 변경, 실행 중 서버·학습·시세 작업은 이 수신기가 변경하지 않습니다. GitHub에 반영한 변경을 원래 체크아웃에 pull하거나 서버에 배포하는 기능은 포함하지 않습니다.
+
+로컬 설정·상태·CLI 로그는 Git 제외 경로 `runtime/codex-fix-receiver/`에 저장합니다. `config.json`의 `codex_binary`, `checkout_root`, `exec_timeout_seconds`를 사용하며 기존 파일은 재등록 시 덮어쓰지 않습니다. 연결 확인은 `python scripts/codex_fix_receiver.py --verify`로 수행할 수 있습니다. 스케줄러 실행 환경에서 1회 확인하려면 같은 설정에 `verify_once: true`를 지정합니다. 실제 소스 읽기와 Git HEAD 증거가 없거나 명령이 정책에 차단되면 CLI 종료 코드가 0이어도 성공으로 처리하지 않습니다.

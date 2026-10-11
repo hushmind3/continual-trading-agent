@@ -1,0 +1,29 @@
+.workspace-compact {font-size:13px;line-height:1.5}
+.workspace-compact .ui-panel {padding:12px;border-radius:10px}
+.workspace-compact .ui-panel>header {margin-bottom:10px;gap:8px}
+.workspace-compact .ui-panel>header h2 {font-size:13px}
+.workspace-compact button:not([role="switch"]) {min-height:28px;padding:5px 10px;font-size:12px;line-height:18px;border-radius:7px;gap:5px}
+.workspace-compact input:not([type="checkbox"]):not([type="radio"]),.workspace-compact select {min-height:30px;padding:5px 8px;font-size:12px;border-radius:6px}
+.workspace-compact textarea {padding:8px;font-size:12px;min-height:72px}
+.workspace-compact .p-6,.workspace-compact .p-5,.workspace-compact .sm\:p-6 {padding:12px}
+.workspace-compact .p-4 {padding:10px}
+.workspace-compact .px-6 {padding-left:12px;padding-right:12px}
+.workspace-compact .py-4,.workspace-compact .py-5 {padding-top:8px;padding-bottom:8px}
+.workspace-compact .gap-6,.workspace-compact .gap-5 {gap:12px}
+.workspace-compact .gap-4 {gap:10px}
+.workspace-compact .space-y-6>:not([hidden])~:not([hidden]),.workspace-compact .space-y-5>:not([hidden])~:not([hidden]) {margin-top:12px}
+.workspace-compact .mb-5,.workspace-compact .mb-6 {margin-bottom:10px}
+.workspace-compact .mt-5,.workspace-compact .mt-6 {margin-top:12px}
+.workspace-compact .text-4xl,.workspace-compact .text-3xl {font-size:22px;line-height:1.25}
+.workspace-compact .text-2xl {font-size:18px;line-height:1.3}
+.workspace-compact th,.workspace-compact td {padding-top:6px;padding-bottom:6px}
+.workspace-compact .rounded-2xl {border-radius:10px}
+.workspace-compact .ui-empty {min-height:0;padding:8px;gap:6px;flex-direction:row;text-align:left;justify-content:flex-start}
+.workspace-compact .ui-empty>svg {width:16px;height:16px;flex-shrink:0}
+.workspace-compact .my-3 {margin-top:6px;margin-bottom:6px}
+.workspace-compact .mt-4 {margin-top:10px}
+.workspace-compact .mb-4 {margin-bottom:10px}
+.workspace-compact .pt-4 {padding-top:10px}
+.workspace-subnav {display:flex;align-items:center;gap:4px;flex-wrap:wrap;border-bottom:1px solid #dbe2eb;margin-bottom:12px;padding-bottom:8px}
+.workspace-subnav a {padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;color:#64748b}
+.workspace-subnav a[aria-current="page"] {color:#1d4ed8;background:#e8f0ff}

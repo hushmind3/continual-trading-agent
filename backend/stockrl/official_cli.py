@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--output',type=Path,help='기존 정책과 분리할 신규 SAC 결과 경로')
     parser.add_argument('--champion-path',type=Path,help='통합 SAC Champion PT')
     parser.add_argument('--champion-output',type=Path,help='학습 결과로 발행할 새 Champion PT')
+    parser.add_argument('--checkpoint-path',help='운영 승인과 별개로 평가할 저장 정책')
     args=parser.parse_args();registry=ExpertRegistry();champion=None
     try:
         if args.champion_path and args.command=='train':
@@ -31,14 +32,17 @@ def main():
         if args.command=='backtest':
             destination=args.output or ROOT/'runtime/official/backtests'/args.currency
             destination.mkdir(parents=True,exist_ok=True)
-            result=backtest(frame,registry,args.currency,args.champion_path);print(result.to_metrics_dataframe().to_string())
+            from pandas import Timedelta
+            trade=frame.date.max()+Timedelta(days=1)
+            frame=frame[(frame.date>=trade-Timedelta(days=365))&(frame.date<trade)]
+            result=backtest(frame,registry,args.currency,args.champion_path,args.checkpoint_path);print(result.to_metrics_dataframe().to_string())
             result.portfolio_values.to_csv(destination/'backtest.csv')
             # Persist official engine metrics for the HTTP/UI adapter.
             from .state_io import atomic_json
             import math
             metrics=result.to_metrics_dataframe()
             records={str(index):{str(key):float(value) if isinstance(value,(int,float)) and math.isfinite(value) else str(value) if not isinstance(value,(int,float)) else None for key,value in row.items()} for index,row in metrics.iterrows()}
-            atomic_json({'currency':args.currency,'symbols':sorted(frame.symbol.unique()),
+            atomic_json({'currency':args.currency,'symbols':sorted(frame.symbol.unique()),'checkpoint_path':args.checkpoint_path,
                 'strategies':records},destination/'backtest_metrics.json')
             result.weights_history.to_csv(destination/'backtest_weights.csv')
             result.trades.to_csv(destination/'backtest_trades.csv')

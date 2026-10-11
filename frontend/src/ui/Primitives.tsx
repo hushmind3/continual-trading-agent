@@ -53,7 +53,7 @@ export function Empty({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-32 flex-col items-center justify-center gap-3 px-5 py-7 text-center">
+    <div className="ui-empty flex min-h-32 flex-col items-center justify-center gap-3 px-5 py-7 text-center">
       <Inbox size={24} className="text-slate-300" />
       <div>
         <p className="text-sm font-medium text-slate-600">{title}</p>

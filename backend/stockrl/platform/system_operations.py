@@ -158,7 +158,7 @@ class SystemOperations:
                     stdout=output,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
             job.update(pid=process.pid,process_created=psutil.Process(process.pid).create_time())
             self.job_process=process
-            update_json(RUNTIME/'job.json',lambda current:{**current,**job} if current.get('id')!=job['id'] else {**job,**current,'pid':job['pid'],'process_created':job['process_created']})
+            update_json(RUNTIME/'job.json',lambda current:dict(job) if current.get('id')!=job['id'] else {**job,**current,'pid':job['pid'],'process_created':job['process_created']})
             (RUNTIME/'training.pid').write_text(str(process.pid))
             return job
 

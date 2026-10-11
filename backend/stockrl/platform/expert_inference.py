@@ -6,7 +6,7 @@ import time
 from .observations import InputUnavailable,native_input
 
 
-def prepare_inputs(entry, frame, account):
+def prepare_inputs(entry, frame, account, context_frames=None):
     if frame.empty:
         raise InputUnavailable('실제 가격 데이터가 없습니다.')
     frame=frame.sort_values('date')
@@ -17,7 +17,31 @@ def prepare_inputs(entry, frame, account):
         raise InputUnavailable('이 Expert의 원본 계약은 USD 계좌입니다.')
     snapshot={'symbols':sorted(frame.symbol.unique()),'as_of':stamp,'policy_account':account}
     if policy:
-        snapshot['stock_policy_history']=daily.assign(date=daily.date.astype(str)).to_dict('records')
+        spec=entry['stock_policy']
+        if spec['kind'] in ('a2c','ppo','sac'):
+            from ..framework import prices,finrlx
+            from ..moe_stock_policies import StockPolicyExpert,history_frame
+            from pathlib import Path
+            store=finrlx('data.data_store').DataStore()
+            database=Path(store.db_path)
+            version=tuple((p.stat().st_mtime_ns,p.stat().st_size) if p.exists() else None
+                for p in (database,Path(str(database)+'-wal')))
+            key=(tuple(spec['universe']),tuple(spec['indicators']))
+            cached=context_frames.get(key) if context_frames is not None else None
+            if cached is None or cached[0]!=version:
+                source=prices('USD',list(spec['universe']))
+                if source.empty:raise InputUnavailable('원본 주식 Expert의 학습 종목 가격 데이터가 없습니다.')
+                native=history_frame(source,source.date.max())
+                native=StockPolicyExpert._portfolio_features(native,spec['indicators'])
+                cached=(version,native)
+                if context_frames is not None:context_frames[key]=cached
+            history=cached[1]
+            history=history[history.Date<pd.Timestamp(stamp).normalize()]
+            if history.empty:raise InputUnavailable('해당 시점 이전의 원본 주식 Expert 입력이 없습니다.')
+            daily=history[history.Date==history.Date.max()]
+            snapshot['stock_policy_history']=daily.assign(Date=daily.Date.astype(str)).to_dict('records')
+        else:
+            snapshot['stock_policy_history']=daily.assign(date=daily.date.astype(str)).to_dict('records')
     batches=[None] if policy else native_input(entry['backend'],frame,daily,stamp)
     if not batches:
         raise InputUnavailable('Expert 추론 입력 묶음이 없습니다.')

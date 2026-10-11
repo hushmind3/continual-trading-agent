@@ -168,11 +168,11 @@ def prices(currency='USD',symbols=None):
     return data
 
 
-def backtest(frame,registry,currency=None,champion_path=None):
+def backtest(frame,registry,currency=None,champion_path=None,checkpoint_path=None):
     """Convert original environment holdings to the official StrategyResult API."""
     import pandas as pd
     from .platform.system_operations import system
-    saved=policy_files(currency)
+    saved=policy_files(currency,checkpoint_path)
     champion=None
     if champion_path:
         from .platform.sac_champion import load_spec
@@ -213,12 +213,12 @@ def backtest(frame,registry,currency=None,champion_path=None):
     finally:env.close()
 
 
-def policy_files(currency=None):
+def policy_files(currency=None,checkpoint_path=None):
     """Select an existing native SB3 revision without modifying its weights."""
     from .state_io import read_json
     root=ROOT/'runtime/official'
     selected=read_json(ROOT/'runtime/operations/policies.json').get(currency) if currency else None
-    selection={'path':selected} if selected else read_json(root/'active-checkpoint.json')
+    selection={'path':checkpoint_path} if checkpoint_path else {'path':selected} if selected else read_json(root/'active-checkpoint.json')
     if not selection:return root
     path=(root/selection['path']).resolve()
     from finrl.agents.stablebaselines3.models import MODELS

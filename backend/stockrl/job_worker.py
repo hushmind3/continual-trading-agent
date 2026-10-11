@@ -49,6 +49,7 @@ def main():
         if job.get('output'):args.extend(['--output',str(root/job['output'])])
         if job.get('champion_path'):args.extend(['--champion-path',job['champion_path']])
         if job.get('champion_output'):args.extend(['--champion-output',job['champion_output']])
+        if job.get('checkpoint_path'):args.extend(['--checkpoint-path',job['checkpoint_path']])
         sys.argv = args
         from .official_cli import main as official_main
         official_main()
@@ -68,6 +69,8 @@ def main():
             if current.get('id')!=job_id or current.get('status')=='stopped':return None
             if job.get('result') is not None:current['result']=job['result']
             if failure:current.update(error=failure,detail=failure)
+            else:
+                current.pop('error',None);current.pop('detail',None)
             current.update(status="succeeded" if exit_code == 0 else "failed", exit_code=exit_code,
                            finished_at=datetime.now(timezone.utc).isoformat())
             return current

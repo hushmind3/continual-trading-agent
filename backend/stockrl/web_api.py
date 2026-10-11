@@ -106,6 +106,7 @@ class RunRequest(BaseModel):
     symbols: list[str] = Field(default_factory=list, max_length=1000)
     resume: bool = False
     champion_path: str | None = None
+    checkpoint_path: str | None = None
     algorithm: str = 'sac'
     total_timesteps: int | None = Field(default=None,ge=1)
 
@@ -599,11 +600,18 @@ def preflight(req, command):
         elif item["observations"] < 2:
             errors.append(symbol + ": 공식 환경 실행에는 최소 2개 가격 관측이 필요합니다.")
     settings = source_settings()
-    model = model_state(settings,policy_files(req.currency)) if command=='backtest' or req.resume else model_state(settings)
+    try:
+        selected=policy_files(req.currency,req.checkpoint_path if command=='backtest' else None)
+        model=model_state(settings,selected) if command=='backtest' or req.resume else model_state(settings)
+    except (ValueError,OSError) as exc:
+        errors.append(str(exc));model=model_state(settings)
+    if req.checkpoint_path and command!='backtest':errors.append('정책 경로 선택은 운영 승인 전 평가에만 사용합니다.')
+    if req.checkpoint_path and req.champion_path:errors.append('평가할 정책 또는 Champion 중 하나를 선택하세요.')
     try:_,_,steps=sac_example(req.algorithm)
     except ValueError as exc:errors.append(str(exc));steps=settings['steps_per_run']
     if req.champion_path and req.algorithm!='sac':errors.append('선택한 Champion은 SAC 정책입니다. SAC를 선택하세요.')
     if req.resume and model['identity'].get('algorithm','sac')!=req.algorithm:errors.append('이어 학습 알고리즘이 저장 정책과 다릅니다.')
+    if command=='backtest' and model['identity'].get('algorithm','sac')!=req.algorithm:errors.append('평가 알고리즘이 저장 정책과 다릅니다.')
     if req.champion_path:
         from .platform.sac_champion import champion_info,MODEL_DIR
         source=Path(req.champion_path).expanduser().resolve()
@@ -672,7 +680,10 @@ def launch(command, req,preserve_output=False):
                "symbols": checked["symbols"], "resume": req.resume, "started_at": now(),
                "log": f"jobs/{job_id}.log", "finished_at": None, "exit_code": None}
         job.update(algorithm=req.algorithm,total_timesteps=req.total_timesteps)
-        if command=='backtest':job['output']='backtests/'+req.currency
+        if command=='backtest':
+            job['output']='backtests/'+req.currency
+            if req.checkpoint_path:job['checkpoint_path']=req.checkpoint_path
+            if req.champion_path:job['champion_path']=str(Path(req.champion_path).expanduser().resolve())
         elif req.champion_path:
             from .platform.sac_champion import _next_version
             _,target=_next_version()

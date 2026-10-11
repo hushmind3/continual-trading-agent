@@ -1,6 +1,6 @@
 # FinRL · SB3 + React — FinRL-X 보조
 
-기본 화면 `#markets`는 데이터 준비·시장 조회, `#learning`은 학습, `#backtest`는 백테스트를 제공합니다. 메뉴와 지연 로딩은 Shell의 라우트 목록에서 관리하고 App.tsx는 화면별 import를 하지 않습니다. React는 FastAPI 설정·상태·결과를 표시하며 FinRL·SB3의 import와 실행은 백엔드에서 수행합니다. FinRL-X의 추가 데이터·전략 기능과 Frozen Expert·SAC Champion 도구는 보조 메뉴에서 제공합니다.
+화면은 운영(#control), 작업(#workspace), MoE(#moe), 설정(#settings)으로 구성됩니다. 운영 제어와 가상계좌를 함께 표시하며, 작업의 데이터·정책 학습·정책 평가·공식 원형은 같은 메뉴의 하위 탭에서 제공합니다. MoE 외 화면은 카드 패딩·버튼 높이·섹션 간격을 줄인 공통 스타일을 사용합니다. 기존 화면 해시는 해당 하위 탭으로 연결됩니다. 정책 평가는 저장 체크포인트를 별도로 선택하며 운영 승인 상태를 바꾸지 않습니다.
 
 모든 프론트 JSON 상태 조회는 `/api`의 `state` 요청 한 요청으로 수행하며 기존 `/api/framework/stock_data`, `/api/framework/stock_train`, `/api/framework/stock_backtest` 및 작업 중지 API를 사용합니다. 데이터는 YahooDownloader·FeatureEngineer·data_split, 학습은 StockTradingEnv·DRLAgent로 실행합니다. 원본의 A2C/DDPG/PPO/TD3/SAC 실행 플래그, 모델별 20,000단계와 예제별 모델 설정을 읽습니다. 백테스트는 DRL_prediction과 원본 예제의 MVO·DJIA 계산을 사용하며 실제 결과가 생성된 뒤 표·그래프·파일을 표시합니다.
 

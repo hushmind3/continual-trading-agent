@@ -1,6 +1,6 @@
 import type {ReactNode} from 'react';
 export function Panel({title,description,actions,children,className=''}:{title:string;description?:string;actions?:ReactNode;children:ReactNode;className?:string}) {
-  return <section className={'min-w-0 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/60 sm:p-6 '+className}>
+  return <section className={'ui-panel min-w-0 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/60 sm:p-6 '+className}>
     <header className="mb-5 flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-base font-bold">{title}</h2>{description&&<p className="mt-1 text-xs leading-5 text-slate-400">{description}</p>}</div>{actions}</header>{children}
   </section>;
 }

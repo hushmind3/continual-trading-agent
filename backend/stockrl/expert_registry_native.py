@@ -42,7 +42,7 @@ class ExpertRegistry:
         resources=SimpleNamespace(expert_devices=read_json(ROOT/'configs/local/operations.json').get('expert_devices',{}))
         self.settings=SimpleNamespace(registry_file=self.registry_file,model_dir=self.model_dir,
             state_dir=self.state_dir,resources=resources)
-        self.pool=None;self.cache={};self.last_outputs={};self.signature=None;self.reported_at=0
+        self.pool=None;self.cache={};self.input_frames={};self.last_outputs={};self.signature=None;self.reported_at=0
         self._catalog_stamp=None;self._catalog_value=None
 
     def catalog(self):
@@ -98,7 +98,7 @@ class ExpertRegistry:
                 entry=self.pool.entries[key];cache_key=(key,account.get('currency'));cached=self.cache.get(cache_key)
                 if not entry.get('stock_policy') and cached and cached[0]==input_signature:packets=cached[1]
                 else:
-                    snapshot,batches=prepare_inputs(entry,frame,account)
+                    snapshot,batches=prepare_inputs(entry,frame,account,self.input_frames)
                     packets=run_batches(self.pool,key,snapshot,batches)
                     if not entry.get('stock_policy'):self.cache[cache_key]=(input_signature,packets)
                 native=np.concatenate([np.asarray(packet['native_output'],dtype=np.float64).reshape(-1) for packet in packets])
@@ -115,6 +115,6 @@ class ExpertRegistry:
 
     def close(self,cleanup=False):
         if self.pool and not self.pool_provider:self.pool.close()
-        self.pool=None;self.cache.clear()
+        self.pool=None;self.cache.clear();self.input_frames.clear()
         if cleanup and self._embedded_temp:
             self._embedded_temp.cleanup();self._embedded_temp=None

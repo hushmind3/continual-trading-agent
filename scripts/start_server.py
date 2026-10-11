@@ -173,7 +173,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False):
                     # Persist server approval waiting separately from running application work.
                     operation['status']='pending';phase(stage,'8766 서버 갱신','pending','서버 재시작 준비 승인 대기')
                     api('system/prepare-restart',{})
-                    api('operations')  # Await existing account/model locks before terminating the idle API.
+                    api('state')  # The unified snapshot awaits existing account/model locks.
                     operation['status']='running';phase(stage,'8766 서버 갱신')
             if restart:
                 for record in current:stop_verified(record)

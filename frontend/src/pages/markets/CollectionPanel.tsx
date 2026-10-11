@@ -1,11 +1,10 @@
 import {useState} from 'react';
 import {Download} from 'lucide-react';
-import {useOperations} from '../../data/Operations';
-import {useEndpoint} from '../../data/useEndpoint';
+import {useSystemState,useOperations} from '../../data/Operations';
 import type {Connections} from '../../data/types';
 import {Panel} from '../../ui/Panel';
 import {Button,ErrorMessage,Status,inputClass} from '../../ui/Primitives';
-export function CollectionPanel(){const {state:s,execute,pending}=useOperations();const connection=useEndpoint<Connections>('connections');const [symbols,setSymbols]=useState(''),[start,setStart]=useState(''),[end,setEnd]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState('');
+export function CollectionPanel(){const {state:s,execute,pending}=useOperations();const connection=useSystemState<Connections>('connections');const [symbols,setSymbols]=useState(''),[start,setStart]=useState(''),[end,setEnd]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState('');
  const configured=connection.data?.data.status==='configured';
  return <Panel title="공식 데이터 수집" description="FinRL-X fetch_price_data · FMP 공급원 · 원본 모듈이 DB 저장" actions={<Status tone={configured?'good':'warn'}>{configured?'인증 설정 있음 · 원격 검증 전':'인증 / 모듈 상태 확인 필요'}</Status>}>
  {connection.error&&<ErrorMessage message={connection.error}/>}<p className="mb-4 text-xs leading-6 text-slate-500">{connection.data?.data.reason||'등록된 미국 주식·ETF 코드와 기간을 입력합니다. 현재 수집 공급원은 FMP입니다.'}</p>

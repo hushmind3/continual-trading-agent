@@ -1,8 +1,6 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useMemo,useState} from 'react';
 import {Play,CheckCircle2} from 'lucide-react';
-import {useOperations} from '../../data/Operations';
-import {request} from '../../data/api';
-import {useEndpoint} from '../../data/useEndpoint';
+import {useSystemState,useOperations} from '../../data/Operations';
 import type {Currency,Instrument,Preflight} from '../../data/types';
 import {Button,ErrorMessage,inputClass} from '../../ui/Primitives';
 import {Panel,KeyValues} from '../../ui/Panel';
@@ -11,13 +9,12 @@ import {number} from '../../ui/format';
 interface ChampionOption {name:string;path:string;trained:boolean;parameters:Record<string,number>;identity:{currency:Currency;symbols:string[]}}
 interface AlgorithmOption {name:string;parameters:Record<string,string|number|boolean>;steps_per_run:number;uses_replay:boolean}
 export function SacControls(){const {state:s,execute,pending}=useOperations();
- const algorithms=useEndpoint<{default:string;items:AlgorithmOption[]}>('algorithms');
+ const algorithms=useSystemState<{default:string;items:AlgorithmOption[]}>('algorithms');
  const [algorithmChoice,setAlgorithmChoice]=useState(''),[timesteps,setTimesteps]=useState('');
  const [currency,setCurrency]=useState<Currency>(()=>sessionStorage.getItem('training_currency')==='KRW'?'KRW':'USD');
  const [symbols,setSymbols]=useState<string[]>(()=>{try{return JSON.parse(sessionStorage.getItem('training_symbols')||'[]')}catch{return []}});
  const [resume,setResume]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[check,setCheck]=useState<{signature:string;result:Preflight}|null>(null);
- const [champions,setChampions]=useState<ChampionOption[]>([]),[champion,setChampion]=useState('');
- useEffect(()=>{let live=true;void request<{items:ChampionOption[]}>('champions').then(v=>{if(live)setChampions(v.items)}).catch(()=>{});return()=>{live=false}},[]);
+ const championOptions=useSystemState<{items:ChampionOption[]}>('champions'),champions=championOptions.data?.items??[];const [champion,setChampion]=useState('');
  const columns=useMemo<Column<Instrument>[]>(()=>[
  {key:'symbol',label:'종목',render:r=>r.symbol,sort:r=>r.symbol},{key:'name',label:'이름',render:r=>r.name},
  {key:'rows',label:'가격 행',render:r=>number(r.rows,0),sort:r=>r.rows},{key:'observations',label:'고유 관측',render:r=>number(r.observations,0)},

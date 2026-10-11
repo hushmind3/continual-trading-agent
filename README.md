@@ -1,8 +1,12 @@
 # FinRL · SB3 + React — FinRL-X 보조
 
-기본 화면 `#finrl`은 설치된 FinRL 커밋의 공식 2026 Stock Trading 예제를 데이터 → 강화학습 → 백테스트 흐름으로 제공합니다. `#learning`도 같은 원형 화면의 학습 단계로 연결합니다. React는 FastAPI 설정·상태·결과를 표시하며 FinRL·SB3의 import와 실행은 백엔드에서 수행합니다. FinRL-X의 추가 데이터·전략 기능과 Frozen Expert·SAC Champion 도구는 보조 메뉴에서 제공합니다.
+기본 화면 `#markets`는 데이터 준비·시장 조회, `#learning`은 학습, `#backtest`는 백테스트를 제공합니다. 메뉴와 지연 로딩은 Shell의 라우트 목록에서 관리하고 App.tsx는 화면별 import를 하지 않습니다. React는 FastAPI 설정·상태·결과를 표시하며 FinRL·SB3의 import와 실행은 백엔드에서 수행합니다. FinRL-X의 추가 데이터·전략 기능과 Frozen Expert·SAC Champion 도구는 보조 메뉴에서 제공합니다.
 
-주 화면은 `/api/finrl`에서 실제 예제 설정을 읽고 기존 `/api/framework/stock_data`, `/api/framework/stock_train`, `/api/framework/stock_backtest` 및 작업 중지 API를 사용합니다. 데이터는 YahooDownloader·FeatureEngineer·data_split, 학습은 StockTradingEnv·DRLAgent로 실행합니다. 원본의 A2C/DDPG/PPO/TD3/SAC 실행 플래그, 모델별 20,000단계와 예제별 모델 설정을 읽습니다. 백테스트는 DRL_prediction과 원본 예제의 MVO·DJIA 계산을 사용하며 실제 결과가 생성된 뒤 표·그래프·파일을 표시합니다.
+모든 프론트 JSON 상태 조회는 `/api/state` 한 요청으로 수행하며 기존 `/api/framework/stock_data`, `/api/framework/stock_train`, `/api/framework/stock_backtest` 및 작업 중지 API를 사용합니다. 데이터는 YahooDownloader·FeatureEngineer·data_split, 학습은 StockTradingEnv·DRLAgent로 실행합니다. 원본의 A2C/DDPG/PPO/TD3/SAC 실행 플래그, 모델별 20,000단계와 예제별 모델 설정을 읽습니다. 백테스트는 DRL_prediction과 원본 예제의 MVO·DJIA 계산을 사용하며 실제 결과가 생성된 뒤 표·그래프·파일을 표시합니다.
+
+통합 소유자는 기존 `SystemOperations.system`입니다. 각 모듈의 JSON 결과 갱신을 보관하고 파일 버전이 바뀐 상태만 다시 계산합니다. `/api/state`는 현재 화면이 사용하는 조회 항목과 전체 운영·작업·모델·자원 상태를 함께 반환합니다. 조회 선택자는 공통 Context를 구독하며 개별 GET·별도 폴링을 하지 않습니다. 명령은 기존 POST API, 파일 전송은 결과 다운로드 경로를 사용합니다.
+
+정책 인스턴스는 프로세스 내에서 체크포인트 절대 경로·파일 버전·알고리즘으로 캐시하며 변경 없는 모델은 재사용합니다. Champion Registry와 기본 ExpertPool도 재사용합니다. 신규 학습·작업은 기존 격리 프로세스를 유지하므로 학습 중인 가중치를 운영 추론에 공유하지 않습니다. 운영 제어는 운영 메뉴, 현재 작업 중지는 공통 헤더에서 한 번 제공합니다.
 
 원본 예제 세 파일은 설치 Git 커밋에 고정하여 `runtime/official/finrl-source/`에서 읽으며 수정하지 않습니다. 작업별 CSV·학습 모델·비교 그래프는 기존 `runtime/official/framework-jobs/{job_id}/`에 저장합니다. Frozen Expert 정책 학습은 MoE 화면의 보조 도구로 제공하며 원형 StockTradingEnv 결과와 PortfolioOptimizationEnv Champion을 호환 정책으로 표시하지 않습니다.
 
@@ -82,12 +86,13 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 | 메뉴 | 실제 HTTP 엔드포인트 (`/api` 접두사) | 호출 함수·소스 |
 | --- | --- | --- |
 | 운영 `#control` | GET state, POST controls/{feed,paper,engine} | `web_api.state`, `OperationsRuntime.command` |
-| MoE `#moe` | GET state/models/library, POST experts/register, experts/select, library/{kind}, champions/create | `ExpertRegistry.register/select`, `model_files`, `LibraryOperations.start/_execute` |
-| 시장 `#markets` | GET state/prices/connections, POST collect, controls/feed | `price_history`, `job_worker.main` → FinRL-X `fetch_price_data`; `LiveMarketCollector.run` |
-| 계좌 `#portfolio` | GET state/result/{weights,trades}, POST orders, preflight/backtest, backtest | `OperationsRuntime.manual_order` → `PaperAccount._fill`; `framework.backtest` → `BacktestEngine.run_backtest` |
-| 학습 `#learning` | GET state/checkpoint, POST preflight/train, train, stop, checkpoints/restore | `preflight`, `launch`, `stop`, `restore_checkpoint` → 현재 SB3 SAC |
-| 연결 `#connection` | GET connections/provider/settings, POST provider/{connect,test,public}, settings | 기존 `connect_credentials/test_connection`, `operations_settings.update` |
-| 진단 `#system` | GET state/logs/modules | `ResourceMonitor.snapshot`, 실제 저장 로그·소스 함수 목록 |
+| MoE `#moe` | GET state (모델·Library 통합 항목), POST experts/register, experts/select, library/{kind}, champions/create | `ExpertRegistry.register/select`, `model_files`, `LibraryOperations.start/_execute` |
+| 시장 `#markets` | GET state (데이터·가격·연결 통합 항목), POST collect, controls/feed | `price_history`, `job_worker.main` → FinRL-X `fetch_price_data`; `LiveMarketCollector.run` |
+| 계좌 `#portfolio` | GET state (평가·가중치·거래 통합 항목), POST orders, preflight/backtest, backtest | `OperationsRuntime.manual_order` → `PaperAccount._fill`; `framework.backtest` → `BacktestEngine.run_backtest` |
+| 학습 `#learning` | GET state, POST framework/stock_train | 원본 StockTradingEnv·DRLAgent 모델별 학습 |
+| 백테스트 `#backtest` | GET state, POST framework/stock_backtest | 학습 모델·MVO·DJIA 비교 |
+| 연결 `#connection` | GET state (연결·인증·설정 통합 항목), POST provider/{connect,test,public}, settings | 기존 `connect_credentials/test_connection`, `operations_settings.update` |
+| 진단 `#system` | GET state (로그·자원·모듈 통합 항목) | `ResourceMonitor.snapshot`, 실제 저장 로그·소스 함수 목록 |
 
 다운로드는 GET `/api/download/{name}`으로 기존 백테스트 결과·현재 SAC 파일을 제공합니다. 체크포인트 다운로드는 GET `/api/checkpoint?path=...`입니다. 등록·선택·교체·해제는 같은 `configs/experts.json`의 슬롯/활성 목록을 사용합니다. 별도 Registry를 만들지 않습니다.
 
@@ -131,7 +136,7 @@ SAC 설정은 설치된 FinRL의 `MODEL_KWARGS['sac']`, 기본 학습 단계는 
 - `champion.pt`: 확인한 형식은 `registered_vertical_trading_moe_v2`, 기존 12개 Expert 참조를 담습니다. 현재 SAC 중앙 정책으로 로드하지 않습니다. 필요한 Frozen Expert 참조만 선택 등록합니다.
 - `experts/`의 개별 원본 가중치는 `native_upgrade.inspect_native/match_weights`가 기존 입력 템플릿과 실제 tensor 이름·크기를 대조합니다. 구조가 맞지 않는 파일은 구체적인 이유를 반환합니다.
 
-등록 경로: `/api/models` 파일 조회 → `library/inspect` 원본 계약 조회 → `library/import` 참조 등록 → 현재 Registry → `ExpertPool.get/run`. 외부 폴더의 기존 패키지는 참조를 등록하고 원본을 복사·수정하지 않습니다. 새로운 다운로드와 변환 결과는 기존 `expert-packages`의 별도 파일로 저장하며 원본과 구분됩니다.
+등록 경로: 통합 상태의 models 항목 조회 → `library/inspect` 원본 계약 조회 → `library/import` 참조 등록 → 현재 Registry → `ExpertPool.get/run`. 외부 폴더의 기존 패키지는 참조를 등록하고 원본을 복사·수정하지 않습니다. 새로운 다운로드와 변환 결과는 기존 `expert-packages`의 별도 파일로 저장하며 원본과 구분됩니다.
 
 입력은 `observations.native_input`의 완료 가격 시계열/OHLCV 또는 `StockPolicyExpert.prepare_input`의 원본 종목·지표·USD 계좌입니다. `expert_inference.prepare_inputs/run_batches`를 개별 검사·전체 검사·SAC 관측이 공유하며, 전체 검사는 입력의 모든 종목 묶음에 대해 출력 크기·유한값·종목 일치를 확인합니다. Chronos/TimesFM을 포함한 시계열 Expert는 실제 저장 시계열을 원본 예측 API에 전달하며 일봉·SPY 조건으로 실행 검사를 차단하지 않습니다. 입력 주기·출력 단위를 packet에 함께 기록합니다. 출력 packet은 `native_output`, `symbols`, `as_of`, `layout`, `units`를 갖고 관측 요약에 전달됩니다. 입력 부족·형식 불일치·실패는 오류/실패 기록으로 표시하며 결과를 만들어 채우지 않습니다.
 
@@ -190,7 +195,7 @@ MoE 화면은 등록 모델의 실제 버전 선택과 SAC Champion 조립에 �
 | 동작 | API / 실제 실행 경로 |
 | --- | --- |
 | 변경 적용·점검 | POST `/api/system/apply` → `start_apply` → 별도 일회성 `scripts/start_server.py --apply-only` |
-| 진행 상태 | GET `/api/system/status` → `apply.json` + `SystemOperations.snapshot`; 재시작 전후 기록 유지 |
+| 진행 상태 | GET `/api/state`의 automation 항목 → `apply.json` + `SystemOperations.snapshot`; 재시작 전후 기록 유지 |
 | 전체 연결 점검 | GET `/api/system/check` → 기존 설정·정책 메타데이터·Registry·원장·공급원·프로세스 조회 |
 | 전체 시작 | POST `/api/system/start` → `SystemOperations.start/run`; CMD도 같은 API 호출 |
 | 전체 중지 | POST `/api/system/stop` → 기존 runtime.command + 기존 SAC stop; 관리 서버 유지 |
@@ -232,8 +237,8 @@ FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합
 
 나머지 공식 공개 callable은 백엔드의 `/api/framework/native_call`에서 실제 소스 선언·인자 계약에 따라 호출합니다. 동일 인스턴스의 메서드 연결, 원본 CLI 인자, 실제 DataFrame/Series/배열·설정 참조를 전달할 수 있습니다. 필요한 인자·객체·패키지·인증이 없으면 실제 오류를 반환하며 실행 성공으로 표시하지 않습니다. 모델 생성자 호출과 학습·추론 성공은 구분합니다.
 
-`/api/modules`는 두 공식 프레임워크의 실제 설치 소스·함수·입력 계약·의존성·호출을 조회합니다. 상태와 성공 함수는 실제 작업 기록으로 구분합니다. 모든 함수의 실행 성공을 보장하는 목록이 아닙니다. 작업·로그·전체 JSON/CSV·원본 그래프는 `runtime/official/framework-jobs/{job_id}`에 저장하며 `/api/stop`으로 동일 작업과 자식 프로세스를 중지합니다.
+통합 상태의 framework 항목은 두 공식 프레임워크의 실제 설치 소스·함수·입력 계약·의존성·호출을 조회합니다. 상태와 성공 함수는 실제 작업 기록으로 구분합니다. 모든 함수의 실행 성공을 보장하는 목록이 아닙니다. 작업·로그·전체 JSON/CSV·원본 그래프는 `runtime/official/framework-jobs/{job_id}`에 저장하며 `/api/stop`으로 동일 작업과 자식 프로세스를 중지합니다.
 
-연결 메뉴의 FMP·Alpaca·WRDS 값은 기존 OS keyring에 저장하고 공식 작업의 원본 환경변수로 전달합니다. 저장 여부와 인증·시세 성공은 구분합니다. 기타 공급원은 원본 생성자·외부 설정 계약을 요구합니다. Expert 최적화·변환·허용 기준은 기존 `library` API와 연결했고 모델 폴더 목록은 기존 `/api/models`를 사용합니다.
+연결 메뉴의 FMP·Alpaca·WRDS 값은 기존 OS keyring에 저장하고 공식 작업의 원본 환경변수로 전달합니다. 저장 여부와 인증·시세 성공은 구분합니다. 기타 공급원은 원본 생성자·외부 설정 계약을 요구합니다. Expert 최적화·변환·허용 기준은 기존 `library` API와 연결했고 모델 폴더 목록은 통합 상태의 models 항목을 사용합니다.
 
 이미 빌드한 화면을 적용하고 추가 검증을 생략하도록 기존 `scripts/start_server.py.main`에 `skip_build`, `skip_checks` 선택 인자를 추가했습니다. 기존 기본 실행 동작은 동일합니다.

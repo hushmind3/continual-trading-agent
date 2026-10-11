@@ -26,7 +26,9 @@ export interface Job {
 }
 export interface Checkpoint {name:string;path:string;file:FileState;num_timesteps:number|null;updates:number|null;identity:Record<string,unknown>;compatible:boolean}
 export interface Snapshot {
-  architecture:"finrlx-official-sac-v2";updated_at:string;
+  architecture:"finrl-unified-v3";updated_at:string;
+  views?:Record<string,{data:unknown;error:string;updated_at:number|null}>;
+  state_revision?:number;module_errors?:Record<string,string>;resident_models?:{path:string;algorithm:string;device:string;loads:number;reuse:number}[];
   settings:{
     parameters:Record<string,string|number|boolean>;steps_per_run:number;environment:string;
     environment_args:Record<string,number>;covariance_lookback:number;rolling_days:number[];

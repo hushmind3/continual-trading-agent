@@ -11,13 +11,15 @@ from ..framework import ROOT,prices,training_environment
 from ..state_io import read_json,atomic_json
 from ..paper_account import PaperAccount
 from .operations_settings import settings
+from .system_operations import system
+from ..framework import policy_checkpoint,CASH_ENVIRONMENT,champion_structure_environment
 
 class OperationsRuntime:
     def __init__(self):
         self.lock=threading.RLock()
         self.controls={'feed':False,'paper':False,'engine':False,'learning':False}
         self.learning_pending=[];self.learning_job=None
-        self.collector=None;self.thread=None;self.pool=None;self.pool_signature=None
+        self.collector=None;self.thread=None
         self.account=None;self.quotes={};self.decisions=[];self.last_policy_date=None
         self.status={'status':'stopped','error':None}
         self.policy_models={}
@@ -34,7 +36,7 @@ class OperationsRuntime:
             return {'controls':self.controls.copy(),'account':account,'quotes':self.quotes.copy(),
                 'decisions':self.decisions,'feed':dict(self.status),
                 'broker':dict(self.collector.broker_status) if self.collector else {},
-                'pool':self.pool.catalog() if self.pool else [],
+                'pool':system.expert_pool.catalog() if system.expert_pool else [],
                 'settings':read_json(ROOT/'configs/local/operations.json'),
                 'policies':{currency:{'path':path,'loaded':self.policy_models.get(currency,{}).get('path')==path,
                     **{key:value for key,value in self.policy_models.get(currency,{}).items() if key not in ('model','path','signature')}}
@@ -178,13 +180,13 @@ class OperationsRuntime:
         # Test status updates do not change the loaded Expert weights or selection.
         signature=json.dumps({'active':catalog.get('active',[]),
             'packages':{key:item.get('package') for key,item in catalog.get('experts',{}).items()}},sort_keys=True)
-        if self.pool and signature!=self.pool_signature:
-            self.pool.refresh_catalog(catalog);self.pool_signature=signature
-        if self.pool is None:
+        if system.expert_pool and signature!=system.expert_pool_signature:
+            system.expert_pool.refresh_catalog(catalog);system.expert_pool_signature=signature
+        if system.expert_pool is None:
             cfg=settings();cfg.state_dir=ROOT/'runtime/experts'
-            self.pool=ExpertPool(cfg,keep_device=True,live=True);self.pool_signature=signature
-            self.pool.cancelled=self.cancel_inference.is_set
-        return self.pool
+            system.expert_pool=ExpertPool(cfg,keep_device=True,live=True);system.expert_pool_signature=signature
+            system.expert_pool.cancelled=self.cancel_inference.is_set
+        return system.expert_pool
 
     def load(self,key):
         with self.lock:
@@ -196,7 +198,7 @@ class OperationsRuntime:
 
     def unload(self,key):
         with self.lock:
-            if self.pool and key in self.pool.loaded:self.pool.release(key)
+            if system.expert_pool and key in system.expert_pool.loaded:system.expert_pool.release(key)
 
     def fixture(self,key,*,frame=None,account=None,all_batches=False):
         from .expert_inference import prepare_inputs
@@ -252,48 +254,30 @@ class OperationsRuntime:
         finally:self.inference_active-=1
 
     def _check_policy(self,files,*,load=False):
-        from finrl.agents.stablebaselines3.models import MODELS
-        from ..framework import policy_checkpoint
-        from ..expert_registry_native import ExpertRegistry
-        from ..framework import champion_structure_environment
         identity=read_json(files/'dataset.json')
         champion_ids=identity.get('champion_experts',[])
-        registry=ExpertRegistry()
-        if identity.get('champion_file'):
-            from .sac_champion import load_spec
-            champion=load_spec(identity['champion_file']);registry=ExpertRegistry(champion=champion)
-            champion_ids=champion['identity']['champion_experts']
-        from ..framework import CASH_ENVIRONMENT
+        registry=system.expert_registry(files,self.expert_pool)
         if identity.get('environment')!=CASH_ENVIRONMENT:raise ValueError('PortfolioOptimizationEnv 정책이 필요합니다. 구형 정책을 실행하지 않습니다.')
         env=champion_structure_environment(identity['currency'],identity['symbols'],registry,champion_ids)
         try:
-            model=MODELS[identity.get('algorithm','sac')].load(policy_checkpoint(files),env=env)
+            model=system.model(policy_checkpoint(files),identity.get('algorithm','sac'),env)
             info={'path':policy_checkpoint(files).relative_to(ROOT/'runtime/official').as_posix(),'algorithm':identity.get('algorithm','sac'),'device':str(model.device),
                 'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
                 'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
             if load:
                 file=policy_checkpoint(files);stat=file.stat()
-                self.policy_models[identity['currency']]={**info,'model':model,'signature':(stat.st_mtime_ns,stat.st_size)}
+                self.policy_models[identity['currency']]={**info,'signature':(stat.st_mtime_ns,stat.st_size)}
                 self.last_policy_date=None
             return info
         finally:env.close()
 
     def _sac_decision(self,files):
-        from finrl.agents.stablebaselines3.models import MODELS
-        from ..framework import policy_checkpoint
-        from ..expert_registry_native import ExpertRegistry
-        from ..expert_observation import ExpertObservation
         identity=read_json(files/'dataset.json')
-        from ..framework import CASH_ENVIRONMENT
         cash_enabled=identity.get('environment')==CASH_ENVIRONMENT
         if identity.get('environment')!=CASH_ENVIRONMENT:
             raise ValueError('현재 저장 SAC는 기존 환경의 파일입니다. 현재 원본 환경으로 학습한 정책이 필요합니다.')
         symbols=identity['symbols'];currency=identity['currency'];frame=prices(currency,symbols)
-        if identity.get('champion_file'):
-            from .sac_champion import load_spec
-            champion=load_spec(identity['champion_file']);registry=ExpertRegistry(champion=champion)
-            champion_ids=champion['identity']['champion_experts']
-        else:registry=ExpertRegistry(self.expert_pool);champion_ids=identity.get('champion_experts',[])
+        registry=system.expert_registry(files,self.expert_pool);champion_ids=identity.get('champion_experts',[])
         prepared=training_environment(frame,registry,training=False,champion_ids=champion_ids)
         latest=prepared.unwrapped.gym_env
         latest._time_index=len(latest._sorted_times)-1
@@ -301,14 +285,10 @@ class OperationsRuntime:
         wrapped=prepared
         try:
             file=policy_checkpoint(files);stat=file.stat();path=file.relative_to(ROOT/'runtime/official').as_posix()
-            cached=self.policy_models.get(currency,{})
-            if cached.get('path')==path and cached.get('signature')==(stat.st_mtime_ns,stat.st_size):
-                model=cached['model'];model.set_env(wrapped)
-            else:
-                model=MODELS[identity.get('algorithm','sac')].load(file,env=wrapped)
-                self.policy_models[currency]={'path':path,'algorithm':identity.get('algorithm','sac'),'model':model,'signature':(stat.st_mtime_ns,stat.st_size),
-                    'device':str(model.device),'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
-                    'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
+            model=system.model(file,identity.get('algorithm','sac'),wrapped)
+            self.policy_models[currency]={'path':path,'algorithm':identity.get('algorithm','sac'),'signature':(stat.st_mtime_ns,stat.st_size),
+                'device':str(model.device),'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
+                'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
             book=self.ledger().snapshot()['books'][currency]
             wrapped.live_account={'currency':currency,'nav':book['equity'],'cash':book['cash'],
                 'positions':{symbol:row['quantity'] for symbol,row in book['positions'].items()}}
@@ -339,6 +319,6 @@ class OperationsRuntime:
 
     def close(self):
         self.command('feed',False)
-        if self.pool:self.pool.close()
+        if system.expert_pool:system.expert_pool.close()
 
 runtime=OperationsRuntime()

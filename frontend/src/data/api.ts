@@ -1,4 +1,5 @@
 export async function request<T>(path: string, body?: unknown): Promise<T> {
+  if(body===undefined&&!/^state(?:\?|$)/.test(path))throw new Error('상태 조회는 통합 상태 선택자를 사용하세요.');
   const response = await fetch(`/api/${path}`, {
     method: body === undefined ? "GET" : "POST",
     cache: "no-store",

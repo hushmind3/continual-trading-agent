@@ -1,4 +1,3 @@
-import {useOperations} from '../../data/Operations';
 import {Panel} from '../../ui/Panel';
 import {Empty,Status} from '../../ui/Primitives';
 import {bytes,date,number} from '../../ui/format';
@@ -6,11 +5,11 @@ import {Capability} from '../../ui/Capability';
 import {useState} from 'react';
 import {Button,ErrorMessage} from '../../ui/Primitives';
 import {inputClass} from '../../ui/Primitives';
-import {useEndpoint} from '../../data/useEndpoint';
+import {useSystemState,useOperations} from '../../data/Operations';
 import type {Champion} from '../../data/library';
 import type {Currency} from '../../data/types';
 import {ChampionSpec} from '../../ui/ChampionSpec';
-export function CheckpointPanel({operating=false}:{operating?:boolean}){const {state:s,execute,pending}=useOperations();const [error,setError]=useState(''),[message,setMessage]=useState(''),[currency,setCurrency]=useState<Currency>('USD'),[path,setPath]=useState('');const champions=useEndpoint<{items:Champion[]}>(operating?'champions':null);if(!s)return null;
+export function CheckpointPanel({operating=false}:{operating?:boolean}){const {state:s,execute,pending}=useOperations();const [error,setError]=useState(''),[message,setMessage]=useState(''),[currency,setCurrency]=useState<Currency>('USD'),[path,setPath]=useState('');const champions=useSystemState<{items:Champion[]}>(operating?'champions':null);if(!s)return null;
  if(operating){const selected=s.operations?.policies?.[currency],options=s.checkpoints.filter(c=>c.identity.currency===currency),chosenPath=options.some(c=>c.path===path)?path:selected?.path??'',chosen=options.find(c=>c.path===chosenPath),model=champions.data?.items.find(c=>c.checkpoint===chosenPath);
   return <Panel title="운영 모델 선택 · 로딩" description="선택한 FinRL 정책·SAC Champion의 중앙 정책을 실제 로드합니다. Expert는 추론 시 모델에 저장된 구성으로 사용합니다.">
    <div className="flex flex-wrap items-center gap-3"><select aria-label="운영 모델 통화" className={inputClass+' !w-auto'} value={currency} onChange={e=>{setCurrency(e.target.value as Currency);setPath('');setMessage('');setError('')}}><option value="USD">USD</option><option value="KRW">KRW</option></select><select aria-label="운영 FinRL 모델 선택" className={inputClass+' min-w-64 !w-auto flex-1'} value={chosenPath} onChange={e=>{setPath(e.target.value);setMessage('');setError('')}}><option value="">운영 모델 선택</option>{options.map(c=><option key={c.path} value={c.path}>{c.name} · {String(c.identity.algorithm??'').toUpperCase()} · {c.num_timesteps===0?'미학습':number(c.num_timesteps,0)+'단계'}</option>)}</select><Button tone="primary" disabled={!chosen||s.job.running} busy={pending.has('checkpoints/restore')} onClick={async()=>{setError('');try{const r=await execute<{message:string}>('checkpoints/restore',{path:chosenPath});setMessage(r.message)}catch(e){setError(e instanceof Error?e.message:'모델 로딩 실패')}}}>선택 모델 로드</Button></div>

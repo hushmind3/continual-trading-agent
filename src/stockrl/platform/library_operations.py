@@ -5,6 +5,7 @@ from pathlib import Path
 from ..state_io import atomic_json,read_json
 from .operations_settings import settings
 from .operations_runtime import runtime
+from .system_operations import system
 from .observations import InputUnavailable
 
 class LibraryOperations:
@@ -242,7 +243,7 @@ class LibraryOperations:
                 if kind=='optimize_all' and (item.get('conversion') or item.get('executor')=='llama_cpp' or not item.get('input',{}).get('supported',False)):
                     results.append(dict(id=key,status='skipped',detail='원본 변환 불가 또는 입력 미지원'))
                     continue
-                was_loaded=bool(runtime.pool and key in runtime.pool.loaded)
+                was_loaded=bool(system.expert_pool and key in system.expert_pool.loaded)
                 started=time.perf_counter()
                 started_at=time.time()
                 if kind=='probe_all' and not item.get('input',{}).get('supported',False):
@@ -269,7 +270,7 @@ class LibraryOperations:
                     result=dict(id=key,status='skipped',detail=str(exc),seconds=time.perf_counter()-started)
                     results.append(result)
                 except Exception as exc:
-                    pool=runtime.pool
+                    pool=system.expert_pool
                     current=dict(pool.metrics.get(key,{})) if pool else {}
                     measured=max(current.get('last_completed_at',0),current.get('last_attempted_at',0))>started_at
                     results.append(dict(id=key,status='failed',detail=str(exc),seconds=time.perf_counter()-started,
@@ -376,7 +377,7 @@ class LibraryOperations:
             except InterruptedError:raise
             except Exception as exc:
                 result={'id':key,'status':'failed','failed':1,'detail':str(exc)}
-                current=runtime.pool.metrics.get(key,{}) if runtime.pool else {}
+                current=system.expert_pool.metrics.get(key,{}) if system.expert_pool else {}
                 if max(current.get('last_completed_at',0),current.get('last_attempted_at',0))>=started:metrics=dict(current)
             latest=read_json(cfg.registry_file);entry=latest.get('experts',{}).get(key)
             if entry is not None and entry.get('package')==catalog.get('experts',{}).get(key,{}).get('package'):

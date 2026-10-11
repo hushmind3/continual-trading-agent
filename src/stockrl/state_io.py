@@ -11,6 +11,11 @@ from weakref import WeakValueDictionary
 
 _locks = WeakValueDictionary()
 _guard = threading.Lock()
+_listeners = set()
+
+
+def subscribe_updates(callback):
+    with _guard:_listeners.add(callback)
 
 
 def read_json(path: str | Path, fallback=None):
@@ -33,7 +38,8 @@ def atomic_json(value, path: str | Path, default=None) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name(path.name + ".tmp")
         try:
-            temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2, default=default), encoding="utf-8")
+            serialized=json.dumps(value, ensure_ascii=False, indent=2, default=default)
+            temporary.write_text(serialized, encoding="utf-8")
             for attempt in range(8):
                 try:
                     os.replace(temporary, path)
@@ -44,3 +50,5 @@ def atomic_json(value, path: str | Path, default=None) -> None:
                     time.sleep(0.025 * (attempt + 1))
         finally:
             temporary.unlink(missing_ok=True)
+    with _guard:listeners=tuple(_listeners)
+    for callback in listeners:callback(path,serialized)

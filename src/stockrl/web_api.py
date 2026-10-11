@@ -25,9 +25,15 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .framework import ROOT,CASH_ENVIRONMENT
+from .framework import ROOT,CASH_ENVIRONMENT,policy_files,policy_checkpoint,sac_example,finrlx,finrl_file,champion_structure_environment
 from .state_io import atomic_json, read_json
 from .platform.resources import ResourceMonitor
+from .platform.system_operations import system,apply_state,apply_running,start_apply,busy,check_system
+from .platform.operations_runtime import runtime
+from .platform.library_operations import library as library_manager
+from .expert_registry_native import ExpertRegistry
+from finrl.agents.stablebaselines3.models import MODELS
+from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 
 RUNTIME = ROOT / "runtime/official"
 DB = ROOT / "data/finrl_trading.db"
@@ -51,7 +57,6 @@ async def local_writes(request: Request, call_next):
     }:
         return JSONResponse({"detail": "로컬 화면에서 요청하세요."}, status_code=403)
     if request.method!='GET':
-        from .platform.system_operations import system,apply_running
         allowed_stop=request.url.path in ('/api/stop','/api/system/stop','/api/system/prepare-restart')
         if (apply_running() or system.restarting) and not allowed_stop and request.url.path!='/api/system/apply':
             return JSONResponse({'detail':'변경 적용/서버 갱신 중입니다. 기존 작업은 보존합니다.'},status_code=409)
@@ -59,7 +64,9 @@ async def local_writes(request: Request, call_next):
         conflict=path in ('/api/train','/api/backtest','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/framework/') or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
         if conflict:
             system.cancel()
-    return await call_next(request)
+    response=await call_next(request)
+    if request.method!='GET':system.invalidate_states()
+    return response
 
 
 class RunRequest(BaseModel):
@@ -96,11 +103,7 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-@app.get('/api/algorithms')
 def algorithms():
-    from finrl.agents.stablebaselines3.models import MODELS
-    from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
-    from .framework import sac_example
     return {'default':'sac','items':[{'name':name,'parameters':sac_example(name)[1],
         'steps_per_run':sac_example(name)[2],'uses_replay':issubclass(model,OffPolicyAlgorithm)} for name,model in MODELS.items()]}
 
@@ -113,7 +116,6 @@ def file_info(path):
 @lru_cache(maxsize=1)
 def source_settings():
     """Read constants from the exact checked-out call sites without loading learners."""
-    from .framework import sac_example
     _, params, steps = sac_example()
     import inspect
     import importlib.metadata
@@ -133,7 +135,6 @@ def source_settings():
                     "optimizer": policy.actor.optimizer.__class__.__name__,
                     "feature_extractor": "stockrl.platform.sac_champion.ChampionExtractor"}
     versions = {name: importlib.metadata.version(name) for name in ("stable-baselines3","finrl","torch","gymnasium")}
-    from .framework import finrl_file
     env_class=finrl_file('meta/env_portfolio_optimization/env_portfolio_optimization.py').PortfolioOptimizationEnv
     env_args={key:value.default for key,value in inspect.signature(env_class).parameters.items()
         if value.default is not inspect.Parameter.empty and isinstance(value.default,(str,int,float,bool,list,type(None)))}
@@ -194,9 +195,6 @@ def database():
 
 
 def model_state(settings,selected=None):
-    from .framework import policy_files,policy_checkpoint,sac_example
-    from finrl.agents.stablebaselines3.models import MODELS
-    from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
     selected=Path(selected) if selected is not None else policy_files()
     path = policy_checkpoint(selected)
     replay = selected / "replay.pkl"
@@ -259,9 +257,6 @@ def replay_metadata(path_string, modified, size):
 
 
 def saved_replay():
-    from .framework import policy_files
-    from finrl.agents.stablebaselines3.models import MODELS
-    from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
     identity=read_json(policy_files()/'dataset.json')
     if not issubclass(MODELS[identity.get('algorithm','sac')],OffPolicyAlgorithm):return {'status':'not_used'}
     path = policy_files() / "replay.pkl"
@@ -274,8 +269,6 @@ def saved_replay():
 
 
 def checkpoints(settings):
-    from finrl.agents.stablebaselines3.models import MODELS
-    from .framework import sac_example
     paths = list(RUNTIME.glob('*.zip')) + sorted((RUNTIME/"archives").glob("*/*.zip")) + sorted((RUNTIME/"policies").glob("*/*.zip")) + sorted((RUNTIME/"champions").glob("*/*.zip"))
     items=[]
     for path in paths:
@@ -320,7 +313,6 @@ def expert_descriptor(key,file,checksum,size,modified):
 
 
 def expert_state():
-    from .platform.operations_runtime import runtime
     registry = read_json(ROOT / "configs/experts.json", {"active": [], "experts": {}})
     status = read_json(ROOT / "runtime/experts/status.json")
     rows = []
@@ -349,8 +341,8 @@ def expert_state():
                      "package_available": available, "package_path": str(path),
                      "inference": status.get("experts", {}).get(key),
                      "resources": status.get("resources", {}).get(key, {}),
-                     "current_resources": runtime.pool.metrics.get(key,{}) if runtime.pool else {},
-                     "loaded": bool(runtime.pool and key in runtime.pool.loaded)})
+                     "current_resources": system.expert_pool.metrics.get(key,{}) if system.expert_pool else {},
+                     "loaded": bool(system.expert_pool and key in system.expert_pool.loaded)})
     return {"active": registry.get("active", []), "items": rows, "as_of": status.get("as_of"),
             "reported": file_info(ROOT / "runtime/experts/status.json").get("modified")}
 
@@ -404,7 +396,6 @@ def evaluation_root(currency=None):
     return RUNTIME if read_json(RUNTIME/'backtest_metrics.json').get('currency')==currency else root
 
 
-@app.get('/api/evaluation')
 def evaluation(currency:Literal['KRW','USD']|None=None):
     root=evaluation_root(currency);path = root / "backtest.csv"
     points = []
@@ -436,13 +427,11 @@ def react_index():
     return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
-@app.get("/api/modules")
 def modules():
     from .platform.framework_operations import catalog
     return catalog()
 
 
-@app.get("/api/result/{kind}")
 def result_table(kind: Literal["weights", "trades"], limit: int = Query(1000, ge=1, le=5000),currency:Literal['KRW','USD']|None=None):
     path = evaluation_root(currency) / ("backtest_" + kind + ".csv")
     if not path.is_file():
@@ -455,34 +444,91 @@ def result_table(kind: Literal["weights", "trades"], limit: int = Query(1000, ge
 
 
 def currency_models(settings):
-    from .framework import policy_files
     return {currency:model_state(settings,policy_files(currency)) for currency in ('KRW','USD')}
 
 
-@app.get("/api/state")
-def state():
-    settings = source_settings()
-    db = database()
-    job = job_state()
-    workers = {"learner": {"pid": job.get("pid"), "alive": job["running"]}}
-    model=model_state(settings)
-    model["replay_state"]=saved_replay()
-    experts=expert_state()
-    experts["observation_connection"]={"size":64*len(model['identity'].get('champion_experts',experts['active']))+16,"configured":True,"recorded":bool(experts.get("as_of")),
-        "last_success":{role:sum(1 for row in experts["items"] if row["active"] and row.get("inference") and row["inference"].get("status")=="ready" and row.get("role")==role) for role in ("market","action")}}
-    from .platform.operations_runtime import runtime
-    from .platform.library_operations import library
-    from .platform.system_operations import system,apply_state
-    return {"architecture":"finrlx-official-sac-v2","updated_at": now(), "settings": settings, "model": model,
-            "data": db, "experts": experts, "job": job, "evaluation": evaluation(),"models_by_currency":currency_models(settings),
-            "checkpoints":checkpoints(settings),"capabilities":capabilities(),
-            "operations":runtime.snapshot(),"library":library.snapshot(),"automation":{"apply":apply_state(),"system":system.snapshot()},
-            "resources": resource_monitor.snapshot(workers)}
+def state_stamp(*patterns):
+    values=[]
+    for pattern in patterns:
+        path=Path(pattern)
+        paths=sorted(path.parent.glob(path.name)) if '*' in path.name else [path]
+        for item in paths:
+            if item.is_file() or item.is_dir():
+                stamp=item.stat();values.append((str(item),stamp.st_mtime_ns,stamp.st_size))
+    return tuple(values)
 
 
-@app.get("/api/connections")
+def state_view(path):
+    from urllib.parse import urlsplit,parse_qs
+    parsed=urlsplit(path);query=parse_qs(parsed.query);key=parsed.path
+    if parsed.scheme or parsed.netloc:raise ValueError('통합 상태 항목을 선택하세요.')
+    currency=query.get('currency',[None])[0]
+    if currency not in (None,'USD','KRW'):raise ValueError('USD/KRW 상태를 선택하세요.')
+    config=ROOT/'configs';official=ROOT/'runtime/official'
+    providers={
+        'algorithms':(algorithms,lambda:()),
+        'finrl':(finrl_workspace,lambda:state_stamp(official/'job.json',*(official/'framework-jobs').glob('*/result.json'))),
+        'framework':(framework_catalog,lambda:state_stamp(config/'local/operations.json',*(official/'framework-jobs').glob('*/result.json'))),
+        'framework/providers':(framework_providers,lambda:state_stamp(config/'local/operations.json')),
+        'connections':(connections,lambda:state_stamp(config/'local/operations.json')),
+        'provider':(provider,lambda:state_stamp(config/'local/operations.json')),
+        'settings':(operational_settings,lambda:state_stamp(config/'local/operations.json')),
+        'models':(model_files,lambda:state_stamp(MODEL_DIR,config/'experts.json')),
+        'champions':(champions,lambda:state_stamp(*MODEL_DIR.glob('sac_champion_*.pt'))),
+        'logs':(logs,lambda:state_stamp(*(official/name for name in ('api.stderr.log','api.stdout.log','server.stderr.log','training.log')))),
+    }
+    if key=='evaluation':
+        folder=evaluation_root(currency);providers[key]=(lambda:evaluation(currency),state_stamp(folder/'backtest.csv',folder/'backtest_metrics.json'))
+    elif key in ('result/weights','result/trades'):
+        kind=key.rsplit('/',1)[1];folder=evaluation_root(currency)
+        providers[key]=(lambda:result_table(kind,1000,currency),state_stamp(folder/('backtest_'+kind+'.csv')))
+    elif key=='prices':
+        symbol=query.get('symbol',[''])[0];limit=int(query.get('limit',['300'])[0])
+        if not symbol or not 1<=limit<=2000:raise ValueError('종목과 기존 가격 조회 범위를 확인하세요.')
+        providers[key]=(lambda:price_history(symbol,limit),state_stamp(DB,DB.with_name(DB.name+'-wal')))
+    if key not in providers:raise ValueError('등록되지 않은 통합 상태 항목입니다: '+key)
+    loader,signature=providers[key];name='view:'+path
+    data=system.state_value(name,loader,signature() if callable(signature) else signature)
+    return {'data':data,'error':system.state_errors.get(name,''),'updated_at':system.state_updates.get(name)}
+
+
+@app.get('/api/state')
+def state(views:str='[]',refresh_views:bool=False):
+    try:
+        requested=json.loads(views)
+        if not isinstance(requested,list) or not all(isinstance(path,str) for path in requested):raise ValueError('상태 항목 목록이 필요합니다.')
+    except (ValueError,TypeError) as exc:raise HTTPException(400,str(exc)) from exc
+    if refresh_views:system.invalidate_states()
+    settings=system.state_value('settings',source_settings,())
+    db=system.state_value('data',database,state_stamp(DB,DB.with_name(DB.name+'-wal'),ROOT/'configs/instruments.json'))
+    job=system.state_value('job',job_state)
+    folder=policy_files();model_signature=state_stamp(policy_checkpoint(folder),folder/'dataset.json',folder/'replay.pkl')
+    def saved_model():
+        value=model_state(settings,folder);value['replay_state']=saved_replay();return value
+    model=system.state_value('model',saved_model,model_signature)
+    experts=system.state_value('experts',expert_state,state_stamp(ROOT/'configs/experts.json',ROOT/'runtime/experts/status.json',*(ROOT/'runtime/experts/champions').glob('*/status.json')))
+    experts={**experts,'observation_connection':{'size':64*len(model['identity'].get('champion_experts',experts['active']))+16,'configured':True,'recorded':bool(experts.get('as_of')),
+        'last_success':{role:sum(1 for row in experts['items'] if row['active'] and row.get('inference') and row['inference'].get('status')=='ready' and row.get('role')==role) for role in ('market','action')}}}
+    currencies=[policy_files(currency) for currency in ('KRW','USD')]
+    models=system.state_value('models_by_currency',lambda:currency_models(settings),state_stamp(*(file for root in currencies for file in (policy_checkpoint(root),root/'dataset.json',root/'replay.pkl'))))
+    evaluations=system.state_value('evaluation',evaluation,state_stamp(evaluation_root()/'backtest.csv',evaluation_root()/'backtest_metrics.json'))
+    revisions=system.state_value('checkpoints',lambda:checkpoints(settings),state_stamp(*(RUNTIME.glob('*.zip')),*(RUNTIME/'policies').glob('*/*.zip'),*(RUNTIME/'champions').glob('*/*.zip'),*(RUNTIME/'archives').glob('*/*.zip')))
+    operations_state=system.state_value('operations',runtime.snapshot)
+    library=system.state_value('library',library_manager.snapshot,state_stamp(library_manager.catalog_path,library_manager.status_path)+(library_manager.active,))
+    automation=system.state_value('automation',lambda:{'apply':apply_state(),'system':system.snapshot()})
+    selected={}
+    for path in dict.fromkeys(requested):
+        try:selected[path]=state_view(path)
+        except (ValueError,OSError,RuntimeError) as exc:selected[path]={'data':None,'error':str(exc),'updated_at':None}
+    workers={'learner':{'pid':job.get('pid'),'alive':job['running']}}
+    resources=system.state_value('resources',lambda:resource_monitor.snapshot(workers))
+    return {'architecture':'finrl-unified-v3','updated_at':now(),'settings':settings,'model':model,'data':db,'experts':experts,'job':job,
+        'evaluation':evaluations,'models_by_currency':models,'checkpoints':revisions,'capabilities':capabilities(),
+        'operations':operations_state,'library':library,'automation':automation,'resources':resources,'views':selected,
+        'state_revision':system.state_revision,'module_errors':dict(system.state_errors),'resident_models':system.resident_models()}
+
+
 def connections():
-    from .framework import finrlx
     try:
         manager=finrlx("data.data_fetcher").get_data_manager()
         sources=[name for name,source in manager.data_sources if source.is_available()]
@@ -496,7 +542,6 @@ def connections():
         for name,key in (("키움","kiwoom"),("Alpaca","alpaca"))]}
 
 
-@app.get("/api/logs")
 def logs():
     names=("api.stderr.log","api.stdout.log","server.stderr.log","training.log")
     result=[]
@@ -509,7 +554,6 @@ def logs():
     return {"items":result}
 
 
-@app.get("/api/prices")
 def price_history(symbol: str, limit: int = Query(300, ge=1, le=2000)):
     if not DB.exists():
         raise HTTPException(404, "가격 DB가 없습니다.")
@@ -521,7 +565,6 @@ def price_history(symbol: str, limit: int = Query(300, ge=1, le=2000)):
 
 @app.get("/api/download/{name}")
 def download(name: Literal["backtest.csv", "backtest_metrics.json", "backtest_weights.csv", "backtest_trades.csv", "sac.zip", "dataset.json"],currency:Literal['KRW','USD']|None=None):
-    from .framework import policy_files
     path = (policy_files(currency) if name in ('sac.zip','dataset.json') else evaluation_root(currency)) / name
     if not path.is_file():
         raise HTTPException(404, "결과 파일이 없습니다.")
@@ -547,9 +590,7 @@ def preflight(req, command):
         elif item["observations"] < 2:
             errors.append(symbol + ": 공식 환경 실행에는 최소 2개 가격 관측이 필요합니다.")
     settings = source_settings()
-    from .framework import policy_files
     model = model_state(settings,policy_files(req.currency)) if command=='backtest' or req.resume else model_state(settings)
-    from .framework import sac_example
     try:_,_,steps=sac_example(req.algorithm)
     except ValueError as exc:errors.append(str(exc));steps=settings['steps_per_run']
     if req.champion_path and req.algorithm!='sac':errors.append('선택한 Champion은 SAC 정책입니다. SAC를 선택하세요.')
@@ -646,20 +687,17 @@ def start_job(job):
     return job
 
 
-@app.get('/api/framework')
 def framework_catalog():
     from .platform.framework_operations import catalog
     return catalog()
 
 
-@app.get('/api/finrl')
 def finrl_workspace():
     from .platform.framework_operations import stock_state
     try:return stock_state()
     except (ValueError,OSError,RuntimeError) as exc:raise HTTPException(503,str(exc)) from exc
 
 
-@app.get('/api/framework/providers')
 def framework_providers():
     from .platform.framework_operations import provider_status
     return provider_status()
@@ -739,7 +777,6 @@ def collect(req:CollectionRequest):
     return {"message":"FinRL-X 원본 가격 수집을 시작했습니다.","job":job}
 
 
-@app.get("/api/champions")
 def champions():
     from .platform.sac_champion import list_champions
     return {"items":list_champions()}
@@ -748,7 +785,6 @@ def champions():
 @app.post("/api/champions/create")
 def champion_create(request:ChampionRequest):
     if job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")
-    from .framework import policy_files
     from .platform.operations_settings import settings
     current=read_json(policy_files()/"dataset.json")
     recent=read_json(RUNTIME/"job.json")
@@ -770,7 +806,6 @@ def champion_create(request:ChampionRequest):
     if invalid:raise HTTPException(400,"선택 시장의 등록 주식·ETF가 아닙니다: "+", ".join(invalid))
     from .platform.sac_champion import create
     from .framework import champion_structure_environment
-    from .expert_registry_native import ExpertRegistry
     env=None
     try:
         env=champion_structure_environment(request.currency,request.symbols,ExpertRegistry(),request.experts)
@@ -785,7 +820,6 @@ def champion_create(request:ChampionRequest):
 @app.get("/api/checkpoint")
 def checkpoint_download(path:str):
     target=(RUNTIME/path).resolve()
-    from finrl.agents.stablebaselines3.models import MODELS
     if not target.is_relative_to(RUNTIME.resolve()) or target.suffix!='.zip' or target.stem not in MODELS or not target.exists():
         raise HTTPException(404,"정책 파일이 없습니다.")
     return FileResponse(target,filename=target.parent.name+'-'+target.name)
@@ -822,7 +856,6 @@ def select(req: Selection):
     with launch_lock:
         if job_state()["running"]:
             raise HTTPException(409, "실행을 마친 뒤 Expert 구성을 변경하세요.")
-        from .expert_registry_native import ExpertRegistry
         try:
             ExpertRegistry().select(sorted(set(req.active)))
         except (ValueError, OSError) as exc:
@@ -838,7 +871,6 @@ def register(req: Registration):
         registry = read_json(ROOT / "configs/experts.json")
         if req.slot in registry.get("experts", {}):
             raise HTTPException(409, "이미 사용 중인 슬롯 이름입니다. 다른 이름으로 등록하세요.")
-        from .expert_registry_native import ExpertRegistry
         try:
             ExpertRegistry().register(req.path, req.slot)
         except (ValueError, RuntimeError, OSError, KeyError) as exc:
@@ -864,27 +896,20 @@ class CredentialRequest(BaseModel):
     account:str=""
 
 
-@app.get("/api/operations")
-def operations():
-    from .platform.operations_runtime import runtime
-    return runtime.snapshot()
 
 
 @app.post("/api/controls/{name}")
 def operation_control(name:Literal["feed","paper","engine","learning"],request:ControlRequest):
-    from .platform.operations_runtime import runtime
     try:return {"controls":runtime.command(name,request.enabled)}
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
 
 
 @app.post("/api/orders")
 def paper_order(request:OrderRequest):
-    from .platform.operations_runtime import runtime
     try:return runtime.manual_order(request.symbol,request.currency,request.action,request.quantity)
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
 
 
-@app.get("/api/provider")
 def provider():
     from .provider_credentials import public_status
     from .platform.operations_settings import settings
@@ -895,7 +920,6 @@ def provider():
 def connect_provider(request:CredentialRequest):
     from .provider_credentials import connect_credentials
     from .platform.operations_settings import settings
-    from .platform.operations_runtime import runtime
     if runtime.controls['feed']:raise HTTPException(409,'기존 시세 수신을 중지한 뒤 공급원 인증을 변경하세요.')
     try:return connect_credentials(settings().state_dir,request.environment,request.app_key,request.secret,request.account)
     except (ValueError,RuntimeError,OSError) as exc:raise HTTPException(400,str(exc))
@@ -911,7 +935,6 @@ def check_provider(request:CredentialRequest):
 
 @app.post("/api/provider/public")
 def public_feed():
-    from .platform.operations_runtime import runtime
     if runtime.controls['feed']:raise HTTPException(409,'시세 수신을 중지한 뒤 공급원을 변경하세요.')
     from .provider_credentials import _write_settings,read_settings
     from .platform.operations_settings import settings
@@ -922,12 +945,10 @@ def public_feed():
 
 @app.post('/api/provider/disconnect')
 def disconnect_provider():
-    from .platform.operations_runtime import runtime
     runtime.command('feed',False)
     return {'message':'시세 연결 중지를 요청했습니다. 저장된 인증 정보는 유지합니다.'}
 
 
-@app.get("/api/settings")
 def operational_settings():
     from .platform.operations_settings import settings
     current=settings()
@@ -938,35 +959,28 @@ def operational_settings():
 @app.post("/api/settings")
 def save_operational_settings(values:dict):
     from .platform.operations_settings import update
-    from .platform.operations_runtime import runtime
     if set(values)-{"risk","data","symbols","expert_devices"}:raise HTTPException(400,"운영 설정만 변경할 수 있습니다. SAC 설정은 원본값을 사용합니다.")
     if runtime.controls['feed']:raise HTTPException(409,"시세 수신을 멈춘 뒤 운영 설정을 변경하세요.")
     value=update(values)
     if runtime.account:
         from .platform.operations_settings import settings
         current=settings();runtime.account.fee=current.risk.fee;runtime.account.slippage=current.risk.slippage
-    if runtime.pool:
-        runtime.pool.settings.resources.expert_devices=value.get('expert_devices',{})
+    if system.expert_pool:
+        system.expert_pool.settings.resources.expert_devices=value.get('expert_devices',{})
     return {"settings":value}
 
 
-@app.get("/api/library")
-def library_state():
-    from .platform.library_operations import library
-    return library.snapshot()
 
 
 @app.post("/api/library/{kind}")
 def library_job(kind:str,payload:dict):
     if kind=='stop':return stop_library()
-    from .platform.library_operations import library
     if job_state()["running"] and kind not in ("search","inspect"):
         raise HTTPException(409,"현재 SAC 작업 종료 후 모델 구성을 변경하세요.")
-    try:return library.start(kind,payload)
+    try:return library_manager.start(kind,payload)
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
 
 
-@app.get("/api/models")
 def model_files():
     registry=read_json(ROOT/'configs/experts.json');registered={item['package']['file']:key for key,item in registry.get('experts',{}).items()}
     for key,item in registry.get('experts',{}).items():
@@ -987,15 +1001,12 @@ def model_files():
 def restore_checkpoint(request:dict):
     if job_state()["running"]:raise HTTPException(409,"현재 학습 작업 종료 후 복원하세요.")
     path=(RUNTIME/request.get("path","")).resolve()
-    from finrl.agents.stablebaselines3.models import MODELS
-    from .framework import sac_example
     if not path.is_relative_to(RUNTIME.resolve()) or path.suffix!='.zip' or path.stem not in MODELS or not path.is_file():
         raise HTTPException(400,"저장된 FinRL 정책 버전을 선택하세요.")
     identity=read_json(path.parent/"dataset.json")
     settings=source_settings()
     if identity.get("environment")!=settings["environment"] or identity.get('algorithm','sac')!=path.stem or identity.get("sac_example")!=sac_example(path.stem)[1]:
         raise HTTPException(400,"현재 FinRL 환경·알고리즘·설정과 호환되지 않는 정책입니다.")
-    from .platform.operations_runtime import runtime
     try:loaded=runtime.check_policy(path.parent,load=True)
     except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
     atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
@@ -1004,45 +1015,35 @@ def restore_checkpoint(request:dict):
     return {"message":"해당 FinRL 정책을 선택하고 중앙 정책을 실제 로드했습니다. 학습·시세·매매는 시작하지 않았습니다.","policy":loaded}
 
 
-@app.get('/api/system/status')
-def system_status():
-    from .platform.system_operations import system,apply_state
-    return {'apply':apply_state(),'system':system.snapshot()}
 
 
 @app.post('/api/system/apply')
 def apply_changes():
-    from .platform.system_operations import start_apply
     return start_apply()
 
 
 @app.get('/api/system/blockers')
 def restart_blockers():
-    from .platform.system_operations import busy
     return {'items':busy()}
 
 
 @app.post('/api/system/prepare-restart')
 def prepare_restart():
-    from .platform.system_operations import busy,system
     with launch_lock:
         blockers=busy()
         if blockers:raise HTTPException(409,' · '.join(blockers))
         system.restarting=True
-        from .platform.operations_runtime import runtime
         runtime.close()
     return {'ready':True}
 
 
 @app.get('/api/system/check')
 def system_check():
-    from .platform.system_operations import check_system
     return check_system()
 
 
 @app.post('/api/system/start')
 def start_system(values:dict):
-    from .platform.system_operations import system
     currencies=values.get('currencies',['USD','KRW'])
     if not currencies or not set(currencies)<= {'USD','KRW'}:raise HTTPException(400,'USD/KRW 운영 통화를 선택하세요.')
     try:return system.start(list(dict.fromkeys(currencies)))
@@ -1051,14 +1052,11 @@ def start_system(values:dict):
 
 @app.post('/api/system/stop')
 def stop_system():
-    from .platform.system_operations import system
     return system.stop()
 
 
 def stop_library():
-    from .platform.library_operations import library
-    from .platform.operations_runtime import runtime
-    library.cancelled.set();runtime.cancel_inference.set()
+    library_manager.cancelled.set();runtime.cancel_inference.set()
     return {'message':'모델 작업 중지를 요청했습니다. 진행 중 연산은 종료 상태를 확인하세요.'}
 
 
@@ -1072,5 +1070,4 @@ def open_model_directory():
 
 @app.on_event("shutdown")
 def close_operations():
-    from .platform.operations_runtime import runtime
     runtime.close()

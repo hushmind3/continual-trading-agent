@@ -2,10 +2,12 @@
 import importlib
 import importlib.util
 import sys
+import threading
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
 CASH_ENVIRONMENT='finrl.meta.env_portfolio_optimization.env_portfolio_optimization.PortfolioOptimizationEnv'
+_module_lock=threading.RLock()
 
 
 def cash_environment(frame,registry,symbols,champion_ids=None,structure_only=False):
@@ -24,8 +26,9 @@ def cash_environment(frame,registry,symbols,champion_ids=None,structure_only=Fal
 
 def finrlx(name):
     source=ROOT/'FinRL-X'
-    if str(source) not in sys.path:sys.path.insert(0,str(source))
-    return importlib.import_module('src.'+name)
+    with _module_lock:
+        if str(source) not in sys.path:sys.path.insert(0,str(source))
+        return importlib.import_module('src.'+name)
 
 
 def finrl_file(relative):
@@ -34,11 +37,14 @@ def finrl_file(relative):
     package=importlib.util.find_spec('finrl')
     path=Path(package.origin).parent/relative
     name='official_finrl_'+relative.replace('/','_').removesuffix('.py')
-    if name in sys.modules:return sys.modules[name]
-    spec=importlib.util.spec_from_file_location(name,path)
-    module=importlib.util.module_from_spec(spec);sys.modules[name]=module
-    spec.loader.exec_module(module)
-    return module
+    with _module_lock:
+        if name in sys.modules:return sys.modules[name]
+        spec=importlib.util.spec_from_file_location(name,path)
+        module=importlib.util.module_from_spec(spec);sys.modules[name]=module
+        try:spec.loader.exec_module(module)
+        except Exception:
+            sys.modules.pop(name,None);raise
+        return module
 
 
 def sac_example(algorithm='sac'):
@@ -74,11 +80,11 @@ def champion_structure_environment(currency,symbols,registry,champion_ids):
 
 
 def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None,algorithm='sac',total_timesteps=None):
-    from finrl.agents.stablebaselines3.models import DRLAgent,MODELS
+    from finrl.agents.stablebaselines3.models import DRLAgent
+    from .platform.system_operations import system
     example,parameters,steps=sac_example(algorithm)
     steps=steps if total_timesteps is None else int(total_timesteps)
     if steps<1:raise ValueError('학습 단계는 1 이상이어야 합니다.')
-    learner=MODELS[algorithm]
     from .platform.sac_champion import load_spec
     champion = load_spec(champion_path) if champion_path else None
     if champion and algorithm!='sac':raise ValueError('선택한 Champion은 SAC 정책입니다. SAC 알고리즘에서 사용하세요.')
@@ -111,11 +117,11 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
         if champion:
             checkpoint=Path(champion['checkpoint'])
             if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/official'/checkpoint
-            model=learner.load(checkpoint,env=env)
+            model=system.model(checkpoint,algorithm,env)
             if (checkpoint.parent/'replay.pkl').is_file():model.load_replay_buffer(checkpoint.parent/'replay.pkl')
             model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
         elif resume:
-            model=learner.load(policy_checkpoint(saved),env=env)
+            model=system.model(policy_checkpoint(saved),algorithm,env)
             if hasattr(model,'load_replay_buffer'):model.load_replay_buffer(saved/'replay.pkl')
             model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
         else:
@@ -155,7 +161,7 @@ def prices(currency='USD',symbols=None):
 def backtest(frame,registry,currency=None):
     """Convert original environment holdings to the official StrategyResult API."""
     import pandas as pd
-    from finrl.agents.stablebaselines3.models import MODELS
+    from .platform.system_operations import system
     saved=policy_files(currency)
     from .state_io import read_json
     identity=read_json(saved/'dataset.json')
@@ -171,7 +177,7 @@ def backtest(frame,registry,currency=None):
     env=training_environment(frame,registry,training=False,champion_ids=identity.get('champion_experts',[]))
     try:
         if identity.get('currency')!=env.currency or identity.get('symbols')!=env.symbols:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다.')
-        model=MODELS[identity.get('algorithm','sac')].load(policy_checkpoint(saved),env=env)
+        model=system.model(policy_checkpoint(saved),identity.get('algorithm','sac'),env)
         from finrl.agents.stablebaselines3.models import DRLAgent
         observation,_=env.reset();raw=env.unwrapped.gym_env;rows=[]
         while not raw._terminal:

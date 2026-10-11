@@ -1,12 +1,11 @@
 import {FrameworkResult} from './FrameworkResult';
 import {useEffect,useMemo,useState} from 'react';
-import {useOperations} from '../data/Operations';
-import {useEndpoint} from '../data/useEndpoint';
+import {useSystemState,useOperations} from '../data/Operations';
 import {Panel} from '../ui/Panel';
 import {Button,ErrorMessage,inputClass} from '../ui/Primitives';
 interface Module {id:string;path:string;framework:string;functions:string[];signatures:Record<string,string>;parameters?:Record<string,{name:string;annotation?:string;required:boolean;default?:string}[]>;native_api?:string;status:string;reason:string}
 export function NativeModuleRunner({selectedModule,onSelect}:{selectedModule:string;onSelect:(module:string)=>void}){
- const catalog=useEndpoint<{items:Module[]}>('modules'),{state,execute,pending}=useOperations();
+ const catalog=useSystemState<{items:Module[]}>('framework'),{state,execute,pending}=useOperations();
  const [query,setQuery]=useState(''),[callable,setCallable]=useState(''),[kwargs,setKwargs]=useState('{}'),[init,setInit]=useState('{}'),[env,setEnv]=useState('{}'),[steps,setSteps]=useState('[]'),[argv,setArgv]=useState('[]'),[symbols,setSymbols]=useState(''),[source,setSource]=useState(''),[error,setError]=useState('');
  const modules=useMemo(()=>catalog.data?.items.filter(m=>m.native_api&&(!query||(m.path+' '+m.functions.join(' ')).toLowerCase().includes(query.toLowerCase())))??[],[catalog.data,query]);
  const module=modules.find(m=>m.id===selectedModule)??modules[0],functions=module?.functions.filter(name=>name.split('.').every(part=>!part.startsWith('_')))??[];

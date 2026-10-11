@@ -1,7 +1,6 @@
-import {useEffect,useState} from 'react';
+import {useState} from 'react';
 import {useOperations} from '../data/Operations';
-import {request} from '../data/api';
-import type {AutomationState,OperationProgress} from '../data/types';
+import type {OperationProgress} from '../data/types';
 import {Panel} from './Panel';
 import {Button,ErrorMessage,Status,inputClass} from './Primitives';
 import {OperationsControls} from './OperationsControls';
@@ -14,9 +13,9 @@ function Progress({value}:{value:OperationProgress|undefined}){
  {value.changed_files?.length? <details><summary className="cursor-pointer text-xs text-blue-600">변경 소스 {value.changed_files.length}개</summary><pre className="mt-2 max-h-40 overflow-auto text-xs text-slate-500">{value.changed_files.join('\n')}</pre></details>:null}</div>;
 }
 export function SystemControls(){
- const {state,refresh}=useOperations();const [value,setValue]=useState<AutomationState|undefined>(state?.automation),[error,setError]=useState(''),[connection,setConnection]=useState(''),[pending,setPending]=useState(''),[currency,setCurrency]=useState('both');
- useEffect(()=>{let closed=false;let timer:ReturnType<typeof setTimeout>;const poll=async()=>{try{const next=await request<AutomationState>('system/status');if(!closed){setValue(next);setConnection('');}}catch(e){if(!closed)setConnection(e instanceof Error?e.message:'서버 갱신 중 연결 대기');}if(!closed)timer=setTimeout(poll,2000);};void poll();return()=>{closed=true;clearTimeout(timer);}},[]);
- async function command(name:string){setError('');setPending(name);try{await request('system/'+name,name==='start'?{currencies:currency==='both'?['USD','KRW']:[currency]}:{});setValue(await request<AutomationState>('system/status'));void refresh();}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setPending('');}}
+ const {state,execute,error:connection}=useOperations();const value=state?.automation;
+ const [error,setError]=useState(''),[pending,setPending]=useState(''),[currency,setCurrency]=useState('both');
+ async function command(name:string){setError('');setPending(name);try{await execute('system/'+name,name==='start'?{currencies:currency==='both'?['USD','KRW']:[currency]}:{});}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setPending('');}}
  const applying=value?.apply.status==='running';
  return <Panel title="운영 실행" description="자동 운영과 개별 실행을 여기서 제어합니다.">
  <div className="flex flex-wrap items-center gap-3"><Button tone="primary" busy={pending==='apply'||applying} onClick={()=>void command('apply')}>코드 변경 적용</Button><select aria-label="자동 운영 통화" className={inputClass+' !w-auto'} value={currency} onChange={e=>setCurrency(e.target.value)}><option value="both">KRW + USD</option><option value="KRW">KRW</option><option value="USD">USD</option></select><Button tone="primary" disabled={applying} busy={pending==='start'||value?.system.active} onClick={()=>void command('start')}>자동 운영 시작</Button><Button tone="danger" busy={pending==='stop'} onClick={()=>void command('stop')}>운영 중지</Button></div>

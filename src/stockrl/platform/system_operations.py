@@ -107,6 +107,68 @@ class SystemOperations:
         self.path=ROOT/'runtime/operations/system.json';self.lock=threading.RLock()
         self.active=False;self.cancelled=threading.Event();self.restarting=False
         self.value=read_json(self.path,{'status':'pending','stages':[]})
+        self.state_lock=threading.RLock();self.model_lock=threading.RLock()
+        self.states={};self.state_signatures={};self.state_errors={};self.state_updates={};self.state_revision=0
+        self.state_loader_locks={}
+        self.model_cache={};self.registry_cache={};self.source_results={};self.expert_pool=None;self.expert_pool_signature=None
+        from ..state_io import subscribe_updates
+        subscribe_updates(self.module_update)
+    def module_update(self,path,value):
+        path=Path(path).resolve()
+        if not path.is_relative_to(ROOT.resolve()):return
+        name=path.relative_to(ROOT).as_posix()
+        with self.state_lock:self.source_results[name]=value
+    def publish(self,name,value,signature=None):
+        with self.state_lock:
+            self.states[name]=deepcopy(value);self.state_signatures[name]=signature
+            self.state_errors.pop(name,None);self.state_revision+=1;self.state_updates[name]=time.time()
+            return self.states[name]
+    def state_value(self,name,loader,signature=None):
+        with self.state_lock:lock=self.state_loader_locks.setdefault(name,threading.RLock())
+        with lock:
+            with self.state_lock:
+                if signature is not None and name in self.states and self.state_signatures.get(name)==signature:return self.states[name]
+            try:return self.publish(name,loader(),signature)
+            except Exception as exc:
+                with self.state_lock:
+                    self.state_errors[name]=str(exc);self.state_updates[name]=time.time();self.state_signatures[name]=signature
+                    self.states.setdefault(name,None)
+                    return self.states[name]
+    def invalidate_states(self):
+        with self.state_lock:self.state_signatures.clear()
+    def model(self,path,algorithm,environment=None):
+        from finrl.agents.stablebaselines3.models import MODELS
+        path=Path(path).resolve()
+        if path.is_relative_to((ROOT/'휴지통').resolve()):raise ValueError('휴지통은 모델 실행에 사용하지 않습니다.')
+        stamp=path.stat();signature=(stamp.st_mtime_ns,stamp.st_size,algorithm)
+        with self.model_lock:
+            key=str(path);entry=self.model_cache.get(key)
+            if entry is None or entry['signature']!=signature:
+                model=MODELS[algorithm].load(path,env=environment)
+                entry={'model':model,'signature':signature,'algorithm':algorithm,'loads':1+(entry['loads'] if entry else 0),'reuse':0}
+                self.model_cache[key]=entry
+            else:
+                entry['reuse']+=1
+                if environment is not None:entry['model'].set_env(environment)
+            return entry['model']
+    def expert_registry(self,folder,pool_provider):
+        from ..expert_registry_native import ExpertRegistry
+        from .sac_champion import load_spec
+        folder=Path(folder).resolve();identity=read_json(folder/'dataset.json');champion_path=identity.get('champion_file')
+        signature=None
+        if champion_path:
+            path=Path(champion_path).resolve();stamp=path.stat();signature=(str(path),stamp.st_mtime_ns,stamp.st_size)
+        key=(str(champion_path) if champion_path else 'shared',identity.get('currency'),tuple(identity.get('symbols',[])),tuple(identity.get('champion_experts',[])),identity.get('environment'))
+        with self.model_lock:
+            entry=self.registry_cache.get(key)
+            if entry is None or entry['signature']!=signature:
+                registry=ExpertRegistry(champion=load_spec(champion_path)) if champion_path else ExpertRegistry(pool_provider)
+                if entry:entry['registry'].close(cleanup=True)
+                entry={'registry':registry,'signature':signature};self.registry_cache[key]=entry
+            return entry['registry']
+    def resident_models(self):
+        with self.model_lock:return [{'path':path,'algorithm':row['algorithm'],'device':str(row['model'].device),
+            'loads':row['loads'],'reuse':row['reuse']} for path,row in self.model_cache.items()]
     def snapshot(self):
         with self.lock:
             value={**deepcopy(self.value),'active':self.active}

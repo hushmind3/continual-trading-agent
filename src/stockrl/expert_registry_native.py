@@ -20,7 +20,6 @@ class ExpertRegistry:
             self.state_dir=ROOT/'runtime/experts';self.state_dir.mkdir(parents=True,exist_ok=True)
         else:
             import tempfile,torch
-            from .platform.expert_packages import digest
             self._embedded_temp=tempfile.TemporaryDirectory(prefix='sac-champion-experts-')
             root=Path(self._embedded_temp.name);self.model_dir=root/'models';self.model_dir.mkdir()
             self.registry_file=root/'configs'/'experts.json';self.registry_file.parent.mkdir()
@@ -43,8 +42,15 @@ class ExpertRegistry:
         self.settings=SimpleNamespace(registry_file=self.registry_file,model_dir=self.model_dir,
             state_dir=self.state_dir,resources=resources)
         self.pool=None;self.cache={};self.last_outputs={};self.signature=None;self.reported_at=0
+        self._catalog_stamp=None;self._catalog_value=None
 
-    def catalog(self):return self.champion_catalog or read_json(self.registry_file)
+    def catalog(self):
+        if self.champion_catalog is not None:return self.champion_catalog
+        stamp=self.registry_file.stat() if self.registry_file.is_file() else None
+        signature=(stamp.st_mtime_ns,stamp.st_size) if stamp else None
+        if self._catalog_value is None or signature!=self._catalog_stamp:
+            self._catalog_value=read_json(self.registry_file);self._catalog_stamp=signature
+        return self._catalog_value
 
     def select(self,active):
         catalog=self.catalog()
@@ -76,10 +82,14 @@ class ExpertRegistry:
         from .platform.expert_inference import prepare_inputs,run_batches
         selected=list(self.catalog().get('active',[])) if champion_ids is None else list(champion_ids)
         if not selected:return np.empty(0,dtype=np.float32)
-        signature=json.dumps(self.catalog(),sort_keys=True)
+        catalog=self.catalog()
+        signature=json.dumps({'active':catalog.get('active',[]),'packages':{key:row.get('package') for key,row in catalog.get('experts',{}).items()}},sort_keys=True)
         if signature!=self.signature:
             self.close();self.last_outputs={};self.signature=signature
-        if self.pool is None:self.pool=self.pool_provider() if self.pool_provider else ExpertPool(self.settings,keep_device=True,live=True)
+        if self.pool_provider:
+            shared=self.pool_provider()
+            if self.pool is not shared:self.cache.clear();self.pool=shared
+        elif self.pool is None:self.pool=ExpertPool(self.settings,keep_device=True,live=True)
         stamp=str(frame.date.max());features={};errors=[]
         for key in selected:
             try:

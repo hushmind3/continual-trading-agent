@@ -427,7 +427,8 @@ def stock_workflow(action,parameters,output):
     import numpy as np
     import pandas as pd
     from contextlib import chdir
-    from finrl.agents.stablebaselines3.models import DRLAgent,MODELS
+    from finrl.agents.stablebaselines3.models import DRLAgent
+    from .system_operations import system
     from finrl.meta.env_stock_trading.env_stocktrading import StockTradingEnv
     from finrl.meta.preprocessor.preprocessors import FeatureEngineer,data_split
     from finrl.meta.preprocessor.yahoodownloader import YahooDownloader
@@ -511,7 +512,7 @@ def stock_workflow(action,parameters,output):
                 try:
                     for name in selected:
                         record['model_states'][name]['status']='running';save()
-                        model=MODELS[name].load(str(training_root/trained['model_states'][name]['checkpoint']))
+                        model=system.model(training_root/trained['model_states'][name]['checkpoint'],name)
                         account,_=DRLAgent.DRL_prediction(model=model,environment=env)
                         curves[name]=account.set_index(account.columns[0])['account_value']
                         record['model_states'][name]['status']='complete';save()

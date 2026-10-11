@@ -212,7 +212,9 @@ class LibraryOperations:
                 'comparison_unavailable':sum(row.get('comparison_status') in ('input_unavailable','no_original') for row in record['reports']),'items':record['reports']}
         if kind in ('probe_all','optimize_all'):
             experts=catalog.get('experts',{})
-            if kind=='probe_all':keys=list(experts)
+            if kind=='probe_all':
+                keys=list(payload.get('ids') or experts)
+                if any(key not in experts for key in keys):raise ValueError('Registry에 등록된 Expert를 선택하세요.')
             else:
                 keys=[]
                 for expert_id,item in experts.items():
@@ -288,6 +290,32 @@ class LibraryOperations:
                 'failed':sum(x['status']=='failed' for x in results),
                 'skipped':sum(x['status']=='skipped' for x in results),'items':results}
         if kind=='compare':
+            if payload.get('ids'):
+                from .expert_packages import load_package
+                from .expert_contracts import descriptor
+                import re
+                caches={};rows=[]
+                try:
+                    for key in payload['ids']:
+                        entry=catalog.get('experts',{}).get(key)
+                        if entry is None:raise ValueError('등록된 Expert를 선택하세요: '+key)
+                        saved=load_package(cfg.model_dir/'expert_registry.json',entry['package'],verify=True)
+                        item=descriptor(key,saved,entry['package'])
+                        base=(item.get('conversion') or {}).get('source_id') or re.sub(r'_(fp16|bf16|int8|int4|nf4)$','',key)
+                        if base==key and any(other.startswith(key+'_') for other in payload['ids']):continue
+                        cache=caches.setdefault(base,{'device':payload.get('device','auto')})
+                        measured=self._compare_quantized(base,item,progress,cache)
+                        row={'id':key,'status':'existing','precision':(item.get('conversion') or {}).get('precision'),'bytes':item.get('weight_bytes') or entry['package']['bytes'],**measured}
+                        rows.append(row);latest=read_json(cfg.registry_file);latest['experts'][key]=item
+                        record=latest.setdefault('quantizations',{}).setdefault(base,{'reports':[],'failures':[]})
+                        record['reports']=[existing for existing in record.get('reports',[]) if existing.get('id')!=key]+[row]
+                        record['finished']=time.time();atomic_json(latest,cfg.registry_file)
+                finally:
+                    for base,cache in caches.items():
+                        if cache.get('release_base'):runtime.unload(base)
+                return {'items':rows,'compared':sum(row['comparison_status']=='measured' for row in rows),
+                    'comparison_failed':sum(row['comparison_status']=='failed' for row in rows),
+                    'comparison_unavailable':sum(row['comparison_status'] in ('input_unavailable','no_original') for row in rows)}
             from .expert_comparison import comparison_result,measure
             keys=[payload['baseline'],payload['variant']];items={key:catalog['experts'][key] for key in keys}
             if items[keys[0]]['input']!=items[keys[1]]['input'] or items[keys[0]]['feature_size']!=items[keys[1]]['feature_size']:
@@ -301,8 +329,16 @@ class LibraryOperations:
             from ..expert_registry_native import ExpertRegistry
             ExpertRegistry().select(payload['active'])
             return {'active':payload['active']}
-        if kind=='load':return runtime.load(payload['id'])
-        if kind=='unload':runtime.unload(payload['id']);return {'unloaded':payload['id']}
+        if kind in ('load','unload'):
+            rows=[]
+            for key in payload.get('ids') or [payload['id']]:
+                progress(stage=kind,detail=key)
+                try:
+                    value=runtime.load(key) if kind=='load' else runtime.unload(key)
+                    rows.append({'id':key,'status':'loaded' if kind=='load' else 'unloaded','metrics':value})
+                except InterruptedError:raise
+                except Exception as exc:rows.append({'id':key,'status':'failed','detail':str(exc)})
+            return {'items':rows,'failed':sum(row['status']=='failed' for row in rows)}
         if kind=='remove':
             ids=sorted(set(payload.get('ids',[])))
             failure_records=payload.get('failures',[])

@@ -103,7 +103,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     if not root.resolve().is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('정책 출력은 기존 runtime/official 내부에 저장합니다.')
     root.mkdir(parents=True,exist_ok=True)
     from .state_io import read_json,atomic_json
-    saved=policy_files()
+    saved=policy_files(env.currency)
     identity={'currency':env.currency,'symbols':env.symbols,'sac_example':parameters,'environment':'finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv','rolling_days':[1095,365]}
     if champion:
         identity.update(champion['identity'])
@@ -151,11 +151,11 @@ def prices(currency='USD',symbols=None):
     return data
 
 
-def backtest(frame,registry):
+def backtest(frame,registry,currency=None):
     """Convert original environment holdings to the official StrategyResult API."""
     import pandas as pd
     from stable_baselines3 import SAC
-    saved=policy_files()
+    saved=policy_files(currency)
     from .state_io import read_json
     identity=read_json(saved/'dataset.json')
     if identity.get('champion_file'):
@@ -182,11 +182,12 @@ def backtest(frame,registry):
     finally:env.close()
 
 
-def policy_files():
+def policy_files(currency=None):
     """Select an existing native SB3 revision without modifying its weights."""
     from .state_io import read_json
     root=ROOT/'runtime/official'
-    selection=read_json(root/'active-checkpoint.json')
+    selected=read_json(ROOT/'runtime/operations/policies.json').get(currency) if currency else None
+    selection={'path':selected} if selected else read_json(root/'active-checkpoint.json')
     if not selection:return root
     path=(root/selection['path']).resolve()
     if not path.is_relative_to(root.resolve()) or path.name!='sac.zip':

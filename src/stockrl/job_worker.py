@@ -46,6 +46,9 @@ def main():
         official_main()
         if job["command"]=="train":
             atomic_json({"path":job['output']+'/sac.zip' if job.get('output') else 'sac.zip'},root/"active-checkpoint.json")
+            selected=read_json(ROOT/'runtime/operations/policies.json')
+            selected[job['currency']]=job['output']+'/sac.zip' if job.get('output') else 'sac.zip'
+            atomic_json(selected,ROOT/'runtime/operations/policies.json')
     except BaseException:
         exit_code = 1
         traceback.print_exc()

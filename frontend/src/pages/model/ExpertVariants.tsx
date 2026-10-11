@@ -19,6 +19,7 @@ export function ExpertVariants({variants,quantization,legacyFailures,selectedIds
     <label className="mb-2 flex cursor-pointer items-center gap-2 text-slate-500"><input type="checkbox" checked={selected} onChange={()=>onToggle(item.id)} aria-label={item.name+' '+label+' 선택'}/>선택</label>
     <button aria-label={item.name+' '+label+' 상세·검사 결과'} onClick={()=>setDetailId(item.id)} className="w-full text-left focus-visible:outline-2 focus-visible:outline-blue-500">
      <b className="block break-words text-slate-700">{label}</b><span className="mt-1 block text-slate-500">{bytes(item.weight_bytes??item.package.bytes)}</span>
+     <span className="mt-1 block text-slate-500">{item.loaded?'메모리 로드됨':'메모리 미로드'}{item.loaded&&typeof item.current_resources?.device==='string'?' · '+item.current_resources.device:''}</span>
      <span className={'mt-2 block '+(failed?'text-rose-700':'text-emerald-700')}>{failed?'가중치·정밀도 확인 실패':item.quantized||conversion?.precision?.match(/^(int8|int4|nf4)$/)?'양자화 가중치':conversion?'비양자화 · 정밀도 변환':'비양자화 · 원본'}</span>
      {failed&&<span className="mt-1 block break-words text-rose-700">{inspectionDetail(item.metadata_error??'등록된 패키지 파일이 없거나 크기가 다릅니다.')}</span>}
      {measured&&<span className="mt-1 block text-slate-500">{item.role==='action'?'판단 일치 '+ratio(measured.action_agreement):'방향 일치 '+ratio(measured.direction_agreement)} · 상대 RMSE {ratio(measured.relative_rmse)}</span>}

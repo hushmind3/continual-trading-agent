@@ -55,13 +55,13 @@ export interface ResultTable {columns:string[];rows:Record<string,unknown>[];tot
 export interface Connections {api:{status:string};data:{status:string;source:string|null;available_sources:string[];reason?:string};brokers:{name:string;status:string;reason:string}[]}
 export interface OperationsState {
   policies?:Partial<Record<Currency,{path:string;loaded:boolean;device?:string;observation_shape?:number[];action_shape?:number[];num_timesteps?:number;updates?:number}>>;
-  controls:{feed:boolean;paper:boolean;engine:boolean};
+  controls:{feed:boolean;paper:boolean;engine:boolean;learning:boolean};
   account:{books:Record<Currency,{initial_cash:number;cash:number;equity:number;net_pnl:number;
     holdings_value:number;fees:number;realized_pnl:number;trade_count:number;
     positions:Record<string,{quantity:number;average_cost:number}>;marks:Record<string,number>}>;
     fills:Record<string,unknown>[];pending:Record<string,unknown>};
   quotes:Record<string,Record<string,unknown>>;decisions:Record<string,unknown>[];
-  feed:{status:string;error?:string;policy_error?:string;last_as_of?:string};
+  feed:{status:string;error?:string;policy_error?:string;learning_status?:string;learning_error?:string;last_as_of?:string};
   broker?:{connected?:boolean;last_error?:string;last_message_utc?:string};
   pool:{id:string;loaded?:boolean;device?:string;resident_bytes?:number;peak_ram_increment?:number}[];
 }

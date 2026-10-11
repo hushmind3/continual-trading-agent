@@ -25,17 +25,19 @@ def main():
     frame=prices(args.currency,args.symbols)
     if frame.empty:raise ValueError('공식 DataStore에 해당 시장의 실제 가격 데이터가 없습니다.')
     if args.command=='backtest':
-        result=backtest(frame,registry);print(result.to_metrics_dataframe().to_string())
-        result.portfolio_values.to_csv(ROOT/'runtime/official/backtest.csv')
+        destination=args.output or ROOT/'runtime/official/backtests'/args.currency
+        destination.mkdir(parents=True,exist_ok=True)
+        result=backtest(frame,registry,args.currency);print(result.to_metrics_dataframe().to_string())
+        result.portfolio_values.to_csv(destination/'backtest.csv')
         # Persist official engine metrics for the HTTP/UI adapter.
         from .state_io import atomic_json
         import math
         metrics=result.to_metrics_dataframe()
         records={str(index):{str(key):float(value) if isinstance(value,(int,float)) and math.isfinite(value) else str(value) if not isinstance(value,(int,float)) else None for key,value in row.items()} for index,row in metrics.iterrows()}
         atomic_json({'currency':args.currency,'symbols':sorted(frame.symbol.unique()),
-            'strategies':records},ROOT/'runtime/official/backtest_metrics.json')
-        result.weights_history.to_csv(ROOT/'runtime/official/backtest_weights.csv')
-        result.trades.to_csv(ROOT/'runtime/official/backtest_trades.csv')
+            'strategies':records},destination/'backtest_metrics.json')
+        result.weights_history.to_csv(destination/'backtest_weights.csv')
+        result.trades.to_csv(destination/'backtest_trades.csv')
         return
     model=train(frame,registry,args.resume,args.output,args.champion_path,args.champion_output)
     print('Saved official SAC:',(args.output or ROOT/'runtime/official')/'sac.zip')

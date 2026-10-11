@@ -15,7 +15,8 @@ from .operations_settings import settings
 class OperationsRuntime:
     def __init__(self):
         self.lock=threading.RLock()
-        self.controls={'feed':False,'paper':False,'engine':False}
+        self.controls={'feed':False,'paper':False,'engine':False,'learning':False}
+        self.learning_pending=[];self.learning_job=None
         self.collector=None;self.thread=None;self.pool=None;self.pool_signature=None
         self.account=None;self.quotes={};self.decisions=[];self.last_policy_date=None
         self.status={'status':'stopped','error':None}
@@ -57,6 +58,13 @@ class OperationsRuntime:
             else:
                 if name=='engine' and enabled:self.cancel_inference.clear()
                 self.controls[name]=bool(enabled)
+                if name=='learning':
+                    self.status['learning_status']='완료 시세 대기' if enabled else '중지'
+                    if not enabled:
+                        self.learning_pending.clear()
+                        from .. import web_api as api
+                        job=api.job_state()
+                        if job.get('running') and job.get('id')==self.learning_job:api.stop()
             return self.controls.copy()
 
     def run(self):
@@ -120,6 +128,27 @@ class OperationsRuntime:
                 try:self.sac_decision()
                 except Exception as exc:self.status['policy_error']=str(exc)
                 self.last_policy_date=str(stamp)
+            if self.controls['learning']:self.queue_learning(symbols)
+
+    def queue_learning(self,symbols):
+        from .. import web_api as api
+        from ..framework import policy_files
+        policies=read_json(ROOT/'runtime/operations/policies.json')
+        if not policies:
+            self.status['learning_error']='운영 모델을 선택·로드한 뒤 지속학습을 켜세요.';return
+        for currency,path in policies.items():
+            identity=read_json((ROOT/'runtime/official'/path).parent/'dataset.json')
+            if set(identity.get('symbols',[]))&set(symbols) and currency not in self.learning_pending:self.learning_pending.append(currency)
+        if api.job_state()['running'] or not self.learning_pending:return
+        currency=self.learning_pending.pop(0)
+        try:
+            identity=read_json(policy_files(currency)/'dataset.json')
+            request=api.RunRequest(currency=currency,symbols=identity['symbols'],resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
+            result=api.launch('train',request,preserve_output=True)
+            self.learning_job=result['job']['id']
+            self.status.update(learning_status='SAC 이어 학습 실행',learning_job=self.learning_job)
+            self.status.pop('learning_error',None)
+        except Exception as exc:self.status.update(learning_status='학습 요청 실패',learning_error=str(exc))
 
     def manual_order(self,symbol,currency,action,quantity):
         from ..paper_account import _currency

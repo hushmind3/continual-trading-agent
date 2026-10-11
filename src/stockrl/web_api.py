@@ -382,8 +382,16 @@ def job_state():
     return result
 
 
-def evaluation():
-    path = RUNTIME / "backtest.csv"
+def evaluation_root(currency=None):
+    if not currency:return RUNTIME
+    root=RUNTIME/'backtests'/currency
+    if (root/'backtest.csv').is_file():return root
+    return RUNTIME if read_json(RUNTIME/'backtest_metrics.json').get('currency')==currency else root
+
+
+@app.get('/api/evaluation')
+def evaluation(currency:Literal['KRW','USD']|None=None):
+    root=evaluation_root(currency);path = root / "backtest.csv"
     points = []
     if path.is_file():
         with path.open(encoding="utf-8-sig", newline="") as stream:
@@ -397,7 +405,7 @@ def evaluation():
                 except (ValueError, IndexError):
                     continue
     return {"points": points, "file": file_info(path),
-            "report": read_json(RUNTIME / "backtest_metrics.json")}
+            "report": read_json(root / "backtest_metrics.json")}
 
 
 @app.get("/api/health")
@@ -439,8 +447,8 @@ def modules():
 
 
 @app.get("/api/result/{kind}")
-def result_table(kind: Literal["weights", "trades"], limit: int = Query(1000, ge=1, le=5000)):
-    path = RUNTIME / ("backtest_" + kind + ".csv")
+def result_table(kind: Literal["weights", "trades"], limit: int = Query(1000, ge=1, le=5000),currency:Literal['KRW','USD']|None=None):
+    path = evaluation_root(currency) / ("backtest_" + kind + ".csv")
     if not path.is_file():
         return {"columns": [], "rows": [], "total": 0}
     import pandas as pd
@@ -511,9 +519,9 @@ def price_history(symbol: str, limit: int = Query(300, ge=1, le=2000)):
 
 
 @app.get("/api/download/{name}")
-def download(name: Literal["backtest.csv", "backtest_metrics.json", "backtest_weights.csv", "backtest_trades.csv", "sac.zip", "dataset.json"]):
+def download(name: Literal["backtest.csv", "backtest_metrics.json", "backtest_weights.csv", "backtest_trades.csv", "sac.zip", "dataset.json"],currency:Literal['KRW','USD']|None=None):
     from .framework import policy_files
-    path = (policy_files() if name in ('sac.zip','dataset.json') else RUNTIME) / name
+    path = (policy_files(currency) if name in ('sac.zip','dataset.json') else evaluation_root(currency)) / name
     if not path.is_file():
         raise HTTPException(404, "결과 파일이 없습니다.")
     return FileResponse(path, filename=name)
@@ -538,7 +546,8 @@ def preflight(req, command):
         elif item["observations"] <= 252:
             errors.append(symbol + ": 공분산을 만들 관측이 252개보다 많아야 합니다.")
     settings = source_settings()
-    model = model_state(settings)
+    from .framework import policy_files
+    model = model_state(settings,policy_files(req.currency)) if command=='backtest' or req.resume else model_state(settings)
     if req.champion_path:
         from .platform.sac_champion import load_spec,MODEL_DIR
         source=Path(req.champion_path).expanduser().resolve()
@@ -605,12 +614,13 @@ def launch(command, req,preserve_output=False):
         job = {"id": job_id, "status": "starting", "command": command, "currency": req.currency,
                "symbols": checked["symbols"], "resume": req.resume, "started_at": now(),
                "log": f"jobs/{job_id}.log", "finished_at": None, "exit_code": None}
-        if req.champion_path:
+        if command=='backtest':job['output']='backtests/'+req.currency
+        elif req.champion_path:
             from .platform.sac_champion import _next_version
             _,target=_next_version()
             job.update(champion_path=str(Path(req.champion_path).expanduser().resolve()),
                 champion_output=str(target),output='champions/'+target.stem)
-        elif preserve_output:job['output']='policies/'+job_id
+        elif command=='train' or preserve_output:job['output']='policies/'+job_id
         (RUNTIME / "jobs").mkdir(exist_ok=True)
         env = os.environ.copy()
         env.update(PYTHONPATH=str(ROOT / "src"), PYTHONUTF8="1")
@@ -800,7 +810,7 @@ def operations():
 
 
 @app.post("/api/controls/{name}")
-def operation_control(name:Literal["feed","paper","engine"],request:ControlRequest):
+def operation_control(name:Literal["feed","paper","engine","learning"],request:ControlRequest):
     from .platform.operations_runtime import runtime
     try:return {"controls":runtime.command(name,request.enabled)}
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))

@@ -45,6 +45,7 @@ def busy():
     if runtime.thread and runtime.thread.is_alive():items.append('실행 중인 시세 수신')
     if runtime.controls['paper']:items.append('활성 가상매매')
     if runtime.controls['engine'] or runtime.inference_active:items.append('활성 추론')
+    if runtime.controls['learning']:items.append('활성 지속학습')
     if library.active:items.append('실행 중인 모델 작업')
     if system.active:items.append('전체 시스템 시작 절차')
     return items
@@ -151,6 +152,7 @@ class SystemOperations:
         from .operations_runtime import runtime
         from .operations_settings import settings
         from ..provider_credentials import public_status,test_connection
+        cfg=settings()
         try:
             key='accounts';title='KRW/USD 가상계좌 준비';self.phase(key,title)
             runtime.ledger().save();self.phase(key,title,'complete','기존 잔고·보유·체결 원장 유지')
@@ -276,7 +278,7 @@ class SystemOperations:
         from .library_operations import library
         from ..web_api import job_state,stop
         self.cancel();library.cancelled.set();runtime.cancel_inference.set()
-        runtime.command('engine',False);runtime.command('paper',False);runtime.command('feed',False)
+        runtime.command('learning',False);runtime.command('engine',False);runtime.command('paper',False);runtime.command('feed',False)
         if job_state()['running']:stop()
         if runtime.account:runtime.account.save()
         pending=bool(runtime.inference_active or library.active or runtime.thread and runtime.thread.is_alive() or self.active)

@@ -20,7 +20,7 @@ export interface Expert {
   current_resources?:Record<string,unknown>;loaded?:boolean;
 }
 export interface Job {
-  running:boolean;id?:string;status?:string;command?:string;pid?:number;started_at?:string;finished_at?:string;
+  action?:string;result?:unknown;running:boolean;id?:string;status?:string;command?:string;pid?:number;started_at?:string;finished_at?:string;
   exit_code?:number;log_text:string;detail?:string;currency?:Currency;symbols?:string[];
   measurements:Record<string,number>;
 }
@@ -34,6 +34,7 @@ export interface Snapshot {
     sb3_defaults:Record<string,unknown>;policy:{actor_arch:number[];critic_arch:number[];n_critics:number;activation:string;optimizer:string;feature_extractor:string};
     versions:Record<string,string>;
   };
+  models_by_currency?:Record<Currency,Snapshot['model']>;
   model:{file:FileState;replay:FileState;identity:{currency?:Currency;symbols?:string[]};compatible:boolean;reasons:string[];
     num_timesteps:number|null;updates:number|null;observation_shape?:number[];action_shape?:number[];
     parameters?:Record<string,unknown>;replay_state:{status:string;error?:string;size?:number;capacity?:number;position?:number;full?:boolean;n_envs?:number;array_bytes?:number}};

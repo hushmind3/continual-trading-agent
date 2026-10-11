@@ -114,7 +114,7 @@ def blockers():
         return items
 
 
-def main(apply_only=False):
+def main(apply_only=False,skip_build=False,skip_checks=False):
     with startup_lock():
         operation={'id':uuid.uuid4().hex,'pid':os.getpid(),'process_created':psutil.Process().create_time(),
             'status':'running','started_at':time.time(),'stages':[]}
@@ -142,7 +142,7 @@ def main(apply_only=False):
             else:
                 phase(stage,'실행 중 작업 보존','complete','기존 작업을 종료하지 않았습니다.')
             stage='build';phase(stage,'React 변경 적용')
-            if frontend_changed:
+            if frontend_changed and not skip_build:
                 node=shutil.which('node');vite=FRONTEND/'node_modules/vite/bin/vite.js';tsc=FRONTEND/'node_modules/typescript/bin/tsc'
                 if not node or not vite.is_file() or not tsc.is_file():raise RuntimeError('설치된 Node/Vite/TypeScript가 필요합니다. 패키지를 자동 설치하지 않습니다.')
                 log=RUNTIME/'apply-build.log';operation['build_log']=str(log)
@@ -151,7 +151,7 @@ def main(apply_only=False):
                         subprocess.run([node,str(script),*args],cwd=FRONTEND,stdout=output,stderr=subprocess.STDOUT,check=True)
                 if not (FRONTEND/'dist/index.html').is_file():raise RuntimeError('React 빌드 산출물이 없습니다.')
                 phase(stage,'React 변경 적용','complete','변경된 소스 빌드 완료; 기존 산출물은 영구 삭제하지 않았습니다.')
-            else:phase(stage,'React 변경 적용','complete','변경 없음; 빌드 생략')
+            else:phase(stage,'React 변경 적용','complete','이미 생성된 React 빌드 사용' if skip_build else '변경 없음; 빌드 생략')
             stage='server';phase(stage,'8766 서버 갱신')
             restart=backend_changed or not live
             if live and restart:
@@ -199,14 +199,21 @@ def main(apply_only=False):
             if refreshed!=groups:raise RuntimeError('적용 도중 소스가 다시 변경됐습니다. 현재 변경은 적용 완료로 기록하지 않습니다.')
             atomic_json({'sources':groups,'revision':revision,'applied_at':time.time(),
                 'dist_sha256':hashlib.sha256((FRONTEND/'dist/index.html').read_bytes()).hexdigest()},APPLIED)
-            stage='check';phase(stage,'전체 연결 상태 확인')
-            checked=api('system/check',timeout=60)
-            operation['checks']=checked['items']
-            issues=[row for row in checked['items'] if row['status'] in ('failed','blocked')]
-            phase(stage,'전체 연결 상태 확인','blocked' if issues else 'complete',f'{len(issues)}개 준비 부족/오류' if issues else '요청한 상태 항목 확인')
-            operation.update(status='blocked' if issues else 'complete',applied=True,finished_at=time.time())
-            atomic_json(operation,APPLY)
-            print('변경 적용 완료; '+('준비 부족 항목 있음' if issues else '상태 조회 완료'),flush=True)
+            if skip_checks:
+                phase('check','사용자 지시로 검증 생략','complete','전체 모듈 점검·테스트를 실행하지 않았습니다.')
+                operation.update(status='complete',applied=True,finished_at=time.time())
+                atomic_json(operation,APPLY)
+                print('React·백엔드 적용 완료; 검증 생략',flush=True)
+            else:
+                stage='check';phase(stage,'전체 연결 상태 확인')
+                checked=api('system/check',timeout=60)
+                operation['checks']=checked['items']
+                issues=[row for row in checked['items'] if row['status'] in ('failed','blocked')]
+                phase(stage,'전체 연결 상태 확인','blocked' if issues else 'complete',f'{len(issues)}개 준비 부족/오류' if issues else '요청한 상태 항목 확인')
+                operation.update(status='blocked' if issues else 'complete',applied=True,finished_at=time.time())
+                atomic_json(operation,APPLY)
+                print('변경 적용 완료; '+('준비 부족 항목 있음' if issues else '상태 조회 완료'),flush=True)
+
         except Exception as exc:
             detail=str(exc);log=RUNTIME/'apply-build.log' if stage=='build' else RUNTIME/'server.stderr.log'
             if isinstance(exc,HTTPError):detail+='\n'+exc.read().decode('utf8',errors='replace')[:1200]

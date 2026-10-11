@@ -25,14 +25,14 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .framework import ROOT
+from .framework import ROOT,CASH_ENVIRONMENT
 from .state_io import atomic_json, read_json
 from .platform.resources import ResourceMonitor
 
 RUNTIME = ROOT / "runtime/official"
 DB = ROOT / "data/finrl_trading.db"
 MODEL_DIR = Path.home() / "Desktop/모델"
-ENVIRONMENT = "finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv"
+ENVIRONMENT = CASH_ENVIRONMENT
 app = FastAPI(title="FinRL-X local workspace", version="2")
 FRONTEND_DIST = ROOT / "frontend/dist"
 app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets"), check_dir=False), name="react-assets")
@@ -56,7 +56,7 @@ async def local_writes(request: Request, call_next):
         if (apply_running() or system.restarting) and not allowed_stop and request.url.path!='/api/system/apply':
             return JSONResponse({'detail':'변경 적용/서버 갱신 중입니다. 기존 작업은 보존합니다.'},status_code=409)
         path=request.url.path
-        conflict=path in ('/api/train','/api/backtest','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
+        conflict=path in ('/api/train','/api/backtest','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/framework/') or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
         if conflict:
             system.cancel()
     return await call_next(request)
@@ -104,15 +104,6 @@ def source_settings():
     """Read constants from the exact checked-out call sites without loading learners."""
     from .framework import sac_example
     _, params, steps = sac_example()
-    framework = ast.parse((ROOT / "src/stockrl/framework.py").read_text(encoding="utf8"))
-    env_args = {}
-    for node in ast.walk(framework):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "StockPortfolioEnv":
-            for kw in node.keywords:
-                try:
-                    env_args[kw.arg] = ast.literal_eval(kw.value)
-                except (ValueError, TypeError):
-                    pass
     import inspect
     import importlib.metadata
     import numpy as np
@@ -129,18 +120,22 @@ def source_settings():
     architecture = {"actor_arch": policy.actor.net_arch, "critic_arch": policy.critic_kwargs["net_arch"],
                     "n_critics": policy.critic.n_critics, "activation": policy.activation_fn.__name__,
                     "optimizer": policy.actor.optimizer.__class__.__name__,
-                    "feature_extractor": policy.features_extractor_class.__name__}
+                    "feature_extractor": "stockrl.platform.sac_champion.ChampionExtractor"}
     versions = {name: importlib.metadata.version(name) for name in ("stable-baselines3","finrl","torch","gymnasium")}
-    return {"parameters": params, "steps_per_run": steps, "environment": ENVIRONMENT,
-            "environment_args": env_args, "covariance_lookback": 252, "rolling_days": [1095, 365],
-            "sb3_defaults": defaults, "policy": architecture, "versions": versions,
-            "parameter_source": "FinRL-X/src/strategies/rl_model.py::train_sac",
-            "environment_source": "src/stockrl/framework.py::training_environment",
-            "save_policy": "실행 정상 종료 시 SAC와 Replay 저장",
-            "observation": "원본 환경 관측 + 시장 예측 4값 + 매매 판단 4값",
-            "notes": ["원본 StockPortfolioEnv.step은 transaction_cost_pct를 차감하지 않습니다.",
-                      "BacktestEngine은 투자 비중을 합계 100%로 정규화하고 거래 비용을 적용합니다.",
-                      "실시간 수신·실제 주문은 현재 실행 경로에 연결되어 있지 않습니다."]}
+    from .framework import finrl_file
+    env_class=finrl_file('meta/env_portfolio_optimization/env_portfolio_optimization.py').PortfolioOptimizationEnv
+    env_args={key:value.default for key,value in inspect.signature(env_class).parameters.items()
+        if value.default is not inspect.Parameter.empty and isinstance(value.default,(str,int,float,bool,list,type(None)))}
+    return {"parameters":params,"steps_per_run":steps,"environment":ENVIRONMENT,"environment_args":env_args,
+        "covariance_lookback":0,"rolling_days":[1095,365],"sb3_defaults":defaults,"policy":architecture,"versions":versions,
+        "parameter_source":"FinRL-X/src/strategies/rl_model.py::train_sac",
+        "environment_source":"finrl/meta/env_portfolio_optimization/env_portfolio_optimization.py::PortfolioOptimizationEnv",
+        "save_policy":"정상 종료 시 동일 SAC 정책·Replay·Champion 새 버전 저장",
+        "observation":"공식 가격 관측 + Expert별 실제 출력 64D + 계좌 16D → ChampionExtractor",
+        "notes":["공식 PortfolioOptimizationEnv의 정규화·보상·수수료 기본값을 사용합니다.",
+            "SAC 행동은 현금(첫 항목)과 종목별 비중입니다. 가상원장 전달 시 현금을 마지막 항목으로 옮깁니다.",
+            "Frozen Expert와 결합부·Actor·Twin Critic은 단일 SAC 정책에 연결됩니다."]}
+
 
 
 def database():
@@ -212,8 +207,10 @@ def model_state(settings,selected=None):
         if not identity.get("symbols") or not identity.get("currency"):
             structure_reasons.append("저장 모델의 통화·종목 정보가 없습니다.")
         is_champion=bool(identity.get("feature_extractor"))
-        if identity.get('environment')!=settings['environment'] or identity.get('rolling_days')!=settings['rolling_days']:
-            structure_reasons.append("StockPortfolioEnv 식별 정보가 현재 환경과 다릅니다.")
+        cash_enabled=identity.get('environment')==CASH_ENVIRONMENT
+        action_count=len(identity.get('symbols',[]))+1
+        if identity.get('environment')!=CASH_ENVIRONMENT or identity.get('rolling_days')!=settings['rolling_days']:
+            structure_reasons.append("PortfolioOptimizationEnv 식별 정보가 현재 환경과 다릅니다.")
         if is_champion and identity.get('feature_extractor')!='stockrl.platform.sac_champion.ChampionExtractor':
             structure_reasons.append("Champion 관측 특성 추출기가 현재 SAC 구조와 다릅니다.")
         for key in ("batch_size", "buffer_size", "learning_rate", "learning_starts"):
@@ -221,13 +218,9 @@ def model_state(settings,selected=None):
                 resume_reasons.append(f"{key}: 저장값 {state.get(key)} / 현재값 {settings['parameters'][key]}")
         if identity.get('symbols') and is_champion:
             expected_shape=[identity.get('base_observation_dim',0)+64*len(identity.get('champion_experts',[]))+identity.get('account_feature_size',16)]
-            if result['observation_shape']!=expected_shape or result['action_shape']!=[len(identity['symbols'])]:
+            if result['observation_shape']!=expected_shape or result['action_shape']!=[action_count]:
                 structure_reasons.append(f"통합 SAC Champion 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{len(identity['symbols'])}]")
-        elif identity.get('symbols'):
-            from finrl import config
-            count=len(identity['symbols']);expected_shape=[(count+len(config.INDICATORS))*count+8]
-            if result['observation_shape']!=expected_shape or result['action_shape']!=[count]:
-                structure_reasons.append(f"원본 환경+Expert 관측/행동 크기 불일치: {result['observation_shape']}/{result['action_shape']} vs {expected_shape}/[{count}]")
+        else:structure_reasons.append('통합 MoE SAC 특성 추출기 식별 정보가 없습니다. 신규 정책으로 생성하세요.')
         result['policy_compatible']=not structure_reasons
         if not replay.is_file():
             resume_reasons.append("이어 학습에 필요한 Replay 파일이 없습니다.")
@@ -423,27 +416,8 @@ def react_index():
 
 @app.get("/api/modules")
 def modules():
-    paths = [*sorted((ROOT / "src/stockrl").rglob("*.py")),
-             *sorted((ROOT / "FinRL-X/src").rglob("*.py"))]
-    items = []
-    for path in paths:
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8-sig"))
-        except (UnicodeError, SyntaxError) as exc:
-            items.append({"path": path.relative_to(ROOT).as_posix(),
-                          "description": "소스 형식 확인 필요: " + str(exc), "functions": []})
-            continue
-        functions = []
-        for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                functions.append(node.name)
-            elif isinstance(node, ast.ClassDef):
-                functions.append(node.name)
-                functions.extend(node.name + "." + child.name for child in node.body
-                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)))
-        items.append({"path": path.relative_to(ROOT).as_posix(),
-                      "description": ast.get_docstring(tree), "functions": functions})
-    return {"items": items}
+    from .platform.framework_operations import catalog
+    return catalog()
 
 
 @app.get("/api/result/{kind}")
@@ -458,6 +432,11 @@ def result_table(kind: Literal["weights", "trades"], limit: int = Query(1000, ge
     return {"columns": list(frame.columns), "rows": finite.tail(limit).to_dict("records"), "total": len(frame)}
 
 
+def currency_models(settings):
+    from .framework import policy_files
+    return {currency:model_state(settings,policy_files(currency)) for currency in ('KRW','USD')}
+
+
 @app.get("/api/state")
 def state():
     settings = source_settings()
@@ -467,13 +446,13 @@ def state():
     model=model_state(settings)
     model["replay_state"]=saved_replay()
     experts=expert_state()
-    experts["observation_connection"]={"size":8,"configured":True,"recorded":bool(experts.get("as_of")),
+    experts["observation_connection"]={"size":64*len(model['identity'].get('champion_experts',experts['active']))+16,"configured":True,"recorded":bool(experts.get("as_of")),
         "last_success":{role:sum(1 for row in experts["items"] if row["active"] and row.get("inference") and row["inference"].get("status")=="ready" and row.get("role")==role) for role in ("market","action")}}
     from .platform.operations_runtime import runtime
     from .platform.library_operations import library
     from .platform.system_operations import system,apply_state
     return {"architecture":"finrlx-official-sac-v2","updated_at": now(), "settings": settings, "model": model,
-            "data": db, "experts": experts, "job": job, "evaluation": evaluation(),
+            "data": db, "experts": experts, "job": job, "evaluation": evaluation(),"models_by_currency":currency_models(settings),
             "checkpoints":checkpoints(settings),"capabilities":capabilities(),
             "operations":runtime.snapshot(),"library":library.snapshot(),"automation":{"apply":apply_state(),"system":system.snapshot()},
             "resources": resource_monitor.snapshot(workers)}
@@ -543,8 +522,8 @@ def preflight(req, command):
             errors.append(symbol + ": 선택 시장의 등록 주식·ETF가 아닙니다.")
         elif not item["stored"]:
             errors.append(symbol + ": 저장 가격이 없습니다.")
-        elif item["observations"] <= 252:
-            errors.append(symbol + ": 공분산을 만들 관측이 252개보다 많아야 합니다.")
+        elif item["observations"] < 2:
+            errors.append(symbol + ": 공식 환경 실행에는 최소 2개 가격 관측이 필요합니다.")
     settings = source_settings()
     from .framework import policy_files
     model = model_state(settings,policy_files(req.currency)) if command=='backtest' or req.resume else model_state(settings)
@@ -580,11 +559,11 @@ def preflight(req, command):
         from pandas import Timedelta, to_datetime
         dates = to_datetime(dates, utc=True)
         trade = dates.max() + Timedelta(days=1)
-        after_covariance = dates[252:]
+        after_covariance = dates
         train_count = int(((after_covariance >= trade - Timedelta(days=1095)) & (after_covariance < trade - Timedelta(days=365))).sum())
         test_count = int(((after_covariance >= trade - Timedelta(days=365)) & (after_covariance < trade)).sum())
         if train_count < 2 and command == "train":
-            errors.append("252개 공분산 관측 제외 후 rolling 학습 구간에 데이터가 부족합니다.")
+            errors.append("공식 rolling 학습 구간에 데이터가 부족합니다.")
         if test_count < 2:
             errors.append("rolling 평가 구간에 데이터가 부족합니다.")
         periods = {"training_observations": train_count, "test_observations": test_count,
@@ -621,18 +600,70 @@ def launch(command, req,preserve_output=False):
             job.update(champion_path=str(Path(req.champion_path).expanduser().resolve()),
                 champion_output=str(target),output='champions/'+target.stem)
         elif command=='train' or preserve_output:job['output']='policies/'+job_id
-        (RUNTIME / "jobs").mkdir(exist_ok=True)
-        env = os.environ.copy()
-        env.update(PYTHONPATH=str(ROOT / "src"), PYTHONUTF8="1")
-        with (RUNTIME / job["log"]).open("w", encoding="utf8") as output:
-            process = subprocess.Popen([sys.executable, "-m", "stockrl.job_worker", job_id],
-                cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        job.update(pid=process.pid, process_created=psutil.Process(process.pid).create_time())
-        children[job_id] = process
-        atomic_json(job, RUNTIME / "job.json")
-        (RUNTIME / "training.pid").write_text(str(process.pid))
+        start_job(job)
         return {"message": "학습을 시작했습니다." if command == "train" else "백테스트를 시작했습니다.", "job": job}
+
+
+def start_job(job):
+    RUNTIME.mkdir(parents=True,exist_ok=True);(RUNTIME/'jobs').mkdir(exist_ok=True)
+    env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'src'),PYTHONUTF8='1')
+    from .platform.framework_operations import provider_environment
+    env.update(provider_environment())
+    with (RUNTIME/job['log']).open('w',encoding='utf8') as output:
+        process=subprocess.Popen([sys.executable,'-m','stockrl.job_worker',job['id']],cwd=ROOT,env=env,
+            stdout=output,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    job.update(pid=process.pid,process_created=psutil.Process(process.pid).create_time())
+    children[job['id']]=process;atomic_json(job,RUNTIME/'job.json')
+    (RUNTIME/'training.pid').write_text(str(process.pid))
+    return job
+
+
+@app.get('/api/framework')
+def framework_catalog():
+    from .platform.framework_operations import catalog
+    return catalog()
+
+
+@app.get('/api/framework/providers')
+def framework_providers():
+    from .platform.framework_operations import provider_status
+    return provider_status()
+
+
+@app.post('/api/framework/providers/{provider}')
+def framework_provider_save(provider:str,values:dict):
+    from .platform.framework_operations import save_provider
+    try:return save_provider(provider,values)
+    except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
+
+
+@app.post('/api/framework/{action}')
+def framework_task(action:str,parameters:dict):
+    from .platform.framework_operations import ACTIONS
+    if action not in ACTIONS:raise HTTPException(404,'등록된 공식 실행 기능이 아닙니다.')
+    with launch_lock:
+        if job_state()['running']:raise HTTPException(409,'현재 공식 작업 종료 후 실행하세요.')
+        job_id=uuid.uuid4().hex
+        job=start_job({'id':job_id,'command':'framework','action':action,'parameters':parameters,
+            'currency':parameters.get('currency','USD'),'symbols':parameters.get('symbols',[]),'resume':False,
+            'status':'starting','started_at':now(),'log':f'jobs/{job_id}.log','output':'framework-jobs/'+job_id})
+    return {'message':ACTIONS[action][0]+' 실행을 시작했습니다.','job':job}
+
+
+@app.get('/api/framework/result/{job_id}')
+def framework_result(job_id:str,kind:Literal['json','csv']='json'):
+    if not re.fullmatch('[0-9a-f]{32}',job_id):raise HTTPException(400,'작업 ID가 유효하지 않습니다.')
+    path=RUNTIME/'framework-jobs'/job_id/('result.'+kind)
+    if not path.is_file():raise HTTPException(404,'해당 작업의 결과 파일이 없습니다.')
+    return FileResponse(path,filename=path.name)
+
+
+@app.get('/api/framework/artifact/{job_id}/{filename}')
+def framework_artifact(job_id:str,filename:str):
+    if not re.fullmatch('[0-9a-f]{32}',job_id) or not re.fullmatch(r'figure_[0-9]+\.png',filename):raise HTTPException(400,'결과 경로가 유효하지 않습니다.')
+    path=RUNTIME/'framework-jobs'/job_id/filename
+    if not path.is_file():raise HTTPException(404,'실제 생성된 그림 파일이 없습니다.')
+    return FileResponse(path)
 
 
 @app.post("/api/train")
@@ -667,16 +698,7 @@ def collect(req:CollectionRequest):
         job={"id":job_id,"command":"collect","status":"starting","started_at":now(),
              "symbols":sorted(set(req.symbols)),"currency":"USD","resume":False,
              "start_date":req.start_date,"end_date":req.end_date,"log":f"jobs/{job_id}.log"}
-        env=os.environ.copy()
-        env.update(PYTHONPATH=str(ROOT/"src"),PYTHONUTF8="1")
-        with (RUNTIME/job["log"]).open("w",encoding="utf8") as output:
-            process=subprocess.Popen([sys.executable,"-m","stockrl.job_worker",job_id],
-                cwd=ROOT,env=env,stdout=output,stderr=subprocess.STDOUT,
-                creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
-        job.update(pid=process.pid,process_created=psutil.Process(process.pid).create_time())
-        children[job_id]=process
-        atomic_json(job,RUNTIME/"job.json")
-        (RUNTIME/"training.pid").write_text(str(process.pid))
+        start_job(job)
     return {"message":"FinRL-X 원본 가격 수집을 시작했습니다.","job":job}
 
 
@@ -693,6 +715,7 @@ def champion_create(request:ChampionRequest):
     from .platform.operations_settings import settings
     current=read_json(policy_files()/"dataset.json")
     recent=read_json(RUNTIME/"job.json")
+    if recent.get('command') not in ('train','backtest'):recent={}
     request.currency=request.currency or recent.get("currency") or current.get("currency") or "USD"
     if not request.symbols:
         configured=settings().symbols

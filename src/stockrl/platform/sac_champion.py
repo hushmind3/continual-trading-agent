@@ -196,10 +196,10 @@ def _expert_payload(active):
     return catalog, packages, counts, roles
 
 
-def _candidate_identity(currency, symbols, active, base_dim):
+def _candidate_identity(currency, symbols, active, base_dim,environment):
     function, parameters, steps = sac_example()
     return {"currency": currency, "symbols": list(symbols), "sac_example": parameters,
-        "environment": "finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv",
+        "environment": environment,
         "rolling_days": [1095, 365], "champion_experts": list(active),
         "expert_feature_size": EXPERT_FEATURES, "base_observation_dim": int(base_dim),
         "account_feature_size": 16,
@@ -256,14 +256,14 @@ def create(currency, symbols, active, env):
     if directory.exists():
         raise FileExistsError(f"체크포인트 경로 충돌: {directory}")
     base_dim = int(np.prod(env.unwrapped.observation_space.shape))
-    identity = _candidate_identity(currency, symbols, active, base_dim)
+    identity = _candidate_identity(currency, symbols, active, base_dim,env.source_environment)
     original = _original_report()
     kwargs = _policy_kwargs(identity, roles, original)
     _, params, _ = sac_example()
     agent = DRLAgent(env=env)
     model = agent.get_model("sac", model_kwargs=dict(params), policy_kwargs=kwargs)
     expected_observation=base_dim+EXPERT_FEATURES*len(active)+16
-    expected_action=len(symbols)
+    expected_action=int(env.action_space.shape[0])
     if tuple(model.observation_space.shape)!=(expected_observation,) or tuple(model.action_space.shape)!=(expected_action,):
         raise ValueError(f"SAC 구조 공간 불일치: 관측 {model.observation_space.shape} / 행동 {model.action_space.shape}; 기대 ({expected_observation},) / ({expected_action},)")
     observation=torch.zeros((1,expected_observation),device=model.device)
@@ -356,7 +356,6 @@ def save_trained_champion(source_path, model, target_path, checkpoint_dir):
         torch.save(data, temporary)
         temporary.replace(target_path)
     except BaseException:
-        shutil.rmtree(target_path.parent, ignore_errors=True)
         raise
     return target_path
 

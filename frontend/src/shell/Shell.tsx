@@ -7,7 +7,7 @@ export const navigation=[
   {hash:"control",name:"운영",icon:Activity},{hash:"moe",name:"MoE",icon:Boxes},
   {hash:"markets",name:"시장",icon:ChartCandlestick},{hash:"portfolio",name:"계좌",icon:Wallet},
   {hash:"learning",name:"학습",icon:GraduationCap},{hash:"connection",name:"연결",icon:Link2},
-  {hash:"system",name:"진단",icon:CircuitBoard},
+  {hash:"system",name:"진단",icon:CircuitBoard},{hash:"frameworks",name:"공식 모듈",icon:Boxes},
 ];
 export function Shell({active,children}:{active:string;children:ReactNode}) {
   const {state,error,refresh,pending}=useOperations();

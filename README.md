@@ -1,6 +1,6 @@
 # FinRL-X · FinRL · SB3 SAC + React
 
-현재 구현의 구조 설명은 이 README에 통합합니다. React는 `f1539571604f23a05f47761b25fc0448d1a12db5`의 흰색 테마·7개 메뉴·공통 컴포넌트를 유지합니다. 과거 커밋으로 백엔드를 되돌리지 않았습니다. 가상계좌·시세·모델 도구의 기존 소스만 복구하고 현재 API에 연결했습니다. PPO 학습기·중앙 Router/Fusion/Controller는 실행하지 않습니다. Frozen Expert에 포함된 PPO 정책의 추론은 SAC 학습기와 별개입니다.
+현재 구현의 구조 설명은 이 README에 통합합니다. React는 `f1539571604f23a05f47761b25fc0448d1a12db5`의 흰색 테마·공통 컴포넌트를 사용하고 공식 모듈 실행 메뉴를 추가했습니다. 과거 커밋으로 백엔드를 되돌리지 않았습니다. 가상계좌·시세·모델 도구의 기존 소스만 복구하고 현재 API에 연결했습니다. 프로젝트의 과거 PPO 학습기를 복구하지 않았습니다. 공식 FinRL 원형 워크플로는 원본 main의 기본 Elegantrl PPO를 별도 작업에서 실행할 수 있으며 운영 SAC 모델을 자동 교체하지 않습니다. Frozen Expert에 포함된 PPO 정책의 추론은 SAC 학습기와 별개입니다.
 
 ## 폴더와 진입점
 
@@ -219,3 +219,17 @@ Windows PowerShell에서 `scripts/register_codex_fix_receiver.ps1`을 실행하�
 수신기는 변경 파일을 확인하여 AGENTS·설정·공식 프레임워크·모델·데이터·Replay·인증 파일 변경을 거부합니다. 승인된 소스 변경만 커밋하고 일반 push로 main에 반영한 뒤 결과 댓글과 함께 Issue를 닫습니다. 실패한 동일 제목·본문은 자동 재시도하지 않으며 오류를 기록하고 Issue를 열어 둡니다. 지시 본문을 변경하면 새 지시로 처리됩니다. 동시 main 변경으로 push가 거부돼도 강제 push·reset하지 않습니다. 원래 프로젝트의 미커밋 변경, 실행 중 서버·학습·시세 작업은 이 수신기가 변경하지 않습니다. GitHub에 반영한 변경을 원래 체크아웃에 pull하거나 서버에 배포하는 기능은 포함하지 않습니다.
 
 로컬 설정·상태·CLI 로그는 Git 제외 경로 `runtime/codex-fix-receiver/`에 저장합니다. `config.json`의 `codex_binary`, `checkout_root`, `exec_timeout_seconds`를 사용하며 기존 파일은 재등록 시 덮어쓰지 않습니다. 연결 확인은 `python scripts/codex_fix_receiver.py --verify`로 수행할 수 있습니다. 스케줄러 실행 환경에서 1회 확인하려면 같은 설정에 `verify_once: true`를 지정합니다. 실제 소스 읽기와 Git HEAD 증거가 없거나 명령이 정책에 차단되면 CLI 종료 코드가 0이어도 성공으로 처리하지 않습니다.
+
+## 공식 시스템 이식 · React 실행 메뉴
+
+`#frameworks`는 Python 모듈을 브라우저에서 import하지 않습니다. React → `/api/framework/{action}` → 기존 `job_worker` → `platform/framework_operations.py` → 공식 Python 함수·클래스·CLI 순서입니다. Streamlit 화면은 이식·실행에서 제외합니다.
+
+공식 거래일·가격/재무/뉴스 수집·전처리·기간 분할·지표·TSMOM·ML/산업별 종목 선택·Adaptive Rotation·성과·설정 함수는 전용 입력으로 실행합니다. 원형 FinRL CLI와 FinRL-X deploy의 원본 데이터 준비 블록 및 Rotation 실행도 연결합니다. 원형 워크플로의 알고리즘·기본값·YAML 입력 계약을 변경하지 않습니다. 원형 출력 경로는 해당 YAML을 따릅니다.
+
+나머지 공식 공개 callable은 백엔드의 `/api/framework/native_call`에서 실제 소스 선언·인자 계약에 따라 호출합니다. 동일 인스턴스의 메서드 연결, 원본 CLI 인자, 실제 DataFrame/Series/배열·설정 참조를 전달할 수 있습니다. 필요한 인자·객체·패키지·인증이 없으면 실제 오류를 반환하며 실행 성공으로 표시하지 않습니다. 모델 생성자 호출과 학습·추론 성공은 구분합니다.
+
+`/api/modules`는 두 공식 프레임워크의 실제 설치 소스·함수·입력 계약·의존성·호출을 조회합니다. 상태와 성공 함수는 실제 작업 기록으로 구분합니다. 모든 함수의 실행 성공을 보장하는 목록이 아닙니다. 작업·로그·전체 JSON/CSV·원본 그래프는 `runtime/official/framework-jobs/{job_id}`에 저장하며 `/api/stop`으로 동일 작업과 자식 프로세스를 중지합니다.
+
+연결 메뉴의 FMP·Alpaca·WRDS 값은 기존 OS keyring에 저장하고 공식 작업의 원본 환경변수로 전달합니다. 저장 여부와 인증·시세 성공은 구분합니다. 기타 공급원은 원본 생성자·외부 설정 계약을 요구합니다. Expert 최적화·변환·허용 기준은 기존 `library` API와 연결했고 모델 폴더 목록은 기존 `/api/models`를 사용합니다.
+
+이미 빌드한 화면을 적용하고 추가 검증을 생략하도록 기존 `scripts/start_server.py.main`에 `skip_build`, `skip_checks` 선택 인자를 추가했습니다. 기존 기본 실행 동작은 동일합니다.

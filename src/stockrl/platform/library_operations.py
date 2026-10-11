@@ -259,7 +259,7 @@ class LibraryOperations:
                         result=dict(id=key,status='passed',metrics=inference.get('metrics'),
                             seconds=inference.get('metrics',{}).get('inference_seconds'))
                     else:
-                        optimized=self._execute('optimize',{'id':key,'goal':'memory','device':payload.get('device','auto')},progress)
+                        optimized=self._execute('optimize',{**payload,'id':key,'goal':payload.get('goal','memory'),'device':payload.get('device','auto')},progress)
                         result=dict(id=key,status='failed' if optimized.get('failed') else 'skipped' if optimized.get('skipped') else 'passed',
                             detail=optimized.get('detail'))
                     results.append(result)

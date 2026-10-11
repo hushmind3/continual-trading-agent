@@ -256,12 +256,14 @@ class OperationsRuntime:
         from ..expert_registry_native import ExpertRegistry
         from ..framework import champion_structure_environment
         identity=read_json(files/'dataset.json')
-        champion_ids=identity.get('champion_experts') if identity.get('feature_extractor') else None
+        champion_ids=identity.get('champion_experts',[])
         registry=ExpertRegistry()
         if identity.get('champion_file'):
             from .sac_champion import load_spec
             champion=load_spec(identity['champion_file']);registry=ExpertRegistry(champion=champion)
             champion_ids=champion['identity']['champion_experts']
+        from ..framework import CASH_ENVIRONMENT
+        if identity.get('environment')!=CASH_ENVIRONMENT:raise ValueError('PortfolioOptimizationEnv 정책이 필요합니다. 구형 정책을 실행하지 않습니다.')
         env=champion_structure_environment(identity['currency'],identity['symbols'],registry,champion_ids)
         try:
             model=SAC.load(files/'sac.zip',env=env)
@@ -280,22 +282,21 @@ class OperationsRuntime:
         from ..expert_registry_native import ExpertRegistry
         from ..expert_observation import ExpertObservation
         identity=read_json(files/'dataset.json')
-        if identity.get('environment')!='finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv':
+        from ..framework import CASH_ENVIRONMENT
+        cash_enabled=identity.get('environment')==CASH_ENVIRONMENT
+        if identity.get('environment')!=CASH_ENVIRONMENT:
             raise ValueError('현재 저장 SAC는 기존 환경의 파일입니다. 현재 원본 환경으로 학습한 정책이 필요합니다.')
         symbols=identity['symbols'];currency=identity['currency'];frame=prices(currency,symbols)
         if identity.get('champion_file'):
             from .sac_champion import load_spec
             champion=load_spec(identity['champion_file']);registry=ExpertRegistry(champion=champion)
             champion_ids=champion['identity']['champion_experts']
-        else:registry=ExpertRegistry(self.expert_pool);champion_ids=None
+        else:registry=ExpertRegistry(self.expert_pool);champion_ids=identity.get('champion_experts',[])
         prepared=training_environment(frame,registry,training=False,champion_ids=champion_ids)
-        raw=prepared.unwrapped
-        # Use the official day constructor for latest-state inference, with identical environment arguments.
-        latest=raw.__class__(df=raw.df,stock_dim=raw.stock_dim,hmax=raw.hmax,initial_amount=raw.initial_amount,
-            transaction_cost_pct=raw.transaction_cost_pct,reward_scaling=raw.reward_scaling,
-            state_space=raw.state_space,action_space=raw.stock_dim,tech_indicator_list=raw.tech_indicator_list,
-            day=int(raw.df.index.max()))
-        wrapped=ExpertObservation(latest,prepared.registry,frame,symbols,champion_ids=champion_ids);wrapped.currency=currency
+        latest=prepared.unwrapped.gym_env
+        latest._time_index=len(latest._sorted_times)-1
+        latest._state,latest._info=latest._get_state_and_info_from_time_index(latest._time_index)
+        wrapped=prepared
         try:
             file=files/'sac.zip';stat=file.stat();path=file.relative_to(ROOT/'runtime/official').as_posix()
             cached=self.policy_models.get(currency,{})
@@ -306,10 +307,16 @@ class OperationsRuntime:
                 self.policy_models[currency]={'path':path,'model':model,'signature':(stat.st_mtime_ns,stat.st_size),
                     'device':str(model.device),'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
                     'num_timesteps':int(model.num_timesteps),'updates':int(model._n_updates)}
-            observation=wrapped.observation(latest.state)
+            book=self.ledger().snapshot()['books'][currency]
+            wrapped.live_account={'currency':currency,'nav':book['equity'],'cash':book['cash'],
+                'positions':{symbol:row['quantity'] for symbol,row in book['positions'].items()}}
+            observation=wrapped.observation(latest._state)
             action,_=model.predict(observation,deterministic=True)
-            weights=latest.softmax_normalization(action)
-            bars=latest.data.set_index('tic');stamp=str(bars.date.iloc[0])
+            import math
+            allocation=action if math.isclose(float(np.sum(action)),1,abs_tol=1e-6) and np.min(action)>=0 else latest._softmax_normalization(action)
+            weights=allocation[1:];cash_weight=float(allocation[0])
+            bars=frame[frame.date==frame.date.max()].set_index('symbol')
+            stamp=str(bars.date.iloc[0])
             panel=SimpleNamespace(dates=[stamp],symbols=symbols,groups={
                 s:('KRX' if s.endswith('.KS') else 'KOSDAQ' if s.endswith('.KQ') else 'US','equity') for s in symbols},
                 observed=np.ones((1,len(symbols)),dtype=bool),closes=np.array([[float(bars.loc[s,'close']) for s in symbols]]),
@@ -319,12 +326,14 @@ class OperationsRuntime:
                 current=[book['positions'].get(s,{}).get('quantity',0)*float(bars.loc[s,'close'])/nav if nav else 0 for s in symbols]
                 actions=np.array([2 if weight>held else 0 if weight<held else 1 for weight,held in zip(weights,current)])
                 self.ledger().queue_decisions(panel,0,np.tile([0.,1.,0.],(len(symbols),1)),self.controls['paper'],
-                    allocation=[*weights,0.],actions=actions)
+                    allocation=[*weights,cash_weight],actions=actions)
                 self.ledger().save()
                 self.decisions.extend({'symbol':s,'currency':currency,'target_weight':float(weight),'as_of':stamp} for s,weight in zip(symbols,weights))
+                self.decisions.append({'symbol':'CASH','currency':currency,'target_weight':cash_weight,'as_of':stamp,'cash_action':cash_enabled})
                 self.status.pop('policy_error',None)
         finally:
-            wrapped.close();prepared.close()
+            wrapped.close()
+            if wrapped is not prepared:prepared.close()
 
     def close(self):
         self.command('feed',False)

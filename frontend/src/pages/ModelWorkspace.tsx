@@ -1,3 +1,4 @@
+import {ModelFiles} from './model/ModelFiles';
 import {useState} from 'react';
 import {FolderOpen,Layers3} from 'lucide-react';
 import {useOperations} from '../data/Operations';
@@ -7,7 +8,7 @@ import {ExpertLibraryPanel} from './model/ExpertLibraryPanel';
 import {ModelGuide} from './model/ModelGuide';
 
 export function ModelWorkspace(){
- const {state}=useOperations();const [error,setError]=useState('');
+ const {state}=useOperations();const [error,setError]=useState(''),[source,setSource]=useState('');
  if(!state)return <Skeleton/>;
  return <div className="space-y-6">
   <header className="flex flex-wrap items-start justify-between gap-4 rounded-2xl bg-[#202e4a] px-6 py-6 text-white">
@@ -22,6 +23,6 @@ export function ModelWorkspace(){
   </header>
   <ModelGuide/>
   {error&&<ErrorMessage message={error}/>}
-  <ExpertLibraryPanel/>
+  <ExpertLibraryPanel initialSource={source}/><ModelFiles onPick={setSource}/>
  </div>;
 }

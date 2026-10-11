@@ -74,52 +74,32 @@ class ExpertRegistry:
     def outputs(self,frame,account,champion_ids=None):
         from .platform.assets import ExpertPool
         from .platform.expert_inference import prepare_inputs,run_batches
-        catalog=self.catalog();signature=json.dumps(catalog,sort_keys=True)
+        selected=list(self.catalog().get('active',[])) if champion_ids is None else list(champion_ids)
+        if not selected:return np.empty(0,dtype=np.float32)
+        signature=json.dumps(self.catalog(),sort_keys=True)
         if signature!=self.signature:
             self.close();self.last_outputs={};self.signature=signature
         if self.pool is None:self.pool=self.pool_provider() if self.pool_provider else ExpertPool(self.settings,keep_device=True,live=True)
-        stamp=str(frame.date.max())
-        groups={'market':[],'action':[]};champion_features={}
-        selected=list(catalog.get('active',[])) if champion_ids is None else list(champion_ids)
+        stamp=str(frame.date.max());features={};errors=[]
         for key in selected:
-            entry=self.pool.entries[key];policy=entry.get('stock_policy');cache_key=(key,stamp)
             try:
-                if not policy and cache_key in self.cache:packet=self.cache[cache_key]
+                entry=self.pool.entries[key];cache_key=(key,stamp)
+                if not entry.get('stock_policy') and cache_key in self.cache:packets=self.cache[cache_key]
                 else:
                     snapshot,batches=prepare_inputs(entry,frame,account)
-                    packet=run_batches(self.pool,key,snapshot,batches)
-                    if not policy:self.cache[cache_key]=packet
-                signals=[];native_features=[]
-                for batch in packet:
-                    values=np.asarray(batch['native_output'],dtype=float)
-                    native_features.extend(values.reshape(-1).tolist())
-                    if policy:signals.extend((values[...,0]-values[...,2]).reshape(-1))
-                    elif batch.get('units')=='price':
-                        if batch.get('layout')=='nine_quantiles,batch,variate,horizon':values=values[:,0].transpose(1,0,2)
-                        marks=frame.sort_values('date').groupby('symbol').close.last()
-                        signals.extend(np.asarray(row).mean()/marks[symbol]-1 for symbol,row in zip(batch['symbols'],values))
-                    else:signals.extend(values.reshape(-1))
-                signal=np.asarray(signals,dtype=float)
-                signal=signal[np.isfinite(signal)]
-                if len(signal):groups['action' if policy else 'market'].append(float(signal.mean()))
-                native=np.asarray(native_features,dtype=np.float64)
-                native=native[np.isfinite(native)]
-                if len(native):
-                    native=np.sign(native)*np.log1p(np.minimum(np.abs(native),1e12))
-                    chunks=np.array_split(native,64)
-                    champion_features[key]=np.asarray([float(chunk.mean()) if len(chunk) else 0. for chunk in chunks],dtype=np.float32)
-                else:champion_features[key]=np.zeros(64,dtype=np.float32)
-                self.last_outputs[key]={'status':'ready','as_of':stamp,'output':signal.tolist()}
-            except (ValueError,RuntimeError,MemoryError,OSError) as exc:
-                self.last_outputs[key]={'status':'needs_input','reason':str(exc)}
-        if time.monotonic()-self.reported_at>=5:
+                    packets=run_batches(self.pool,key,snapshot,batches)
+                    if not entry.get('stock_policy'):self.cache[cache_key]=packets
+                native=np.concatenate([np.asarray(packet['native_output'],dtype=np.float64).reshape(-1) for packet in packets])
+                if not native.size or not np.isfinite(native).all():raise ValueError('실제 Expert 출력이 비었거나 NaN·Inf가 있습니다.')
+                transformed=np.sign(native)*np.log1p(np.abs(native))
+                features[key]=np.asarray([float(chunk.mean()) if chunk.size else 0. for chunk in np.array_split(transformed,64)],dtype=np.float32)
+                self.last_outputs[key]={'status':'ready','as_of':stamp,'output':native.tolist(),'adapter_features':features[key].tolist()}
+            except (KeyError,ValueError,RuntimeError,MemoryError,OSError) as exc:
+                self.last_outputs[key]={'status':'needs_input','reason':str(exc)};errors.append(key+': '+str(exc))
+        if time.monotonic()-self.reported_at>=5 or errors:
             atomic_json({'as_of':stamp,'experts':self.last_outputs,'resources':self.pool.metrics},self.state_dir/'status.json');self.reported_at=time.monotonic()
-        if champion_ids is not None:
-            return np.concatenate([champion_features.get(key,np.zeros(64,dtype=np.float32)) for key in champion_ids]) if champion_ids else np.empty(0,dtype=np.float32)
-        result=[]
-        for values in groups.values():
-            result.extend([float(np.mean(values)),float(np.std(values)),float(np.max(np.abs(values))),float(len(values))] if values else [0.,0.,0.,0.])
-        return np.array(result,dtype=np.float32)
+        if errors:raise ValueError('Expert 입력·추론 실패: '+'; '.join(errors))
+        return np.concatenate([features[key] for key in selected])
 
     def close(self,cleanup=False):
         if self.pool and not self.pool_provider:self.pool.close()

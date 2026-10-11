@@ -1,3 +1,4 @@
+import {FrameworkWorkspace} from "./pages/FrameworkWorkspace";
 import { useEffect, useState } from "react";
 import { Shell } from "./shell/Shell";
 import { OperationsBoard } from "./pages/OperationsBoard";
@@ -10,7 +11,7 @@ import { Diagnostics } from "./pages/Diagnostics";
 
 export function route(hash: string) {
   const name = hash.replace(/^#/, "") || "control";
-  return ["control","moe","markets","portfolio","learning","connection","system"].includes(name) ? name : "control";
+  return ["control","moe","markets","portfolio","learning","connection","system","frameworks"].includes(name) ? name : "control";
 }
 export default function App() {
   const [active, setActive] = useState(() => route(location.hash));
@@ -20,7 +21,7 @@ export default function App() {
     return () => window.removeEventListener("hashchange", changed);
   }, []);
   const page =
-    active === "moe" ? (
+    active === "frameworks" ? (<FrameworkWorkspace />) : active === "moe" ? (
       <ModelWorkspace />
     ) : active === "markets" ? (
       <MarketScanner />

@@ -22,6 +22,12 @@ def main():
     atomic_json(job, root / "job.json")
     exit_code = 0
     try:
+        if job['command']=='framework':
+            from .platform.framework_operations import execute,preview
+            result=execute(job['action'],job['parameters'],root/job['output'])
+            atomic_json(result,root/job['output']/'result.json')
+            job['result']=preview(result)
+            return
         if job["command"]=="collect":
             from .framework import finrlx
             frame=finrlx("data.data_fetcher").fetch_price_data(
@@ -52,9 +58,15 @@ def main():
     except BaseException:
         exit_code = 1
         traceback.print_exc()
+        if job['command']=='framework':
+            from .platform.framework_operations import ACTIONS
+            row=ACTIONS[job['action']]
+            atomic_json({'action':job['action'],'module':row[2],'function':row[3],
+                'error':str(sys.exc_info()[1])},root/job['output']/'result.json')
     finally:
         current = read_json(root / "job.json")
         if current.get("id") == job_id and current.get("status") != "stopped":
+            if job.get('result') is not None:current['result']=job['result']
             current.update(status="succeeded" if exit_code == 0 else "failed", exit_code=exit_code,
                            finished_at=datetime.now(timezone.utc).isoformat())
             atomic_json(current, root / "job.json")

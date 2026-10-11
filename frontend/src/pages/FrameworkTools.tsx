@@ -14,10 +14,10 @@ export function FrameworkTools({menu}:{menu:string}){
  if(!actions.length)return <ErrorMessage message={catalog.error}/>;
  const run=async()=>{if(!action)return;setError('');const parameters:Record<string,unknown>={};for(const key of action.fields){const value=values[key]?.trim();if(value)parameters[key]=key==='symbols'?value.split(',').map(v=>v.trim()).filter(Boolean):value}try{await execute('framework/'+action.id,parameters)}catch(e){setError(e instanceof Error?e.message:'실행 실패')}};
  const job=state?.job.command==='framework'&&actions.some(a=>a.id===state.job.action)?state.job:null;
- return <Panel title={{workflows:'공식 시스템 원형 실행',markets:'공식 데이터·전처리',portfolio:'공식 전략·성과',connection:'공식 설정 검사'}[menu]??'공식 프레임워크 기능'} description="공식 함수와 기본 설정으로 실행합니다. 원형 실행의 출력 경로는 원형 YAML 설정을 따릅니다.">
+ return <Panel title={{workflows:'공식 시스템 원형 실행',markets:'공식 데이터·전처리',portfolio:'공식 전략·성과',connection:'공식 설정 검사'}[menu]??'공식 프레임워크 기능'}>
   <div className="flex flex-wrap items-center gap-3"><select aria-label="공식 기능 선택" className={inputClass} value={action?.id??''} onChange={e=>{setSelected(e.target.value);setError('')}}>{actions.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select><Button tone="primary" disabled={state?.job.running} busy={pending.has('framework/'+action?.id)} onClick={()=>void run()}>실행</Button><Button tone="danger" disabled={!job?.running} onClick={()=>void execute('stop',{}).catch(e=>setError(String(e)))}>작업 중지</Button></div>
   <div className="my-4 grid gap-3 sm:grid-cols-2">{action?.fields.map(key=><label key={key} className="text-xs text-slate-500">{labels[key]??key}{key==='currency'?<select className={inputClass+' mt-2'} value={values[key]??'USD'} onChange={e=>setValues(v=>({...v,[key]:e.target.value}))}><option>USD</option><option>KRW</option></select>:<input className={inputClass+' mt-2'} type={key.endsWith('date')?'date':'text'} value={values[key]??''} onChange={e=>setValues(v=>({...v,[key]:e.target.value}))}/>}</label>)}</div>
-  <p className="text-xs text-slate-400">{action?.api} → {action?.module} · {action?.function}</p><ErrorMessage message={error||catalog.error}/>
+  <ErrorMessage message={error||catalog.error}/>
   {job&&<details open className="mt-4 text-xs text-slate-600"><summary>{job.action} · {job.running?'실행 중':job.status} · {job.finished_at??job.started_at}</summary><FrameworkResult job={job}/></details>}
  </Panel>;
 }

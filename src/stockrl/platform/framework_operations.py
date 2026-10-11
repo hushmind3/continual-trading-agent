@@ -17,6 +17,7 @@ from ..state_io import atomic_json,read_json
 ACTIONS={
  'native_call':('공식 모듈 직접 실행','native',None,'선택한 원본 함수 호출',['module','callable','kwargs','init_kwargs','symbols','source']),
  'finrl_workflow':('FinRL 원형 학습·평가·모의매매','workflows','FinRL:main','main',['mode']),
+ 'finrl_algorithm':('FinRL 공식 알고리즘 학습','workflows','FinRL:agents.stablebaselines3.models','DRLAgent.get_model → DRLAgent.train_model',['algorithm','currency','symbols','total_timesteps']),
  'adaptive_download':('Adaptive Rotation 원형 데이터 준비','workflows','FinRL-X:deploy','deploy.sh::data download',['config_path','data_dir']),
  'adaptive_single':('Adaptive Rotation 원형 단일 실행','workflows','FinRL-X:strategies.run_adaptive_rotation_strategy','run_single_date',['config_path','data_dir','as_of_date']),
  'adaptive_backtest':('Adaptive Rotation 원형 전체 백테스트','workflows','FinRL-X:strategies.run_adaptive_rotation_strategy','run_backtest',['config_path','data_dir','start_date','end_date']),
@@ -43,8 +44,10 @@ ACTIONS={
 
 
 def action_list():
+    from finrl.agents.stablebaselines3.models import MODELS
     return [{'id':key,'name':row[0],'menu':row[1],'module':row[2] or '요청에서 선택한 공식 모듈','function':row[3],
-             'fields':row[4],'api':'/api/framework/'+key,'stop_api':'/api/stop'} for key,row in ACTIONS.items()]
+             'fields':row[4],'choices':{'algorithm':sorted(MODELS)} if key=='finrl_algorithm' else {},
+             'api':'/api/framework/'+key,'stop_api':'/api/stop'} for key,row in ACTIONS.items()]
 
 
 def serialize(value):
@@ -238,6 +241,31 @@ def _execute(action,parameters,output):
         subprocess.run([sys.executable,'-m','finrl.main','--mode',mode],cwd=output,check=True,
             creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         return {'action':action,'module':row[2],'function':row[3],'value':{'mode':mode,'output':str(output),'policy':'공식 main 기본 PPO'},'output':str(output.relative_to(ROOT))}
+    if action=='finrl_algorithm':
+        from finrl.agents.stablebaselines3.models import DRLAgent,MODELS
+        algorithm=p.get('algorithm','sac').lower()
+        if algorithm not in MODELS:raise ValueError('현재 설치된 FinRL DRLAgent가 지원하는 알고리즘을 선택하세요: '+', '.join(sorted(MODELS)))
+        steps=int(p.get('total_timesteps',5000))
+        if steps<1:raise ValueError('학습 단계는 1 이상이어야 합니다.')
+        frame=prices(p.get('currency','USD'),p.get('symbols'))
+        if frame.empty:raise ValueError('FinRL 학습에 사용할 실제 저장 가격이 없습니다.')
+        environment=finrl_file('meta/env_portfolio_optimization/env_portfolio_optimization.py').PortfolioOptimizationEnv(
+            df=frame.rename(columns={'symbol':'tic'}),initial_amount=1000000,cwd=str(output))
+        try:
+            agent=DRLAgent(env=environment)
+            model=agent.get_model(algorithm)
+            model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
+            checkpoint=output/algorithm
+            model.save(str(checkpoint))
+            result={'action':action,'module':row[2],'function':row[3],
+                'value':{'algorithm':algorithm,'trained_timesteps':int(model.num_timesteps),
+                    'checkpoint':str(checkpoint.relative_to(ROOT))},'output':str(output.relative_to(ROOT))}
+            atomic_json({'algorithm':algorithm,'source':'FinRL DRLAgent.MODELS','checkpoint':str(checkpoint.relative_to(ROOT)),
+                'trained_timesteps':int(model.num_timesteps)},output/'policy.json')
+            atomic_json(result,output/'result.json')
+            print('FinRL 공식 알고리즘 학습 완료:',algorithm,int(model.num_timesteps),'단계',flush=True)
+            return result
+        finally:environment.close()
     if action=='adaptive_download':
         import re
         script=ROOT/'FinRL-X/deploy.sh';source=script.read_text(encoding='utf-8')

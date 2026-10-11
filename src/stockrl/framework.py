@@ -42,12 +42,11 @@ def finrl_file(relative):
 
 
 def sac_example():
-    import ast,inspect
-    function=finrlx('strategies.rl_model').train_sac
-    tree=ast.parse(inspect.getsource(function))
-    parameters=next(ast.literal_eval(n.value) for n in ast.walk(tree) if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='SAC_PARAMS' for t in n.targets))
-    steps=next(ast.literal_eval(k.value) for n in ast.walk(tree) if isinstance(n,ast.Call) for k in n.keywords if k.arg=='total_timesteps')
-    return function,parameters,steps
+    import inspect
+    from finrl.agents.stablebaselines3.models import DRLAgent,MODEL_KWARGS
+    function=DRLAgent.train_model
+    steps=inspect.signature(function).parameters['total_timesteps'].default
+    return function,dict(MODEL_KWARGS['sac']),steps
 
 
 def training_environment(frame,registry,training=True,champion_ids=None):

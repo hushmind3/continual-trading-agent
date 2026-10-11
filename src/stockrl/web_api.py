@@ -33,7 +33,7 @@ RUNTIME = ROOT / "runtime/official"
 DB = ROOT / "data/finrl_trading.db"
 MODEL_DIR = Path.home() / "Desktop/모델"
 ENVIRONMENT = CASH_ENVIRONMENT
-app = FastAPI(title="FinRL-X local workspace", version="2")
+app = FastAPI(title="FinRL local workspace", version="2")
 FRONTEND_DIST = ROOT / "frontend/dist"
 app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets"), check_dir=False), name="react-assets")
 launch_lock = threading.Lock()
@@ -128,7 +128,7 @@ def source_settings():
         if value.default is not inspect.Parameter.empty and isinstance(value.default,(str,int,float,bool,list,type(None)))}
     return {"parameters":params,"steps_per_run":steps,"environment":ENVIRONMENT,"environment_args":env_args,
         "covariance_lookback":0,"rolling_days":[1095,365],"sb3_defaults":defaults,"policy":architecture,"versions":versions,
-        "parameter_source":"FinRL-X/src/strategies/rl_model.py::train_sac",
+        "parameter_source":"finrl.agents.stablebaselines3.models::MODEL_KWARGS['sac']",
         "environment_source":"finrl/meta/env_portfolio_optimization/env_portfolio_optimization.py::PortfolioOptimizationEnv",
         "save_policy":"정상 종료 시 동일 SAC 정책·Replay·Champion 새 버전 저장",
         "observation":"공식 가격 관측 + Expert별 실제 출력 64D + 계좌 16D → ChampionExtractor",

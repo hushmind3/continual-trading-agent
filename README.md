@@ -93,20 +93,20 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 
 | 프레임워크 | 현재 담당 |
 | --- | --- |
-| FinRL-X (서브모듈 FinRL-Trading) | DataStore, DataProcessor, FMP 수집, rolling 구간, `train_sac(agent)`, StrategyResult, BacktestEngine |
-| 설치된 FinRL | FeatureEngineer, StockPortfolioEnv, DRLAgent 학습·예측 호출 |
+| 설치된 FinRL | PortfolioOptimizationEnv, FeatureEngineer, DRLAgent·MODELS 알고리즘 선택, 학습·예측 호출 |
+| FinRL-X (서브모듈 FinRL-Trading) | FinRL에 없는 DataStore, 추가 데이터 처리·FMP 수집, rolling 구간, StrategyResult, BacktestEngine |
 | 설치된 Stable-Baselines3 | SACPolicy/MlpPolicy, Actor/Twin Critic, Optimizer/Loss, Replay, 공식 save/load |
 
 학습 경로:
 
 1. React `SacControls` → `preflight/train` → `web_api.launch` → 별도 `stockrl.job_worker`.
 2. `official_cli.main` → `framework.prices(currency,symbols)` → 공식 DataStore의 실제 가격.
-3. `framework.training_environment` → FinRL `FeatureEngineer` → 원본 252일 공분산 입력 → FinRL-X rolling 구간 → 원본 `StockPortfolioEnv`.
+3. `framework.training_environment` → FinRL-X rolling 구간 → FinRL 원본 `PortfolioOptimizationEnv`.
 4. `ExpertObservation.observation` → `ExpertRegistry.outputs` → ExpertPool → 원본 관측을 펼친 값 + 시장/매매별 평균·표준편차·최대 절댓값·성공 수 8개.
-5. `framework.train` → FinRL-X 원본 `train_sac(agent)` → FinRL `DRLAgent` → SB3 SAC. 이어 학습은 원본 `SAC.load`와 `load_replay_buffer`를 사용합니다.
+5. `framework.train` → FinRL `DRLAgent.get_model('sac', MODEL_KWARGS['sac'])`·`train_model` → SB3 SAC. 이어 학습은 원본 `SAC.load`와 `load_replay_buffer`를 사용합니다.
 6. 완료 시 `sac.zip`, `replay.pkl`, `dataset.json`을 저장합니다. 작업 stdout 로그는 `runtime/official/jobs/`에 기록됩니다.
 
-현재 예제 설정은 `batch_size=128`, `buffer_size=100000`, `learning_rate=0.0003`, `learning_starts=100`, `ent_coef="auto_0.1"`, 실행 50,000단계입니다. 나머지 SAC 설정은 설치된 라이브러리 기본값입니다. 기본 Actor/Critic은 `[256,256]`입니다. 화면은 `source_settings()`가 실제 예제 AST·설치 클래스에서 읽은 값을 표시합니다. 이번 연결 작업은 알고리즘·기본값·환경 규칙을 바꾸지 않았습니다.
+SAC 설정은 설치된 FinRL의 `MODEL_KWARGS['sac']`, 기본 학습 단계는 `DRLAgent.train_model` 인자 기본값에서 읽습니다. SB3 정책 기본값과 PortfolioOptimizationEnv 기본값도 `source_settings()`가 설치된 클래스를 읽어 표시합니다.
 
 환경 인자는 기존 `framework.training_environment` 그대로입니다. 원본 Portfolio 환경의 `step()`은 포트폴리오 가치 환경이며 실제 증권사 체결이 아닙니다. PaperAccount는 별도의 기존 가상 원장입니다. 두 계층의 손익과 수수료 계산을 동일하다고 설명하지 않습니다.
 
@@ -224,7 +224,7 @@ Windows PowerShell에서 `scripts/register_codex_fix_receiver.ps1`을 실행하�
 
 `#frameworks`는 Python 모듈을 브라우저에서 import하지 않습니다. React → `/api/framework/{action}` → 기존 `job_worker` → `platform/framework_operations.py` → 공식 Python 함수·클래스·CLI 순서입니다. Streamlit 화면은 이식·실행에서 제외합니다.
 
-공식 거래일·가격/재무/뉴스 수집·전처리·기간 분할·지표·TSMOM·ML/산업별 종목 선택·Adaptive Rotation·성과·설정 함수는 전용 입력으로 실행합니다. 원형 FinRL CLI와 FinRL-X deploy의 원본 데이터 준비 블록 및 Rotation 실행도 연결합니다. 원형 워크플로의 알고리즘·기본값·YAML 입력 계약을 변경하지 않습니다. 원형 출력 경로는 해당 YAML을 따릅니다.
+FinRL 공식 알고리즘 학습은 설치된 `DRLAgent.MODELS`에서 선택해 `get_model`·`train_model`로 실행하며 결과는 개별 공식 작업 폴더에 저장합니다. 이 결과를 중앙 SAC 운영 정책으로 자동 선택하지는 않습니다. FinRL에 없는 거래 달력·FMP 재무/뉴스·추가 데이터 처리·TSMOM·Adaptive Rotation·전략/백테스트 엔진은 FinRL-X 원본 기능으로 실행합니다. 원형 FinRL CLI와 FinRL-X deploy 데이터 준비·Rotation 실행도 연결합니다.
 
 나머지 공식 공개 callable은 백엔드의 `/api/framework/native_call`에서 실제 소스 선언·인자 계약에 따라 호출합니다. 동일 인스턴스의 메서드 연결, 원본 CLI 인자, 실제 DataFrame/Series/배열·설정 참조를 전달할 수 있습니다. 필요한 인자·객체·패키지·인증이 없으면 실제 오류를 반환하며 실행 성공으로 표시하지 않습니다. 모델 생성자 호출과 학습·추론 성공은 구분합니다.
 

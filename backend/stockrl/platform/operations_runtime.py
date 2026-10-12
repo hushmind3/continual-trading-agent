@@ -161,7 +161,9 @@ class OperationsRuntime:
                     with self.lock:self.status['policy_error']=str(exc)
             if self.controls['learning']:
                 with self.lock:symbols=list(self.quotes)
-                self.queue_learning(symbols)
+                try:self.queue_learning(symbols)
+                except Exception as exc:
+                    with self.lock:self.status.update(learning_status='학습 입력 오류',learning_error=str(exc))
 
     def queue_learning(self,symbols):
         with system.job_lock,self.lock:

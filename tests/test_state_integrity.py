@@ -127,6 +127,16 @@ class IntegrityTests(unittest.TestCase):
   with patch.dict(sys.modules,{'stockrl.live_feed':SimpleNamespace(LIVE_QUOTE_MAX_AGE_SECONDS=300)}),patch.object(operations_runtime,'read_json',return_value={'instruments':[{'symbol':'AAPL','market':'US','asset_class':'equity'}]}):
    with self.assertRaisesRegex(ValueError,'최신 시세'):runtime.manual_order('AAPL','USD','BUY',1)
   self.assertEqual(runtime.account.state['fills'],[])
+ def test_learning_input_error_does_not_kill_worker(self):
+  runtime=OperationsRuntime();runtime.controls.update(feed=True,learning=True)
+  attempted=threading.Event()
+  def fail(symbols):attempted.set();raise ValueError('ambiguous daily input')
+  runtime.queue_learning=fail
+  worker=threading.Thread(target=runtime.process_updates);worker.start();runtime.feed_cycle.set()
+  try:
+   self.assertTrue(attempted.wait(1));self.assertTrue(worker.is_alive())
+  finally:runtime.controls['feed']=False;runtime.feed_cycle.set();worker.join(3)
+  self.assertEqual(runtime.status.get('learning_error'),'ambiguous daily input')
  def test_receiver_does_not_push_main_or_auto_merge(self):
   source=(ROOT/'scripts/codex_fix_receiver.py').read_text(encoding='utf8');ast.parse(source)
   self.assertNotIn('HEAD:main',source)

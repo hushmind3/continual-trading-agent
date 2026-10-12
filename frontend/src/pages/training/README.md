@@ -10,3 +10,5 @@
 백엔드 메인은 stockrl.finrl.framework입니다. 실제 모델 적재와 학습 상태를 별도로 표시합니다.
 
 모든 호출은 data/Operations.tsx와 단일 /api를 사용합니다. 부모 폴더 변경 시 import 경로와 shell/Shell.tsx의 메뉴 연결을 함께 갱신합니다.
+
+알고리즘 선택값은 MoE와 공유하며 선택 알고리즘의 Champion만 목록에 표시합니다. 새 학습은 이전 저장 모델의 호환 여부를 요구하지 않습니다. 선택 Champion의 체크포인트는 해당 알고리즘으로 적재·학습합니다.

@@ -94,7 +94,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     if steps<1:raise ValueError('학습 단계는 1 이상이어야 합니다.')
     from ..platform.sac_champion import load_spec
     if champion is None and champion_path:champion=load_spec(champion_path)
-    if champion and algorithm!='sac':raise ValueError('선택한 Champion은 SAC 정책입니다. SAC 알고리즘에서 사용하세요.')
+    if champion and champion['identity']['algorithm']!=algorithm:raise ValueError('선택한 알고리즘과 Champion의 알고리즘이 다릅니다.')
     champion_ids = champion.get('identity',{}).get('champion_experts') if champion else None
     from ..state_io import read_json,atomic_json
     currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in frame.symbol.unique()) else 'USD'
@@ -109,7 +109,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     identity={'currency':env.currency,'symbols':env.symbols,'algorithm':algorithm,'sac_example':parameters,'environment':CASH_ENVIRONMENT,'rolling_days':[1095,365]}
     from ..platform.sac_champion import _candidate_identity,_policy_kwargs,_original_report
     base_dim=int(__import__('numpy').prod(env.unwrapped.observation_space.shape))
-    if algorithm=='sac':identity.update(_candidate_identity(env.currency,env.symbols,champion_ids,base_dim,CASH_ENVIRONMENT))
+    if algorithm=='sac' or champion:identity.update(_candidate_identity(env.currency,env.symbols,champion_ids,base_dim,CASH_ENVIRONMENT,algorithm))
     else:identity.update(champion_experts=champion_ids,base_observation_dim=base_dim,account_feature_size=16,observation_contract='expert-observation-v1')
     if champion:
         identity.update(champion['identity'])
@@ -124,7 +124,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
             checkpoint=Path(champion['checkpoint'])
             if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/official'/checkpoint
             model=system.model(checkpoint,algorithm,env)
-            if (checkpoint.parent/'replay.pkl').is_file():model.load_replay_buffer(checkpoint.parent/'replay.pkl')
+            if hasattr(model,'load_replay_buffer') and (checkpoint.parent/'replay.pkl').is_file():model.load_replay_buffer(checkpoint.parent/'replay.pkl')
             model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
         elif resume:
             model=system.model(policy_checkpoint(saved),algorithm,env)

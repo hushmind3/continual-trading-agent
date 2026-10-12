@@ -113,6 +113,7 @@ class RunRequest(BaseModel):
 
 
 class ChampionRequest(BaseModel):
+    algorithm:str='sac'
     currency:Literal["USD","KRW"]|None=None
     symbols:list[str]=Field(default_factory=list,max_length=1000)
     experts:list[str]=Field(default_factory=list,max_length=128)
@@ -608,25 +609,27 @@ def preflight(req, command):
         elif item["observations"] < 2:
             errors.append(symbol + ": 공식 환경 실행에는 최소 2개 가격 관측이 필요합니다.")
     settings = source_settings()
-    try:
-        selected=policy_files(req.currency,req.checkpoint_path if command=='backtest' else None)
-        model=model_state(settings,selected) if command=='backtest' or req.resume else model_state(settings)
-    except (ValueError,OSError) as exc:
-        errors.append(str(exc));model=model_state(settings)
+    model={'identity':{}}
+    if command=='backtest' and not req.champion_path or req.resume:
+        try:
+            selected=policy_files(req.currency,req.checkpoint_path if command=='backtest' else None)
+            model=model_state(settings,selected)
+        except (ValueError,OSError) as exc:
+            errors.append(str(exc));model=model_state(settings)
     if req.checkpoint_path and command!='backtest':errors.append('정책 경로 선택은 운영 승인 전 평가에만 사용합니다.')
     if req.checkpoint_path and req.champion_path:errors.append('평가할 정책 또는 Champion 중 하나를 선택하세요.')
     try:_,_,steps=sac_example(req.algorithm)
     except ValueError as exc:errors.append(str(exc));steps=settings['steps_per_run']
-    if req.champion_path and req.algorithm!='sac':errors.append('선택한 Champion은 SAC 정책입니다. SAC를 선택하세요.')
     if req.resume and model['identity'].get('algorithm','sac')!=req.algorithm:errors.append('이어 학습 알고리즘이 저장 정책과 다릅니다.')
-    if command=='backtest' and model['identity'].get('algorithm','sac')!=req.algorithm:errors.append('평가 알고리즘이 저장 정책과 다릅니다.')
+    if command=='backtest' and not req.champion_path and model['identity'].get('algorithm','sac')!=req.algorithm:errors.append('평가 알고리즘이 저장 정책과 다릅니다.')
     if req.champion_path:
         from .platform.sac_champion import champion_info,MODEL_DIR
         source=Path(req.champion_path).expanduser().resolve()
         try:
-            if not source.is_relative_to(MODEL_DIR.resolve()) or not source.name.startswith('sac_champion_'):
-                raise ValueError('모델 폴더의 SAC Champion을 선택하세요.')
+            if not source.is_relative_to(MODEL_DIR.resolve()) or source.suffix!='.pt':
+                raise ValueError('모델 폴더의 MoE Champion을 선택하세요.')
             champion=champion_info(source);identity=champion['identity']
+            if identity['algorithm']!=req.algorithm:raise ValueError('선택한 알고리즘과 Champion의 알고리즘이 다릅니다.')
             if identity.get('environment')!=CASH_ENVIRONMENT:
                 raise ValueError('현재 PortfolioOptimizationEnv와 다른 Champion입니다. MoE에서 현재 환경으로 생성하세요.')
             checkpoint=Path(champion['checkpoint'])
@@ -635,7 +638,7 @@ def preflight(req, command):
             if identity.get('currency')!=req.currency or identity.get('symbols')!=symbols:
                 raise ValueError('선택한 Champion의 통화·종목 구성이 다릅니다.')
         except (ValueError,OSError,KeyError,RuntimeError) as exc:
-            errors.append('SAC Champion: '+str(exc))
+            errors.append('MoE Champion: '+str(exc))
     if (command == "backtest" or req.resume) and not req.champion_path:
         compatible=model["compatible"] if req.resume else model["policy_compatible"]
         if not compatible:
@@ -695,7 +698,7 @@ def launch(command, req,preserve_output=False):
             if req.champion_path:job['champion_path']=str(Path(req.champion_path).expanduser().resolve())
         elif req.champion_path:
             from .platform.sac_champion import _next_version
-            _,target=_next_version()
+            _,target=_next_version(req.algorithm)
             job.update(champion_path=str(Path(req.champion_path).expanduser().resolve()),
                 champion_output=str(target),output='champions/'+target.stem)
         elif command=='train' or preserve_output:job['output']='policies/'+job_id
@@ -807,13 +810,12 @@ def champions():
 def champion_create(request:ChampionRequest):
     if system.job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")
     from .platform.operations_settings import settings
-    current=read_json(policy_files()/"dataset.json")
     recent=read_json(RUNTIME/"job.json")
     if recent.get('command') not in ('train','backtest'):recent={}
-    request.currency=request.currency or recent.get("currency") or current.get("currency") or "USD"
+    request.currency=request.currency or recent.get("currency") or "USD"
     if not request.symbols:
         configured=settings().symbols
-        request.symbols=configured or (recent.get("symbols") if recent.get("currency")==request.currency else []) or (current.get("symbols") if current.get("currency")==request.currency else []) or []
+        request.symbols=configured or (recent.get("symbols") if recent.get("currency")==request.currency else []) or []
         if not request.symbols:
             request.symbols=[row["symbol"] for row in database()["instruments"] if row["currency"]==request.currency and row["eligible"] and row["stored"]]
     if not request.symbols:raise HTTPException(400,"기존 운영·학습 종목 구성이 없습니다. 종목을 등록한 뒤 생성하세요.")
@@ -830,7 +832,7 @@ def champion_create(request:ChampionRequest):
     env=None
     try:
         env=champion_structure_environment(request.currency,request.symbols,ExpertRegistry(),request.experts)
-        result=create(request.currency,request.symbols,request.experts,env)
+        result=create(request.currency,request.symbols,request.experts,env,algorithm=request.algorithm)
         return result
     except HTTPException:raise
     except (ValueError,RuntimeError,OSError,KeyError,MemoryError,FileExistsError) as exc:raise HTTPException(400,str(exc)) from exc

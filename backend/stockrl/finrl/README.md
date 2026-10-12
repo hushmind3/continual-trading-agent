@@ -28,3 +28,5 @@ finrl_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
 | 주식거래 알고리즘 학습 | stock_training_menu.py | pages/finrl/FinrlWorkspace.tsx |
 | 주식거래 백테스트 | stock_backtest_menu.py | pages/finrl/FinrlWorkspace.tsx |
 | FinRL 모듈 · 도구 | finrl_tools_menu.py | pages/frameworks/FrameworkWorkspace.tsx |
+
+Champion 학습은 identity.algorithm과 요청 algorithm의 일치를 확인하며 해당 공식 SB3 모델을 적재합니다. 새 정책 학습과 MoE 생성은 구형 저장 모델의 호환 여부를 요구하지 않습니다.

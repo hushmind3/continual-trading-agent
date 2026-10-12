@@ -1,4 +1,4 @@
-"""Versioned SB3 SAC policies assembled with frozen, per-Expert MoE inputs."""
+"""Versioned FinRL/SB3 policies assembled with frozen, per-Expert MoE inputs."""
 from __future__ import annotations
 
 import hashlib
@@ -159,12 +159,12 @@ def _original_report():
     return report
 
 
-def _next_version():
+def _next_version(algorithm='sac'):
     number = 1
-    while ((MODEL_DIR / f"sac_champion_{number:03d}.pt").exists() or
-           (ROOT / "runtime/official/champions" / f"sac_champion_{number:03d}").exists()):
+    while ((MODEL_DIR / f"{algorithm}_champion_{number:03d}.pt").exists() or
+           (ROOT / "runtime/official/champions" / f"{algorithm}_champion_{number:03d}").exists()):
         number += 1
-    return number, MODEL_DIR / f"sac_champion_{number:03d}.pt"
+    return number, MODEL_DIR / f"{algorithm}_champion_{number:03d}.pt"
 
 
 def _expert_payload(active):
@@ -197,14 +197,14 @@ def _expert_payload(active):
     return catalog, packages, counts, roles
 
 
-def _candidate_identity(currency, symbols, active, base_dim,environment):
-    function, parameters, steps = sac_example()
-    return {"currency": currency, "symbols": list(symbols), "sac_example": parameters,
+def _candidate_identity(currency, symbols, active, base_dim,environment,algorithm='sac'):
+    function, parameters, steps = sac_example(algorithm)
+    return {"currency": currency, "symbols": list(symbols), "algorithm":algorithm,"sac_example": parameters,
         "environment": environment,
         "rolling_days": [1095, 365], "champion_experts": list(active),
         "expert_feature_size": EXPERT_FEATURES, "base_observation_dim": int(base_dim),
         "account_feature_size": 16,
-        "sac_steps_per_run": steps, "feature_extractor": "stockrl.platform.sac_champion.ChampionExtractor"}
+        "steps_per_run": steps, "feature_extractor": "stockrl.platform.sac_champion.ChampionExtractor"}
 
 
 def _policy_kwargs(identity, roles, original):
@@ -224,7 +224,7 @@ def _policy_kwargs(identity, roles, original):
 
 def _counts(model, expert_counts):
     params=list(model.policy.named_parameters())
-    integration_prefixes=("actor.features_extractor.","critic.features_extractor.","critic_target.features_extractor.")
+    integration_prefixes=("actor.features_extractor.","critic.features_extractor.","critic_target.features_extractor.","features_extractor.","pi_features_extractor.","vf_features_extractor.")
     integration=sum(parameter.numel() for name,parameter in params if name.startswith(integration_prefixes))
     entropy=int(model.log_ent_coef.numel()) if getattr(model,'log_ent_coef',None) is not None else 0
     central=sum(parameter.numel() for name,parameter in params if not name.startswith(integration_prefixes))+entropy
@@ -246,47 +246,61 @@ def _next_paths(version, stem=None):
     return model_path, directory, run_id
 
 
-def create(currency, symbols, active, env):
+def create(currency, symbols, active, env,algorithm='sac'):
     from finrl.agents.stablebaselines3.models import DRLAgent
     if not symbols:
-        raise ValueError("SAC Champion의 시장과 종목을 지정해야 합니다.")
+        raise ValueError("MoE Champion의 시장과 종목을 지정해야 합니다.")
+    _,params,_=sac_example(algorithm)
     active = list(active)
     catalog, packages, expert_counts, roles = _expert_payload(active)
-    number, model_path = _next_version()
+    number, model_path = _next_version(algorithm)
     directory = ROOT / "runtime/official/champions" / model_path.stem
     if directory.exists():
         raise FileExistsError(f"체크포인트 경로 충돌: {directory}")
     base_dim = int(np.prod(env.unwrapped.observation_space.shape))
-    identity = _candidate_identity(currency, symbols, active, base_dim,env.source_environment)
+    identity = _candidate_identity(currency, symbols, active, base_dim,env.source_environment,algorithm)
     original = _original_report()
     kwargs = _policy_kwargs(identity, roles, original)
-    _, params, _ = sac_example()
     agent = DRLAgent(env=env)
-    model = agent.get_model("sac", model_kwargs=dict(params), policy_kwargs=kwargs)
+    model = agent.get_model(algorithm, model_kwargs=dict(params), policy_kwargs=kwargs)
     expected_observation=base_dim+EXPERT_FEATURES*len(active)+16
     expected_action=int(env.action_space.shape[0])
     if tuple(model.observation_space.shape)!=(expected_observation,) or tuple(model.action_space.shape)!=(expected_action,):
-        raise ValueError(f"SAC 구조 공간 불일치: 관측 {model.observation_space.shape} / 행동 {model.action_space.shape}; 기대 ({expected_observation},) / ({expected_action},)")
+        raise ValueError(f"{algorithm.upper()} 구조 공간 불일치: 관측 {model.observation_space.shape} / 행동 {model.action_space.shape}; 기대 ({expected_observation},) / ({expected_action},)")
     observation=torch.zeros((1,expected_observation),device=model.device)
+    from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
+    policy_spaces={"observation_shape":list(model.observation_space.shape),"action_shape":list(model.action_space.shape)}
+    model.policy.set_training_mode(False)
     with torch.inference_mode():
-        action,_=model.actor.action_log_prob(observation)
-        critics=model.critic(observation,action)
-        target_critics=model.critic_target(observation,action)
-    if action.shape!=(1,expected_action) or len(critics)!=2 or len(target_critics)!=2:
-        raise ValueError("SAC Actor 또는 Twin Critic 출력 구조가 맞지 않습니다.")
-    if not torch.isfinite(action).all() or any(not torch.isfinite(value).all() or value.shape!=(1,1) for value in (*critics,*target_critics)):
-        raise ValueError("SAC Actor/Twin Critic 출력에 비유한 값 또는 잘못된 차원이 있습니다.")
-    sac_spaces={"observation_shape":list(model.observation_space.shape),"action_shape":list(model.action_space.shape),
-        "actor_action_shape":list(action.shape),"twin_critic_output_shapes":[list(value.shape) for value in critics],
-        "target_twin_critic_output_shapes":[list(value.shape) for value in target_critics]}
+        prediction=model.policy(observation,deterministic=True)
+        if isinstance(model,OffPolicyAlgorithm):
+            action=prediction;critics=model.critic(observation,action)
+            target=getattr(model,'critic_target',None)
+            target_critics=target(observation,action) if target is not None else ()
+            if torch.is_tensor(critics):
+                if critics.ndim!=3 or critics.shape[1]!=model.critic.n_critics or target is not None and target_critics.shape!=critics.shape:raise ValueError('공식 분위수 Critic 출력 구조가 다릅니다.')
+                critics=(critics,);target_critics=(target_critics,) if target is not None else ()
+            else:
+                if len(critics)!=model.critic.n_critics or target is not None and len(target_critics)!=model.critic.n_critics:raise ValueError('공식 Critic 출력 개수가 다릅니다.')
+                if any(value.shape!=(1,1) for value in (*critics,*target_critics)):raise ValueError('공식 Critic 출력 차원이 다릅니다.')
+            outputs=(*critics,*target_critics)
+            policy_spaces['critic_output_shapes']=[list(value.shape) for value in critics]
+            if target is not None:policy_spaces['target_critic_output_shapes']=[list(value.shape) for value in target_critics]
+        else:
+            action,value,log_prob=prediction;outputs=(value,)
+            if value.shape!=(1,1) or log_prob.shape!=(1,) or not torch.isfinite(log_prob).all():raise ValueError('공식 정책·가치 출력 구조가 다릅니다.')
+            policy_spaces.update(value_output_shape=list(value.shape),log_prob_shape=list(log_prob.shape))
+    if action.shape!=(1,expected_action) or not torch.isfinite(action).all() or any(not torch.isfinite(value).all() or value.shape[0]!=1 for value in outputs):
+        raise ValueError(algorithm.upper()+' 정책·가치 출력에 비유한 값 또는 잘못된 차원이 있습니다.')
+    policy_spaces['actor_action_shape']=list(action.shape)
     directory.mkdir(parents=True)
     model_path.parent.mkdir(parents=True, exist_ok=True)
     identity['champion_file']=str(model_path)
-    model.save(directory / "sac")
-    model.save_replay_buffer(directory / "replay.pkl")
+    model.save(directory / algorithm)
+    if isinstance(model,OffPolicyAlgorithm):model.save_replay_buffer(directory / "replay.pkl")
     atomic_json(identity, directory / "dataset.json")
     parameter_counts = _counts(model, expert_counts)
-    output = {"format": "finrlx_compositional_sac_champion_v1", "version": number,
+    output = {"format": "finrlx_compositional_policy_champion_v1", "version": number,
         "trained": False, "created_at": __import__("datetime").datetime.now().astimezone().isoformat(),
         "identity": identity, "roles": roles, "expert_packages": packages,
         "expert_package_digests": {key:catalog['experts'][key]['package']['sha256'] for key in active},
@@ -298,12 +312,12 @@ def create(currency, symbols, active, env):
             "policy_adapter_size": kwargs["features_extractor_kwargs"]["policy_dim"],
             "policy_attention_heads": kwargs["features_extractor_kwargs"]["policy_heads"],
             "expert_native_output_features": EXPERT_FEATURES, "account_context_features": 16,
-            "sac_feature_size": kwargs["features_extractor_kwargs"]["base_dim"]+
+            "policy_feature_size": kwargs["features_extractor_kwargs"]["base_dim"]+
                 kwargs["features_extractor_kwargs"]["hidden_size"]+kwargs["features_extractor_kwargs"]["policy_dim"]},
-        "expert_counts": expert_counts, "parameters": parameter_counts,"sac_spaces":sac_spaces,
+        "expert_counts": expert_counts, "parameters": parameter_counts,"policy_spaces":policy_spaces,
         "training": {"num_timesteps":int(model.num_timesteps),"updates":int(model._n_updates)},
-        "policy_state": {key:value.detach().cpu() for key,value in model.policy.state_dict().items()}, "checkpoint": f"champions/{model_path.stem}/sac.zip",
-        "transfer": {"optimizer_state":"신규 SAC 정책으로 초기화","replay":"신규 빈 Replay Buffer"},
+        "policy_state": {key:value.detach().cpu() for key,value in model.policy.state_dict().items()}, "checkpoint": f"champions/{model_path.stem}/{algorithm}.zip",
+        "transfer": {"optimizer_state":"신규 "+algorithm.upper()+" 정책으로 초기화","replay":"신규 빈 Replay Buffer" if isinstance(model,OffPolicyAlgorithm) else "사용하지 않음"},
         "original_pro": original}
     try:
         temporary = model_path.with_suffix(".partial")
@@ -313,7 +327,7 @@ def create(currency, symbols, active, env):
         shutil.rmtree(directory, ignore_errors=True)
         raise
     return {"name": model_path.name, "path": str(model_path), "checkpoint": output["checkpoint"],"file_bytes":model_path.stat().st_size,
-        "trained": output["trained"], "parameters": parameter_counts,"training":output["training"],"sac_spaces":sac_spaces,
+        "trained": output["trained"], "parameters": parameter_counts,"training":output["training"],"policy_spaces":policy_spaces,
         "transfer": output["transfer"], "identity": identity,"moe_architecture":output["moe_architecture"],"expert_counts":expert_counts}
 
 
@@ -325,7 +339,7 @@ def champion_info(path):
         return {"name":path.name,"path":str(path),"version":data.get('version'),
             "trained":data.get('trained',False),"parameters":data.get('parameters',{}),
             "identity":data.get('identity',{}),"checkpoint":data.get('checkpoint'),"training":data.get('training',{}),
-            "file_bytes":stamp.st_size,"sac_spaces":data.get('sac_spaces',{}),"moe_architecture":data.get('moe_architecture',{}),"expert_counts":data.get('expert_counts',{})}
+            "file_bytes":stamp.st_size,"policy_spaces":data.get('policy_spaces',{}),"moe_architecture":data.get('moe_architecture',{}),"expert_counts":data.get('expert_counts',{})}
     value=system.state_value('champion:'+str(path),load,(stamp.st_mtime_ns,stamp.st_size))
     if system.state_errors.get('champion:'+str(path)):raise ValueError(system.state_errors['champion:'+str(path)])
     return value
@@ -333,7 +347,7 @@ def champion_info(path):
 
 def list_champions():
     result = []
-    for path in sorted(MODEL_DIR.glob("sac_champion_*.pt")):
+    for path in sorted(MODEL_DIR.glob("*_champion_*.pt")):
         try:
             result.append(champion_info(path))
         except (OSError, ValueError, RuntimeError):
@@ -343,8 +357,8 @@ def list_champions():
 
 def load_spec(path):
     data = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
-    if data.get("format") != "finrlx_compositional_sac_champion_v1":
-        raise ValueError("SAC Champion PT 형식이 아닙니다.")
+    if data.get("format") != "finrlx_compositional_policy_champion_v1":
+        raise ValueError("현재 알고리즘 MoE Champion PT 형식이 아닙니다. 새로 생성하세요.")
     return data
 
 
@@ -355,12 +369,12 @@ def save_trained_champion(source_path, model, target_path, checkpoint_dir,spec=N
     data["policy_state"] = {key:value.detach().cpu() for key,value in model.policy.state_dict().items()}
     data["trained"] = True
     data["training"] = {"num_timesteps": int(model.num_timesteps), "updates": int(model._n_updates),
-        "checkpoint": str((checkpoint_dir / "sac.zip").relative_to(ROOT / "runtime/official").as_posix()),
-        "replay_file": str((checkpoint_dir / "replay.pkl").relative_to(ROOT / "runtime/official").as_posix())}
+        "checkpoint": str((checkpoint_dir / (data['identity']['algorithm']+'.zip')).relative_to(ROOT / "runtime/official").as_posix())}
+    if hasattr(model,'save_replay_buffer'):data['training']['replay_file']=str((checkpoint_dir/'replay.pkl').relative_to(ROOT/'runtime/official').as_posix())
     data["checkpoint"] = data["training"]["checkpoint"]
     data["version"] = int(target_path.stem.rsplit("_", 1)[1])
     data["transfer"] = {"from": Path(source_path).name, "policy_tensors_updated": True,
-        "optimizer_state": "SB3 체크포인트에서 실제 복원", "replay": "SB3 Replay Buffer를 체크포인트와 함께 저장"}
+        "optimizer_state": "SB3 체크포인트에서 실제 복원", "replay": "SB3 Replay Buffer를 체크포인트와 함께 저장" if hasattr(model,'save_replay_buffer') else "사용하지 않음"}
     if target_path.exists():raise FileExistsError(f"Champion 파일이 이미 있습니다: {target_path.name}")
     target_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = target_path.with_suffix(".partial")

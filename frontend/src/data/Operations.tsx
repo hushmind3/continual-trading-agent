@@ -2,11 +2,14 @@ import {createContext,useCallback,useContext,useEffect,useRef,useState,type Reac
 import {request} from './api';
 import type {Snapshot} from './types';
 interface Context {
+  algorithm:string;selectAlgorithm:(value:string)=>void;
   state:Snapshot|null;error:string;pending:Set<string>;refresh:()=>Promise<void>;
   observe:(path:string)=>()=>void;execute:<T>(path:string,body:unknown,method?:'GET'|'POST')=>Promise<T>;
 }
 const Operations=createContext<Context|null>(null);
 export function OperationsProvider({children}:{children:ReactNode}) {
+  const [algorithm,setAlgorithm]=useState(()=>sessionStorage.getItem('finrl.algorithm')??'');
+  const selectAlgorithm=useCallback((value:string)=>{setAlgorithm(value);sessionStorage.setItem('finrl.algorithm',value)},[]);
   const [state,setState]=useState<Snapshot|null>(null),[error,setError]=useState(''),[pending,setPending]=useState(new Set<string>());
   const views=useRef(new Map<string,number>()),inFlight=useRef<Promise<void>|null>(null),scheduled=useRef(false),alive=useRef(true),lastSelection=useRef(''),frontendRevision=useRef<string|null>(null);
   const refresh=useCallback((force=true):Promise<void>=>{
@@ -41,7 +44,7 @@ export function OperationsProvider({children}:{children:ReactNode}) {
     try{const result=await request<T>(path,body,method);await inFlight.current;await refresh(false);return result}
     finally{setPending(old=>{const next=new Set(old);next.delete(path);return next})}
   };
-  return <Operations.Provider value={{state,error,pending,refresh,observe,execute}}>{children}</Operations.Provider>;
+  return <Operations.Provider value={{state,error,pending,refresh,observe,execute,algorithm,selectAlgorithm}}>{children}</Operations.Provider>;
 }
 export function useOperations(){const context=useContext(Operations);if(!context)throw new Error('OperationsProvider가 필요합니다.');return context;}
 export function useSystemState<T>(path:string|null){

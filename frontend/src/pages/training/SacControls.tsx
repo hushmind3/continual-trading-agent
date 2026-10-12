@@ -1,4 +1,4 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {Play,CheckCircle2} from 'lucide-react';
 import {useSystemState,useOperations} from '../../data/Operations';
 import type {Currency,Instrument,Preflight} from '../../data/types';
@@ -6,13 +6,14 @@ import {Button,ErrorMessage,inputClass} from '../../ui/Primitives';
 import {Panel,KeyValues} from '../../ui/Panel';
 import {DataTable,type Column} from '../../ui/DataTable';
 import {number} from '../../ui/format';
-interface ChampionOption {name:string;path:string;trained:boolean;parameters:Record<string,number>;identity:{currency:Currency;symbols:string[]}}
+interface ChampionOption {name:string;path:string;trained:boolean;parameters:Record<string,number>;identity:{currency:Currency;symbols:string[];algorithm:string}}
 interface AlgorithmOption {name:string;parameters:Record<string,string|number|boolean>;steps_per_run:number;uses_replay:boolean}
-export function SacControls(){const {state:s,execute,pending}=useOperations();
+export function SacControls(){const {state:s,execute,pending,algorithm:algorithmChoice,selectAlgorithm:setAlgorithmChoice}=useOperations();
  const algorithms=useSystemState<{default:string;items:AlgorithmOption[]}>('algorithms');
- const [algorithmChoice,setAlgorithmChoice]=useState(''),[timesteps,setTimesteps]=useState('');
+ const [timesteps,setTimesteps]=useState('');
  const [currency,setCurrency]=useState<Currency>(()=>sessionStorage.getItem('training_currency')==='KRW'?'KRW':'USD');
  const [symbols,setSymbols]=useState<string[]>(()=>{try{return JSON.parse(sessionStorage.getItem('training_symbols')||'[]')}catch{return []}});
+ useEffect(()=>{sessionStorage.setItem('training_currency',currency);sessionStorage.setItem('training_symbols',JSON.stringify(symbols))},[currency,symbols]);
  const [resume,setResume]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[check,setCheck]=useState<{signature:string;result:Preflight}|null>(null);
  const championOptions=useSystemState<{items:ChampionOption[]}>('champions'),champions=championOptions.data?.items??[];const [champion,setChampion]=useState('');
  const columns=useMemo<Column<Instrument>[]>(()=>[
@@ -32,7 +33,7 @@ export function SacControls(){const {state:s,execute,pending}=useOperations();
  <label className="text-xs text-slate-500">학습 단계<input aria-label="학습 단계" type="number" min={1} className={inputClass+' mt-2'} value={timesteps||official?.steps_per_run||''} disabled={s.job.running} onChange={e=>{setTimesteps(e.target.value);setCheck(null)}}/></label>
  <label className="text-xs text-slate-500">학습 방식<select aria-label="학습 방식" className={inputClass+' mt-2'} value={resume?'resume':'new'} disabled={s.job.running||!!champion} onChange={e=>{setResume(e.target.value==='resume');setCheck(null)}}><option value="new">새 학습</option><option value="resume" disabled={!model.compatible||model.identity.algorithm!==algorithm}>저장 정책 이어 학습</option></select></label>
  </div>
- {algorithm==='sac'&&<label className="mt-4 block text-xs text-slate-500">SAC Champion 선택<select aria-label="SAC Champion 선택" className={inputClass+' mt-2'} value={champion} disabled={s.job.running} onChange={e=>{const path=e.target.value;setChampion(path);setResume(false);const chosen=champions.find(c=>c.path===path);if(chosen){setCurrency(chosen.identity.currency);setSymbols(chosen.identity.symbols)}setCheck(null)}}><option value="">FinRL SAC 정책</option>{champions.map(c=><option key={c.path} value={c.path}>{c.name} · {c.trained?'학습된 상태':'미학습'} · {number(c.parameters?.total_logical_parameters,0)} params</option>)}</select></label>}
+ <label className="mt-4 block text-xs text-slate-500">{algorithm.toUpperCase()} MoE Champion 선택<select aria-label="MoE Champion 선택" className={inputClass+' mt-2'} value={champion} disabled={s.job.running} onChange={e=>{const path=e.target.value;setChampion(path);setResume(false);const chosen=champions.find(c=>c.path===path);if(chosen){setCurrency(chosen.identity.currency);setSymbols(chosen.identity.symbols)}setCheck(null)}}><option value="">FinRL {algorithm.toUpperCase()} 새 정책</option>{champions.filter(c=>c.identity.algorithm===algorithm).map(c=><option key={c.path} value={c.path}>{c.name} · {c.trained?'학습된 상태':'미학습'} · {number(c.parameters?.total_logical_parameters,0)} params</option>)}</select></label>
  {official&&<details className="my-4 rounded-xl bg-slate-50 p-4"><summary className="cursor-pointer text-xs text-blue-600">{algorithm.toUpperCase()} · FinRL 공식 기본 설정</summary><KeyValues items={Object.entries(official.parameters).map(([key,value])=>[key,String(value)])}/></details>}
  {!model.compatible&&<p className="my-4 rounded-xl bg-amber-50 p-4 text-xs leading-6 text-amber-800">현재 저장본은 최신 학습 환경과 호환되지 않아 이어 학습이 차단되어 있습니다. 아래 호환 사유를 확인하세요.</p>}
  {model.reasons.length>0&&<details className="mb-4 rounded-xl bg-slate-50 p-4 text-xs text-slate-500"><summary className="cursor-pointer font-medium">저장 정책 호환 사유</summary><ul className="mt-3 list-disc space-y-1 pl-4">{model.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul></details>}
@@ -42,6 +43,6 @@ export function SacControls(){const {state:s,execute,pending}=useOperations();
  {check?.signature===signature&&<div role="status" className={'my-4 rounded-xl p-4 text-xs leading-6 '+(check.result.ok?'bg-emerald-50 text-emerald-800':'bg-amber-50 text-amber-800')}>{check.result.ok?check.result.symbols.length+'개 종목 · 실행 조건 확인됨':check.result.errors.map((r,i)=><p key={i}>{r}</p>)}</div>}
  {check?.result.periods&&<KeyValues items={[['rolling 학습 관측',number(check.result.periods.training_observations,0)],['평가 관측',number(check.result.periods.test_observations,0)]]}/>}
  <ErrorMessage message={error}/>{message&&<p className="text-sm text-emerald-700">{message}</p>}
- <p className="mt-4 text-xs leading-6 text-slate-400">{champion?'선택한 SAC Champion을 새 버전으로 학습합니다.':'학습 결과는 작업별 새 정책으로 저장합니다.'} {number(timesteps?Number(timesteps):official?.steps_per_run,0)}단계 · 정상 종료 시 {official?.uses_replay?'정책과 Replay':'정책'}를 저장합니다.</p>
+ <p className="mt-4 text-xs leading-6 text-slate-400">{champion?'선택한 '+algorithm.toUpperCase()+' MoE Champion을 새 버전으로 학습합니다.':'학습 결과는 작업별 새 정책으로 저장합니다.'} {number(timesteps?Number(timesteps):official?.steps_per_run,0)}단계 · 정상 종료 시 {official?.uses_replay?'정책과 Replay':'정책'}를 저장합니다.</p>
  </Panel>;
 }

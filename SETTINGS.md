@@ -6,7 +6,7 @@
 
 | 설정 | 현재 값 | 출처 |
 |---|---:|---|
-| 학습 함수 | `backend/stockrl/finrl_trading/upstream/src/strategies/rl_model.py::train_sac(agent)` 직접 호출 | FinRL-X 원본 함수 |
+| 학습 함수 | `FinRL-X/src/strategies/rl_model.py::train_sac(agent)` 직접 호출 | FinRL-X 원본 함수 |
 | 알고리즘 / 정책 | SB3 `SAC`, `MlpPolicy` | FinRL `DRLAgent.get_model()` 기본 정책 및 SB3 원본 |
 | 총 학습 단계 | 50,000 | FinRL-X `train_sac` 예제 |
 | 배치 크기 | 128 | FinRL-X SAC 예제에서 지정 |
@@ -90,7 +90,7 @@ GGUF 실행은 설치된 `llama-server`를 사용한다. 컨텍스트 길이, CP
 
 - FinRL-X 서브모듈 커밋: `4409abe925c904e570be78ebfb5e77ac3491dff8`
 - FinRL 설치 소스 커밋: `00f3596facd01cced5217d875d8c1fc413a31665`
-- SAC 예제: `backend/stockrl/finrl_trading/upstream/src/strategies/rl_model.py`
-- rolling 예제 설정: `backend/stockrl/finrl_trading/upstream/src/strategies/fundamental_portfolio_drl.py`
+- SAC 예제: `FinRL-X/src/strategies/rl_model.py`
+- rolling 예제 설정: `FinRL-X/src/strategies/fundamental_portfolio_drl.py`
 - 포트폴리오 환경: 설치된 `finrl/meta/env_portfolio_allocation/env_portfolio.py`
 - SB3 SAC 기본 정책: 설치된 `stable_baselines3/sac/policies.py`, `stable_baselines3/sac/sac.py`

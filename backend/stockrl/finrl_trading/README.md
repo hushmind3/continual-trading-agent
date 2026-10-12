@@ -1,6 +1,6 @@
 # FinRL-Trading · 보조
 
-공식 원본은 이 폴더의 upstream/입니다. FinRL-X와 FinRL-Trading은 같은 프레임워크입니다. 이 폴더는 필요한 보조 기능의 연결 코드이며 기본 학습기를 소유하지 않습니다.
+공식 원본은 프로젝트 최상위 FinRL-X/입니다. 이 폴더는 필요한 보조 기능의 연결 코드이며 기본 학습기를 소유하지 않습니다.
 
 | 파일 | 역할·진입점 |
 | --- | --- |
@@ -24,5 +24,3 @@ finrl_trading_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
 | 화면 | 연결 파일 | 프론트 담당 파일 |
 | --- | --- | --- |
 | 보조 데이터 · 전략 · 도구 | finrl_trading_tools_menu.py | pages/frameworks/FrameworkWorkspace.tsx |
-
-SOURCE_ROOT가 upstream/의 단일 원본 경로를 소유합니다. 원본은 이동만 하고 수정하지 않았습니다. 큰 메뉴 매니저는 각 원본 모듈의 작은 메뉴와 상세 화면을 연결합니다.

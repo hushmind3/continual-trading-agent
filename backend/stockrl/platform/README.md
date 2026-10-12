@@ -24,5 +24,3 @@ FinRL과 FinRL-Trading의 실행 코드는 각 전용 폴더에 있습니다. �
 menu_catalog는 action의 큰 메뉴·작은 메뉴 소속과 동적 framework API의 실제 입력 필드를 제공합니다. native_call의 환경·메서드 연결·CLI 인자는 기존 계약 그대로 전달합니다.
 
 MoE Champion 생성은 요청 algorithm의 공식 DRLAgent 모델·기본 설정을 사용합니다. A2C/PPO는 정책·가치 출력, DDPG/TD3/SAC는 정책·Critic 출력, TQC는 분위수 Critic 출력, CrossQ는 Target 없이 Critic 출력을 확인하고 Replay는 지원 알고리즘만 저장합니다. Champion 형식은 finrlx_compositional_policy_champion_v1이며 알고리즘별 버전·체크포인트를 사용합니다.
-
-module_inventory.py는 설치 기록·파일 선언을 읽는 공통 모듈 목록과 상세 조회입니다. 모듈을 import/실행하지 않습니다. source_definition은 프레임워크 원본과 선택된 설치 모듈의 공통 AST 입력 계약 추출기입니다.

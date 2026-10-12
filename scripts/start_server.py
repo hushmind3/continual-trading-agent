@@ -98,7 +98,7 @@ def sources():
         path=ROOT/name
         groups[group][name]=hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else 'missing'
     revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
-    groups['backend']['FinRL-X']=subprocess.check_output(['git','-C','backend/stockrl/finrl_trading/upstream','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    groups['backend']['FinRL-X']=subprocess.check_output(['git','-C','FinRL-X','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     return groups,revision
 
 

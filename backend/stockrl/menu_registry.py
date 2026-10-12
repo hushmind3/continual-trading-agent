@@ -50,7 +50,6 @@ def dispatch(scope,parameters):
 def catalog(routes):
     from pydantic import TypeAdapter
     from .platform.framework_operations import action_list
-    from .module_inventory import module_menus
     actions=action_list()
     for action in actions:
         action['group'],action['menu_id']=owner('framework/'+action['id'])
@@ -93,5 +92,5 @@ def catalog(routes):
                     'description':action['name']+' · '+action['module']+' · '+action['function'],
                     'path_schema':{'type':'object','properties':{}},
                     'body_schema':{**body,'properties':properties}})
-    return {'modules':module_menus(),'groups':[{'id':g['id'],'title':g['title'],'menus':list(g['menus'])} for g in GROUPS],
+    return {'groups':[{'id':g['id'],'title':g['title'],'menus':list(g['menus'])} for g in GROUPS],
         'actions':actions,'commands':commands}

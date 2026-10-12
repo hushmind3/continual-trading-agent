@@ -2,13 +2,12 @@
 import importlib
 import sys
 import threading
-from pathlib import Path
-SOURCE_ROOT=Path(__file__).resolve().parent/"upstream"
+from .. import ROOT
 
 _module_lock=threading.RLock()
 
 def finrlx(name):
-    source=SOURCE_ROOT
+    source=ROOT/'FinRL-X'
     with _module_lock:
         if str(source) not in sys.path:sys.path.insert(0,str(source))
         return importlib.import_module('src.'+name)

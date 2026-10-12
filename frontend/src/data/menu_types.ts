@@ -13,8 +13,6 @@ export interface BackendCommand {
  path_schema:JsonSchema;query_schema:JsonSchema;body_schema:JsonSchema;
 }
 export interface BackendMenuCatalog {
- modules:BackendModuleMenu[];
  groups:{id:string;title:string;menus:{id:string;title:string;operations:string[];views:string[];frontend:string;manager:string}[]}[];
  actions:BackendAction[];commands:BackendCommand[];
 }
-export interface BackendModuleMenu {id:string;name:string;framework:string;group:string;package:string}

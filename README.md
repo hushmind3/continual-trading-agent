@@ -71,7 +71,7 @@ requirements/operations.txt     Python 의존성
 scripts/start_server.py         통합 서버 실행·소유권 확인
 scripts/install_windows.py      기존 누락 의존성 설치 스크립트
 서버켜기.cmd                   8766 운영 진입점
-backend/stockrl/finrl_trading/upstream/ 공식 FinRL-Trading Git 서브모듈, 수정하지 않음
+FinRL-X/                       공식 FinRL-Trading Git 서브모듈, 수정하지 않음
 data/                          실제 가격 DB, Git 제외
 runtime/official/              SAC·Replay·작업·체크포인트·백테스트, Git 제외
 runtime/experts/               동결 추론 결과·외부 실행기, Git 제외
@@ -271,5 +271,3 @@ GitHub backend-integrity CI는 Python 구문 검사와 tests/test_state_integrit
 CI 워크플로가 main에 설치되기 전에는 수신기가 waiting_for_main_workflow로 대기하며, Issue별 수정 실행·직접 배포를 시작하지 않습니다.
 
 학습과 MoE의 알고리즘 선택값은 공유합니다. MoE는 설치된 FinRL 목록에서 선택한 A2C/DDPG/PPO/TD3/SAC/TQC/CrossQ의 공식 정책을 생성하고 해당 알고리즘으로 새 버전 학습합니다. 새 학습은 이전 저장 모델의 호환 여부를 요구하지 않으며 Replay는 지원하는 알고리즘만 저장합니다.
-
-FinRL-X와 FinRL-Trading은 같은 프레임워크입니다. 공식 원본은 backend/stockrl/finrl_trading/upstream/에 한 번 보관하고 연결 코드는 같은 finrl_trading/ 구역에 둡니다. 큰 메뉴 매니저는 설치된 각 모듈의 작은 메뉴를 등록합니다. 실행 여부와 관계없이 Python·FinRL·FinRL-Trading·SB3·SB3-Contrib의 소스·설치 기록을 표시하며 각 모듈 화면에서 역할·파일·함수/클래스·입력값·의존성을 확인합니다. 설치 모듈은 import나 실행 테스트 없이 메타데이터로 나열하고, 상세 화면을 열 때 해당 파일 선언만 읽습니다.

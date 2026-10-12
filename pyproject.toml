@@ -14,4 +14,3 @@ teachers = ["stable-baselines3>=2.3", "sb3-contrib>=2.3", "gymnasium>=0.29", "sc
 
 [tool.setuptools.packages.find]
 where = ["backend"]
-exclude = ["stockrl.finrl_trading.upstream*"]

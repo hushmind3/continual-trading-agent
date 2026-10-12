@@ -6,11 +6,9 @@ import {CollapsiblePanels} from '../ui/Panel';
 import {date} from '../ui/format';
 import '../ui/Workspace.css';
 import type {BackendMenuCatalog} from '../data/menu_types';
-import type {SourceModule} from '../data/menu_types';
 function useNavigation(){
  const catalog=useSystemState<BackendMenuCatalog>('menu_catalog');
- const modules=useSystemState<{items:SourceModule[]}>('source_modules');
- return useMemo(()=>registeredNavigation(catalog.data?.actions??[],modules.data?.items??[]),[catalog.data,modules.data]);
+ return useMemo(()=>registeredNavigation(catalog.data?.actions??[]),[catalog.data]);
 }
 import {navigation,registeredNavigation} from './menu_groups/menu_registry';
 export {navigation} from './menu_groups/menu_registry';
@@ -21,11 +19,11 @@ function destination(hash:string,items=navigation){
  if(name==='settings')selected=params.get('tab')==='modules'?'frameworks':params.get('tab')==='diagnostics'?'system':'connection';
  return items.find(item=>item.hash===selected)||items[0];
 }
-export function route(hash:string){const name=hash.replace(/^#/,'').split('?')[0];return name.startsWith('feature-')||name.startsWith('source-module-')||name==='backend-browser'?name:destination(hash).hash;}
+export function route(hash:string){const name=hash.replace(/^#/,'').split('?')[0];return name.startsWith('feature-')||name==='backend-browser'?name:destination(hash).hash;}
 function errorSection(name:string){
- if(name.includes('FinRL-X:')||name.includes('stockrl.finrl_trading.'))return {group:'FinRL-Trading · 보조 실행',target:'finrl-trading'};
- if(name.includes('FinRL:')||name.includes('stockrl.finrl.')||['model','models_by_currency','checkpoints'].includes(name))return {group:'FinRL · 메인 실행',target:'frameworks'};
- if(name==='evaluation')return {group:'FinRL · 메인 실행',target:'portfolio'};
+ if(name.includes('FinRL-X:')||name.includes('stockrl.finrl_trading.'))return {group:'FinRL-Trading · 보조',target:'finrl-trading'};
+ if(name.includes('FinRL:')||name.includes('stockrl.finrl.')||['model','models_by_currency','checkpoints'].includes(name))return {group:'FinRL · 메인',target:'frameworks'};
+ if(name==='evaluation')return {group:'FinRL · 메인',target:'portfolio'};
  if(['experts','library','models'].includes(name)||name.includes('platform.expert_')||name.includes('platform.assets')||name.includes('platform.sac_champion'))return {group:'프로젝트 확장',target:'moe'};
  if(name==='data')return {group:'거래 운영',target:'markets'};
  if(name==='operations')return {group:'거래 운영',target:'control'};

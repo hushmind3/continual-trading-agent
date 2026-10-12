@@ -436,11 +436,6 @@ def menu_catalog():
     from .menu_registry import catalog
     return catalog(private_api.routes)
 
-def source_modules():
-    from .platform.framework_operations import source_catalog
-    return {'items':[{'id':item['id'],'path':item['path'],'framework':item['framework'],
-                     'description':item.get('description') or ''} for item in source_catalog()]}
-
 
 def result_table(kind: Literal["weights", "trades"], limit: int = Query(1000, ge=1, le=5000),currency:Literal['KRW','USD']|None=None):
     path = evaluation_root(currency) / ("backtest_" + kind + ".csv")
@@ -477,7 +472,6 @@ def state_view(path):
     config=ROOT/'configs';official=ROOT/'runtime/official'
     providers={
         'menu_catalog':(menu_catalog,lambda:()),
-        'source_modules':(source_modules,lambda:()),
         'algorithms':(algorithms,lambda:()),
         'finrl':(finrl_workspace,lambda:state_stamp(official/'job.json',*(official/'framework-jobs').glob('*/result.json'))),
         'framework':(framework_catalog,None),

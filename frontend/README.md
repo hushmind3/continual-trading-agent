@@ -21,3 +21,7 @@ FinRL 메인과 FinRL-Trading 보조의 경계를 유지합니다. 새 기능 �
 React 소스는 `src/`, 공통 컴포넌트는 `src/ui/`, 화면은 `src/pages/`, API 호출과 타입은 `src/data/`에 있습니다. `dist/`는 빌드 산출물, `node_modules/`는 설치 의존성입니다. 소스와 역할이 다릅니다.
 
 운영 화면의 `변경 적용 · 전체 점검`은 바뀐 소스만 기존 런처에서 빌드·갱신하고 실제 상태를 기록합니다. `전체 시스템 시작·중지`는 별도 운영 동작입니다. 실행 단계와 미확인 사항은 관리 화면에서 구분합니다.
+
+## 자동검증
+
+`npm run typecheck`, `npm run build`, `npm run test:api`로 타입·운영 빌드·전송 회귀 4개를 검사합니다. 실행 중인 로컬 서버 `http://127.0.0.1:8766`에서 `npm run test:browser`는 38개 등록 화면·시장 표 페이지 이동과 구역별 오류/진단 표시를 검사합니다. Chromium은 `npx playwright install chromium`으로 준비하며 `FINRL_BASE_URL`로 검사 주소를 지정할 수 있습니다. 로그·스크린샷·trace는 Git 제외 결과 폴더에 남습니다. 일반 요청은 60초, Champion 생성은 30분 제한이며 모듈 오류는 관련 구역과 공통 진단에 표시합니다.

@@ -30,3 +30,7 @@ finrl_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
 | FinRL 모듈 · 도구 | finrl_tools_menu.py | pages/frameworks/FrameworkWorkspace.tsx |
 
 Champion 학습은 identity.algorithm과 요청 algorithm의 일치를 확인하며 해당 공식 SB3 모델을 적재합니다. 새 정책 학습과 MoE 생성은 구형 저장 모델의 호환 여부를 요구하지 않습니다.
+
+백테스트 CLI는 평가 이전 가격 이력을 유지합니다. `training_environment(training=False)`가 실제 거래 기간을 구분하고 `ExpertObservation`은 각 관측 시점 이하 이력만 Expert에 전달합니다. 평가 첫 관측의 최소 32일 이력 부족과 미래 데이터 사용을 방지합니다. 원본 FinRL 환경은 수정하지 않습니다.
+
+PortfolioOptimizationEnv의 종료 step은 날짜·행동을 진행하지 않고 마지막 상태를 다시 반환합니다. 평가 연결은 그 응답을 가중치 행으로 재기록하지 않아 중복 날짜를 방지합니다.

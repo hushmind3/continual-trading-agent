@@ -28,7 +28,7 @@ frontend/
   dist/                       운영 빌드 산출물, Git 제외
   node_modules/               설치 의존성, Git 제외
 backend/stockrl/
-  web_api.py                  FastAPI + React 정적 제공
+  web_api.py / api_transport.py FastAPI 핸들러·단일 전달·유한 JSON·React 제공
   __main__.py / official_cli.py CLI → 현재 프레임워크 함수
   finrl/                      메인 FinRL·SB3 환경·학습·공식 데이터·평가
     framework.py              공식 환경·알고리즘·정책 경로
@@ -69,7 +69,7 @@ configs/instruments.json        현재 종목·시장·통화·시세 공급원 
 configs/local/                 인증 공급원·운영 설정 (Git 제외)
 requirements/operations.txt     Python 의존성
 scripts/start_server.py         통합 서버 실행·소유권 확인
-scripts/install_windows.py      기존 누락 의존성 설치 스크립트
+scripts/install_windows.py      독립 주 환경·키움 SDK 환경 설치·정합성 검사
 서버켜기.cmd                   8766 운영 진입점
 FinRL-X/                       공식 FinRL-Trading Git 서브모듈, 수정하지 않음
 data/                          실제 가격 DB, Git 제외
@@ -130,7 +130,7 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 
 백테스트: `official_cli.main` → `finrl.framework.backtest` → FinRL `training_environment(training=False)` → 통합 관리자의 해당 SB3 알고리즘 모델 → `model.predict`·공식 환경 `step` → FinRL-X `StrategyResult`·`BacktestEngine.run_backtest`의 보조 비중 평가. 결과 가치·지표·가중치·거래 기록을 `backtest.csv`, `backtest_metrics.json`, `backtest_weights.csv`, `backtest_trades.csv`로 기록하고 React가 조회합니다. 원본 BacktestEngine의 비중 정규화·비용 계산은 유지합니다.
 
-현재 로컬 `sac.zip`은 이전 환경·다른 설정의 파일입니다. 현재 FinRL 원본 환경과 호환되는 정책을 학습하기 전에는 이어 학습·백테스트·자동 판단을 정상 실행된 것으로 표시하지 않습니다. 원본 파일과 Replay는 보존했습니다.
+이전 `StockPortfolioEnv` 체크포인트와 Replay는 보존합니다. 새 `PortfolioOptimizationEnv` 계약으로 현재 선택된 11개 Expert와 AAPL/MSFT·USD·SAC 모델을 생성하고 105단계 진단 학습(실제 업데이트 5회)을 완료했습니다. 관측은 726D, 행동은 현금 포함 3D입니다. 기본 학습 단계 5,000은 유지하며 진단 학습 결과를 수익성 검증으로 설명하지 않습니다.
 
 ## 외부 모델과 Frozen Expert 계약
 
@@ -159,7 +159,7 @@ UI 적재는 `ExpertPool`과 기존 `Residency.preload/release`를 사용합니�
 
 SAC 자동 판단은 `OperationsRuntime.sac_decision` → 현재 원본 환경/ExpertObservation → `SAC.load/predict` → 환경의 원본 `softmax_normalization` → 기존 `PaperAccount.queue_decisions`입니다. 가상 원장 규칙이나 새 학습기를 구현하지 않습니다. 호환 정책·실제 관측이 없는 경우 `policy_error`를 표시합니다.
 
-키움: 기존 `provider_credentials.connect_credentials/test_connection` → OS keyring 보안 저장소; 공급원·환경·마지막 인증 상태만 `configs/local/provider_settings.json`에 기록합니다. 시세 수송은 기존 `platform/kiwoom_data.py`의 `kwcli` SDK (`import kiwoom`)와 `kiwoom_stream.py` 파서를 사용합니다. 국내/미국 시세 접근은 발급 환경·API 권한에 따릅니다. 인증 성공과 실제 스트림 수신은 별개 상태입니다. 이번 작업에서 키 인증·외부 시세 수신을 실행하지 않았습니다.
+키움: 기존 `provider_credentials.connect_credentials/test_connection` → OS keyring 보안 저장소; 공급원·환경·마지막 인증 상태만 `configs/local/provider_settings.json`에 기록합니다. 시세 수송은 기존 `platform/kiwoom_data.py`의 `kwcli` SDK (`import kiwoom`)와 `kiwoom_stream.py` 파서를 사용합니다. 국내/미국 시세 접근은 발급 환경·API 권한에 따릅니다. 인증 성공과 실제 스트림 수신은 별개 상태입니다. 키움 SDK import와 정규화 이벤트 계약을 검사했고 키움 원격 인증은 실행하지 않았습니다. Yahoo/Kraken 시세 수신은 기존 운영 기록으로 확인합니다.
 
 운영 설정은 `configs/local/operations.json`의 기존 `risk.fee/slippage`, `data.poll_seconds/timeout_seconds`, `symbols`, `expert_devices`입니다. 파일은 사용자 저장 요청 전에는 생성하지 않습니다. 기존 기본값은 가상 원장 fee 0.001/slippage 0.0001, 수신 주기 15초/대기 10초이며 SAC 설정 편집 API는 추가하지 않습니다. Expert 장치는 운영 풀과 이후 생성한 Registry에 적용됩니다.
 
@@ -183,7 +183,7 @@ $env:PYTHONUTF8="1"
 
 ## 구현 상태와 보존 범위
 
-- **소스 연결 완료 / 실제 실행 미확인**: React 운영 제어·KRW/USD 가상계좌·키움 인증/수신·외부 모델 조회/등록/적재/추론·검색/다운로드·변환/최적화·정책 선택 복원·운영 설정 API. 복구 커밋 a7301ae에서는 이 작업들을 실행하지 않았습니다. 현재 적용 자동화의 실제 빌드·응답 결과는 apply 상태에 기록되며, 전체 시작 전에는 인증·시세·추론·학습·가상매매 실행 성공을 주장하지 않습니다.
+- **실제 실행 확인**: API·시세 입력·삭제 파일 캐시·GPU 계산·11개 Expert를 연결한 신규 SAC 진단 학습과 38개 화면 검사를 완료했습니다. 세부 범위는 검토 보고서에 기록합니다. 키움 원격 인증/전체 종목 수신·선택하지 않은 외부 모델 변환/최적화·정책 수익성은 검증 범위 밖입니다.
 - **기존 연결 유지**: 공식 SAC 학습·Replay·백테스트·저장 가격 조회·FMP 수집·기존 동결 관측 구조. 새로운 실행 성공을 주장하지 않습니다.
 - **미연결**: 실제 증권 계좌 주문, Alpaca 주문. **사용 조건 미충족**: 현재 저장된 이전 SAC는 원본 환경과 호환되지 않으며 원본 학습 종목·필수 지표의 실제 이력이 없는 주식 정책 Expert는 입력 오류를 표시합니다.
 - **제거한 실행 대상**: 루트 Streamlit 화면, 구형 화면 테스트/설정, 감사 보고서/임시 프론트 백업, 호출되지 않는 구형 operating_rules·package_disposal. 확인한 미사용 파일만 프로젝트 휴지통으로 이동했습니다. 공식 프레임워크와 정상 사용 모듈은 유지합니다.
@@ -247,7 +247,8 @@ FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합
 
 자체 Python 코드는 `backend/stockrl/`에 모읍니다. React는 `frontend/`, 공식 보조 원본은 `FinRL-X/`, 저장 상태·작업 결과는 기존 `runtime/`, 데이터와 모델 자산은 기존 경로를 사용합니다. Python 모듈 이름 `stockrl.*`은 유지합니다.
 
-- `web_api.py`: 단일 통로·요청 검증·응답 전달
+- `web_api.py`: 핸들러·요청 검증·React 제공
+- `api_transport.py`: 단일 통로·응답 전달·유한 숫자 JSON
 - `platform/system_operations.py`: 통합 상태·정책 캐시·Registry·작업 프로세스·실행 및 중지
 - `platform/operations_runtime.py`: 시세·추론·계좌 실행; 학습 작업은 통합 관리자에 전달
 - `finrl/framework.py`: 공식 환경·학습·정책 계약
@@ -266,10 +267,18 @@ FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합
 
 수신 분봉·시세는 CSV와 received_bars 인덱스에 보관하고, 완료 일봉만 공식 가격 저장소에 공급합니다. 가격 조회는 완료 일봉 저장소를 우선하며 분봉으로 확인된 행은 학습에서 제외합니다. 구분되지 않는 상충 일봉은 오류로 반환합니다. 모든 종목이 갖춰진 가장 최근 공통 일봉으로 추론하며 저장 성공·중복 제거를 통과한 행만 원장에 전달합니다. 시세 수신과 추론은 별도 스레드이고, 같은 일봉 데이터 버전으로 지속학습을 반복하지 않습니다. 수동 즉시 체결은 기존 수신기의 5분 최신 시세 기준을 사용합니다.
 
-GitHub backend-integrity CI는 Python 구문 검사와 tests/test_state_integrity.py의 회귀 검증을 실행합니다. 실제 GPU 정책 성능과 전체 백테스트 검증은 별도입니다.
+GitHub backend-integrity CI는 Python 3.13 구문·정합성·FastAPI 전송과 Node 22 React 타입·빌드·전송 회귀를 실행합니다. 실제 GPU 정책 성능과 전체 백테스트는 로컬에서 별도 검증합니다.
 
 시세 공급원별 없는 선택 필드는 `None`으로 처리하며 API 응답의 비정상 숫자는 `null`로 전달합니다. 외부에서 삭제한 Champion 파일의 상태·오류 캐시는 다음 통합 조회에서 제거합니다. 회귀 검사에는 혼합 시세 필드의 JSON 정합성과 삭제된 Champion 오류의 제거를 포함합니다. 전체 검토의 확인 결과·남은 차단 사항·검증 범위는 [프로젝트 검토 보고서](프로젝트_검토보고서.md)에 기록했습니다.
 
 CI 워크플로가 main에 설치되기 전에는 수신기가 waiting_for_main_workflow로 대기하며, Issue별 수정 실행·직접 배포를 시작하지 않습니다.
 
 학습과 MoE의 알고리즘 선택값은 공유합니다. MoE는 설치된 FinRL 목록에서 선택한 A2C/DDPG/PPO/TD3/SAC/TQC/CrossQ의 공식 정책을 생성하고 해당 알고리즘으로 새 버전 학습합니다. 새 학습은 이전 저장 모델의 호환 여부를 요구하지 않으며 Replay는 지원하는 알고리즘만 저장합니다.
+
+## 재현 환경과 자동검증
+
+주 `.venv`와 키움 `.venv-kiwoom`은 시스템 패키지를 공유하지 않습니다. 설치 스크립트는 운영/키움 명세와 lock 제약을 적용하고 양쪽 `pip check`를 실행합니다. 주 Torch 2.14.0+cu132·torchvision 0.29.1+cu132·SB3 2.9.0과 FinRL 고정 커밋을 유지합니다. 키움 SDK는 별도 프로세스의 JSON 이벤트로 수집기에 연결해 Alpaca/키움 websockets 버전 충돌을 해소합니다. FinCast 실행에 필요한 beartype/einx/colt5-attention도 명시합니다. 기존 환경은 Git 제외 `.venv-previous-*`에 보존합니다.
+
+Python 3.13에서 `python -m unittest discover -s tests`는 정합성 20개와 실제 FastAPI 전송 3개를 검사합니다. React 타입·빌드와 전송 테스트 4개는 CI에서도 실행합니다. 로컬 서버의 실제 38개 화면 검사는 `frontend`에서 `npm run test:browser`로 실행합니다. GPU 모델·외부 인증은 이 최소 CI의 범위에 포함하지 않습니다. 자세한 실행 근거와 제한은 기존 [검토 보고서](프로젝트_검토보고서.md)를 확인하세요.
+
+2026-10-13 실행 검증: 신규 SAC의 11개 Expert 모두 CUDA 추론, 105단계 진단 학습·업데이트 5회, 평가 251개 거래일과 공식 가치·지표 저장을 완료했습니다. 현재 USD 선택은 새 호환 체크포인트이며 구형 모델·Replay와 이전 선택 경로는 보존합니다. 원본 BacktestEngine의 가중치 이력·거래 DataFrame은 비어 있으므로 해당 표를 체결 내역으로 취급하지 않습니다.

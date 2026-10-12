@@ -9,5 +9,6 @@ _module_lock=threading.RLock()
 def finrlx(name):
     source=ROOT/'FinRL-X'
     with _module_lock:
-        if str(source) not in sys.path:sys.path.insert(0,str(source))
+        for path in (source/'src',source):
+            if str(path) not in sys.path:sys.path.insert(0,str(path))
         return importlib.import_module('src.'+name)

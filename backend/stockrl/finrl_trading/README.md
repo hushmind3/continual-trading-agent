@@ -24,3 +24,7 @@ finrl_trading_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
 | 화면 | 연결 파일 | 프론트 담당 파일 |
 | --- | --- | --- |
 | 보조 데이터 · 전략 · 도구 | finrl_trading_tools_menu.py | pages/frameworks/FrameworkWorkspace.tsx |
+
+`finrlx()`는 고정된 `FinRL-X` submodule 루트와 `src`를 import 경로에 추가하고 `src.<모듈>`을 적재합니다. 원본의 `data`·`strategies` 등 절대 import를 유지합니다. 중복 `finrl-trading` 배포판 대신 이 원본을 사용하며 필요한 공급원 패키지는 운영 명세에 선언합니다. 외부 원본은 수정하지 않습니다.
+
+현재 고정 원본 BacktestEngine은 가치·지표를 반환하지만 `weights_history`·`trades`에는 빈 DataFrame을 반환합니다. 따라서 해당 CSV/표가 비어 있을 수 있으며 이를 실제 거래 내역으로 만들어 채우지 않습니다.

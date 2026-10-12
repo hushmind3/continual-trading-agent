@@ -1,26 +1,27 @@
-"""Install missing distributions; preserve installed packages and official sources."""
+"""Install validated main/broker environments without sharing system packages."""
 from pathlib import Path
-import json,os,re,subprocess,tempfile,venv
+import os,subprocess,venv
 ROOT=Path(__file__).resolve().parents[1]
 
 def main():
     os.environ['PYTHONUTF8']='1'
-    python=ROOT/'.venv/Scripts/python.exe'
-    if not python.exists():venv.EnvBuilder(with_pip=True,system_site_packages=True).create(ROOT/'.venv')
     subprocess.run(['git','submodule','update','--init','FinRL-X'],cwd=ROOT,check=True)
-    probe=subprocess.check_output([str(python),'-c','import importlib.metadata,json; print(json.dumps([d.metadata["Name"].lower().replace("_","-") for d in importlib.metadata.distributions()]))'],text=True)
-    installed=set(json.loads(probe))
-    pins=subprocess.check_output([str(python),'-c','import importlib.metadata; names={d.metadata["Name"] for d in importlib.metadata.distributions()}; print("\\n".join(n+"=="+importlib.metadata.version(n) for n in sorted(names)))'],text=True)
-    temporary=tempfile.TemporaryDirectory(prefix='finrl-install-');constraints=Path(temporary.name)/'constraints.txt';constraints.write_text(pins,encoding='utf8')
-    for requirement in (ROOT/'requirements/operations.txt').read_text().splitlines():
-        requirement=requirement.strip()
-        if not requirement or requirement.startswith('#'):continue
-        name=re.split(r'[<>=@\[ ]',requirement,1)[0].lower().replace('_','-')
-        if name in installed:continue
-        subprocess.run([str(python),'-m','pip','install','--extra-index-url','https://download.pytorch.org/whl/cu132','-c',str(constraints),requirement],cwd=ROOT,check=True)
-        installed.add(name)
-    subprocess.run([str(python),'-m','pip','install','--no-deps','-e',str(ROOT)],cwd=ROOT,check=True)
-    temporary.cleanup()
-    print('설치 완료. 서버켜기.cmd를 실행하세요. 기존 패키지는 재설치하거나 업그레이드하지 않았습니다.')
+    env=os.environ.copy();env.update(MSGPACK_PUREPYTHON='1',PYYAML_FORCE_LIBYAML='0')
+    for directory,requirements in (('.venv','operations.txt'),('.venv-kiwoom','kiwoom.txt')):
+        target=ROOT/directory;python=target/'Scripts/python.exe'
+        if not python.exists():venv.EnvBuilder(with_pip=True,system_site_packages=False).create(target)
+        config=target/'pyvenv.cfg'
+        if 'include-system-site-packages = true' in config.read_text(encoding='utf8'):
+            raise RuntimeError(f'{directory}가 시스템 패키지를 공유합니다. 실행 중 작업을 종료하고 검증된 독립 환경으로 교체하세요.')
+        command=[str(python),'-m','pip','install','--no-compile']
+        if directory=='.venv':command+=['--extra-index-url','https://download.pytorch.org/whl/cu132']
+        lock=ROOT/'requirements'/requirements.replace('.txt','.lock.txt')
+        if lock.is_file():command+=['-c',str(lock)]
+        subprocess.run([*command,'-r',str(ROOT/'requirements'/requirements)],cwd=ROOT,env=env,check=True)
+        if directory=='.venv':
+            subprocess.run([*command,'-r',str(ROOT/'requirements/verification.txt')],cwd=ROOT,env=env,check=True)
+            subprocess.run([str(python),'-m','pip','install','--no-deps','-e',str(ROOT)],cwd=ROOT,check=True)
+        subprocess.run([str(python),'-m','pip','check'],cwd=ROOT,check=True)
+    print('주 실행 환경과 키움 SDK 의존성 검사 완료. 서버켜기.cmd를 실행하세요.')
 
 if __name__=='__main__':main()

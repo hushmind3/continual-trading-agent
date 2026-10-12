@@ -1,0 +1,2 @@
+# HTTP gateway integration tests; UI checks use frontend's locked Playwright dependency.
+httpx==0.28.1

@@ -40,7 +40,7 @@ def prepare_inputs(entry, frame, account, context_frames=None):
             history=cached[1]
             history=history[history.Date<pd.Timestamp(stamp).normalize()]
             if history.empty:raise InputUnavailable('해당 시점 이전의 원본 주식 Expert 입력이 없습니다.')
-            daily=history[history.Date==history.Date.max()]
+            daily=complete_policy_day(history,spec['universe'])
             snapshot['stock_policy_history']=daily.assign(Date=daily.Date.astype(str)).to_dict('records')
         else:
             snapshot['stock_policy_history']=daily.assign(date=daily.date.astype(str)).to_dict('records')
@@ -48,6 +48,16 @@ def prepare_inputs(entry, frame, account, context_frames=None):
     if not batches:
         raise InputUnavailable('Expert 추론 입력 묶음이 없습니다.')
     return snapshot,batches
+
+
+def complete_policy_day(history,universe):
+    """Latest real shared session; never mix dates or synthesize missing tickers."""
+    selected=history[history.Ticker.isin(universe)]
+    dates=selected.groupby('Date').Ticker.agg(['size','nunique'])
+    complete=dates[(dates['size']==len(universe))&(dates['nunique']==len(universe))]
+    if complete.empty:
+        raise InputUnavailable('원본 주식 Expert의 전체 종목이 갖춰진 실제 과거 일봉이 없습니다.')
+    return selected[selected.Date==complete.index.max()]
 
 
 def run_batches(pool,key,snapshot,batches):

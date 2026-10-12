@@ -27,3 +27,9 @@ FinRL과 FinRL-Trading의 실행 코드는 각 전용 폴더에 있습니다. �
 menu_catalog는 action의 큰 메뉴·작은 메뉴 소속과 동적 framework API의 실제 입력 필드를 제공합니다. native_call의 환경·메서드 연결·CLI 인자는 기존 계약 그대로 전달합니다.
 
 MoE Champion 생성은 요청 algorithm의 공식 DRLAgent 모델·기본 설정을 사용합니다. A2C/PPO는 정책·가치 출력, DDPG/TD3/SAC는 정책·Critic 출력, TQC는 분위수 Critic 출력, CrossQ는 Target 없이 Critic 출력을 확인하고 Replay는 지원 알고리즘만 저장합니다. Champion 형식은 finrlx_compositional_policy_champion_v1이며 알고리즘별 버전·체크포인트를 사용합니다.
+
+## 키움 SDK 격리
+
+`kiwoom_data.BrokerStreams`는 `.venv-kiwoom`의 `kiwoom_worker` 자식 프로세스로 SDK를 실행합니다. stdin/stdout의 `stockrl-kiwoom-v1` JSON 이벤트가 기존 시세 수집기에 전달되며 추가 HTTP 서버는 없습니다. 인증은 자식의 OS keyring에서 읽고 이벤트에는 인증 정보를 넣지 않습니다. 주 환경 Alpaca의 websockets 10.4와 SDK의 15.0.1 요구를 분리하며 종료 시 자식도 정리합니다. SDK import 검사는 `python -m stockrl.platform.kiwoom_worker --check`로 실행합니다.
+
+원본 포트폴리오 주식 Expert의 입력은 관측 시점 이전 데이터에서 전체 학습 종목이 모두 존재하는 가장 최근 공통 일봉을 선택합니다. 서로 다른 날짜를 섞거나 빠진 가격을 채우지 않습니다. 공통 일봉이 없으면 입력 오류를 반환합니다.

@@ -83,7 +83,7 @@ GGUF 실행은 설치된 `llama-server`를 사용한다. 컨텍스트 길이, CP
 - 학습 입력은 FinRL-X `DataStore`에 저장된 과거 가격이다.
 - FinRL-X의 `StrategyResult`와 `BacktestEngine` 원본 API를 호출한다.
 - 학습·백테스트는 저장 가격을 사용한다. 운영 시세 수신은 별도 Yahoo/Kraken/키움 경로이며 실제 증권사 주문은 호출하지 않는다.
-- 이번 전체 검토에서는 새 학습·전체 백테스트·GPU Expert 추론을 실행하지 않았다. 사전 검사·조회 성공을 학습 완료나 수익률 개선으로 설명하지 않는다.
+- 2026-10-13 현재 선택된 11개 Expert, AAPL/MSFT·USD·SAC로 신규 모델 생성과 105단계 진단 학습(업데이트 5회)을 실제 실행했다. 기본 5,000단계를 변경한 것이 아니며 수익성·수렴 검증이 아니다. 관측 726D와 현금 포함 행동 3D를 확인했다.
 - 원본 FinRL-X 서브모듈 소스는 수정하지 않는다.
 
 ## 원본 위치
@@ -95,3 +95,11 @@ GGUF 실행은 설치된 `llama-server`를 사용한다. 컨텍스트 길이, CP
 - rolling 예제 설정: `FinRL-X/src/strategies/fundamental_portfolio_drl.py`
 - 포트폴리오 환경: 설치된 `finrl/meta/env_portfolio_optimization/env_portfolio_optimization.py`
 - SB3 SAC 기본 정책: 설치된 `stable_baselines3/sac/policies.py`, `stable_baselines3/sac/sac.py`
+
+## 실행 의존성
+
+운영/키움 요구와 재현 버전은 `requirements/operations.txt`, `operations.lock.txt`, `kiwoom.txt`, `kiwoom.lock.txt`가 관리합니다. `.venv`는 websockets 10.4, `.venv-kiwoom`은 SDK 1.0.2와 websockets 15.0.1을 사용합니다. 주 FinRL/NumPy/Pandas 버전을 SDK 요구에 맞춰 바꾸지 않습니다. `teachers`의 stockstats도 FinRL 요구와 같은 0.5.4입니다. Frozen FinCast의 실제 실행 의존성 beartype 0.22.9/einx 0.4.3/colt5-attention 0.11.2를 포함합니다.
+
+원본 주식 Expert는 전체 학습 종목의 동일 과거 거래일 가격·원본 지표를 요구합니다. 일부 종목만 갱신된 최근 일봉 대신 관측 시점 이전의 가장 최근 완전한 공통 거래일을 사용합니다. 일봉을 만들거나 종목을 제외하지 않습니다.
+
+2026-10-13 실행 검증: 신규 SAC의 11개 Expert 모두 CUDA 추론, 105단계 진단 학습·업데이트 5회, 평가 251개 거래일과 공식 가치·지표 저장을 완료했습니다. 현재 USD 선택은 새 호환 체크포인트이며 구형 모델·Replay와 이전 선택 경로는 보존합니다. 원본 BacktestEngine의 가중치 이력·거래 DataFrame은 비어 있으므로 해당 표를 체결 내역으로 취급하지 않습니다.

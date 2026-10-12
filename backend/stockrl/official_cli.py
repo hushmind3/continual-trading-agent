@@ -34,9 +34,7 @@ def main():
         if args.command=='backtest':
             destination=args.output or ROOT/'runtime/official/backtests'/args.currency
             destination.mkdir(parents=True,exist_ok=True)
-            from pandas import Timedelta
-            trade=frame.date.max()+Timedelta(days=1)
-            frame=frame[(frame.date>=trade-Timedelta(days=365))&(frame.date<trade)]
+            # Keep pre-evaluation history for Experts; framework splits trading dates.
             result=backtest(frame,registry,args.currency,args.champion_path,args.checkpoint_path);print(result.to_metrics_dataframe().to_string())
             result.portfolio_values.to_csv(destination/'backtest.csv')
             # Persist official engine metrics for the HTTP/UI adapter.

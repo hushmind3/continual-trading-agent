@@ -31,3 +31,7 @@ menu_registry.py는 큰 메뉴 연결 파일 5개만 import하고, 각 파일은
 menu_registry.py는 큰 메뉴 연결 파일 5개만 import합니다. 각 큰 메뉴 연결 파일은 자기 아래 작은 메뉴만 연결합니다. 기존 API 핸들러를 메뉴별로 묶어 bind하고 dispatch하며 SystemOperations에 메뉴 연결을 추가하지 않습니다. 상태·모델·작업 관리는 기존 공통 관리자를 사용합니다.
 
 등록된 화면·추가 기능·API 입력 계약은 단일 state의 menu_catalog 조회로 제공합니다. API 등록은 실제 실행 성공을 뜻하지 않습니다.
+
+## 응답·환경 검증
+
+`api_transport.py`가 `UnifiedAPI`, 유한 숫자 JSON 응답 및 내부 요청 전달을 담당하고 `web_api.py`는 실제 핸들러·React 제공을 연결합니다. `tests/test_http_transport.py`는 실제 FastAPI 요청으로 조회·실행·오류 전달을 검사합니다. 주 환경은 시스템 패키지를 공유하지 않는 `.venv`, 키움 SDK는 별도 `.venv-kiwoom`입니다.

@@ -28,6 +28,7 @@ from . import ROOT
 from .finrl.framework import CASH_ENVIRONMENT,policy_files,policy_checkpoint,sac_example,finrl_file,champion_structure_environment
 from .finrl_trading import finrlx
 from .state_io import atomic_json, read_json, update_json
+from .api_transport import FiniteJSONResponse,UnifiedAPI
 from .platform.resources import ResourceMonitor
 from .platform.system_operations import system,apply_state,apply_running,start_apply,busy,check_system
 from .platform.operations_runtime import runtime
@@ -42,30 +43,8 @@ MODEL_DIR = Path.home() / "Desktop/모델"
 ENVIRONMENT = CASH_ENVIRONMENT
 
 
-def finite_json(value):
-    if isinstance(value,float) and not math.isfinite(value):return None
-    if isinstance(value,dict):return {key:finite_json(item) for key,item in value.items()}
-    if isinstance(value,(list,tuple)):return [finite_json(item) for item in value]
-    return value
-
-
-class FiniteJSONResponse(JSONResponse):
-    def render(self,content):
-        return super().render(finite_json(content))
-
-
 app = FastAPI(title="FinRL local workspace", version="2",default_response_class=FiniteJSONResponse)
 private_api=APIRouter(default_response_class=FiniteJSONResponse)
-class UnifiedAPI:
-    async def __call__(self,scope,receive,send):
-        route,forwarded,body=scope['state']['api_dispatch']
-        received=False
-        async def payload():
-            nonlocal received
-            if received:return await receive()
-            received=True
-            return {'type':'http.request','body':body,'more_body':False}
-        await route.handle(forwarded,payload,send)
 app.router.routes.append(Route('/api',UnifiedAPI(),methods=['GET','POST']))
 FRONTEND_DIST = ROOT / "frontend/dist"
 app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets"), check_dir=False), name="react-assets")

@@ -1,12 +1,17 @@
 """Official Kiwoom SDK for OAuth/transport; existing normalized domestic bar parser."""
 import asyncio
+import json
+import os
+import subprocess
 from datetime import datetime,timezone
 import threading
 import time
 from zoneinfo import ZoneInfo
-from kiwoom import KiwoomAuth,KiwoomClient,KiwoomWebSocketClient
-from kiwoom.core.secrets import StaticSecretProvider
-from kiwoom.core.token_store import MemoryTokenStore
+if os.environ.get('STOCKRL_KIWOOM_WORKER')=='1':
+    from kiwoom import KiwoomAuth,KiwoomClient,KiwoomWebSocketClient
+    from kiwoom.core.secrets import StaticSecretProvider
+    from kiwoom.core.token_store import MemoryTokenStore
+from .. import ROOT
 from ..kiwoom_stream import KiwoomRealtimeStream,_number
 from ..provider_credentials import get_credentials,read_settings
 from ..state_io import atomic_json,read_json
@@ -65,7 +70,7 @@ class USQuotes(DomesticQuotes):
             self._set(last_message_utc=datetime.now(timezone.utc).isoformat(),last_error=None)
 
 
-class BrokerStreams:
+class _SDKBrokerStreams:
     def __init__(self,collector):
         self.collector=collector;self.stop=collector.broker_stop;self.thread=None;self.states={}
         cfg=read_settings(collector.runtime_dir);self.environment=cfg['environment']
@@ -178,3 +183,53 @@ class BrokerStreams:
     def close(self):
         self.stop.set()
         if self.thread:self.thread.join(timeout=10)
+
+
+class BrokerStreams:
+    """Keep the Kiwoom SDK's dependencies in its own process; share normalized events."""
+    def __init__(self,collector):
+        self.collector=collector;self.stop=collector.broker_stop
+        self.thread=None;self.process=None
+
+    def _event(self,event):
+        kind=event.get('kind');value=event.get('value')
+        if kind=='bar':self.collector.broker_rows.put(value)
+        elif kind=='status':self.collector.broker_status.update(value)
+        elif kind=='quote':self.collector.latest_quotes[value['symbol']]=value['quote']
+        elif kind=='symbols':self.collector.broker_symbols.update(value)
+
+    def start(self):
+        python=ROOT/'.venv-kiwoom/Scripts/python.exe'
+        if not python.is_file():raise RuntimeError('키움 SDK 실행 환경이 없습니다. 설치.cmd로 준비하세요.')
+        env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_KIWOOM_WORKER='1')
+        log=self.collector.runtime_dir/'kiwoom-sdk.stderr.log';log.parent.mkdir(parents=True,exist_ok=True)
+        with log.open('ab') as errors:
+            self.process=subprocess.Popen([str(python),'-m','stockrl.platform.kiwoom_worker'],
+                cwd=ROOT,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=errors,
+                text=True,encoding='utf-8',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        payload={'runtime_dir':str(self.collector.runtime_dir),'instruments':self.collector.instruments,
+                 'broker_instruments':self.collector.broker_instruments,'broker_symbols':sorted(self.collector.broker_symbols)}
+        self.process.stdin.write(json.dumps(payload,ensure_ascii=False)+'\n');self.process.stdin.flush()
+        def receive():
+            try:
+                for line in self.process.stdout:
+                    try:event=json.loads(line)
+                    except ValueError:continue
+                    if isinstance(event,dict) and event.get('protocol')=='stockrl-kiwoom-v1':self._event(event)
+                code=self.process.wait()
+                if code and not self.stop.is_set():self.collector.broker_status.update(connected=False,last_error=f'키움 SDK 작업 종료 ({code}); {log}')
+            finally:self.collector.broker_status.update(connected=False)
+        self.thread=threading.Thread(target=receive,name='kiwoom-sdk-events',daemon=True);self.thread.start()
+
+    def close(self):
+        self.stop.set()
+        if self.process and self.process.poll() is None:
+            try:self.process.stdin.write('{"stop":true}\n');self.process.stdin.flush()
+            except (OSError,ValueError):pass
+            try:self.process.wait(timeout=15)
+            except subprocess.TimeoutExpired:self.process.terminate();self.process.wait(timeout=5)
+        if self.thread:self.thread.join(timeout=5)
+        if self.process:
+            for stream in (self.process.stdin,self.process.stdout):
+                try:stream.close()
+                except (OSError,ValueError):pass

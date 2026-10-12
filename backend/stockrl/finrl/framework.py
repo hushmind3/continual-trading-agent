@@ -177,6 +177,8 @@ def backtest(frame,registry,currency=None,champion_path=None,checkpoint_path=Non
         while not raw._terminal:
             action,_=model.predict(observation,deterministic=True)
             observation,_,terminal,truncated,_=env.step(action)
+            # Upstream termination returns the previous date/action without advancing.
+            if terminal:break
             allocation=raw._actions_memory[-1]
             rows.append({'date':raw._info['end_time'],**dict(zip(env.symbols,allocation[1:])), 'CASH':float(allocation[0])})
             if terminal or truncated:break

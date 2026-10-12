@@ -346,6 +346,8 @@ def champion_info(path):
 
 
 def list_champions():
+    from .system_operations import system
+    system.prune_missing_file_states('champion:')
     result = []
     for path in sorted(MODEL_DIR.glob("*_champion_*.pt")):
         try:

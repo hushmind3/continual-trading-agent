@@ -39,7 +39,7 @@ backend/stockrl/
     operations.py             추가 데이터·전략·공급원 실행 등록
   job_worker.py               별도 SAC/백테스트/수집 작업과 저장 기록
   platform/system_operations.py 통합 시작·중지·점검, 런처 적용 요청
-  expert_registry_native.py   현재 Registry, 동결 추론, 8개 관측 요약
+  expert_registry_native.py   현재 Registry, 동결 추론, Expert별 64D 출력
   expert_observation.py       원본 환경을 감싼 Gymnasium ObservationWrapper
   moe_native.py               패키지 원본 구조와 runner로 추론
   moe_stock_policies.py       기존 주식 Expert의 원본 입력·정책 추론
@@ -116,7 +116,7 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 1. React 주 학습 화면의 알고리즘·통화·종목·학습 단계 선택 → `preflight/train` → `/api/train` → `web_api.launch` → 별도 `stockrl.job_worker`. 알고리즘 목록과 공식 기본 설정은 백엔드 `/api/algorithms`가 설치된 FinRL에서 읽습니다. 기본 선택은 SAC입니다.
 2. `official_cli.main` → `finrl_trading.data.prices(currency,symbols)` → 공식 DataStore의 실제 가격.
 3. `finrl.framework.training_environment` → FinRL `data_split`의 기존 1,095일/365일 구간 → FinRL 원본 `PortfolioOptimizationEnv`. 기간 분할을 위해 FinRL-X RL 모듈을 import하거나 그 모듈의 전역 FinRL 예측 함수 교체를 실행하지 않습니다.
-4. `ExpertObservation.observation` → `ExpertRegistry.outputs` → ExpertPool → 원본 관측을 펼친 값 + 시장/매매별 평균·표준편차·최대 절댓값·성공 수 8개.
+4. `ExpertObservation.observation` → `ExpertRegistry.outputs` → ExpertPool → 원본 관측을 펼친 값 + Expert별 실제 출력 64D + 계좌 상대값 16D.
 5. `finrl.framework.train` → FinRL `DRLAgent.get_model(algorithm, MODEL_KWARGS[algorithm])`·`train_model` → 선택한 SB3 알고리즘. 이어 학습·백테스트·운영 로딩은 저장 메타데이터의 실제 알고리즘 클래스를 사용합니다. SAC Champion은 SAC에서 사용합니다.
 6. 완료 시 `{algorithm}.zip`, `dataset.json`과 해당 알고리즘에서 사용하는 Replay를 저장하고 통화별 운영 정책으로 선택합니다. 작업 stdout 로그는 `runtime/official/jobs/`에 기록됩니다.
 
@@ -267,6 +267,8 @@ FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합
 수신 분봉·시세는 CSV와 received_bars 인덱스에 보관하고, 완료 일봉만 공식 가격 저장소에 공급합니다. 가격 조회는 완료 일봉 저장소를 우선하며 분봉으로 확인된 행은 학습에서 제외합니다. 구분되지 않는 상충 일봉은 오류로 반환합니다. 모든 종목이 갖춰진 가장 최근 공통 일봉으로 추론하며 저장 성공·중복 제거를 통과한 행만 원장에 전달합니다. 시세 수신과 추론은 별도 스레드이고, 같은 일봉 데이터 버전으로 지속학습을 반복하지 않습니다. 수동 즉시 체결은 기존 수신기의 5분 최신 시세 기준을 사용합니다.
 
 GitHub backend-integrity CI는 Python 구문 검사와 tests/test_state_integrity.py의 회귀 검증을 실행합니다. 실제 GPU 정책 성능과 전체 백테스트 검증은 별도입니다.
+
+시세 공급원별 없는 선택 필드는 `None`으로 처리하며 API 응답의 비정상 숫자는 `null`로 전달합니다. 외부에서 삭제한 Champion 파일의 상태·오류 캐시는 다음 통합 조회에서 제거합니다. 회귀 검사에는 혼합 시세 필드의 JSON 정합성과 삭제된 Champion 오류의 제거를 포함합니다. 전체 검토의 확인 결과·남은 차단 사항·검증 범위는 [프로젝트 검토 보고서](프로젝트_검토보고서.md)에 기록했습니다.
 
 CI 워크플로가 main에 설치되기 전에는 수신기가 waiting_for_main_workflow로 대기하며, Issue별 수정 실행·직접 배포를 시작하지 않습니다.
 

@@ -494,7 +494,7 @@ def state_view(path):
         'provider':(provider,None),
         'settings':(operational_settings,lambda:state_stamp(config/'local/operations.json')),
         'models':(model_files,lambda:state_stamp(config/'experts.json',*MODEL_DIR.rglob('*'))),
-        'champions':(champions,lambda:state_stamp(*MODEL_DIR.glob('sac_champion_*.pt'))),
+        'champions':(champions,lambda:state_stamp(*MODEL_DIR.glob('*_champion_*.pt'))),
         'logs':(logs,lambda:state_stamp(*(official/name for name in ('api.stderr.log','api.stdout.log','server.stderr.log','training.log')))),
     }
     if key=='evaluation':
@@ -519,6 +519,7 @@ def state(views:str='[]',refresh_views:bool=False):
         if not isinstance(requested,list) or not all(isinstance(path,str) for path in requested):raise ValueError('상태 항목 목록이 필요합니다.')
     except (ValueError,TypeError) as exc:raise HTTPException(400,str(exc)) from exc
     if refresh_views:system.invalidate_states()
+    system.prune_missing_file_states('champion:')
     imports=system.connect_modules()
     settings=system.state_value('settings',source_settings,())
     db=system.state_value('data',database,lambda:state_stamp(DB,DB.with_name(DB.name+'-wal'),ROOT/'configs/instruments.json'))

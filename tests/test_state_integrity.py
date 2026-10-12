@@ -87,6 +87,28 @@ class IntegrityTests(unittest.TestCase):
   runtime=OperationsRuntime();runtime.account=PaperAccount.in_memory(0,0)
   runtime.accept([row('AAPL','2026-01-03',100)]);runtime.accept([row('AAPL','2026-01-02',80)])
   self.assertEqual(runtime.quotes['AAPL']['close'],100)
+ def test_mixed_provider_quotes_keep_missing_fields_json_safe(self):
+  runtime=OperationsRuntime();runtime.account=PaperAccount.in_memory(0,0)
+  first=row('AAPL','2026-01-03');second={**row('MSFT','2026-01-03'), 'bid':99.,'ask':101.,'trade_count':2}
+  runtime.accept([first,second])
+  self.assertIsNone(runtime.quotes['AAPL']['bid'])
+  self.assertIsNone(runtime.quotes['AAPL']['trade_count'])
+  json.dumps(runtime.quotes,allow_nan=False)
+ def test_deleted_champion_clears_file_caches_without_hiding_other_errors(self):
+  from stockrl.platform.system_operations import SystemOperations
+  cache=SystemOperations.__new__(SystemOperations);cache.state_lock=threading.RLock();cache.state_revision=0
+  with tempfile.TemporaryDirectory() as directory:
+   present=Path(directory)/'present.pt';present.touch()
+   kept='champion:'+str(present);removed='champion:'+str(Path(directory)/'deleted.pt')
+   for name in ('states','state_signatures','state_errors','state_updates'):
+    setattr(cache,name,{kept:'invalid existing file',removed:'deleted file','import:other':'other error'})
+   cache.prune_missing_file_states('champion:')
+   for name in ('states','state_signatures','state_errors','state_updates'):
+    self.assertNotIn(removed,getattr(cache,name));self.assertIn(kept,getattr(cache,name));self.assertIn('import:other',getattr(cache,name))
+   self.assertEqual(cache.state_revision,1)
+   cache.prune_missing_file_states('champion:');self.assertEqual(cache.state_revision,1)
+   present.unlink();cache.prune_missing_file_states('champion:')
+   self.assertNotIn(kept,cache.state_errors);self.assertEqual(cache.state_revision,2)
  def test_daily_read_excludes_intraday_rows(self):
   import sqlite3
   from stockrl.finrl_trading import data as framework

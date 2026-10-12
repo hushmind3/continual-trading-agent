@@ -6,56 +6,56 @@
 
 | 설정 | 현재 값 | 출처 |
 |---|---:|---|
-| 학습 함수 | `FinRL-X/src/strategies/rl_model.py::train_sac(agent)` 직접 호출 | FinRL-X 원본 함수 |
+| 학습 함수 | FinRL `DRLAgent.get_model()` / `DRLAgent.train_model()` | `backend/stockrl/finrl/framework.py`의 현재 호출 |
 | 알고리즘 / 정책 | SB3 `SAC`, `MlpPolicy` | FinRL `DRLAgent.get_model()` 기본 정책 및 SB3 원본 |
-| 총 학습 단계 | 50,000 | FinRL-X `train_sac` 예제 |
-| 배치 크기 | 128 | FinRL-X SAC 예제에서 지정 |
-| Replay 용량 | 100,000 | FinRL-X SAC 예제에서 지정 |
-| 학습률 | 0.0003 | FinRL-X SAC 예제에서 지정 |
-| 학습 시작 전 단계 | 100 | FinRL-X SAC 예제에서 지정 |
-| 엔트로피 계수 | `auto_0.1` | FinRL-X SAC 예제에서 지정 |
+| 기본 학습 단계 | 5,000 | 설치된 FinRL `DRLAgent.train_model(total_timesteps=...)` 기본값. 요청의 `total_timesteps`로 변경 가능 |
+| 배치 크기 | 64 | 설치된 FinRL `MODEL_KWARGS['sac']` |
+| Replay 용량 | 100,000 | 설치된 FinRL `MODEL_KWARGS['sac']` |
+| 학습률 | 0.0001 | 설치된 FinRL `MODEL_KWARGS['sac']` |
+| 학습 시작 전 단계 | 100 | 설치된 FinRL `MODEL_KWARGS['sac']` |
+| 엔트로피 계수 | `auto_0.1` | 설치된 FinRL `MODEL_KWARGS['sac']` |
 | 그 밖의 SAC 인자 | SB3 설치 버전의 기본값 | 호출부에서 별도 인자를 넘기지 않음 |
 | Actor / Critic MLP | `[256, 256]`, ReLU | SB3 SAC 정책 기본값 |
 | 장치 | `auto` | SB3 기본값. 라이브러리가 CUDA 사용 가능 여부로 선택 |
 
-위 다섯 SAC 인자는 **SB3 라이브러리 기본값 전체가 아니라 FinRL-X 공식 예제의 값**이다. 예제를 그대로 실행하는 경로에서는 예제 값을 바꾸지 않는다. 별도로 만든 정책 구조, 손실 함수, Optimizer, Replay 구현은 사용하지 않는다.
+위 다섯 SAC 인자는 **SB3 라이브러리 기본값 전체가 아니라 설치된 FinRL의 알고리즘 설정**이다. SB3 SAC 자체 기본값은 배치 256, Replay 1,000,000, 학습률 0.0003, 엔트로피 `auto`이며 `state.settings.sb3_defaults`에서 별도로 조회한다. FinRL-X의 과거 `train_sac` 예제 설정을 현재 주 학습 경로로 설명하지 않는다. SB3의 학습·손실·Optimizer·Replay를 사용하되, SAC 및 MoE Champion의 관측 결합에는 프로젝트 `ChampionExtractor`를 연결한다.
 
-FinRL-X 예제는 학습 종료 시점 체크포인트를 만들도록 정하지 않는다. 이 프로젝트는 재시작을 위해 공식 SB3 `save()`와 `save_replay_buffer()`를 학습 종료 후 호출한다. 자체 중간 저장 주기나 자체 학습 반복 횟수는 추가하지 않았다. 이전 프로젝트 자체 정책과 Replay는 새 SAC 정책에 승계하지 않는다.
+이 프로젝트는 정상 학습 종료 후 공식 SB3 `save()`와, Replay를 지원하는 알고리즘의 `save_replay_buffer()`를 호출한다. A2C/PPO는 Replay를 저장하지 않는다. 자체 중간 저장 주기는 추가하지 않았다. 이어 학습은 동일 알고리즘·환경·통화·종목·Expert 계약을 검사하며 구형 환경의 정책·Replay를 자동 변환하지 않는다. MoE 생성과 학습은 설치된 FinRL의 A2C/DDPG/PPO/TD3/SAC/TQC/CrossQ 목록을 사용하며 정책 구조와 Replay 지원 여부를 알고리즘별로 구분한다.
 
 ## 가격·전처리·환경
 
 | 설정 | 현재 값 | 출처 / 의미 |
 |---|---:|---|
 | 가격 저장·조회 | FinRL-X `DataStore` | 원본 FinRL-X API |
-| 기술 지표 전처리 | FinRL `FeatureEngineer()` | 원본 생성자 기본 설정 |
-| 학습·평가 구간 나누기 | FinRL-X `prepare_rolling_train/test()` | 원본 함수 |
-| 전체 rolling 구간 / 평가 구간 | 1,095일 / 365일 | FinRL-X `fundamental_portfolio_drl.py` 예제 호출값 |
-| 포트폴리오 환경 | FinRL `StockPortfolioEnv` | 설치된 FinRL 원본 클래스 |
-| 공분산 lookback | 252 거래 관측 | FinRL Portfolio Allocation 튜토리얼 방식 |
-| `hmax` | 100 | FinRL Portfolio Allocation 튜토리얼 값 |
-| 초기 자본 | 1,000,000 | FinRL Portfolio Allocation 튜토리얼 값 |
-| `transaction_cost_pct` | 0.001 | FinRL Portfolio Allocation 튜토리얼 값 |
-| `reward_scaling` | 0.0001 | FinRL Portfolio Allocation 튜토리얼 값 |
-| 종목·상태·행동 차원 | 선택 종목 수 | 이 환경의 포트폴리오 입력 규격 |
-| 지표 목록 | `finrl.config.INDICATORS` | 설치된 FinRL 설정 |
-| `turbulence_threshold`, `lookback`, `day` | `None`, 252, 0 | 원본 생성자 기본값 |
+| 정책 가격 전처리 | `normalize_df='by_previous_time'` | `PortfolioOptimizationEnv` 원본 기본값. 별도 StockTradingEnv 화면은 `FeatureEngineer` 사용 |
+| 학습·평가 구간 나누기 | FinRL `data_split()` | `training_environment()`에서 원본 함수 호출 |
+| rolling 시작 범위 / 평가 구간 | 1,095일 / 365일 | 프로젝트가 마지막 가격 다음 날을 기준으로 학습 종료·평가 시작을 계산 |
+| 포트폴리오 환경 | FinRL `PortfolioOptimizationEnv` + Shimmy + `ExpertObservation` | `cash_environment()`의 현재 환경 |
+| 공분산 lookback | 사용하지 않음 | 현재 환경에 공분산 관측을 추가하지 않음 |
+| `hmax` | 사용하지 않음 | 현재 환경의 인자가 아님 |
+| 초기 자본 | 1,000,000 | 프로젝트 환경 생성 시 지정 |
+| 수수료 | `comission_fee_model='trf'`, `comission_fee_pct=0` | 환경 원본 기본값. 운영 가상계좌의 수수료·슬리피지와 별도 |
+| `reward_scaling` | 1 | 환경 원본 기본값 |
+| 관측 / 행동 | 가격 관측을 펼친 값 + Expert별 64D + 계좌 16D / 현금 1 + 종목 수 | 현금은 환경 행동의 첫 항목이며 원장 전달 시 마지막 항목으로 이동 |
+| 가격 특성 | `close`, `high`, `low` | 환경 원본 `features` 기본값 |
+| 관측 시간창 | `time_window=1` | 환경 원본 기본값 |
 
-환경은 FinRL-X가 아니라 FinRL의 공식 `StockPortfolioEnv`다. FinRL-X `fundamental_portfolio_drl.py`의 환경 설정 전체를 그대로 쓴다고 표시하면 틀린다. 그 예제는 `k_eig=10`을 전달하지만 설치된 FinRL `StockPortfolioEnv`에는 `k_eig` 인자가 없다. 현재 연결은 별도 `k_eig`나 임의 환경 변경 없이 FinRL의 Portfolio Allocation 튜토리얼 입력 규격을 사용한다.
+현재 주 정책 경로는 FinRL의 현금 포함 `PortfolioOptimizationEnv`다. 과거 `StockPortfolioEnv`의 관측·행동 규격과 다르며 구형 체크포인트는 호환 검사에서 차단한다. 원본의 Gym 환경은 Shimmy로 Gymnasium 계약에 연결하고 가격 행렬의 날짜별 종목 누락·중복을 학습 전에 검사한다. 별도 주식거래 메뉴의 `StockTradingEnv` 결과를 MoE Champion과 호환이라고 표시하지 않는다.
 
-환경의 원본 `step()`은 행동을 합계 1의 포트폴리오 비중으로 정규화하고 다음 가격 변화로 계좌 가치를 계산한다. 원본 코드에서 `transaction_cost_pct`는 이 `step()`에 적용되지 않으며 `reward_scaling`도 보상 계산에서 주석 처리되어 있다. 따라서 이 환경을 실제 수수료 차감 체결이나 실계좌 동작으로 설명하지 않는다. 별도의 FinRL-X `BacktestEngine`은 엔진 원본 기본 설정으로 실행하며, 자체 설정을 넘기는 경우 시작일과 종료일만 지정한다.
+환경의 가격 정규화·보상·수수료 동작은 설치된 `PortfolioOptimizationEnv` 원본을 따른다. 학습 환경과 운영 `PaperAccount`의 체결·비용 계산은 별도이며 실제 증권사 주문을 실행하지 않는다. 정책 백테스트는 원본 환경의 비중을 FinRL-X `StrategyResult`·`BacktestEngine`에 전달한다.
 
 ## Expert 연결과 프로젝트 전용 값
 
-Expert는 동결 자산이며 등록·선택·로딩·해제는 프로젝트 연결 계층이 담당한다. Expert를 학습시키거나 Expert 구조에 SAC 설정을 덮어쓰지 않는다. 관측 연결은 Gymnasium `ObservationWrapper`를 사용하며, 기존 환경 관측 뒤에 시장 예측·매매 판단의 요약 신호 8개를 붙인다. 이는 FinRL-X/SB3 기본 기능이 아니라 현재 Expert 입력 계약이다.
+Expert는 동결 자산이며 등록·선택·로딩·해제는 프로젝트 연결 계층이 담당한다. Expert를 학습시키거나 Expert 구조에 SAC 설정을 덮어쓰지 않는다. Gymnasium `ObservationWrapper`는 기존 환경 관측 뒤에 Expert별 실제 출력 64D와 계좌 상대값 16D를 붙인다. `ChampionExtractor`는 이 입력을 공식 알고리즘의 정책·가치 구조에 연결한다. 이는 FinRL-X/SB3 원본 기본 구조가 아니라 프로젝트 관측 계약이다.
 
 현재 코드에는 프레임워크 기본값이 아닌 Expert 연결 값도 있다.
 
 | 설정 | 현재 값 | 범위 |
 |---|---:|---|
-| Expert 출력 요약 | 8개 값 | 프로젝트 관측 계약 |
+| Expert 출력 | Expert별 64D + 계좌 16D | 프로젝트 관측 계약 |
 | 예측 요청 기본 horizon | 1 | 프로젝트 호출 계약; 최대 요청 128 |
 | 최소 시장 이력 | 예측형 32행, 매매형 128행 | Expert 등록 계약 |
-| Expert 결과 캐시 상한 | 제한 없음 | 별도 캐시 제한 제거 |
+| Expert 결과 캐시 | Expert·통화별 마지막 입력·계좌 서명과 결과 | `ExpertRegistry.outputs()`가 동일 입력일 때 재사용하며 새 입력으로 교체 |
 | 메모리 여유 예약 | 없음 | 현재 사용 가능 RAM/VRAM 기준 |
 | Expert 요청 제한 시간 | HTTP 라이브러리 기본값 | 요청 timeout 인자 생략 |
 | Native Expert Torch CPU threads | PyTorch 기본값 | 별도 전역 재설정 제거 |
@@ -65,7 +65,7 @@ Expert는 동결 자산이며 등록·선택·로딩·해제는 프로젝트 연
 | Kronos context / sample count / verbosity | Kronos API 기본값 | 선택 인자 생략 |
 | GGUF 포트·로그 경로 | 동적 포트·전용 로그 파일 | 여러 Expert 프로세스 연결 |
 
-메모리 예약·캐시 상한을 임의로 제한하지 않고 현재 사용 가능 메모리로 적재를 판단한다. Expert 입출력 계약은 유지하면서 라이브러리가 기본값을 제공하는 선택 인자는 생략한다. horizon, 장치, 모델 가중치 형식, 입출력 tensor dtype처럼 패키지 호환에 필요한 인자는 유지한다.
+메모리 예약을 임의로 추가하지 않고 현재 사용 가능 메모리로 적재를 판단한다. Expert 출력 캐시와 통합 관리자의 정책·메타데이터 캐시는 역할이 다르다. Expert 입출력 계약을 유지하면서 라이브러리가 기본값을 제공하는 선택 인자는 생략하며 horizon, 장치, 모델 가중치 형식, 입출력 tensor dtype처럼 패키지 호환에 필요한 인자는 유지한다.
 
 공식 설정과 프로젝트 연결 설정을 적용할 때의 기준은 다음과 같다.
 
@@ -82,15 +82,16 @@ GGUF 실행은 설치된 `llama-server`를 사용한다. 컨텍스트 길이, CP
 
 - 학습 입력은 FinRL-X `DataStore`에 저장된 과거 가격이다.
 - FinRL-X의 `StrategyResult`와 `BacktestEngine` 원본 API를 호출한다.
-- 현재 이 경로는 키움 실시간 수신과 실제 주문을 실행하지 않는다.
-- 50,000단계 공식 SAC 예제 학습을 이번 변경 과정에서 실행하지 않았다. 따라서 완료된 학습이나 수익률 개선을 주장하지 않는다.
+- 학습·백테스트는 저장 가격을 사용한다. 운영 시세 수신은 별도 Yahoo/Kraken/키움 경로이며 실제 증권사 주문은 호출하지 않는다.
+- 이번 전체 검토에서는 새 학습·전체 백테스트·GPU Expert 추론을 실행하지 않았다. 사전 검사·조회 성공을 학습 완료나 수익률 개선으로 설명하지 않는다.
 - 원본 FinRL-X 서브모듈 소스는 수정하지 않는다.
 
 ## 원본 위치
 
 - FinRL-X 서브모듈 커밋: `4409abe925c904e570be78ebfb5e77ac3491dff8`
 - FinRL 설치 소스 커밋: `00f3596facd01cced5217d875d8c1fc413a31665`
-- SAC 예제: `FinRL-X/src/strategies/rl_model.py`
+- 현재 알고리즘 설정·기본 단계: 설치된 `finrl/agents/stablebaselines3/models.py`
+- 과거 SAC 예제: `FinRL-X/src/strategies/rl_model.py` (현재 주 학습 경로 아님)
 - rolling 예제 설정: `FinRL-X/src/strategies/fundamental_portfolio_drl.py`
-- 포트폴리오 환경: 설치된 `finrl/meta/env_portfolio_allocation/env_portfolio.py`
+- 포트폴리오 환경: 설치된 `finrl/meta/env_portfolio_optimization/env_portfolio_optimization.py`
 - SB3 SAC 기본 정책: 설치된 `stable_baselines3/sac/policies.py`, `stable_baselines3/sac/sac.py`

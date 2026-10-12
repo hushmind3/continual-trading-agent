@@ -223,6 +223,14 @@ class SystemOperations:
                     return self.states.get(name)
     def invalidate_states(self):
         with self.state_lock:self.state_signatures.clear()
+    def prune_missing_file_states(self,prefix):
+        with self.state_lock:
+            caches=(self.states,self.state_signatures,self.state_errors,self.state_updates)
+            names=set().union(*(cache.keys() for cache in caches))
+            missing=[name for name in names if name.startswith(prefix) and not Path(name[len(prefix):]).is_file()]
+            for name in missing:
+                for cache in caches:cache.pop(name,None)
+            if missing:self.state_revision+=1
     def connect_modules(self):
         import importlib
         import sys

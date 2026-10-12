@@ -231,18 +231,22 @@ class SystemOperations:
         with self.state_lock:self.state_signatures.clear()
     def connect_modules(self):
         import importlib
-        from ..framework import finrl_file,finrlx
+        import sys
+        from ..framework import finrl_file
         modules={
             'stockrl':['live_feed','platform.kiwoom_data','platform.assets','platform.expert_inference','platform.expert_conversion','platform.sac_champion'],
             'FinRL':['meta.env_portfolio_optimization.env_portfolio_optimization','meta.env_stock_trading.env_stocktrading','meta.preprocessor.preprocessors','meta.preprocessor.yahoodownloader','agents.stablebaselines3.models'],
-            'FinRL-X':['strategies.rl_model','backtest.backtest_engine','data.data_fetcher','data.trading_calendar']}
+            'FinRL-X':['data.data_store','strategies.base_strategy','backtest.backtest_engine','data.data_fetcher','data.trading_calendar']}
         result={}
         for framework,names in modules.items():
             for name in names:
                 key=framework+':'+name
+                if framework=='FinRL-X':
+                    module=sys.modules.get('src.'+name)
+                    result[key]={'imported':module is not None,'file':getattr(module,'__file__',None),'error':'','optional':True}
+                    continue
                 def load(framework=framework,name=name):
-                    if framework=='FinRL-X':module=finrlx(name)
-                    elif framework=='FinRL' and name.startswith('meta.env_portfolio_optimization.'):
+                    if framework=='FinRL' and name.startswith('meta.env_portfolio_optimization.'):
                         module=finrl_file(name.replace('.','/')+'.py')
                     else:module=importlib.import_module(('finrl' if framework=='FinRL' else 'stockrl')+'.'+name)
                     return {'imported':True,'file':getattr(module,'__file__',None)}

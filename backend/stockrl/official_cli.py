@@ -1,4 +1,4 @@
-"""Call original FinRL-X/FinRL/SB3 APIs, with only frozen Expert registration added."""
+"""Run FinRL/SB3 training and evaluation with optional frozen Expert integration."""
 import argparse
 from pathlib import Path
 from .framework import ROOT,prices,train,backtest

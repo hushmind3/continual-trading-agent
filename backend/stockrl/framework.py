@@ -1,4 +1,4 @@
-"""Official framework entrypoints; no policy, loss, optimizer or replay implementation."""
+"""FinRL/SB3 learning entrypoints with explicit FinRL-X storage/backtest extensions."""
 import importlib
 import importlib.util
 import sys
@@ -68,9 +68,11 @@ def validate_price_panel(frame,symbols):
 
 def training_environment(frame,registry,training=True,champion_ids=None):
     import pandas as pd
-    example=finrlx('strategies.rl_model');trade_date=frame.date.max()+pd.Timedelta(days=1)
-    prepared=(example.prepare_rolling_train if training else example.prepare_rolling_test)(
-        frame.rename(columns={'symbol':'tic'}),'date',pd.Timedelta(days=365),pd.Timedelta(days=1095),trade_date)
+    from finrl.meta.preprocessor.preprocessors import data_split
+    trade_date=frame.date.max()+pd.Timedelta(days=1)
+    start=trade_date-pd.Timedelta(days=1095 if training else 365)
+    end=trade_date-pd.Timedelta(days=365) if training else trade_date
+    prepared=data_split(frame.rename(columns={'symbol':'tic'}),start,end)
     prepared=prepared.rename(columns={'tic':'symbol'})
     if prepared.empty:raise ValueError('공식 rolling 구간에 PortfolioOptimizationEnv 가격 입력이 없습니다.')
     validate_price_panel(prepared,sorted(frame.symbol.unique()))
@@ -218,7 +220,6 @@ def backtest(frame,registry,currency=None,champion_path=None,checkpoint_path=Non
     try:
         if identity.get('currency')!=env.currency or identity.get('symbols')!=env.symbols:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다.')
         model=system.model(policy_checkpoint(saved),identity.get('algorithm','sac'),env)
-        from finrl.agents.stablebaselines3.models import DRLAgent
         observation,_=env.reset();raw=env.unwrapped.gym_env;rows=[]
         while not raw._terminal:
             action,_=model.predict(observation,deterministic=True)

@@ -32,6 +32,9 @@
 .workspace-layout-compact {grid-template-columns:52px minmax(0,1fr)}
 .workspace-sidebar {position:sticky;top:49px;height:calc(100dvh - 49px);overflow-y:auto;border-right:1px solid #e2e8f0;background:#fff;padding:8px}
 .workspace-menu-group {margin-bottom:8px}
+.workspace-menu-group:has(a[href="#frameworks"]),.workspace-menu-group:has(a[href="#finrl-trading"]) {border-top:1px solid #dbe2eb;padding-top:8px;margin-top:10px}
+.workspace-menu-group:has(a[href="#frameworks"])>summary {color:#1d4ed8;font-size:12px;font-weight:600}
+.workspace-menu-group:has(a[href="#finrl-trading"])>summary {color:#7c5b25;font-size:12px;font-weight:600}
 .workspace-menu-group>summary {padding:6px 4px;font-size:11px;font-weight:600;color:#94a3b8;cursor:pointer}
 .workspace-menu-item {display:flex;align-items:center;gap:8px;padding:7px 8px;margin:2px 0;border-radius:6px;font-size:12px;color:#475569}
 .workspace-menu-item:hover {background:#f1f5f9}

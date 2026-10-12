@@ -1,6 +1,6 @@
 # FinRL · SB3 + React — FinRL-X 보조
 
-React는 접고 펼치는 사이드 메뉴에서 시장 데이터, 운영 제어, 가상계좌, 정책 학습·평가, MoE, FinRL 공식 데이터·알고리즘 학습·백테스트, 모듈 도구, 연결 설정, 진단·로그를 각각 직접 제공합니다. MoE 외 화면의 공통 패널은 접고 펼칠 수 있으며 기존 실행 기능을 유지합니다. 프론트 적용은 React 파일만 갱신하고 백엔드 적용은 별도로 선택합니다. 실제 등록된 백엔드 명령은 통합 관리자가 동적으로 조회·중계합니다.
+React의 접이식 메뉴는 `FinRL · 메인`과 `FinRL-Trading · 보조` 구역을 구분합니다. FinRL 구역에는 정책 학습·평가, 주식거래 데이터·알고리즘 학습·백테스트, FinRL 모듈·도구를 제공합니다. FinRL-Trading(FinRL-X) 구역에는 보조 데이터·전략·설정 도구를 제공합니다. 도구·모듈·원본 함수 선택 목록은 각 구역의 프레임워크만 표시하며 같은 통합 API를 사용합니다. MoE와 프로젝트 모듈은 프로젝트 확장 구역, 시장·운영·계좌와 연결·진단은 공통 운영/관리 구역에 둡니다. MoE 외 화면의 공통 패널은 접고 펼칠 수 있으며 기존 실행 기능을 유지합니다. 프론트 적용은 React 파일만 갱신하고 백엔드 적용은 별도로 선택합니다. 실제 등록된 백엔드 명령은 통합 관리자가 동적으로 조회·중계합니다.
 
 모든 프론트 JSON 상태 조회는 `/api`의 `state` 요청 한 요청으로 수행하며 기존 `/api/framework/stock_data`, `/api/framework/stock_train`, `/api/framework/stock_backtest` 및 작업 중지 API를 사용합니다. 데이터는 YahooDownloader·FeatureEngineer·data_split, 학습은 StockTradingEnv·DRLAgent로 실행합니다. 원본의 A2C/DDPG/PPO/TD3/SAC 실행 플래그, 모델별 20,000단계와 예제별 모델 설정을 읽습니다. 백테스트는 DRL_prediction과 원본 예제의 MVO·DJIA 계산을 사용하며 실제 결과가 생성된 뒤 표·그래프·파일을 표시합니다.
 

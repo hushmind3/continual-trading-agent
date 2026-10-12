@@ -1,4 +1,5 @@
 export type Currency = "USD" | "KRW";
+export type FrameworkScope = "FinRL" | "FinRL-X" | "stockrl";
 export type Control = "learning";
 export interface Worker {alive?:boolean;requested?:boolean;status?:string;error?:string}
 export interface FileState {exists:boolean;bytes:number;modified:string|null}
@@ -20,6 +21,7 @@ export interface Expert {
   current_resources?:Record<string,unknown>;loaded?:boolean;
 }
 export interface Job {
+  parameters?:Record<string,unknown>;
   action?:string;result?:unknown;running:boolean;id?:string;status?:string;command?:string;pid?:number;started_at?:string;finished_at?:string;
   exit_code?:number;log_text:string;detail?:string;currency?:Currency;symbols?:string[];
   measurements:Record<string,number>;

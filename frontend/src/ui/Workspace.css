@@ -41,3 +41,6 @@
 .workspace-menu-item[aria-current="page"] {color:#1d4ed8;background:#e8f0ff;font-weight:600}
 .workspace-compact .ui-panel:has(>header button[aria-expanded="false"])>header {margin-bottom:0}
 @media(max-width:640px) {.workspace-layout {grid-template-columns:168px minmax(0,1fr)}.workspace-layout-compact {grid-template-columns:44px minmax(0,1fr)}.workspace-sidebar {padding:4px}.workspace-menu-item {padding:7px 6px;font-size:11px}}
+
+.workspace-menu-group:has(a[href^="#source-module-"]) {border-top:1px solid #dbe2eb;padding-top:8px;margin-top:10px}
+.workspace-menu-group:has(a[href^="#source-module-"])>summary {font-size:12px;color:#475569;font-weight:600}

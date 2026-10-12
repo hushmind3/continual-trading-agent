@@ -16,3 +16,4 @@ export interface BackendMenuCatalog {
  groups:{id:string;title:string;menus:{id:string;title:string;operations:string[];views:string[];frontend:string;manager:string}[]}[];
  actions:BackendAction[];commands:BackendCommand[];
 }
+export interface SourceModule {id:string;path:string;framework:string;description:string}

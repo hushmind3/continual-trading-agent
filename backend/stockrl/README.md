@@ -30,3 +30,5 @@ menu_registry.py는 큰 메뉴 연결 파일 5개만 import하고, 각 파일은
 menu_registry.py는 큰 메뉴 연결 파일 5개만 import합니다. 각 큰 메뉴 연결 파일은 자기 아래 작은 메뉴만 연결합니다. 기존 API 핸들러를 메뉴별로 묶어 bind하고 dispatch하며 SystemOperations에 메뉴 연결을 추가하지 않습니다. 상태·모델·작업 관리는 기존 공통 관리자를 사용합니다.
 
 등록된 화면·추가 기능·API 입력 계약은 단일 state의 menu_catalog 조회로 제공합니다. API 등록은 실제 실행 성공을 뜻하지 않습니다.
+
+state의 source_modules 조회는 설치 소스의 전체 목록을 제공하며 실행 가능 여부로 제외하지 않습니다. 정적 소스 목록은 기존 source_catalog 캐시를 공유하고 선택한 모듈의 실행 상태는 framework 조회에서 읽습니다.

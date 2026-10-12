@@ -40,8 +40,22 @@ RUNTIME = ROOT / "runtime/official"
 DB = ROOT / "data/finrl_trading.db"
 MODEL_DIR = Path.home() / "Desktop/모델"
 ENVIRONMENT = CASH_ENVIRONMENT
-app = FastAPI(title="FinRL local workspace", version="2")
-private_api=APIRouter()
+
+
+def finite_json(value):
+    if isinstance(value,float) and not math.isfinite(value):return None
+    if isinstance(value,dict):return {key:finite_json(item) for key,item in value.items()}
+    if isinstance(value,(list,tuple)):return [finite_json(item) for item in value]
+    return value
+
+
+class FiniteJSONResponse(JSONResponse):
+    def render(self,content):
+        return super().render(finite_json(content))
+
+
+app = FastAPI(title="FinRL local workspace", version="2",default_response_class=FiniteJSONResponse)
+private_api=APIRouter(default_response_class=FiniteJSONResponse)
 class UnifiedAPI:
     async def __call__(self,scope,receive,send):
         route,forwarded,body=scope['state']['api_dispatch']

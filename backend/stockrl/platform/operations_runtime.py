@@ -132,6 +132,7 @@ class OperationsRuntime:
         frame=pd.DataFrame(rows)
         if frame.empty:return
         for stamp,group in frame.sort_values('date').groupby('date',sort=True):
+            group=group.astype(object).where(group.notna(),None)
             with self.lock:
                 records=[r for r in group.to_dict('records') if r['symbol'] not in self.quotes or _moment(r['date'])>_moment(self.quotes[r['symbol']]['date'])]
             if not records:continue

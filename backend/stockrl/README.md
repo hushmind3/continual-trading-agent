@@ -18,6 +18,7 @@
 - FinRL·SB3가 알고리즘 선택·생성·학습을 담당합니다.
 - FinRL-Trading은 기존 저장·추가 수집·전략·비중 평가를 보조합니다.
 - React는 단일 /api를 호출합니다. 상태와 작업 관리는 SystemOperations가 공유합니다.
+- API JSON 응답의 `NaN`·무한대는 미측정 값인 `null`로 전달하여 일부 숫자 때문에 통합 상태 조회 전체가 실패하지 않도록 합니다. 모델·계좌·저장 데이터는 응답 변환으로 변경하지 않습니다.
 - 실행 코드 import는 stockrl.finrl 또는 stockrl.finrl_trading의 실제 모듈을 사용합니다.
 - 모델·Replay·데이터·계좌·인증은 이 소스 폴더의 정리 대상이 아닙니다.
 

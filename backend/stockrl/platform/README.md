@@ -17,6 +17,7 @@ FinRL과 FinRL-Trading의 실행 코드는 각 전용 폴더에 있습니다. �
 - framework_operations의 등록표는 요청 중계용입니다. 알고리즘을 병합하거나 재구현하지 않습니다.
 - FinRL 요청은 finrl.operations, 보조 요청은 finrl_trading.operations로 전달합니다.
 - 상태 조회는 SystemOperations 한 곳에서 관리하며 이미 적재한 모델을 재사용합니다.
+- 시세 공급원별로 없는 필드는 표 병합 후 `None`으로 처리합니다. 선택적 bid/ask·거래 수 필드가 `NaN`으로 시세 상태나 스프레드 관측에 섞이지 않도록 합니다.
 - 프론트 대응: 거래 운영, 프로젝트 확장, 연결·관리. 프레임워크 실행 목록은 해당 구역에 따로 표시합니다.
 
 메뉴 요청 분배는 상위 menu_registry.py가 담당합니다. SystemOperations는 상태·작업·모델 캐시와 공통 명령 목록을 유지합니다.

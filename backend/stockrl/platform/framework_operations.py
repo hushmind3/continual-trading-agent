@@ -11,10 +11,11 @@ from functools import lru_cache
 from pathlib import Path
 from .. import ROOT
 from ..finrl.framework import finrl_file
-from ..finrl_trading import finrlx
+from ..finrl_trading import finrlx,SOURCE_ROOT
 from ..finrl_trading.data import prices
 from ..finrl_trading.operations import provider_environment
 from ..state_io import atomic_json,read_json
+from .module_inventory import source_definition
 
 # Shared registry; execution belongs to each framework folder.
 from ..finrl.operations import ACTIONS as FINRL_ACTIONS
@@ -140,7 +141,7 @@ def native_call(parameters,output):
             context[value]=config.INITIAL_AMOUNT
         elif value=='$config':context[value]=finrlx('config.settings').get_config()
         elif value=='$rotation_config':
-            context[value]=finrlx('strategies.adaptive_rotation.config_loader').load_config(str(parameters.get('config_path',ROOT/'FinRL-X/src/strategies/AdaptiveRotationConf_v1.2.1.yaml')))
+            context[value]=finrlx('strategies.adaptive_rotation.config_loader').load_config(str(parameters.get('config_path',SOURCE_ROOT/'src/strategies/AdaptiveRotationConf_v1.2.1.yaml')))
         elif value=='$indicators':
             from finrl import config
             context[value]=config.INDICATORS
@@ -235,7 +236,7 @@ def execute(action,parameters,output):
     """Record the actual official functions called by a successful task."""
     called={};previous=sys.getprofile();source_names={}
     finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    source_root=ROOT/'FinRL-X/src'
+    source_root=SOURCE_ROOT/'src'
     def trace(frame,event,arg):
         if event!='call':return
         filename=frame.f_code.co_filename
@@ -274,52 +275,21 @@ def execute(action,parameters,output):
 
 @lru_cache(maxsize=1)
 def source_catalog():
-    """Inventory every real Python source, without executing package import side effects."""
-    finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    roots=[('stockrl',ROOT/'backend/stockrl'),('FinRL-X',ROOT/'FinRL-X/src'),('FinRL',finrl_root)]
+    roots=[('stockrl',ROOT/'backend/stockrl'),('FinRL-X',SOURCE_ROOT/'src')]
+    for framework,package in [('FinRL','finrl'),('SB3','stable_baselines3'),('SB3-Contrib','sb3_contrib')]:
+        spec=importlib.util.find_spec(package)
+        if spec and spec.origin:roots.append((framework,Path(spec.origin).parent))
     items=[]
     for framework,root in roots:
         for path in sorted(root.rglob('*.py')):
-            relative=path.relative_to(root).as_posix();module=relative.removesuffix('.py').replace('/','.').removesuffix('.__init__')
-            name=framework+':'+module
-            try:
-                with tokenize.open(path) as source:tree=ast.parse(source.read())
-            except (UnicodeError,SyntaxError) as exc:
-                items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':str(exc),'functions':[],'imports':[],'calls':[]});continue
-            functions=[];signatures={};parameters={};imports=[];calls=[];keyword_contracts={}
-            def arguments(node,full_name=None):
-                keyword_contracts[full_name or node.name]={'variadic':node.args.kwarg is not None,
-                    'positional_only':[arg.arg for arg in node.args.posonlyargs if arg.arg not in ('self','cls')],
-                    'instance':bool(node.args.args and node.args.args[0].arg=='self')}
-                positional=[*node.args.posonlyargs,*node.args.args]
-                defaults=[None]*(len(positional)-len(node.args.defaults))+node.args.defaults
-                fields=[]
-                for arg,default in [*zip(positional,defaults),*zip(node.args.kwonlyargs,node.args.kw_defaults)]:
-                    if arg.arg in ('self','cls'):continue
-                    fields.append({'name':arg.arg,'annotation':ast.unparse(arg.annotation) if arg.annotation else None,
-                        'required':default is None,'default':ast.unparse(default) if default is not None else None})
-                return fields
-            for node in ast.walk(tree):
-                if isinstance(node,ast.ImportFrom):
-                    imports.append('.'*node.level+(node.module or ''))
-                elif isinstance(node,ast.Import):imports.extend(alias.name for alias in node.names)
-                elif isinstance(node,ast.Call):
-                    calls.append(ast.unparse(node.func))
-                    if isinstance(node.func,ast.Name) and node.func.id in ('finrlx','finrl_file') and node.args and isinstance(node.args[0],ast.Constant):
-                        imports.append(('src.' if node.func.id=='finrlx' else 'finrl.')+str(node.args[0].value).removesuffix('.py').replace('/','.'))
-            for node in tree.body:
-                if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)):
-                    functions.append(node.name);signatures[node.name]=ast.unparse(node.args);parameters[node.name]=arguments(node)
-                elif isinstance(node,ast.ClassDef):
-                    functions.append(node.name)
-                    for child in node.body:
-                        if isinstance(child,(ast.FunctionDef,ast.AsyncFunctionDef)):
-                            key=node.name+'.'+child.name;functions.append(key);signatures[key]=ast.unparse(child.args);parameters[key]=arguments(child,key)
-            items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':ast.get_docstring(tree),
-                          'functions':functions,'signatures':signatures,'parameters':parameters,'keyword_contracts':keyword_contracts,'imports':sorted(set(imports)),'calls':sorted(set(calls))})
-    script=ROOT/'FinRL-X/deploy.sh'
+            if framework=='stockrl' and path.is_relative_to(SOURCE_ROOT):continue
+            relative=path.relative_to(root).as_posix()
+            module=relative.removesuffix('.py').replace('/','.').removesuffix('.__init__')
+            item=source_definition(path,framework,module);item['path']=framework+'/'+relative
+            items.append(item)
+    script=SOURCE_ROOT/'deploy.sh'
     if script.is_file():items.append({'id':'FinRL-X:deploy','path':'FinRL-X/deploy.sh','framework':'FinRL-X',
-        'description':'공식 배포 스크립트의 데이터 준비 및 전략 실행 절차','functions':[],
+        'source_path':str(script),'description':'공식 데이터 준비 및 전략 실행 절차','functions':[],
         'signatures':{},'imports':[],'calls':['data download','run_single_date','run_backtest']})
     return items
 
@@ -340,6 +310,9 @@ def catalog():
             elif imported.startswith('src.'):target='FinRL-X:'+imported[4:]
             elif imported.startswith('finrl.'):target='FinRL:'+imported[6:]
             elif imported.startswith('stockrl.'):target='stockrl:'+imported[8:]
+            elif imported=='stable_baselines3':target='SB3:__init__'
+            elif imported.startswith('stable_baselines3.'):target='SB3:'+imported.removeprefix('stable_baselines3.')
+            elif imported.startswith('sb3_contrib.'):target='SB3-Contrib:'+imported.removeprefix('sb3_contrib.')
             elif item['framework']=='FinRL-X' and imported.startswith(('strategies.','data.','config.','trading.','backtest.')):target='FinRL-X:'+imported
             else:continue
             if target in by_id:deps.append(target)

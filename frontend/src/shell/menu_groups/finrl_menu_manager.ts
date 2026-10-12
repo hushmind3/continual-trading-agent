@@ -1,7 +1,7 @@
 import {lazy} from 'react';
 import {ChartNoAxesCombined,Database,GraduationCap,Workflow} from 'lucide-react';
-import {actionMenus,type MenuItem} from './menu_types';
-import type {BackendAction} from '../../data/menu_types';
+import {actionMenus,moduleMenus,type MenuItem} from './menu_types';
+import type {BackendAction,BackendModuleMenu} from '../../data/menu_types';
 const reference=lazy(()=>import('../../pages/finrl/ReferenceWorkspace').then(m=>({default:m.ReferenceWorkspace})));
 const feature=lazy(()=>import('../../pages/frameworks/FeatureWorkspace').then(m=>({default:m.FeatureWorkspace})));
 export const menus:MenuItem[]=[
@@ -12,4 +12,6 @@ export const menus:MenuItem[]=[
  {hash:'backtest',name:'주식거래 백테스트',group:'FinRL · 메인',icon:ChartNoAxesCombined,component:reference,required:['job']},
  {hash:'frameworks',name:'FinRL 모듈 · 도구',group:'FinRL · 메인',icon:Workflow,component:lazy(()=>import('../../pages/frameworks/FrameworkWorkspace').then(m=>({default:m.FinrlToolsWorkspace}))),required:['job']},
 ];
-export function registeredMenus(actions:BackendAction[]){return [...menus,...actionMenus(actions,'finrl','FinRL · 메인',feature,Workflow)];}
+export function registeredMenus(actions:BackendAction[],modules:BackendModuleMenu[]=[]){return [...menus,...actionMenus(actions,'finrl','FinRL · 메인',feature,Workflow),...moduleMenus(modules,'finrl','FinRL · 메인',moduleScreen,Workflow)];}
+
+const moduleScreen=lazy(()=>import('../../pages/frameworks/FrameworkWorkspace').then(m=>({default:m.ModuleWorkspace})));

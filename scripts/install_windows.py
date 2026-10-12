@@ -7,7 +7,7 @@ def main():
     os.environ['PYTHONUTF8']='1'
     python=ROOT/'.venv/Scripts/python.exe'
     if not python.exists():venv.EnvBuilder(with_pip=True,system_site_packages=True).create(ROOT/'.venv')
-    subprocess.run(['git','submodule','update','--init','FinRL-X'],cwd=ROOT,check=True)
+    subprocess.run(['git','submodule','update','--init','backend/stockrl/finrl_trading/upstream'],cwd=ROOT,check=True)
     probe=subprocess.check_output([str(python),'-c','import importlib.metadata,json; print(json.dumps([d.metadata["Name"].lower().replace("_","-") for d in importlib.metadata.distributions()]))'],text=True)
     installed=set(json.loads(probe))
     pins=subprocess.check_output([str(python),'-c','import importlib.metadata; names={d.metadata["Name"] for d in importlib.metadata.distributions()}; print("\\n".join(n+"=="+importlib.metadata.version(n) for n in sorted(names)))'],text=True)

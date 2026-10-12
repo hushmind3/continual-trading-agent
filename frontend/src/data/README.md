@@ -17,3 +17,5 @@ menu_types.ts는 메뉴·추가 작업·API 입력 계약 응답 타입입니다
 BackendAction.menu_id는 담당 작은 메뉴이며 추가 입력 허용 여부는 API의 additionalProperties 계약을 사용합니다.
 
 OperationsProvider의 algorithm/selectAlgorithm은 학습·MoE가 공유하는 선택값이며 세션에 유지합니다. Champion 응답은 identity.algorithm과 policy_spaces를 사용합니다.
+
+menu_catalog.modules는 실제 모듈 작은 메뉴 등록 목록입니다. module?id= 조회는 파일 상세를 공통 state 요청에 포함합니다.

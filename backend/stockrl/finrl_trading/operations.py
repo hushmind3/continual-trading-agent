@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 from .. import ROOT
-from . import finrlx
+from . import finrlx,SOURCE_ROOT
 from .data import prices
 from ..state_io import atomic_json
 
@@ -70,16 +70,16 @@ def execute(action, parameters, output):
     row = ACTIONS[action]
     if action == 'adaptive_download':
         import re
-        script = ROOT / 'FinRL-X/deploy.sh'
+        script = SOURCE_ROOT / 'deploy.sh'
         source = script.read_text(encoding='utf-8')
         match = re.search('python3 - "\\$CONFIG" "\\$DATA_DIR" <<\\x27PYEOF\\x27\\n(.*?)\\nPYEOF', source, re.S)
         if not match:
             raise ValueError('공식 deploy.sh의 데이터 준비 실행 블록을 찾지 못했습니다.')
-        config = str(Path(p.get('config_path', ROOT / 'FinRL-X/src/strategies/AdaptiveRotationConf_v1.2.1.yaml')).resolve())
-        directory = Path(p.get('data_dir', ROOT / 'FinRL-X/data/fmp_daily')).resolve()
+        config = str(Path(p.get('config_path', SOURCE_ROOT / 'src/strategies/AdaptiveRotationConf_v1.2.1.yaml')).resolve())
+        directory = Path(p.get('data_dir', SOURCE_ROOT / 'data/fmp_daily')).resolve()
         directory.mkdir(parents=True, exist_ok=True)
         print('공식 deploy.sh 데이터 준비 블록 실행:', directory, flush=True)
-        subprocess.run([sys.executable, '-', config, str(directory)], input=match.group(1), text=True, encoding='utf-8', cwd=ROOT / 'FinRL-X', check=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        subprocess.run([sys.executable, '-', config, str(directory)], input=match.group(1), text=True, encoding='utf-8', cwd=SOURCE_ROOT, check=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         return {'action': action, 'module': row[2], 'function': row[3], 'value': {'data_dir': str(directory), 'config': config}, 'output': str(output.relative_to(ROOT))}
     module = finrlx(row[2].split(':', 1)[1])
     currency = p.get('currency', 'USD')
@@ -88,10 +88,10 @@ def execute(action, parameters, output):
         symbols = [s.strip() for s in symbols.split(',') if s.strip()]
     print('공식 함수 실행:', row[2], row[3], flush=True)
     if action in ('adaptive_single', 'adaptive_backtest'):
-        config = str(Path(p.get('config_path', ROOT / 'FinRL-X/src/strategies/AdaptiveRotationConf_v1.2.1.yaml')).resolve())
+        config = str(Path(p.get('config_path', SOURCE_ROOT / 'src/strategies/AdaptiveRotationConf_v1.2.1.yaml')).resolve())
         kwargs = {'data_dir': p['data_dir']} if p.get('data_dir') else {}
         from contextlib import chdir
-        with chdir(ROOT / 'FinRL-X'):
+        with chdir(SOURCE_ROOT):
             if action == 'adaptive_single':
                 value = module.run_single_date(config, p['as_of_date'], **kwargs)
             else:
@@ -138,7 +138,7 @@ def execute(action, parameters, output):
             engine = module.TSMOMSignalEngine()
             value = {symbol: engine.generate_signal_one_ticker(data.rename(columns={'symbol': 'tic'})) for symbol, data in frame.groupby('symbol')}
         elif action == 'adaptive':
-            config = Path(p.get('config_path', ROOT / 'FinRL-X/src/strategies/AdaptiveRotationConf_v1.2.1.yaml')).expanduser().resolve()
+            config = Path(p.get('config_path', SOURCE_ROOT / 'src/strategies/AdaptiveRotationConf_v1.2.1.yaml')).expanduser().resolve()
             if not config.is_file():
                 raise ValueError('실제 Adaptive Rotation YAML 경로가 필요합니다.')
             preprocessing = finrlx('strategies.adaptive_rotation.data_preprocessor')

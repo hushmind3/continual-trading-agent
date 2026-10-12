@@ -32,3 +32,36 @@ export function FrameworkWorkspace({framework}:{framework?:FrameworkScope}={}){
 export function FinrlToolsWorkspace(){return <FrameworkWorkspace framework="FinRL"/>}
 export function FinrlTradingWorkspace(){return <FrameworkWorkspace framework="FinRL-X"/>}
 export function ProjectModulesWorkspace(){return <FrameworkWorkspace framework="stockrl"/>}
+
+interface ModuleDetail extends Module {
+ name:string;package:string;version?:string;source_path:string;file_exists:boolean;requires?:string[];
+ parameters?:Record<string,{name:string;annotation?:string;required:boolean;default?:string}[]>;
+}
+export function ModuleWorkspace(){
+ const id=decodeURIComponent(location.hash.split('?')[0].replace(/^#module-/,''));
+ const state=useSystemState<ModuleDetail>('module?id='+encodeURIComponent(id)),module=state.data;
+ const [selected,setSelected]=useState(id);
+ if(!module)return <Panel title="모듈 상세"><ErrorMessage message={state.error}/><p className="text-xs">설치 정보와 소스 선언을 읽는 중입니다. 모듈을 실행하지 않습니다.</p></Panel>;
+ const owner=module.framework==='FinRL-X'?'FinRL-Trading':module.framework;
+ return <div className="space-y-4">
+  <Panel title={module.name} description="이 모듈의 역할·소스·공개 계약을 확인하고 채택 여부를 판단하는 화면입니다.">
+   <ErrorMessage message={state.error}/>
+   <KeyValues items={[["소속",owner],["패키지",module.package],["설치 버전",module.version??'소스 기준'],["파일",module.file_exists?'있음':'설치 기록만 있음'],["연결 상태",module.status]]}/>
+   <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{module.description||'원본에 모듈 설명이 기록되어 있지 않습니다.'}</p>
+   <p className="mt-3 break-all rounded bg-slate-50 p-3 font-mono text-xs">{module.source_path}</p>
+   <p className="mt-2 text-xs text-slate-500">{module.reason}</p>
+  </Panel>
+  <Panel title={'함수 · 클래스 · 메서드 '+module.functions.length+'개'} description="실행 여부와 관계없이 소스에 선언된 항목을 표시합니다.">
+   {!module.functions.length&&<p className="text-xs text-slate-500">선언된 Python 함수가 없는 초기화·상수 파일 또는 컴파일 모듈입니다. 아래 의존성·패키지 정보로 확인하세요.</p>}
+   <div className="grid gap-3 xl:grid-cols-2">{module.functions.map(name=><section key={name} className="rounded border border-slate-200 bg-white p-3">
+    <h3 className="break-all text-sm font-semibold text-blue-700">{name}</h3><code className="mt-2 block break-all text-xs">{name}({module.signatures[name]??module.signatures[name+'.__init__']??''})</code>
+    <div className="mt-3 space-y-2">{(module.parameters?.[name]??module.parameters?.[name+'.__init__']??[]).map(field=><div key={field.name} className="rounded bg-slate-50 p-2 text-xs"><b>{field.name}</b> · {field.required?'필수':'선택'}<span className="mt-1 block text-slate-500">타입: {field.annotation??'원본에 명시 없음'} · 기본값: {field.default??'없음'}</span></div>)}</div>
+   </section>)}</div>
+  </Panel>
+  <div className="grid gap-4 lg:grid-cols-2">
+   <Panel title="import · 패키지 의존성"><div className="space-y-2 text-xs">{[...module.dependencies,...(module.requires??[])].map((value,index)=><p key={index} className="break-all rounded bg-slate-50 p-2">{value}</p>)}</div></Panel>
+   <Panel title="소스 호출 · 연결 기능"><div className="space-y-2 text-xs">{module.calls.map((value,index)=><p key={index} className="break-all rounded bg-slate-50 p-2">{value}</p>)}</div><p className="mt-3 text-xs">등록 작업: {module.actions.join(', ')||'직접 실행 API 없음'}</p><p className="mt-2 text-xs text-slate-500">이전 성공 기록: {module.verified_functions.join(', ')||'없음'}. 이번 작업에서는 실행 테스트를 하지 않았습니다.</p></Panel>
+  </div>
+  {module.native_api&&<NativeModuleRunner framework={module.framework==='FinRL-X'?'FinRL-X':'FinRL'} selectedModule={selected} onSelect={setSelected}/>}
+ </div>;
+}

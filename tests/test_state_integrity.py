@@ -20,6 +20,9 @@ def panel(symbol,date,price=100):
 def row(symbol,date,price=100):
  return dict(symbol=symbol,date=date,market='US',asset_class='equity',open=price,high=price,low=price,close=price,volume=1)
 class IntegrityTests(unittest.TestCase):
+ @classmethod
+ def setUpClass(cls):
+  (ROOT/'runtime').mkdir(parents=True,exist_ok=True)
  def test_same_time_different_symbols_and_duplicate(self):
   ledger=PaperAccount.in_memory(0,0)
   for symbol in ('AAPL','MSFT'):ledger.state['pending'][symbol]={'date':'2026-01-01','action':'BUY','budget':100,'requested_quantity':1}

@@ -8,12 +8,14 @@ from pathlib import Path
 from types import SimpleNamespace
 import numpy as np
 import pandas as pd
-from ..framework import ROOT,prices,training_environment
+from .. import ROOT
+from ..finrl_trading.data import prices
+from ..finrl.framework import training_environment
 from ..state_io import read_json,atomic_json
 from ..paper_account import PaperAccount,_moment
 from .operations_settings import settings
 from .system_operations import system
-from ..framework import policy_checkpoint,CASH_ENVIRONMENT,champion_structure_environment
+from ..finrl.framework import policy_checkpoint,CASH_ENVIRONMENT,champion_structure_environment
 
 class OperationsRuntime:
     def __init__(self):
@@ -169,7 +171,7 @@ class OperationsRuntime:
         with system.job_lock,self.lock:
             if not self.controls['learning']:return
             from .. import web_api as api
-            from ..framework import policy_files
+            from ..finrl.framework import policy_files
             policies=read_json(ROOT/'runtime/operations/policies.json')
             if not policies:
                 self.status['learning_error']='운영 모델을 선택·로드한 뒤 지속학습을 켜세요.';return
@@ -281,7 +283,7 @@ class OperationsRuntime:
                 'batches':len(packets),'symbols_checked':symbols_checked}
 
     def sac_decision(self):
-        from ..framework import policy_files
+        from ..finrl.framework import policy_files
         self.inference_active+=1
         try:
             selected=read_json(ROOT/'runtime/operations/policies.json')

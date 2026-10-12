@@ -2,7 +2,7 @@
 import math
 from pathlib import Path
 from types import SimpleNamespace
-from ..framework import ROOT
+from .. import ROOT
 from ..state_io import read_json,atomic_json
 
 CONFIG_PATH=ROOT/'configs/local/operations.json'

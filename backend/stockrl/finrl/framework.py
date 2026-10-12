@@ -1,11 +1,10 @@
-"""FinRL/SB3 learning entrypoints with explicit FinRL-X storage/backtest extensions."""
-import importlib
+"""Primary FinRL/SB3 environments, learners and saved policies."""
 import importlib.util
 import sys
 import threading
 from pathlib import Path
 
-ROOT=Path(__file__).resolve().parents[2]
+from .. import ROOT
 CASH_ENVIRONMENT='finrl.meta.env_portfolio_optimization.env_portfolio_optimization.PortfolioOptimizationEnv'
 _module_lock=threading.RLock()
 
@@ -13,7 +12,7 @@ _module_lock=threading.RLock()
 def cash_environment(frame,registry,symbols,champion_ids=None,structure_only=False):
     """Adapt the official cash-enabled Gym environment to Gymnasium; no trading rules."""
     from shimmy import GymV21CompatibilityV0
-    from .expert_observation import ExpertObservation
+    from ..expert_observation import ExpertObservation
     raw=finrl_file('meta/env_portfolio_optimization/env_portfolio_optimization.py').PortfolioOptimizationEnv(
         df=frame.rename(columns={'symbol':'tic'}).copy(),initial_amount=1000000,
         cwd=str(ROOT/'runtime/official'))
@@ -24,11 +23,6 @@ def cash_environment(frame,registry,symbols,champion_ids=None,structure_only=Fal
     return wrapped
 
 
-def finrlx(name):
-    source=ROOT/'FinRL-X'
-    with _module_lock:
-        if str(source) not in sys.path:sys.path.insert(0,str(source))
-        return importlib.import_module('src.'+name)
 
 
 def finrl_file(relative):
@@ -94,15 +88,15 @@ def champion_structure_environment(currency,symbols,registry,champion_ids):
 
 def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None,algorithm='sac',total_timesteps=None,champion=None):
     from finrl.agents.stablebaselines3.models import DRLAgent
-    from .platform.system_operations import system
+    from ..platform.system_operations import system
     example,parameters,steps=sac_example(algorithm)
     steps=steps if total_timesteps is None else int(total_timesteps)
     if steps<1:raise ValueError('학습 단계는 1 이상이어야 합니다.')
-    from .platform.sac_champion import load_spec
+    from ..platform.sac_champion import load_spec
     if champion is None and champion_path:champion=load_spec(champion_path)
     if champion and algorithm!='sac':raise ValueError('선택한 Champion은 SAC 정책입니다. SAC 알고리즘에서 사용하세요.')
     champion_ids = champion.get('identity',{}).get('champion_experts') if champion else None
-    from .state_io import read_json,atomic_json
+    from ..state_io import read_json,atomic_json
     currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in frame.symbol.unique()) else 'USD'
     if champion and champion['identity']['environment']!=CASH_ENVIRONMENT:raise ValueError('PortfolioOptimizationEnv Champion으로 새로 생성하세요.')
     if resume and read_json(policy_files(currency)/'dataset.json').get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경의 정책은 실행하지 않습니다. 현금 정책을 새로 학습하세요.')
@@ -113,7 +107,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     root.mkdir(parents=True,exist_ok=True)
     saved=policy_files(env.currency)
     identity={'currency':env.currency,'symbols':env.symbols,'algorithm':algorithm,'sac_example':parameters,'environment':CASH_ENVIRONMENT,'rolling_days':[1095,365]}
-    from .platform.sac_champion import _candidate_identity,_policy_kwargs,_original_report
+    from ..platform.sac_champion import _candidate_identity,_policy_kwargs,_original_report
     base_dim=int(__import__('numpy').prod(env.unwrapped.observation_space.shape))
     if algorithm=='sac':identity.update(_candidate_identity(env.currency,env.symbols,champion_ids,base_dim,CASH_ENVIRONMENT))
     else:identity.update(champion_experts=champion_ids,base_observation_dim=base_dim,account_feature_size=16,observation_contract='expert-observation-v1')
@@ -145,71 +139,30 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
         if hasattr(model,'save_replay_buffer'):model.save_replay_buffer(root/'replay.pkl')
         atomic_json(identity,root/'dataset.json')
         if champion and champion_output:
-            from .platform.sac_champion import save_trained_champion
+            from ..platform.sac_champion import save_trained_champion
             save_trained_champion(champion_path,model,Path(champion_output),root,spec=champion)
         print('학습 완료:',model.num_timesteps,'관측,',getattr(model,'_n_updates',None),'업데이트',flush=True)
     finally:env.close()
     return model
 
 
-def prices(currency='USD',symbols=None):
-    import pandas as pd
-    store=finrlx('data.data_store').DataStore()
-    import sqlite3
-    from contextlib import closing
-    with closing(sqlite3.connect(store.db_path)) as connection:
-        available=pd.read_sql_query('SELECT DISTINCT ticker FROM price_data',connection).ticker.tolist()
-        start,end=connection.execute('SELECT MIN(date),MAX(date) FROM price_data').fetchone()
-    import json
-    market=json.loads((ROOT/'configs/instruments.json').read_text(encoding='utf8'))
-    allowed=set(available) if currency is None else {i['symbol'] for i in market['instruments'] if i.get('market') in (('KRX','KOSDAQ') if currency=='KRW' else ('US','NASDAQ','NYSE','NYSEARCA','AMEX')) and i.get('asset_class') in ('equity','etf')}
-    names=symbols or [s for s in available if s in allowed]
-    if start is None:return pd.DataFrame()
-    data=store.get_price_data(names,start,end)
-    data=data.rename(columns={'tic':'symbol','datadate':'date','prcod':'open','prchd':'high','prcld':'low','prccd':'close','cshtrd':'volume'})
-    dates=pd.to_datetime(data.date,utc=True,format='mixed')
-    feed=ROOT/'runtime/operations/live/timeframes.sqlite3'
-    if feed.is_file():
-        with closing(sqlite3.connect('file:'+feed.as_posix()+'?mode=ro',uri=True)) as connection:
-            tables={row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            if 'received_bars' in tables:
-                raw=set(connection.execute('SELECT symbol,stamp_ns FROM received_bars'))
-                daily=set(connection.execute('SELECT symbol,stamp_ns FROM daily_bars')) if 'daily_bars' in tables else set()
-                keep=[(str(symbol),int(stamp.value)) not in raw or (str(symbol),int(stamp.value)) in daily for symbol,stamp in zip(data.symbol,dates)]
-                data=data.loc[keep].copy();dates=dates.loc[keep]
-            if 'daily_bars' in tables:
-                placeholders=','.join('?' for _ in names)
-                authoritative=pd.read_sql_query('SELECT symbol,stamp_ns,open,high,low,close,volume FROM daily_bars WHERE symbol IN ('+placeholders+')',connection,params=names) if names else pd.DataFrame()
-                if not authoritative.empty:
-                    authoritative['date']=pd.to_datetime(authoritative.pop('stamp_ns'),utc=True)
-                    keys=set(zip(authoritative.symbol,authoritative.date.dt.normalize()))
-                    keep=[(symbol,date.normalize()) not in keys for symbol,date in zip(data.symbol,dates)]
-                    historical=data.loc[keep]
-                    data=authoritative.copy() if historical.empty else pd.concat([historical,authoritative],ignore_index=True)
-                    dates=pd.to_datetime(data.date,utc=True,format='mixed')
-    data['date']=dates.dt.tz_localize(None).dt.normalize()
-    data=data.drop_duplicates(subset=['symbol','date','open','high','low','close','volume'])
-    if data.duplicated(['symbol','date']).any():raise ValueError('서로 다른 주기의 가격 또는 상충하는 일봉이 남아 있어 학습에 사용할 수 없습니다.')
-    data=data.sort_values(['date','symbol']).reset_index(drop=True)
-    data.attrs['timeframe']='1d'
-    return data
 
 
 def backtest(frame,registry,currency=None,champion_path=None,checkpoint_path=None):
     """Convert original environment holdings to the official StrategyResult API."""
     import pandas as pd
-    from .platform.system_operations import system
+    from ..platform.system_operations import system
     saved=policy_files(currency,checkpoint_path)
     champion=None
     if champion_path:
-        from .platform.sac_champion import load_spec
+        from ..platform.sac_champion import load_spec
         champion=load_spec(champion_path)
         checkpoint=Path(champion['checkpoint'])
         if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/official'/checkpoint
         checkpoint=checkpoint.resolve()
         if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()) or not checkpoint.is_file():raise ValueError('선택한 Champion의 실제 운영 폴더 체크포인트가 필요합니다.')
         saved=checkpoint.parent
-    from .state_io import read_json
+    from ..state_io import read_json
     identity=read_json(saved/'dataset.json')
     if identity.get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경 정책은 백테스트하지 않습니다.')
     if identity.get('champion_file'):
@@ -228,20 +181,14 @@ def backtest(frame,registry,currency=None,champion_path=None,checkpoint_path=Non
             rows.append({'date':raw._info['end_time'],**dict(zip(env.symbols,allocation[1:])), 'CASH':float(allocation[0])})
             if terminal or truncated:break
         weights=pd.DataFrame(rows).set_index('date')
-        result=finrlx('strategies.base_strategy').StrategyResult('FinRL '+identity.get('algorithm','sac').upper(),weights)
-        module=finrlx('backtest.backtest_engine')
-        config=module.BacktestConfig(str(frame.date.min().date()),str(frame.date.max().date()))
-        selected=frame[frame.date.isin(env.unwrapped.gym_env._sorted_times)]
-        prices_wide=selected.pivot(index='date',columns='symbol',values='close')
-        prices_wide['CASH']=1.
-        evaluated=module.BacktestEngine(config).run_backtest(result.strategy_name,prices_wide,result.weights)
-        return evaluated
+        from ..finrl_trading.backtest import evaluate_weights
+        return evaluate_weights(frame,weights,raw._sorted_times,'FinRL '+identity.get('algorithm','sac').upper())
     finally:env.close()
 
 
 def policy_files(currency=None,checkpoint_path=None):
     """Select an existing native SB3 revision without modifying its weights."""
-    from .state_io import read_json
+    from ..state_io import read_json
     root=ROOT/'runtime/official'
     selected=read_json(ROOT/'runtime/operations/policies.json').get(currency) if currency else None
     selection={'path':checkpoint_path} if checkpoint_path else {'path':selected} if selected else read_json(root/'active-checkpoint.json')
@@ -254,7 +201,7 @@ def policy_files(currency=None,checkpoint_path=None):
 
 
 def policy_checkpoint(folder):
-    from .state_io import read_json
+    from ..state_io import read_json
     from finrl.agents.stablebaselines3.models import MODELS
     algorithm=read_json(Path(folder)/'dataset.json').get('algorithm','sac')
     if algorithm not in MODELS:raise ValueError('저장된 정책의 FinRL 알고리즘을 확인할 수 없습니다.')

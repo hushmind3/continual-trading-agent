@@ -24,7 +24,9 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
-from .framework import ROOT,CASH_ENVIRONMENT,policy_files,policy_checkpoint,sac_example,finrlx,finrl_file,champion_structure_environment
+from . import ROOT
+from .finrl.framework import CASH_ENVIRONMENT,policy_files,policy_checkpoint,sac_example,finrl_file,champion_structure_environment
+from .finrl_trading import finrlx
 from .state_io import atomic_json, read_json, update_json
 from .platform.resources import ResourceMonitor
 from .platform.system_operations import system,apply_state,apply_running,start_apply,busy,check_system
@@ -324,7 +326,7 @@ def checkpoints(settings):
 
 def capabilities():
     return {
-        "learning":{"status":"supported","reason":"FinRL DRLAgent · SB3 알고리즘 선택·학습·중단·동일 정책 이어 학습 · 기본 SAC","source":"stockrl.framework.train"},
+        "learning":{"status":"supported","reason":"FinRL DRLAgent · SB3 알고리즘 선택·학습·중단·동일 정책 이어 학습 · 기본 SAC","source":"stockrl.finrl.framework.train"},
         "expert_selection":{"status":"supported","reason":"Frozen Expert 등록·선택·같은 모델 정밀도 교체·해제","source":"stockrl.expert_registry_native.ExpertRegistry"},
         "collection":{"status":"supported","reason":"FinRL-X FMP 가격 수집 모듈. API 인증이 있어야 원격 수집 가능합니다.","source":"FinRL-X/src/data/data_fetcher.py::fetch_price_data"},
         "paper_accounts":{"status":"supported","reason":"원본 PaperAccount의 KRW/USD 독립 잔고·보유·체결·손익 기능이 연결되어 있습니다.","source":"stockrl.paper_account.PaperAccount"},
@@ -333,7 +335,7 @@ def capabilities():
         "alpaca":{"status":"not_connected","reason":"공식 서브모듈에는 Alpaca 모듈이 있지만 현재 SAC 작업에 연결되지 않았습니다.","source":"FinRL-X/src/trading/alpaca_manager.py"},
         "conversion":{"status":"supported","reason":"기존 정밀도 변환과 품질 비교·후보 선택 함수를 연결합니다. 변환은 새 파일로 저장됩니다.","source":"stockrl.platform.expert_conversion / expert_optimizer"},
         "discovery":{"status":"supported","reason":"기존 HF/GitHub 검색·가중치 호환 확인·다운로드·자동 등록 함수가 연결되어 있습니다.","source":"stockrl.platform.expert_discovery / expert_acquisition"},
-        "checkpoint_restore":{"status":"supported","reason":"기존 SB3 파일을 변경하지 않고 선택하여 복원·이어 학습에 사용합니다. 이전 자체 정책 형식은 호환되지 않습니다.","source":"stockrl.framework.policy_files"},
+        "checkpoint_restore":{"status":"supported","reason":"기존 SB3 파일을 변경하지 않고 선택하여 복원·이어 학습에 사용합니다. 이전 자체 정책 형식은 호환되지 않습니다.","source":"stockrl.finrl.framework.policy_files"},
         "settings_edit":{"status":"supported","reason":"시세·가상계좌·Expert 장치의 기존 운영 설정을 편집합니다. SAC 학습값은 변경하지 않습니다.","source":"stockrl.platform.operations_settings"},
     }
 
@@ -640,7 +642,8 @@ def preflight(req, command):
                 errors.append(row["id"] + ": 활성 Expert 패키지가 없거나 크기가 다릅니다.")
     periods=None
     if symbols and not errors:
-        from .framework import prices,validate_price_panel
+        from .finrl_trading.data import prices
+        from .finrl.framework import validate_price_panel
         from pandas import Timedelta,to_datetime
         frame=prices(req.currency,symbols)
         if frame.empty:errors.append('학습·추론 모듈이 사용하는 실제 저장 가격이 없습니다.')
@@ -701,19 +704,19 @@ def framework_catalog():
 
 
 def finrl_workspace():
-    from .platform.framework_operations import stock_state
+    from .finrl.operations import stock_state
     try:return stock_state()
     except (ValueError,OSError,RuntimeError) as exc:raise HTTPException(503,str(exc)) from exc
 
 
 def framework_providers():
-    from .platform.framework_operations import provider_status
+    from .finrl_trading.operations import provider_status
     return provider_status()
 
 
 @private_api.post('/api/framework/providers/{provider}')
 def framework_provider_save(provider:str,values:dict):
-    from .platform.framework_operations import save_provider
+    from .finrl_trading.operations import save_provider
     try:return save_provider(provider,values)
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
 
@@ -816,7 +819,7 @@ def champion_create(request:ChampionRequest):
     invalid=[symbol for symbol in request.symbols if symbol not in markets or markets[symbol].get("market") not in valid_markets or markets[symbol].get("asset_class") not in ("equity","etf")]
     if invalid:raise HTTPException(400,"선택 시장의 등록 주식·ETF가 아닙니다: "+", ".join(invalid))
     from .platform.sac_champion import create
-    from .framework import champion_structure_environment
+    from .finrl.framework import champion_structure_environment
     env=None
     try:
         env=champion_structure_environment(request.currency,request.symbols,ExpertRegistry(),request.experts)

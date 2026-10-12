@@ -1,7 +1,9 @@
 """Run FinRL/SB3 training and evaluation with optional frozen Expert integration."""
 import argparse
 from pathlib import Path
-from .framework import ROOT,prices,train,backtest
+from . import ROOT
+from .finrl_trading.data import prices
+from .finrl.framework import train,backtest
 from .expert_registry_native import ExpertRegistry
 
 

@@ -4,7 +4,7 @@ import sys
 import time
 import traceback
 from datetime import datetime, timezone
-from .framework import ROOT
+from . import ROOT
 from .state_io import read_json, atomic_json, update_json
 
 
@@ -29,7 +29,7 @@ def main():
             job['result']=preview(result)
             return
         if job["command"]=="collect":
-            from .framework import finrlx
+            from .finrl_trading import finrlx
             frame=finrlx("data.data_fetcher").fetch_price_data(
                 job["symbols"],job["start_date"],job["end_date"])
             print("FinRL-X 가격 수집 완료:",len(frame),"행",flush=True)

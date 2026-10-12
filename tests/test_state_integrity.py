@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 import numpy as np
 import pandas as pd
-from stockrl.framework import ROOT
+from stockrl import ROOT
 from stockrl.paper_account import PaperAccount
 from stockrl.expert_observation import ExpertObservation
 from stockrl.platform.operations_runtime import OperationsRuntime
@@ -90,7 +90,7 @@ class IntegrityTests(unittest.TestCase):
   self.assertEqual(runtime.quotes['AAPL']['close'],100)
  def test_daily_read_excludes_intraday_rows(self):
   import sqlite3
-  from stockrl import framework
+  from stockrl.finrl_trading import data as framework
   with tempfile.TemporaryDirectory(dir=ROOT/'runtime') as directory:
    root=Path(directory);(root/'configs').mkdir();(root/'configs/instruments.json').write_text(json.dumps({'instruments':[{'symbol':'AAPL','market':'US','asset_class':'equity'}]}),encoding='utf8')
    dbpath=root/'prices.sqlite3'
@@ -111,7 +111,7 @@ class IntegrityTests(unittest.TestCase):
  def test_unchanged_daily_data_does_not_repeat_learning(self):
   import sys
   from stockrl.platform import operations_runtime
-  from stockrl import framework
+  from stockrl.finrl import framework
   runtime=OperationsRuntime();runtime.controls['learning']=True
   frame=pd.DataFrame([row('AAPL','2026-01-01')]);launched=[]
   def launch(*args,**kwargs):launched.append(args);return {'job':{'id':str(len(launched))}}

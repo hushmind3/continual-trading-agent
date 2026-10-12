@@ -4,7 +4,8 @@ from pathlib import Path
 from datetime import datetime,timezone
 import psutil
 from copy import deepcopy
-from ..framework import ROOT,policy_files
+from .. import ROOT
+from ..finrl.framework import policy_files
 from ..state_io import atomic_json,read_json,update_json
 
 RUNTIME=ROOT/'runtime/official'
@@ -168,7 +169,7 @@ class SystemOperations:
         with self.job_lock:
             RUNTIME.mkdir(parents=True,exist_ok=True);(RUNTIME/'jobs').mkdir(exist_ok=True)
             env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1')
-            from .framework_operations import provider_environment
+            from ..finrl_trading.operations import provider_environment
             env.update(provider_environment())
             with (RUNTIME/job['log']).open('w',encoding='utf8') as output:
                 process=subprocess.Popen([sys.executable,'-m','stockrl.job_worker',job['id']],cwd=ROOT,env=env,
@@ -232,7 +233,7 @@ class SystemOperations:
     def connect_modules(self):
         import importlib
         import sys
-        from ..framework import finrl_file
+        from ..finrl.framework import finrl_file
         modules={
             'stockrl':['live_feed','platform.kiwoom_data','platform.assets','platform.expert_inference','platform.expert_conversion','platform.sac_champion'],
             'FinRL':['meta.env_portfolio_optimization.env_portfolio_optimization','meta.env_stock_trading.env_stocktrading','meta.preprocessor.preprocessors','meta.preprocessor.yahoodownloader','agents.stablebaselines3.models'],
@@ -375,7 +376,7 @@ class SystemOperations:
                 if selected_policies.get(currency):
                     path=(RUNTIME/selected_policies[currency]).resolve()
                     try:
-                        from ..framework import policy_checkpoint
+                        from ..finrl.framework import policy_checkpoint
                         if not path.is_relative_to(RUNTIME.resolve()) or path!=policy_checkpoint(path.parent) or read_json(path.parent/'dataset.json').get('currency')!=currency:
                             raise ValueError('선택한 운영 정책의 경로 또는 통화가 다릅니다.')
                         runtime.check_policy(path.parent,load=True)

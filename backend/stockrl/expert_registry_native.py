@@ -6,7 +6,7 @@ import hashlib
 import time
 import numpy as np
 import pandas as pd
-from .framework import ROOT
+from . import ROOT
 from .state_io import read_json,atomic_json
 from .platform.expert_packages import PACKAGE_FORMAT,digest,load_package
 from .platform.expert_contracts import input_contract,descriptor

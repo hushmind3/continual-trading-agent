@@ -28,7 +28,13 @@ frontend/
 backend/stockrl/
   web_api.py                  FastAPI + React 정적 제공
   __main__.py / official_cli.py CLI → 현재 프레임워크 함수
-  framework.py                FinRL·SB3 학습·공식 기간 분할, 보조 저장·비중 평가, 선택 정책 경로
+  finrl/                      메인 FinRL·SB3 환경·학습·공식 데이터·평가
+    framework.py              공식 환경·알고리즘·정책 경로
+    operations.py             FinRL 실행 등록·주식거래 데이터/학습/평가
+  finrl_trading/              보조 FinRL-Trading 전용 호출
+    data.py                   기존 DataStore 가격 조회
+    backtest.py               비중 기반 BacktestEngine 평가
+    operations.py             추가 데이터·전략·공급원 실행 등록
   job_worker.py               별도 SAC/백테스트/수집 작업과 저장 기록
   platform/system_operations.py 통합 시작·중지·점검, 런처 적용 요청
   expert_registry_native.py   현재 Registry, 동결 추론, 8개 관측 요약
@@ -88,7 +94,7 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 | 운영 `#control` | GET state, POST controls/{feed,paper,engine} | `web_api.state`, `OperationsRuntime.command` |
 | MoE `#moe` | GET state (모델·Library 통합 항목), POST experts/register, experts/select, library/{kind}, champions/create | `ExpertRegistry.register/select`, `model_files`, `LibraryOperations.start/_execute` |
 | 시장 `#markets` | GET state (데이터·가격·연결 통합 항목), POST collect, controls/feed | `price_history`, `job_worker.main` → FinRL-X `fetch_price_data`; `LiveMarketCollector.run` |
-| 계좌 `#portfolio` | GET state (평가·가중치·거래 통합 항목), POST orders, preflight/backtest, backtest | `OperationsRuntime.manual_order` → `PaperAccount._fill`; `framework.backtest` → `BacktestEngine.run_backtest` |
+| 계좌 `#portfolio` | GET state (평가·가중치·거래 통합 항목), POST orders, preflight/backtest, backtest | `OperationsRuntime.manual_order` → `PaperAccount._fill`; `finrl.framework.backtest` → `BacktestEngine.run_backtest` |
 | 학습 `#learning` | GET state, POST framework/stock_train | 원본 StockTradingEnv·DRLAgent 모델별 학습 |
 | 백테스트 `#backtest` | GET state, POST framework/stock_backtest | 학습 모델·MVO·DJIA 비교 |
 | 연결 `#connection` | GET state (연결·인증·설정 통합 항목), POST provider/{connect,test,public}, settings | 기존 `connect_credentials/test_connection`, `operations_settings.update` |
@@ -109,21 +115,21 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 학습 경로:
 
 1. React 주 학습 화면의 알고리즘·통화·종목·학습 단계 선택 → `preflight/train` → `/api/train` → `web_api.launch` → 별도 `stockrl.job_worker`. 알고리즘 목록과 공식 기본 설정은 백엔드 `/api/algorithms`가 설치된 FinRL에서 읽습니다. 기본 선택은 SAC입니다.
-2. `official_cli.main` → `framework.prices(currency,symbols)` → 공식 DataStore의 실제 가격.
-3. `framework.training_environment` → FinRL `data_split`의 기존 1,095일/365일 구간 → FinRL 원본 `PortfolioOptimizationEnv`. 기간 분할을 위해 FinRL-X RL 모듈을 import하거나 그 모듈의 전역 FinRL 예측 함수 교체를 실행하지 않습니다.
+2. `official_cli.main` → `finrl_trading.data.prices(currency,symbols)` → 공식 DataStore의 실제 가격.
+3. `finrl.framework.training_environment` → FinRL `data_split`의 기존 1,095일/365일 구간 → FinRL 원본 `PortfolioOptimizationEnv`. 기간 분할을 위해 FinRL-X RL 모듈을 import하거나 그 모듈의 전역 FinRL 예측 함수 교체를 실행하지 않습니다.
 4. `ExpertObservation.observation` → `ExpertRegistry.outputs` → ExpertPool → 원본 관측을 펼친 값 + 시장/매매별 평균·표준편차·최대 절댓값·성공 수 8개.
-5. `framework.train` → FinRL `DRLAgent.get_model(algorithm, MODEL_KWARGS[algorithm])`·`train_model` → 선택한 SB3 알고리즘. 이어 학습·백테스트·운영 로딩은 저장 메타데이터의 실제 알고리즘 클래스를 사용합니다. SAC Champion은 SAC에서 사용합니다.
+5. `finrl.framework.train` → FinRL `DRLAgent.get_model(algorithm, MODEL_KWARGS[algorithm])`·`train_model` → 선택한 SB3 알고리즘. 이어 학습·백테스트·운영 로딩은 저장 메타데이터의 실제 알고리즘 클래스를 사용합니다. SAC Champion은 SAC에서 사용합니다.
 6. 완료 시 `{algorithm}.zip`, `dataset.json`과 해당 알고리즘에서 사용하는 Replay를 저장하고 통화별 운영 정책으로 선택합니다. 작업 stdout 로그는 `runtime/official/jobs/`에 기록됩니다.
 
 알고리즘 목록은 설치된 FinRL의 `MODELS`에서 읽으며 A2C·DDPG·PPO·TD3·SAC의 선택·생성·학습은 FinRL `DRLAgent`와 SB3가 담당합니다. 알고리즘 설정은 `MODEL_KWARGS`, 기본 학습 단계는 `DRLAgent.train_model` 인자 기본값에서 읽습니다. SAC가 기본 선택이며 SB3 정책 기본값과 PortfolioOptimizationEnv 기본값도 `source_settings()`가 설치된 클래스를 읽어 표시합니다. 통합 상태 조회의 기본 모듈 연결은 FinRL-X를 먼저 적재하지 않습니다. 보조 모듈은 해당 기능이 실제로 호출할 때 import하며 모듈 상태에는 프로세스의 실제 적재 여부를 기록합니다.
 
-환경 인자는 기존 `framework.training_environment` 그대로입니다. 원본 Portfolio 환경의 `step()`은 포트폴리오 가치 환경이며 실제 증권사 체결이 아닙니다. PaperAccount는 별도의 기존 가상 원장입니다. 두 계층의 손익과 수수료 계산을 동일하다고 설명하지 않습니다.
+환경 인자는 기존 `finrl.framework.training_environment` 그대로입니다. 원본 Portfolio 환경의 `step()`은 포트폴리오 가치 환경이며 실제 증권사 체결이 아닙니다. PaperAccount는 별도의 기존 가상 원장입니다. 두 계층의 손익과 수수료 계산을 동일하다고 설명하지 않습니다.
 
 ## Replay · 정책 버전 · 백테스트
 
-`job_worker`는 학습 실행 전에 현재 SAC·Replay·dataset을 `runtime/official/archives/{job_id}`에 보관합니다. `restore_checkpoint()`는 환경·예제 식별정보와 SB3 로딩을 확인한 뒤 `active-checkpoint.json`에 선택 경로만 기록합니다. 가중치 파일을 덮어써 복원하지 않습니다. `framework.policy_files()`가 선택한 폴더에서 정책·Replay·식별정보를 읽고, 이후 학습 결과는 현재 경로에 저장합니다. 현재 종목·통화와 맞지 않는 이어 학습은 기존 식별 검사를 사용합니다.
+`job_worker`는 학습 실행 전에 현재 SAC·Replay·dataset을 `runtime/official/archives/{job_id}`에 보관합니다. `restore_checkpoint()`는 환경·예제 식별정보와 SB3 로딩을 확인한 뒤 `active-checkpoint.json`에 선택 경로만 기록합니다. 가중치 파일을 덮어써 복원하지 않습니다. `finrl.framework.policy_files()`가 선택한 폴더에서 정책·Replay·식별정보를 읽고, 이후 학습 결과는 현재 경로에 저장합니다. 현재 종목·통화와 맞지 않는 이어 학습은 기존 식별 검사를 사용합니다.
 
-백테스트: `official_cli.main` → `framework.backtest` → FinRL `training_environment(training=False)` → 통합 관리자의 해당 SB3 알고리즘 모델 → `model.predict`·공식 환경 `step` → FinRL-X `StrategyResult`·`BacktestEngine.run_backtest`의 보조 비중 평가. 결과 가치·지표·가중치·거래 기록을 `backtest.csv`, `backtest_metrics.json`, `backtest_weights.csv`, `backtest_trades.csv`로 기록하고 React가 조회합니다. 원본 BacktestEngine의 비중 정규화·비용 계산은 유지합니다.
+백테스트: `official_cli.main` → `finrl.framework.backtest` → FinRL `training_environment(training=False)` → 통합 관리자의 해당 SB3 알고리즘 모델 → `model.predict`·공식 환경 `step` → FinRL-X `StrategyResult`·`BacktestEngine.run_backtest`의 보조 비중 평가. 결과 가치·지표·가중치·거래 기록을 `backtest.csv`, `backtest_metrics.json`, `backtest_weights.csv`, `backtest_trades.csv`로 기록하고 React가 조회합니다. 원본 BacktestEngine의 비중 정규화·비용 계산은 유지합니다.
 
 현재 로컬 `sac.zip`은 이전 환경·다른 설정의 파일입니다. 현재 FinRL 원본 환경과 호환되는 정책을 학습하기 전에는 이어 학습·백테스트·자동 판단을 정상 실행된 것으로 표시하지 않습니다. 원본 파일과 Replay는 보존했습니다.
 
@@ -235,7 +241,7 @@ Windows PowerShell에서 `scripts/register_codex_fix_receiver.ps1`을 실행하�
 
 ## 공식 시스템 이식 · React 실행 메뉴
 
-`#frameworks`는 Python 모듈을 브라우저에서 import하지 않습니다. React → `/api/framework/{action}` → 기존 `job_worker` → `platform/framework_operations.py` → 공식 Python 함수·클래스·CLI 순서입니다. Streamlit 화면은 이식·실행에서 제외합니다.
+`#frameworks`는 Python 모듈을 브라우저에서 import하지 않습니다. React → `/api/framework/{action}` → 기존 `job_worker` → `platform/framework_operations.py` → `finrl/operations.py` 또는 `finrl_trading/operations.py` → 공식 Python 함수·클래스·CLI 순서입니다. Streamlit 화면은 이식·실행에서 제외합니다.
 
 FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합니다. 별도의 알고리즘 학습 도구는 두지 않습니다. FinRL에 없는 거래 달력·FMP 재무/뉴스·추가 데이터 처리·TSMOM·Adaptive Rotation·전략/백테스트 엔진은 FinRL-X 보조 기능으로 실행합니다. 원형 FinRL CLI와 FinRL-X deploy 데이터 준비·Rotation 실행도 연결합니다. FinRL·SB3는 백엔드 Python에서 import·실행하며 React는 API 설정·목록·상태·결과를 표시합니다.
 
@@ -255,7 +261,8 @@ FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합
 - `web_api.py`: 단일 통로·요청 검증·응답 전달
 - `platform/system_operations.py`: 통합 상태·정책 캐시·Registry·작업 프로세스·실행 및 중지
 - `platform/operations_runtime.py`: 시세·추론·계좌 실행; 학습 작업은 통합 관리자에 전달
-- `framework.py`: 공식 환경·학습·백테스트 계약
+- `finrl/framework.py`: 공식 환경·학습·정책 계약
+- `finrl_trading/`: 보조 저장·비중 평가·추가 실행
 - `state_io.py`: 프로세스 간 상태 기록
 
 상태 조회는 통합 관리자의 모듈 캐시를 사용하고 정책 변경은 공통 작업 잠금으로 직렬화합니다. 잠금 순서는 작업→운영→모델로 맞춥니다. 선택한 Champion은 백테스트에 실제 전달하며 학습의 로딩·등록·저장에서는 한 번 읽은 Spec을 공유합니다. Champion 목록·검사는 가중치를 보관하지 않고 파일 버전별 메타데이터만 재사용합니다. Expert 결과 캐시는 입력·계좌가 같을 때만 재사용하고 통화·Expert별 마지막 입력만 유지합니다.

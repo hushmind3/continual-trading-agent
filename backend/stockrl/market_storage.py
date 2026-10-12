@@ -25,7 +25,8 @@ class AppendOnlyMarketCSV:
     def __init__(self, path: str | Path):
         self.path = ensure_project_path(path, "market data")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        from .framework import ROOT,finrlx
+        from . import ROOT
+        from .finrl_trading import finrlx
         self.store=finrlx('data.data_store').DataStore(str(ROOT/'data'))
         self.processor=finrlx('data.data_processor').DataProcessor(str(self.path.parent/'data'))
         self.db_path=self.store.db_path

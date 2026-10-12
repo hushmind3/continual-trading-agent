@@ -10,7 +10,8 @@ import numpy as np
 import torch
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
-from ..framework import ROOT, sac_example
+from .. import ROOT
+from ..finrl.framework import sac_example
 from ..state_io import atomic_json, read_json
 from .expert_packages import load_package
 from .expert_contracts import input_contract
@@ -369,4 +370,3 @@ def save_trained_champion(source_path, model, target_path, checkpoint_dir,spec=N
     except BaseException:
         raise
     return target_path
-

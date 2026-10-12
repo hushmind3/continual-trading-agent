@@ -1,11 +1,11 @@
-import {FrameworkProviders} from './FrameworkProviders';
+import {FrameworkProviders} from '../frameworks/FrameworkProviders';
 import {useState} from 'react';
 import {Link2,RefreshCw} from 'lucide-react';
-import {useSystemState,useOperations} from '../data/Operations';
-import type {Connections} from '../data/types';
-import {Panel,KeyValues} from '../ui/Panel';
-import {Button,ErrorMessage,Skeleton,Status,inputClass} from '../ui/Primitives';
-import {Capability} from '../ui/Capability';
+import {useSystemState,useOperations} from '../../data/Operations';
+import type {Connections} from '../../data/types';
+import {Panel,KeyValues} from '../../ui/Panel';
+import {Button,ErrorMessage,Skeleton,Status,inputClass} from '../../ui/Primitives';
+import {Capability} from '../../ui/Capability';
 interface Provider {provider:string;environment:string;saved:boolean;vault_error?:string;last_test?:{ok:boolean;message:string}}
 interface Settings {risk:{fee:number;slippage:number};data:{poll_seconds:number;timeout_seconds:number};symbols:string[];expert_devices:Record<string,string>}
 function ProviderForm(){

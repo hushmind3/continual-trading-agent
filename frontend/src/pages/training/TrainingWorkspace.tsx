@@ -1,14 +1,14 @@
 import {Workflow} from 'lucide-react';
-import {useOperations} from '../data/Operations';
-import {Skeleton,Button} from '../ui/Primitives';
-import {Panel,KeyValues} from '../ui/Panel';
-import {TrainingReadiness} from '../ui/TrainingReadiness';
-import {JobLog} from '../ui/JobLog';
-import {bytes,number} from '../ui/format';
-import {SacControls} from './training/SacControls';
-import {PolicyArchitecture} from './training/PolicyArchitecture';
-import {CheckpointPanel} from './training/CheckpointPanel';
-import {HelpDisclosure} from '../ui/HelpDisclosure';
+import {useOperations} from '../../data/Operations';
+import {Skeleton,Button} from '../../ui/Primitives';
+import {Panel,KeyValues} from '../../ui/Panel';
+import {TrainingReadiness} from '../../ui/TrainingReadiness';
+import {JobLog} from '../../ui/JobLog';
+import {bytes,number} from '../../ui/format';
+import {SacControls} from './SacControls';
+import {PolicyArchitecture} from './PolicyArchitecture';
+import {CheckpointPanel} from './CheckpointPanel';
+import {HelpDisclosure} from '../../ui/HelpDisclosure';
 export function TrainingWorkspace(){const {state:s}=useOperations();if(!s)return <Skeleton/>;const buffer=s.model.replay_state,m=s.job.measurements;
  return <div className="space-y-6"><section className="rounded-2xl bg-[#edf0fc] p-6"><div className="flex flex-wrap justify-between gap-4"><div><p className="flex items-center gap-2 text-xs text-violet-600"><Workflow size={15}/>FinRL · SB3 공식 학습</p><h2 className="mt-2 text-2xl font-bold">시장 경험으로 정책 가중치 업데이트</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">알고리즘 선택·설정·학습은 백엔드 FinRL DRLAgent에 연결됩니다. PortfolioOptimizationEnv와 Frozen Expert 관측을 사용하며 기본 알고리즘은 SAC입니다.</p></div><TrainingReadiness/></div><div className="mt-6 grid gap-5 sm:grid-cols-3">{[['저장된 학습 단계',number(s.model.num_timesteps,0)],['저장된 가중치 업데이트',number(s.model.updates,0)],['이번 실행 로그 단계',m.total_timesteps!=null?number(m.total_timesteps,0):'로그 기록 없음']].map(([k,v])=><div key={k}><p className="text-xs text-slate-500">{k}</p><b className="mt-2 block text-xl">{v}</b></div>)}</div></section>
  <SacControls/>

@@ -1,11 +1,11 @@
 import {ArrowRight,Boxes,Database,GraduationCap,Radio,Cpu} from 'lucide-react';
-import {useOperations} from '../data/Operations';
-import {Skeleton,Meter} from '../ui/Primitives';
-import {Panel} from '../ui/Panel';
-import {bytes,number} from '../ui/format';
-import {ServiceProgress} from '../ui/ServiceProgress';
-import {Capability} from '../ui/Capability';
-import {SystemControls} from '../ui/SystemControls';
+import {useOperations} from '../../data/Operations';
+import {Skeleton,Meter} from '../../ui/Primitives';
+import {Panel} from '../../ui/Panel';
+import {bytes,number} from '../../ui/format';
+import {ServiceProgress} from '../../ui/ServiceProgress';
+import {Capability} from '../../ui/Capability';
+import {SystemControls} from '../../ui/SystemControls';
 export function OperationsBoard(){const {state:s}=useOperations();if(!s)return <Skeleton/>;const r=s.resources;
  return <div className="space-y-6">
   <SystemControls/>

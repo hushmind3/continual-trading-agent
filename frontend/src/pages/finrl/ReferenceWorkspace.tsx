@@ -1,5 +1,5 @@
 import {FinrlWorkspace} from './FinrlWorkspace';
-import {Tabs} from '../ui/Primitives';
+import {Tabs} from '../../ui/Primitives';
 export function ReferenceWorkspace(){
  const requested=new URLSearchParams(location.hash.split('?')[1]||'').get('ref');
  const step:'data'|'train'|'backtest'=requested==='train'||location.hash.startsWith('#stock-training')?'train':requested==='backtest'||location.hash.startsWith('#backtest')?'backtest':'data';

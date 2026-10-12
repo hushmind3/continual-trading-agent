@@ -1,9 +1,9 @@
 import {FrameworkResult} from './FrameworkResult';
 import {useEffect,useMemo,useState} from 'react';
-import {useSystemState,useOperations} from '../data/Operations';
-import {Panel} from '../ui/Panel';
-import {Button,ErrorMessage,inputClass} from '../ui/Primitives';
-import type {FrameworkScope} from '../data/types';
+import {useSystemState,useOperations} from '../../data/Operations';
+import {Panel} from '../../ui/Panel';
+import {Button,ErrorMessage,inputClass} from '../../ui/Primitives';
+import type {FrameworkScope} from '../../data/types';
 interface Module {id:string;path:string;framework:string;functions:string[];signatures:Record<string,string>;parameters?:Record<string,{name:string;annotation?:string;required:boolean;default?:string}[]>;native_api?:string;status:string;reason:string}
 export function NativeModuleRunner({selectedModule,onSelect,framework}:{selectedModule:string;onSelect:(module:string)=>void;framework?:FrameworkScope}){
  const catalog=useSystemState<{items:Module[]}>('framework'),{state,execute,pending}=useOperations();

@@ -1,11 +1,11 @@
 import {useState} from 'react';
-import {Progress} from '../ui/SystemControls';
-import {useSystemState,useOperations} from '../data/Operations';
-import {Panel,KeyValues} from '../ui/Panel';
-import {Button,ErrorMessage,Skeleton} from '../ui/Primitives';
-import {DataTable} from '../ui/DataTable';
-import {JobLog} from '../ui/JobLog';
-import {bytes,number} from '../ui/format';
+import {Progress} from '../../ui/SystemControls';
+import {useSystemState,useOperations} from '../../data/Operations';
+import {Panel,KeyValues} from '../../ui/Panel';
+import {Button,ErrorMessage,Skeleton} from '../../ui/Primitives';
+import {DataTable} from '../../ui/DataTable';
+import {JobLog} from '../../ui/JobLog';
+import {bytes,number} from '../../ui/format';
 export function Diagnostics(){const {state:s,execute,pending}=useOperations();const [applyError,setApplyError]=useState('');const logs=useSystemState<{items:{name:string;text:string}[]}>('logs');if(!s)return <Skeleton/>;
  return <div className="space-y-6"><ErrorMessage message={applyError}/><Panel title="코드 적용" actions={<div className="flex gap-2"><Button busy={pending.has('system/apply')||s.automation?.apply.status==='running'} onClick={()=>{setApplyError('');void execute('system/apply',{target:'frontend'}).catch(e=>setApplyError(e instanceof Error?e.message:String(e)))}}>프론트 적용</Button><Button busy={pending.has('system/apply')||s.automation?.apply.status==='running'} onClick={()=>{setApplyError('');void execute('system/apply',{target:'backend'}).catch(e=>setApplyError(e instanceof Error?e.message:String(e)))}}>백엔드 적용</Button></div>}><Progress value={s.automation?.apply}/></Panel><Panel title="현재 실행 프로세스" description="기존 ResourceMonitor의 실제 PID·RAM·CPU·I/O"><DataTable label="프로세스 자원" items={s.resources.processes} keyFor={r=>String(r.pid)} columns={[{key:'role',label:'대상',render:r=>r.role},{key:'pid',label:'PID',render:r=>r.pid},{key:'ram',label:'RAM',render:r=>bytes(r.rss_bytes)},{key:'cpu',label:'CPU 코어 합산',render:r=>number(r.cpu_percent)+'%'},{key:'threads',label:'스레드',render:r=>r.threads},{key:'io',label:'I/O 누적',render:r=>bytes(r.read_bytes)+' 읽기 / '+bytes(r.write_bytes)+' 쓰기'}]}/></Panel>
  <JobLog/><div className="grid items-start gap-6 lg:grid-cols-2"><Panel title="설치된 라이브러리" description="현재 Python 배포판의 실제 버전"><KeyValues items={Object.entries(s.settings.versions).map(([name,v])=>[name,v])}/><details className="mt-4"><summary className="cursor-pointer text-xs text-blue-600">실제 API 상태 JSON</summary><pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-slate-950 p-4 text-xs text-slate-300">{JSON.stringify(s,null,2)}</pre></details></Panel>

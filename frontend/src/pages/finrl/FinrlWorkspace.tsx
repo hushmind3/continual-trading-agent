@@ -1,8 +1,8 @@
-import {Panel} from '../ui/Panel';
+import {Panel} from '../../ui/Panel';
 import {useEffect,useState} from 'react';
 import {ArrowRight,Download,Play} from 'lucide-react';
-import {useSystemState,useOperations} from '../data/Operations';
-import {MarketScanner} from './MarketScanner';
+import {useSystemState,useOperations} from '../../data/Operations';
+import {MarketScanner} from '../markets/MarketScanner';
 
 type Step='data'|'train'|'backtest';
 interface Defaults {revision:string;data_source:string;ticker_group:string;tickers:string[];train_start:string;train_end:string;trade_start:string;trade_end:string;indicators:string[];initial_amount:number;cost_pct:number;total_timesteps:number;algorithms:string[];environment:string;model_kwargs:Record<string,Record<string,unknown>>;scripts:{name:string;url:string}[]}

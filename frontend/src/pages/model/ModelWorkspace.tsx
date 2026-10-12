@@ -1,11 +1,11 @@
-import {ModelFiles} from './model/ModelFiles';
+import {ModelFiles} from './ModelFiles';
 import {useState} from 'react';
 import {FolderOpen,Layers3} from 'lucide-react';
-import {useOperations} from '../data/Operations';
-import {request} from '../data/api';
-import {Button,ErrorMessage,Skeleton} from '../ui/Primitives';
-import {ExpertLibraryPanel} from './model/ExpertLibraryPanel';
-import {ModelGuide} from './model/ModelGuide';
+import {useOperations} from '../../data/Operations';
+import {request} from '../../data/api';
+import {Button,ErrorMessage,Skeleton} from '../../ui/Primitives';
+import {ExpertLibraryPanel} from './ExpertLibraryPanel';
+import {ModelGuide} from './ModelGuide';
 
 export function ModelWorkspace(){
  const {state}=useOperations();const [error,setError]=useState(''),[source,setSource]=useState('');

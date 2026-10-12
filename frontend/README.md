@@ -1,5 +1,17 @@
 # React 개발 실행
 
+## 구조부터 확인
+
+| 역할 | 먼저 읽을 문서 |
+| --- | --- |
+| 전체 메뉴·구역·오류 표시 | [src/shell/README.md](src/shell/README.md) |
+| 단일 API·공통 상태 | [src/data/README.md](src/data/README.md) |
+| 기능별 화면 폴더 | [src/pages/README.md](src/pages/README.md) |
+| 재사용 컴포넌트·밀도 | [src/ui/README.md](src/ui/README.md) |
+| 대응 백엔드 | [backend/stockrl/README.md](../backend/stockrl/README.md) |
+
+FinRL 메인과 FinRL-Trading 보조의 경계를 유지합니다. 새 기능 연결·파일 이동 시 해당 폴더 문서와 메뉴·오류 표시를 함께 갱신합니다.
+
 흰색 테마와 7개 메뉴는 f153957 React 구성을 유지합니다. 전체 구조, 메뉴별 API, SAC·Expert·시세·가상계좌 연결 상태는 [루트 README](../README.md)를 참조합니다.
 
 운영 접속: 루트 `서버켜기.cmd` → `http://127.0.0.1:8766/` (FastAPI + React 정적 파일).

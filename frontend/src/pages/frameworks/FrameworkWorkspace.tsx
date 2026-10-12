@@ -1,10 +1,10 @@
 import {useState} from 'react';
 import {FrameworkTools} from './FrameworkTools';
 import {NativeModuleRunner} from './NativeModuleRunner';
-import {useSystemState} from '../data/Operations';
-import {Panel,KeyValues} from '../ui/Panel';
-import {Button,ErrorMessage,inputClass} from '../ui/Primitives';
-import type {FrameworkScope} from '../data/types';
+import {useSystemState} from '../../data/Operations';
+import {Panel,KeyValues} from '../../ui/Panel';
+import {Button,ErrorMessage,inputClass} from '../../ui/Primitives';
+import type {FrameworkScope} from '../../data/types';
 interface Module {id:string;path:string;framework:string;status:string;reason:string;description:string;functions:string[];signatures:Record<string,string>;dependencies:string[];calls:string[];actions:string[];verified_functions:string[];last_error?:string;native_api?:string}
 export function ModuleCatalog({onRun,scope}:{onRun?:(module:string)=>void;scope?:FrameworkScope}={}){
  const catalog=useSystemState<{items:Module[];counts:Record<string,number>}>('framework');

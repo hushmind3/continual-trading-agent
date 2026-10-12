@@ -1,9 +1,9 @@
 import {FrameworkResult} from './FrameworkResult';
 import {useState} from 'react';
-import {useSystemState,useOperations} from '../data/Operations';
-import {Panel} from '../ui/Panel';
-import {Button,ErrorMessage,inputClass} from '../ui/Primitives';
-import type {FrameworkScope} from '../data/types';
+import {useSystemState,useOperations} from '../../data/Operations';
+import {Panel} from '../../ui/Panel';
+import {Button,ErrorMessage,inputClass} from '../../ui/Primitives';
+import type {FrameworkScope} from '../../data/types';
 interface Action {id:string;name:string;menu:string;module:string;function:string;fields:string[];defaults?:Record<string,string|number>;api:string;stop_api:string}
 const labels:Record<string,string>={mode:'FinRL 원형 모드 · train / test / trade',data_dir:'공식 OHLCV CSV 폴더 · 비워두면 원형 경로',currency:'통화',symbols:'종목 · 쉼표로 구분',symbol:'종목',start_date:'시작일',end_date:'종료일',exchange:'공식 거래소 코드',source:'기존 가격 CSV 경로',fundamentals:'기존 재무 CSV 경로',target_period:'예측 기간 · 비워두면 공식 기본값',config_path:'기존 Adaptive Rotation YAML · 비워두면 공식 제공 파일',as_of_date:'기준일',prediction_mode:'예측 방식 · single / rolling',weight_method:'비중 방식 · equal / min_variance'};
 export function FrameworkTools({menu,framework}:{menu:string;framework?:FrameworkScope}){

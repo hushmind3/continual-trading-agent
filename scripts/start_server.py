@@ -114,10 +114,10 @@ def blockers():
         return items
 
 
-def main(apply_only=False,skip_build=False,skip_checks=False):
+def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False):
     with startup_lock():
         operation={'id':uuid.uuid4().hex,'pid':os.getpid(),'process_created':psutil.Process().create_time(),
-            'status':'running','started_at':time.time(),'stages':[]}
+            'status':'running','target':'frontend' if frontend_only else 'backend' if skip_build else 'all','started_at':time.time(),'stages':[]}
         def phase(key,title,status='running',detail='',**values):
             row=next((row for row in operation['stages'] if row['id']==key),None)
             if row is None:row={'id':key,'title':title};operation['stages'].append(row)
@@ -134,9 +134,9 @@ def main(apply_only=False,skip_build=False,skip_checks=False):
             backend_changed=groups['backend']!=old.get('backend')
             if before.get('dist_sha256') and (FRONTEND/'dist/index.html').is_file():
                 frontend_changed|=hashlib.sha256((FRONTEND/'dist/index.html').read_bytes()).hexdigest()!=before['dist_sha256']
-            phase(stage,'변경 소스 확인','complete',f'{len(changed)}개 변경; 프론트 빌드 {frontend_changed}, 서버 갱신 {backend_changed or not live}')
+            phase(stage,'변경 소스 확인','complete',f'{len(changed)}개 변경; 프론트 빌드 {frontend_changed}, 서버 갱신 {not frontend_only and (backend_changed or not live)}')
             stage='preserve';phase(stage,'실행 중 작업 보존')
-            active=blockers() if live else []
+            active=blockers() if live and backend_changed and not frontend_only else []
             if active and backend_changed:
                 phase(stage,'실행 중 작업 보존','complete',' · '.join(active)+'; 백엔드 재시작은 보류하고 프론트 변경만 적용할 수 있습니다.')
             else:
@@ -152,6 +152,19 @@ def main(apply_only=False,skip_build=False,skip_checks=False):
                 if not (FRONTEND/'dist/index.html').is_file():raise RuntimeError('React 빌드 산출물이 없습니다.')
                 phase(stage,'React 변경 적용','complete','변경된 소스 빌드 완료; 기존 산출물은 영구 삭제하지 않았습니다.')
             else:phase(stage,'React 변경 적용','complete','이미 생성된 React 빌드 사용' if skip_build else '변경 없음; 빌드 생략')
+            if frontend_only:
+                stage='react';phase(stage,'프론트 독립 적용')
+                refreshed,_=sources()
+                if refreshed['frontend']!=groups['frontend']:raise RuntimeError('프론트 적용 도중 소스가 변경됐습니다.')
+                if live:
+                    with urlopen(f'http://127.0.0.1:{PORT}/',timeout=10) as response:served=response.read().decode('utf8')
+                    if served!=(FRONTEND/'dist/index.html').read_text(encoding='utf8'):raise RuntimeError('새 React HTML 제공을 확인하지 못했습니다.')
+                digest=hashlib.sha256((FRONTEND/'dist/index.html').read_bytes()).hexdigest()
+                atomic_json({**before,'sources':{**old,'frontend':groups['frontend']},'dist_sha256':digest,
+                    'frontend_applied_at':time.time()},APPLIED)
+                phase(stage,'프론트 독립 적용','complete','React 파일 갱신 완료; 백엔드 모듈·모델·작업은 갱신하지 않았습니다.')
+                operation.update(status='complete',applied=True,finished_at=time.time())
+                atomic_json(operation,APPLY);print('프론트 독립 적용 완료',flush=True);return
             stage='server';phase(stage,'8766 서버 갱신')
             restart=backend_changed or not live
             if live and restart:
@@ -196,7 +209,8 @@ def main(apply_only=False,skip_build=False,skip_checks=False):
             phase(stage,'React · FastAPI 응답 확인','complete','8766 React HTML 및 현재 API 응답 확인; 브라우저 화면 테스트는 수행하지 않았습니다.')
             refreshed,_=sources()
             if refreshed!=groups:raise RuntimeError('적용 도중 소스가 다시 변경됐습니다. 현재 변경은 적용 완료로 기록하지 않습니다.')
-            atomic_json({'sources':groups,'revision':revision,'applied_at':time.time(),
+            stored_groups={**groups,'frontend':old.get('frontend',{})} if skip_build and frontend_changed else groups
+            atomic_json({'sources':stored_groups,'revision':revision,'applied_at':time.time(),
                 'dist_sha256':hashlib.sha256((FRONTEND/'dist/index.html').read_bytes()).hexdigest()},APPLIED)
             if skip_checks:
                 phase('check','사용자 지시로 검증 생략','complete','전체 모듈 점검·테스트를 실행하지 않았습니다.')
@@ -228,8 +242,12 @@ def main(apply_only=False,skip_build=False,skip_checks=False):
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--apply-only',action='store_true')
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--apply-only',action='store_true')
+    parser.add_argument('--frontend-only',action='store_true')
+    parser.add_argument('--skip-build',action='store_true')
+    parser.add_argument('--skip-checks',action='store_true')
     args=parser.parse_args()
-    try:main(args.apply_only)
+    try:main(args.apply_only,args.skip_build,args.skip_checks,args.frontend_only)
     except (OSError,RuntimeError,ValueError,subprocess.SubprocessError,psutil.Error) as exc:
         print(str(exc),file=sys.stderr);raise SystemExit(1)

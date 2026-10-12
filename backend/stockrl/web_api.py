@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
-from starlette.routing import Route, Match
+from starlette.routing import Route
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
@@ -72,9 +72,7 @@ async def local_writes(request: Request, call_next):
             for internal_method in (('GET',) if method=='GET' else ('POST','GET')):
                 forwarded={**request.scope,'path':path,'raw_path':path.encode('utf-8'),'method':internal_method,
                     'query_string':urlencode(parameters,doseq=True).encode() if internal_method=='GET' else b''}
-                for route in private_api.routes:
-                    match,child=route.matches(forwarded)
-                    if match==Match.FULL:matched=(route,{**forwarded,**child});break
+                matched=system.dispatch(forwarded)
                 if matched:break
             if not matched:return JSONResponse({'detail':'등록되지 않은 백엔드 명령입니다.'},status_code=404)
             method=matched[1]['method'];body=json.dumps(parameters,ensure_ascii=False).encode('utf-8') if method=='POST' else b''
@@ -91,7 +89,7 @@ async def local_writes(request: Request, call_next):
         return JSONResponse({"detail": "로컬 화면에서 요청하세요."}, status_code=403)
     if method!='GET':
         allowed_stop=path in ('/api/stop','/api/system/stop','/api/system/prepare-restart','/api/library/stop') or path.startswith('/api/controls/') and parameters.get('enabled') is False
-        if (apply_running() or system.restarting) and not allowed_stop and path!='/api/system/apply':
+        if ((apply_running() and apply_state().get('target')!='frontend') or system.restarting) and not allowed_stop and path!='/api/system/apply':
             return JSONResponse({'detail':'변경 적용/서버 갱신 중입니다. 기존 작업은 보존합니다.'},status_code=409)
         conflict=path in ('/api/train','/api/backtest','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/framework/') or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
         if conflict:
@@ -535,7 +533,8 @@ def state(views:str='[]',refresh_views:bool=False):
     return {'architecture':'finrl-unified-v3','updated_at':now(),'settings':settings,'model':model,'data':db,'experts':experts,'job':job,
         'evaluation':evaluations,'models_by_currency':models,'checkpoints':revisions,'capabilities':system.state_value('capabilities',capabilities,()),
         'operations':operations_state,'library':library,'automation':automation,'resources':resources,'views':selected,
-        'state_revision':system.state_revision,'module_errors':dict(system.state_errors),'module_updated_at':dict(system.state_updates),'resident_models':system.resident_models(),'imports':imports}
+        'state_revision':system.state_revision,'module_errors':dict(system.state_errors),'module_updated_at':dict(system.state_updates),'resident_models':system.resident_models(),'imports':imports,
+        'commands':system.commands(),'frontend_revision':system.state_value('frontend_revision',lambda:read_json(RUNTIME/'applied-sources.json').get('dist_sha256'),lambda:state_stamp(RUNTIME/'applied-sources.json'))}
 
 
 def connections():
@@ -1015,8 +1014,9 @@ def restore_checkpoint(request:dict):
 
 
 @private_api.post('/api/system/apply')
-def apply_changes():
-    return start_apply()
+def apply_changes(request:dict):
+    try:return start_apply(request.get('target','frontend'))
+    except ValueError as exc:raise HTTPException(400,str(exc)) from exc
 
 
 @private_api.get('/api/system/blockers')
@@ -1071,3 +1071,4 @@ def close_operations():
     system.close_models()
 
 app.add_middleware(GZipMiddleware)
+system.command_router=private_api

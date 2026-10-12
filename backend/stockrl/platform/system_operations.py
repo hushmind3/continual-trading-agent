@@ -23,15 +23,19 @@ def apply_running(value=None):
         return abs(process.create_time()-value['process_created'])<.01 and any('start_server.py' in arg for arg in process.cmdline())
     except (psutil.Error,KeyError):return False
 
-def start_apply():
+def start_apply(target='frontend'):
+    if target not in ('frontend','backend','all'):raise ValueError('frontend, backend, all 중 적용 대상을 선택하세요.')
     with system.job_lock:
         if apply_running():return apply_state()
         env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1')
         RUNTIME.mkdir(parents=True,exist_ok=True)
         with (RUNTIME/'apply-launch.log').open('ab') as output:
-            child=subprocess.Popen([sys.executable,str(ROOT/'scripts/start_server.py'),'--apply-only'],cwd=ROOT,env=env,
+            args=[sys.executable,str(ROOT/'scripts/start_server.py'),'--apply-only','--skip-checks']
+            if target=='frontend':args.append('--frontend-only')
+            elif target=='backend':args.append('--skip-build')
+            child=subprocess.Popen(args,cwd=ROOT,env=env,
                 stdout=output,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-        value={'status':'running','pid':child.pid,'process_created':psutil.Process(child.pid).create_time(),
+        value={'status':'running','target':target,'pid':child.pid,'process_created':psutil.Process(child.pid).create_time(),
             'stages':[{'id':'queue','title':'변경 적용 요청','status':'pending','detail':'독립 런처에서 처리합니다.'}]}
         atomic_json(value,RUNTIME/'apply.json')
         return value
@@ -111,9 +115,22 @@ class SystemOperations:
         self.state_lock=threading.RLock();self.model_lock=threading.RLock()
         self.states={};self.state_signatures={};self.state_errors={};self.state_updates={};self.state_revision=0
         self.state_loader_locks={}
+        self.command_router=None
         self.model_cache={};self.registry_cache={};self.expert_pool=None;self.expert_pool_signature=None
         from ..state_io import subscribe_updates
         subscribe_updates(self.module_update)
+    def dispatch(self,scope):
+        from starlette.routing import Match
+        for route in self.command_router.routes if self.command_router is not None else ():
+            match,child=route.matches(scope)
+            if match==Match.FULL:return route,{**scope,**child}
+        return None
+
+    def commands(self):
+        return [{'operation':route.path.removeprefix('/api/'),'methods':sorted(route.methods or ()),
+            'module':route.endpoint.__module__,'function':route.endpoint.__name__}
+            for route in self.command_router.routes if hasattr(route,'endpoint') and route.path.startswith('/api/')]
+
     def process_for(self,job):
         try:
             process = psutil.Process(int(job["pid"]))

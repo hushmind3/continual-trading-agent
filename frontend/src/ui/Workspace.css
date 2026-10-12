@@ -27,3 +27,14 @@
 .workspace-subnav {display:flex;align-items:center;gap:4px;flex-wrap:wrap;border-bottom:1px solid #dbe2eb;margin-bottom:12px;padding-bottom:8px}
 .workspace-subnav a {padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;color:#64748b}
 .workspace-subnav a[aria-current="page"] {color:#1d4ed8;background:#e8f0ff}
+
+.workspace-layout {display:grid;grid-template-columns:208px minmax(0,1fr);min-height:calc(100dvh - 49px)}
+.workspace-layout-compact {grid-template-columns:52px minmax(0,1fr)}
+.workspace-sidebar {position:sticky;top:49px;height:calc(100dvh - 49px);overflow-y:auto;border-right:1px solid #e2e8f0;background:#fff;padding:8px}
+.workspace-menu-group {margin-bottom:8px}
+.workspace-menu-group>summary {padding:6px 4px;font-size:11px;font-weight:600;color:#94a3b8;cursor:pointer}
+.workspace-menu-item {display:flex;align-items:center;gap:8px;padding:7px 8px;margin:2px 0;border-radius:6px;font-size:12px;color:#475569}
+.workspace-menu-item:hover {background:#f1f5f9}
+.workspace-menu-item[aria-current="page"] {color:#1d4ed8;background:#e8f0ff;font-weight:600}
+.workspace-compact .ui-panel:has(>header button[aria-expanded="false"])>header {margin-bottom:0}
+@media(max-width:640px) {.workspace-layout {grid-template-columns:168px minmax(0,1fr)}.workspace-layout-compact {grid-template-columns:44px minmax(0,1fr)}.workspace-sidebar {padding:4px}.workspace-menu-item {padding:7px 6px;font-size:11px}}

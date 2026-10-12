@@ -1,6 +1,6 @@
 # FinRL · SB3 + React — FinRL-X 보조
 
-화면은 운영(#control), 작업(#workspace), MoE(#moe), 설정(#settings)으로 구성됩니다. 운영 제어와 가상계좌를 함께 표시하며, 작업의 데이터·정책 학습·정책 평가·공식 원형은 같은 메뉴의 하위 탭에서 제공합니다. MoE 외 화면은 카드 패딩·버튼 높이·섹션 간격을 줄인 공통 스타일을 사용합니다. 기존 화면 해시는 해당 하위 탭으로 연결됩니다. 정책 평가는 저장 체크포인트를 별도로 선택하며 운영 승인 상태를 바꾸지 않습니다.
+React는 접고 펼치는 사이드 메뉴에서 시장 데이터, 운영 제어, 가상계좌, 정책 학습·평가, MoE, FinRL 공식 데이터·알고리즘 학습·백테스트, 모듈 도구, 연결 설정, 진단·로그를 각각 직접 제공합니다. MoE 외 화면의 공통 패널은 접고 펼칠 수 있으며 기존 실행 기능을 유지합니다. 프론트 적용은 React 파일만 갱신하고 백엔드 적용은 별도로 선택합니다. 실제 등록된 백엔드 명령은 통합 관리자가 동적으로 조회·중계합니다.
 
 모든 프론트 JSON 상태 조회는 `/api`의 `state` 요청 한 요청으로 수행하며 기존 `/api/framework/stock_data`, `/api/framework/stock_train`, `/api/framework/stock_backtest` 및 작업 중지 API를 사용합니다. 데이터는 YahooDownloader·FeatureEngineer·data_split, 학습은 StockTradingEnv·DRLAgent로 실행합니다. 원본의 A2C/DDPG/PPO/TD3/SAC 실행 플래그, 모델별 20,000단계와 예제별 모델 설정을 읽습니다. 백테스트는 DRL_prediction과 원본 예제의 MVO·DJIA 계산을 사용하며 실제 결과가 생성된 뒤 표·그래프·파일을 표시합니다.
 
@@ -194,7 +194,7 @@ MoE 화면은 등록 모델의 실제 버전 선택과 SAC Champion 조립에 �
 
 | 동작 | API / 실제 실행 경로 |
 | --- | --- |
-| 변경 적용·점검 | POST `/api/system/apply` → `start_apply` → 별도 일회성 `scripts/start_server.py --apply-only` |
+| 프론트/백엔드 독립 적용 | POST `/api/system/apply` → `start_apply` → 별도 일회성 `scripts/start_server.py --apply-only` |
 | 진행 상태 | GET `/api`의 `state` 요청의 automation 항목 → `apply.json` + `SystemOperations.snapshot`; 재시작 전후 기록 유지 |
 | 전체 연결 점검 | GET `/api/system/check` → 기존 설정·정책 메타데이터·Registry·원장·공급원·프로세스 조회 |
 | 전체 시작 | POST `/api/system/start` → `SystemOperations.start/run`; CMD도 같은 API 호출 |
@@ -261,3 +261,5 @@ FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합
 상태 조회는 통합 관리자의 모듈 캐시를 사용하고 정책 변경은 공통 작업 잠금으로 직렬화합니다. 잠금 순서는 작업→운영→모델로 맞춥니다. 선택한 Champion은 백테스트에 실제 전달하며 학습의 로딩·등록·저장에서는 한 번 읽은 Spec을 공유합니다. Champion 목록·검사는 가중치를 보관하지 않고 파일 버전별 메타데이터만 재사용합니다. Expert 결과 캐시는 입력·계좌가 같을 때만 재사용하고 통화·Expert별 마지막 입력만 유지합니다.
 
 학습 전 검사는 실제 학습·추론이 읽는 동일 가격 모듈로 rolling 구간의 종목별 가격 행렬을 확인합니다. 누락 가격을 만들거나 종목을 자동 제외하지 않습니다. 추론은 선택 종목의 최신 바가 모두 도착할 때까지 대기하고 통화별 처리 시각으로 중복 판단을 막습니다.
+
+프론트만 적용할 때는 기존 scripts/start_server.py --apply-only --frontend-only를 사용합니다. 단일 API의 system/apply 명령은 target이 frontend(기본값), backend, all 중 하나입니다. 프론트 적용 시 백엔드 변경이 남아 있어도 서버를 재시작하지 않으며, 통합 상태의 frontend_revision 변경을 브라우저가 반영합니다.

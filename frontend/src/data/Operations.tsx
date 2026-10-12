@@ -8,7 +8,7 @@ interface Context {
 const Operations=createContext<Context|null>(null);
 export function OperationsProvider({children}:{children:ReactNode}) {
   const [state,setState]=useState<Snapshot|null>(null),[error,setError]=useState(''),[pending,setPending]=useState(new Set<string>());
-  const views=useRef(new Map<string,number>()),inFlight=useRef<Promise<void>|null>(null),scheduled=useRef(false),alive=useRef(true),lastSelection=useRef('');
+  const views=useRef(new Map<string,number>()),inFlight=useRef<Promise<void>|null>(null),scheduled=useRef(false),alive=useRef(true),lastSelection=useRef(''),frontendRevision=useRef<string|null>(null);
   const refresh=useCallback((force=true):Promise<void>=>{
     if(inFlight.current)return inFlight.current;
     const selection=JSON.stringify([...views.current.keys()].sort());
@@ -17,7 +17,7 @@ export function OperationsProvider({children}:{children:ReactNode}) {
       try{
         const next=await request<Snapshot>('state',{views:selection,refresh_views:force});
         if(next.architecture!=='finrl-unified-v3')throw new Error('통합 상태 API가 아닌 서버에 연결되어 있습니다.');
-        if(alive.current){setState(next);setError('');}
+        if(alive.current){if(next.frontend_revision){if(frontendRevision.current&&frontendRevision.current!==next.frontend_revision){location.reload();return;}frontendRevision.current=next.frontend_revision;}setState(next);setError('');}
       }catch(e){if(alive.current)setError(e instanceof Error?e.message:'연결 실패');}
     })();
     inFlight.current=run;

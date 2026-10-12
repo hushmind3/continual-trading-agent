@@ -120,13 +120,6 @@ class SystemOperations:
         self.model_cache={};self.registry_cache={};self.expert_pool=None;self.expert_pool_signature=None
         from ..state_io import subscribe_updates
         subscribe_updates(self.module_update)
-    def dispatch(self,scope):
-        from starlette.routing import Match
-        for route in self.command_router.routes if self.command_router is not None else ():
-            match,child=route.matches(scope)
-            if match==Match.FULL:return route,{**scope,**child}
-        return None
-
     def commands(self):
         return [{'operation':route.path.removeprefix('/api/'),'methods':sorted(route.methods or ()),
             'module':route.endpoint.__module__,'function':route.endpoint.__name__}

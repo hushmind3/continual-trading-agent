@@ -16,3 +16,11 @@
 - 설정·가격·비중 평가의 기존 계약과 기본값을 유지합니다.
 - A2C·DDPG·PPO·TD3·SAC 알고리즘 선택·학습은 finrl/에서 담당합니다.
 - 프론트 대응 구역: FinRL-Trading · 보조. 인증 설정은 공통 연결·설정 화면에서도 접근합니다.
+
+## 메뉴 연결 파일
+
+finrl_trading_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
+
+| 화면 | 연결 파일 | 프론트 담당 파일 |
+| --- | --- | --- |
+| 보조 데이터 · 전략 · 도구 | finrl_trading_tools_menu.py | pages/frameworks/FrameworkWorkspace.tsx |

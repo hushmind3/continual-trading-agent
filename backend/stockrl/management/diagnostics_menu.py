@@ -1,0 +1,2 @@
+"""진단 · 로그 · 코드 적용의 기존 기능 연결."""
+MENU={'id': 'system', 'title': '진단 · 로그 · 코드 적용', 'operations': ['health', 'state', 'job', 'resources', 'logs', 'capabilities', 'imports', 'stop', 'system/apply', 'system/status', 'system/prepare-restart', 'system/check', 'download/', 'framework/result/', 'framework/artifact/'], 'views': ['settings', 'resources', 'job', 'logs'], 'frontend': 'pages/system/Diagnostics.tsx', 'manager': 'stockrl.management.diagnostics_menu'}

@@ -20,7 +20,7 @@ export function ModuleCatalog({onRun,scope}:{onRun?:(module:string)=>void;scope?
  </Panel>;
 }
 export function FrameworkWorkspace({framework}:{framework?:FrameworkScope}={}){
- const [selected,setSelected]=useState('');
+ const [selected,setSelected]=useState(()=>new URLSearchParams(location.hash.split('?')[1]??'').get('module')??'');
  return <div className="space-y-6">
   {framework==='FinRL'&&<p className="text-xs text-slate-600">FinRL · 기본 프레임워크 — SB3 알고리즘·공식 데이터 처리·학습·평가 기능</p>}
   {framework==='FinRL-X'&&<p className="text-xs text-slate-600">FinRL-Trading (FinRL-X) · 보조 프레임워크 — 추가 데이터·전략·비중 평가 기능. 알고리즘 선택·학습은 FinRL 구역에서 제공합니다.</p>}

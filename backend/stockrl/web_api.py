@@ -74,7 +74,8 @@ async def local_writes(request: Request, call_next):
             for internal_method in (('GET',) if method=='GET' else ('POST','GET')):
                 forwarded={**request.scope,'path':path,'raw_path':path.encode('utf-8'),'method':internal_method,
                     'query_string':urlencode(parameters,doseq=True).encode() if internal_method=='GET' else b''}
-                matched=system.dispatch(forwarded)
+                from .menu_registry import dispatch
+                matched=dispatch(forwarded,parameters)
                 if matched:break
             if not matched:return JSONResponse({'detail':'등록되지 않은 백엔드 명령입니다.'},status_code=404)
             method=matched[1]['method'];body=json.dumps(parameters,ensure_ascii=False).encode('utf-8') if method=='POST' else b''
@@ -430,6 +431,11 @@ def modules():
     return catalog()
 
 
+def menu_catalog():
+    from .menu_registry import catalog
+    return catalog(private_api.routes)
+
+
 def result_table(kind: Literal["weights", "trades"], limit: int = Query(1000, ge=1, le=5000),currency:Literal['KRW','USD']|None=None):
     path = evaluation_root(currency) / ("backtest_" + kind + ".csv")
     if not path.is_file():
@@ -464,6 +470,7 @@ def state_view(path):
     if currency not in (None,'USD','KRW'):raise ValueError('USD/KRW 상태를 선택하세요.')
     config=ROOT/'configs';official=ROOT/'runtime/official'
     providers={
+        'menu_catalog':(menu_catalog,lambda:()),
         'algorithms':(algorithms,lambda:()),
         'finrl':(finrl_workspace,lambda:state_stamp(official/'job.json',*(official/'framework-jobs').glob('*/result.json'))),
         'framework':(framework_catalog,None),
@@ -1076,3 +1083,5 @@ def close_operations():
 
 app.add_middleware(GZipMiddleware)
 system.command_router=private_api
+from .menu_registry import bind as bind_menu_commands
+bind_menu_commands(private_api.routes)

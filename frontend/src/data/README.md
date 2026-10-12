@@ -11,3 +11,5 @@
 - 버튼은 기존 operation과 payload를 execute로 전달합니다.
 - Python 모듈은 프론트에서 import하지 않습니다.
 - API 계약과 상태 의미를 화면 변경 때문에 임의로 바꾸지 않습니다.
+
+menu_types.ts는 메뉴·추가 작업·API 입력 계약 응답 타입입니다. menu_catalog는 상태 Provider의 동일 요청에 포함됩니다. API 전송기는 명시적인 GET 조회와 POST 실행을 구분합니다.

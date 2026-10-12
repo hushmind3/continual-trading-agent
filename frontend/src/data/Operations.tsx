@@ -3,7 +3,7 @@ import {request} from './api';
 import type {Snapshot} from './types';
 interface Context {
   state:Snapshot|null;error:string;pending:Set<string>;refresh:()=>Promise<void>;
-  observe:(path:string)=>()=>void;execute:<T>(path:string,body:unknown)=>Promise<T>;
+  observe:(path:string)=>()=>void;execute:<T>(path:string,body:unknown,method?:'GET'|'POST')=>Promise<T>;
 }
 const Operations=createContext<Context|null>(null);
 export function OperationsProvider({children}:{children:ReactNode}) {
@@ -36,9 +36,9 @@ export function OperationsProvider({children}:{children:ReactNode}) {
     const poll=async()=>{if(disposed)return;await refresh(false);if(!disposed)timer=setTimeout(poll,4000)};void poll();
     return()=>{disposed=true;alive.current=false;clearTimeout(timer)};
   },[refresh]);
-  const execute=async<T,>(path:string,body:unknown):Promise<T>=>{
+  const execute=async<T,>(path:string,body:unknown,method:'GET'|'POST'='POST'):Promise<T>=>{
     setPending(old=>new Set(old).add(path));
-    try{const result=await request<T>(path,body);await inFlight.current;await refresh(false);return result}
+    try{const result=await request<T>(path,body,method);await inFlight.current;await refresh(false);return result}
     finally{setPending(old=>{const next=new Set(old);next.delete(path);return next})}
   };
   return <Operations.Provider value={{state,error,pending,refresh,observe,execute}}>{children}</Operations.Provider>;

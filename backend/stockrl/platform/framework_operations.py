@@ -20,7 +20,7 @@ from ..state_io import atomic_json,read_json
 from ..finrl.operations import ACTIONS as FINRL_ACTIONS
 from ..finrl_trading.operations import ACTIONS as TRADING_ACTIONS
 
-ACTIONS={**FINRL_ACTIONS,**TRADING_ACTIONS,"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'symbols', 'source'])}
+ACTIONS={**FINRL_ACTIONS,**TRADING_ACTIONS,"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'env_kwargs', 'steps', 'argv', 'symbols', 'source'])}
 
 
 

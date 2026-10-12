@@ -8,3 +8,5 @@ management_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
 | --- | --- | --- |
 | 연결 · 설정 | connection_settings_menu.py | pages/settings/ConnectionSettings.tsx |
 | 진단 · 로그 · 코드 적용 | diagnostics_menu.py | pages/system/Diagnostics.tsx |
+
+| 백엔드 기능 전체 | backend_browser_menu.py | pages/frameworks/FeatureWorkspace.tsx |

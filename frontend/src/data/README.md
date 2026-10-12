@@ -13,3 +13,5 @@
 - API 계약과 상태 의미를 화면 변경 때문에 임의로 바꾸지 않습니다.
 
 menu_types.ts는 메뉴·추가 작업·API 입력 계약 응답 타입입니다. menu_catalog는 상태 Provider의 동일 요청에 포함됩니다. API 전송기는 명시적인 GET 조회와 POST 실행을 구분합니다.
+
+BackendAction.menu_id는 담당 작은 메뉴이며 추가 입력 허용 여부는 API의 additionalProperties 계약을 사용합니다.

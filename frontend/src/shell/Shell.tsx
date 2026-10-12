@@ -1,18 +1,16 @@
-import {useCallback,useState,useMemo,lazy,Suspense,type ReactNode} from 'react';
-import {Activity,Bell,Menu,PanelLeftClose,RefreshCw,Workflow} from 'lucide-react';
+import {useCallback,useState,useMemo,Suspense,type ReactNode} from 'react';
+import {Activity,Bell,Menu,PanelLeftClose,RefreshCw} from 'lucide-react';
 import {useOperations,useSystemState} from '../data/Operations';
 import {Drawer,Empty,ErrorMessage,Status} from '../ui/Primitives';
 import {CollapsiblePanels} from '../ui/Panel';
 import {date} from '../ui/format';
 import '../ui/Workspace.css';
 import type {BackendMenuCatalog} from '../data/menu_types';
-import type {MenuItem} from './menu_groups/menu_types';
-const feature=lazy(()=>import('../pages/frameworks/FeatureWorkspace').then(m=>({default:m.FeatureWorkspace})));
 function useNavigation(){
  const catalog=useSystemState<BackendMenuCatalog>('menu_catalog');
- return useMemo<MenuItem[]>(()=>[...navigation,{hash:'backend-browser',name:'백엔드 기능 전체',group:'연결 · 관리',icon:Workflow,component:feature,required:['job'] as MenuItem['required']},...(catalog.data?.actions??[]).filter(a=>!['stock_data','stock_train','stock_backtest','native_call'].includes(a.id)).map(a=>({hash:'feature-'+a.id,name:a.name,group:a.group==='finrl_trading'?'FinRL-Trading · 보조':a.group==='finrl'?'FinRL · 메인':'프로젝트 확장',icon:Workflow,component:feature,required:['job'] as MenuItem['required']}))],[catalog.data]);
+ return useMemo(()=>registeredNavigation(catalog.data?.actions??[]),[catalog.data]);
 }
-import {navigation} from './menu_groups/menu_registry';
+import {navigation,registeredNavigation} from './menu_groups/menu_registry';
 export {navigation} from './menu_groups/menu_registry';
 function destination(hash:string,items=navigation){
  const [name,query='']=hash.replace(/^#/,'').split('?'),params=new URLSearchParams(query);

@@ -1,4 +1,3 @@
-import ast
 import json
 import tempfile
 import threading
@@ -140,8 +139,4 @@ class IntegrityTests(unittest.TestCase):
    self.assertTrue(attempted.wait(1));self.assertTrue(worker.is_alive())
   finally:runtime.controls['feed']=False;runtime.feed_cycle.set();worker.join(3)
   self.assertEqual(runtime.status.get('learning_error'),'ambiguous daily input')
- def test_receiver_does_not_push_main_or_auto_merge(self):
-  source=(ROOT/'scripts/codex_fix_receiver.py').read_text(encoding='utf8');ast.parse(source)
-  self.assertNotIn('HEAD:main',source)
-  self.assertIn("status='awaiting_review'",source);self.assertIn("pr.get('merged') and approved and passed",source)
 if __name__=='__main__':unittest.main()

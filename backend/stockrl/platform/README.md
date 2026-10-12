@@ -20,3 +20,5 @@ FinRL과 FinRL-Trading의 실행 코드는 각 전용 폴더에 있습니다. �
 - 프론트 대응: 거래 운영, 프로젝트 확장, 연결·관리. 프레임워크 실행 목록은 해당 구역에 따로 표시합니다.
 
 메뉴 요청 분배는 상위 menu_registry.py가 담당합니다. SystemOperations는 상태·작업·모델 캐시와 공통 명령 목록을 유지합니다.
+
+menu_catalog는 action의 큰 메뉴·작은 메뉴 소속과 동적 framework API의 실제 입력 필드를 제공합니다. native_call의 환경·메서드 연결·CLI 인자는 기존 계약 그대로 전달합니다.

@@ -23,7 +23,7 @@
 
 ## 전체 메뉴 연결
 
-menu_registry.py는 큰 메뉴 연결 파일 5개만 import하고, 각 파일은 3/6/1/2/2개의 작은 메뉴를 연결합니다. SystemOperations의 공통 상태·모델 캐시는 변경하지 않습니다. 메뉴 정보는 기존 단일 state의 menu_catalog 항목으로 제공합니다.
+menu_registry.py는 큰 메뉴 연결 파일 5개만 import하고, 각 파일은 3/6/1/2/3개의 작은 메뉴를 연결합니다. SystemOperations의 공통 상태·모델 캐시는 변경하지 않습니다. 메뉴 정보는 기존 단일 state의 menu_catalog 항목으로 제공합니다.
 
 ## 메뉴 등록과 실제 요청 분배
 

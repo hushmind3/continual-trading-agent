@@ -9,6 +9,7 @@ GROUPS=(TRADING,FINRL,FINRL_TRADING,EXTENSIONS,MANAGEMENT)
 _routes_by_menu={}
 
 def owner(operation):
+    if operation=='framework/native_call':return 'management','backend-browser'
     if operation.startswith('framework/') and operation.count('/')==1:
         from .finrl.operations import ACTIONS as finrl_actions
         from .finrl_trading.operations import ACTIONS as trading_actions
@@ -28,7 +29,7 @@ def bind(routes):
     for route in routes:
         if not hasattr(route,'endpoint') or not route.path.startswith('/api/'):continue
         operation=route.path.removeprefix('/api/')
-        menus=set(('frameworks','finrl-trading','project-modules','finrl','stock-training','backtest','system') if operation=='framework/{action}' else (owner(operation)[1],))
+        menus=set(('frameworks','finrl-trading','project-modules','finrl','stock-training','backtest','system','backend-browser') if operation=='framework/{action}' else (owner(operation)[1],))
         for group in GROUPS:
             for menu in group['menus']:
                 if any(not pattern.endswith('/') and route.path_regex.fullmatch('/api/'+pattern) for pattern in menu['operations']):menus.add(menu['id'])
@@ -51,7 +52,7 @@ def catalog(routes):
     from .platform.framework_operations import action_list
     actions=action_list()
     for action in actions:
-        action['group']='finrl_trading' if action['module'].startswith('FinRL-X:') else 'finrl' if action['module'].startswith('FinRL:') else 'extensions'
+        action['group'],action['menu_id']=owner('framework/'+action['id'])
     def fields(values):
         properties={};required=[]
         for field in values:
@@ -62,6 +63,7 @@ def catalog(routes):
             if field.required:required.append(field.alias)
         return {'type':'object','properties':properties,'required':required}
     commands=[]
+    registered_paths={route.path for route in routes if hasattr(route,'endpoint')}
     for route in routes:
         if not hasattr(route,'endpoint') or not route.path.startswith('/api/'):continue
         operation=route.path.removeprefix('/api/')
@@ -70,10 +72,25 @@ def catalog(routes):
         if route.body_field:
             annotation=route.body_field.field_info.annotation
             body=TypeAdapter(annotation).json_schema()
-        commands.append({'operation':operation,'methods':sorted(route.methods or ()),
+        command={'operation':operation,'methods':sorted(route.methods or ()),
             'module':route.endpoint.__module__,'function':route.endpoint.__name__,
             'group':group,'menu':menu,'description':route.description or '',
             'path_schema':fields(route.dependant.path_params),
-            'query_schema':fields(route.dependant.query_params),'body_schema':body})
+            'query_schema':fields(route.dependant.query_params),'body_schema':body}
+        commands.append(command)
+        if operation=='framework/{action}':
+            for action in actions:
+                if '/api/framework/'+action['id'] in registered_paths:continue
+                properties={key:{'title':key} for key in action['fields']}
+                for key in ('kwargs','init_kwargs','env_kwargs'):
+                    if key in properties:properties[key]['type']='object'
+                for key in ('symbols','steps','argv'):
+                    if key in properties:properties[key]['type']='array'
+                if 'symbols' in properties:properties['symbols']['items']={'type':'string'}
+                commands.append({**command,'operation':'framework/'+action['id'],
+                    'group':action['group'],'menu':action['menu_id'],
+                    'description':action['name']+' · '+action['module']+' · '+action['function'],
+                    'path_schema':{'type':'object','properties':{}},
+                    'body_schema':{**body,'properties':properties}})
     return {'groups':[{'id':g['id'],'title':g['title'],'menus':list(g['menus'])} for g in GROUPS],
         'actions':actions,'commands':commands}

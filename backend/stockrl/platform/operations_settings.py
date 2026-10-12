@@ -1,4 +1,5 @@
 """Operational fields reused from f153957; SAC settings stay in framework.py."""
+import math
 from pathlib import Path
 from types import SimpleNamespace
 from ..framework import ROOT
@@ -24,6 +25,16 @@ def settings():
 def update(values):
     current=read_json(CONFIG_PATH)
     for name in ('risk','data','symbols','expert_devices'):
-        if name in values:current[name]=values[name]
+        if name not in values:continue
+        if name in ('risk','data','expert_devices'):
+            if not isinstance(values[name],dict):raise ValueError(name+': 객체가 필요합니다.')
+            current[name]={**current.get(name,{}),**values[name]}
+        else:current[name]=values[name]
+    for group,fields in (('risk',('fee','slippage')),('data',('poll_seconds','timeout_seconds'))):
+        for name in fields:
+            if name not in current.get(group,{}):continue
+            value=current[group][name]
+            if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<0 or (group=='data' and value==0):
+                raise ValueError(group+'.'+name+': 유한한 '+('양수' if group=='data' else '0 이상의 값')+'가 필요합니다.')
     atomic_json(current,CONFIG_PATH)
     return current

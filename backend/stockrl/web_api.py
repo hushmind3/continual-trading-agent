@@ -954,7 +954,8 @@ def save_operational_settings(values:dict):
     from .platform.operations_settings import update
     if set(values)-{"risk","data","symbols","expert_devices"}:raise HTTPException(400,"운영 설정만 변경할 수 있습니다. SAC 설정은 원본값을 사용합니다.")
     if runtime.controls['feed']:raise HTTPException(409,"시세 수신을 멈춘 뒤 운영 설정을 변경하세요.")
-    value=update(values)
+    try:value=update(values)
+    except ValueError as exc:raise HTTPException(400,str(exc)) from exc
     if runtime.account:
         from .platform.operations_settings import settings
         current=settings();runtime.account.fee=current.risk.fee;runtime.account.slippage=current.risk.slippage

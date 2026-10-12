@@ -32,6 +32,11 @@ def _currency(market: str, asset: str) -> str | None:
     return None
 
 
+def _moment(value):
+    moment=datetime.fromisoformat(str(value).replace('Z','+00:00'))
+    return moment.replace(tzinfo=timezone.utc) if moment.tzinfo is None else moment.astimezone(timezone.utc)
+
+
 class PaperAccount:
     def __init__(self, path: Path, fee: float, slippage: float):
         self.path = Path(path)
@@ -51,6 +56,7 @@ class PaperAccount:
             "version": 1,
             "episode_id": uuid.uuid4().hex,
             "last_timestamp": None,
+            "last_processed_at": {},
             "pending": {},
             "fills": [],
             "books": {currency: {
@@ -321,15 +327,15 @@ class PaperAccount:
         return fill
 
     def process_bar(self, panel, index: int, enabled: bool) -> list[dict]:
-        timestamp = str(panel.dates[index])
-        if self.state["last_timestamp"] and timestamp <= self.state["last_timestamp"]:
-            return []
+        moment=_moment(panel.dates[index]);timestamp=moment.isoformat()
+        processed=self.state.setdefault('last_processed_at',{})
         if not enabled:
             self.state["pending"].clear()
         filled=[]
         for j, symbol in enumerate(panel.symbols):
             if not panel.observed[index, j]:
                 continue
+            if symbol in processed and moment<=_moment(processed[symbol]):continue
             market, asset = panel.groups[symbol]
             currency = _currency(market, asset)
             if currency is None:
@@ -340,7 +346,7 @@ class PaperAccount:
             book = self.state["books"][currency]
             book["marks"][symbol] = price
             order = self.state["pending"].get(symbol)
-            if enabled and order and order["date"] < timestamp:
+            if enabled and order and _moment(order['date']) < moment:
                 # The completed bar close is known only now. The prior signal
                 # could not trade on its own observation bar.
                 spread_bps = max(0.0, float(panel.features[index, j, 7]))
@@ -355,7 +361,9 @@ class PaperAccount:
                     fill["symbol_pnl_before_fill"]=symbol_pnl_before_fill
                     filled.append(fill)
                 del self.state["pending"][symbol]
-        self.state["last_timestamp"] = timestamp
+            processed[symbol]=timestamp
+        previous=self.state.get('last_timestamp')
+        if previous is None or moment>_moment(previous):self.state['last_timestamp']=timestamp
         return filled
 
     def queue_decisions(self, panel, index: int, probabilities, enabled: bool,

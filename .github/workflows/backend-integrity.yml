@@ -1,0 +1,21 @@
+name: Backend integrity
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  backend-integrity:
+    name: backend-integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy==2.2.6 pandas==2.2.3 gymnasium==1.3.0 psutil==7.0.0
+      - run: python -m compileall -q backend scripts
+      - run: python -m unittest discover -s tests -v
+        env:
+          PYTHONPATH: backend

@@ -1,8 +1,10 @@
-"""Deduplicated completed bars, persisted through the current official DataStore."""
+"""Deduplicated live bars kept separate from the official daily price history."""
 from __future__ import annotations
 
 import csv
 import os
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -27,11 +29,18 @@ class AppendOnlyMarketCSV:
         self.store=finrlx('data.data_store').DataStore(str(ROOT/'data'))
         self.processor=finrlx('data.data_processor').DataProcessor(str(self.path.parent/'data'))
         self.db_path=self.store.db_path
+        self.raw_path=self.path.with_name("timeframes.sqlite3")
+        self.last_added_rows=[]
+        with closing(sqlite3.connect(self.raw_path)) as db,db:
+            db.execute("CREATE TABLE IF NOT EXISTS received_bars (symbol TEXT NOT NULL, stamp_ns INTEGER NOT NULL, PRIMARY KEY(symbol,stamp_ns))")
         self._seed_index()
 
     def _seed_index(self) -> None:
         if self.path.exists() and self.path.stat().st_size:
-            for chunk in pd.read_csv(self.path,chunksize=100_000):self._save_prices(chunk)
+            with closing(sqlite3.connect(self.raw_path)) as db,db:
+                for chunk in pd.read_csv(self.path,chunksize=100_000):
+                    stamps=pd.to_datetime(chunk.date,utc=True,errors='raise',format='mixed')
+                    db.executemany("INSERT OR IGNORE INTO received_bars VALUES (?,?)",zip(chunk.symbol.astype(str),stamps.astype('int64').map(int)))
 
     def _save_prices(self,frame):
         canonical=frame.rename(columns={'symbol':'gvkey','date':'datadate','open':'prcod','high':'prchd','low':'prcld','close':'prccd','volume':'cshtrd'}).copy()
@@ -41,38 +50,26 @@ class AppendOnlyMarketCSV:
         return self.store.save_price_data(canonical)
 
     def append(self, rows: list[dict[str, Any]]) -> int:
-        unique: list[dict[str, Any]] = []
-        batch: set[tuple[str, int]] = set()
+        self.last_added_rows=[]
+        unique=[];batch=set()
         if not rows:return 0
         stamps=pd.to_datetime([r.get('date') for r in rows],utc=True,errors='coerce',format='mixed')
-        valid=[s.value for s in stamps if not pd.isna(s)]
-        if not valid:return 0
-        symbols=sorted({str(r.get('symbol')) for r in rows if r.get('symbol')})
-        existing=set()
-        stored=self.store.get_price_data(symbols,min(s.isoformat() for s in stamps if not pd.isna(s)),max(s.isoformat() for s in stamps if not pd.isna(s)))
-        if not stored.empty:
-            existing={(str(symbol),int(pd.Timestamp(stamp).value)) for symbol,stamp in zip(stored.tic,stored.datadate)}
-        for row,stamp in zip(rows,stamps):
-            row = {key: row.get(key) for key in FEED_COLUMNS}
-            if pd.isna(stamp) or not row["symbol"]:
-                continue
-            row["date"] = stamp.isoformat()
-            key = (str(row["symbol"]), int(stamp.value))
-            if key in batch or key in existing:
-                continue
-            batch.add(key)
-            unique.append(row)
-        if not unique:
-            return 0
-        fresh = not self.path.exists() or self.path.stat().st_size == 0
-        with self.path.open("a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=FEED_COLUMNS, extrasaction="ignore")
-            if fresh:
-                writer.writeheader()
-            writer.writerows(unique)
-            f.flush()
-            os.fsync(f.fileno())
-        self._save_prices(pd.DataFrame(unique))
+        with closing(sqlite3.connect(self.raw_path)) as db,db:
+            for source,stamp in zip(rows,stamps):
+                row={key:source.get(key) for key in FEED_COLUMNS}
+                if pd.isna(stamp) or not row['symbol']:continue
+                key=(str(row['symbol']),int(stamp.value))
+                if key in batch:continue
+                inserted=db.execute("INSERT OR IGNORE INTO received_bars VALUES (?,?)",key).rowcount
+                if not inserted:continue
+                batch.add(key);row['date']=stamp.isoformat();unique.append(row)
+            if not unique:return 0
+            fresh=not self.path.exists() or self.path.stat().st_size==0
+            with self.path.open('a',newline='',encoding='utf8') as stream:
+                writer=csv.DictWriter(stream,fieldnames=FEED_COLUMNS,extrasaction='ignore')
+                if fresh:writer.writeheader()
+                writer.writerows(unique);stream.flush();os.fsync(stream.fileno())
+        self.last_added_rows=unique
         return len(unique)
 
     def close(self):

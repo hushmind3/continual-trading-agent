@@ -18,7 +18,7 @@ class ExpertObservation(gym.ObservationWrapper):
     def observation(self,value):
         if self.structure_only:return np.zeros(self.observation_space.shape,dtype=np.float32)
         base=self.unwrapped.gym_env
-        data=base._info['data'];stamp=pd.Timestamp(base._info['end_time'])
+        stamp=pd.Timestamp(base._info['end_time'])
         portfolio_value=float(base._portfolio_value);self.assets.append(portfolio_value)
         history=self.frame[self.frame.date<=stamp];nav=max(portfolio_value,1e-9)
         allocation=base._final_weights[-1];weights=allocation[1:]
@@ -27,13 +27,25 @@ class ExpertObservation(gym.ObservationWrapper):
         account={'currency':getattr(self,'currency','USD'),'cash':cash,'nav':nav,
             'positions':{symbol:float(weight*nav/marks[symbol]) for symbol,weight in zip(self.symbols,weights)},
             'drawdown':1-nav/max(self.assets),'volatility':float(np.std(np.diff(np.log(np.maximum(self.assets,1e-9))))) if len(self.assets)>1 else 0.}
+        initial_amount=float(base._initial_amount)
         if getattr(self,'live_account',None):
             account.update(self.live_account);nav=float(account['nav']);cash=float(account['cash'])
+            initial_amount=float(account['initial_cash'])
+            if not np.isfinite(initial_amount) or initial_amount<=0:raise ValueError('계좌 초기자본이 유효하지 않습니다.')
+            positions=account['positions'];live_marks=account['marks']
+            outside=sorted(symbol for symbol,quantity in positions.items() if quantity and symbol not in self.symbols)
+            if outside:raise ValueError('모델 관측 종목에 없는 보유 포지션: '+', '.join(outside))
+            if any(float(positions.get(symbol,0)) and symbol not in live_marks for symbol in self.symbols):
+                raise ValueError('실제 보유 종목의 평가 시세가 없습니다.')
+            weights=np.asarray([float(positions.get(symbol,0))*float(live_marks.get(symbol,0))/nav if nav>0 else 0 for symbol in self.symbols])
+            values=[float(point['nav']) for point in account['equity_history']]
+            if not values or values[-1]!=nav:values.append(nav)
+            account['drawdown']=1-nav/max(initial_amount,*values)
+            account['volatility']=float(np.std(np.diff(np.log(np.maximum(values,1e-9))))) if len(values)>1 else 0.
         signals=self.registry.outputs(history,account,champion_ids=self.champion_ids)
         fractions=np.asarray(weights,dtype=np.float32)
         quantiles=np.quantile(fractions,[0,.25,.5,.75,1]).astype(np.float32) if len(fractions) else np.zeros(5,dtype=np.float32)
-        initial_amount=float(base._initial_amount)
-        account_features=np.asarray([nav/max(initial_amount,1.),cash/max(initial_amount,1.),account['drawdown'],account['volatility'],
+        account_features=np.asarray([nav/initial_amount,cash/initial_amount,account['drawdown'],account['volatility'],
             len(fractions)/max(1,len(self.symbols)),float(fractions.sum()),float(fractions.mean()) if len(fractions) else 0.,
             float(fractions.std()) if len(fractions) else 0.,*quantiles,
             float((fractions>0).sum())/max(1,len(fractions)),float(np.square(fractions).sum()),0.],dtype=np.float32)

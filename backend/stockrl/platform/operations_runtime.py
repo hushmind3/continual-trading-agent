@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 import threading
 import time
+from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 from ..framework import ROOT,prices,training_environment
 from ..state_io import read_json,atomic_json
-from ..paper_account import PaperAccount
+from ..paper_account import PaperAccount,_moment
 from .operations_settings import settings
 from .system_operations import system
 from ..framework import policy_checkpoint,CASH_ENVIRONMENT,champion_structure_environment
@@ -18,8 +19,8 @@ class OperationsRuntime:
     def __init__(self):
         self.lock=threading.RLock()
         self.controls={'feed':False,'paper':False,'engine':False,'learning':False}
-        self.learning_pending=[];self.learning_job=None
-        self.collector=None;self.thread=None
+        self.learning_pending=[];self.learning_job=None;self.learning_versions={}
+        self.collector=None;self.thread=None;self.policy_thread=None
         self.account=None;self.quotes={};self.decisions=[];self.last_policy_dates={}
         self.status={'status':'stopped','error':None}
         self.policy_models={}
@@ -93,12 +94,12 @@ class OperationsRuntime:
             collector=LiveMarketCollector(config,cfg.state_dir/'live/market.csv',
                 poll_seconds=cfg.data.poll_seconds,timeout=cfg.data.timeout_seconds)
             with self.lock:self.collector=collector
-            # Existing writer persists incoming bars through the official DataStore.
+            # Raw bars are persisted separately; only accepted rows update the ledger.
             original_append=collector.index.append
             def append(rows):
                 added=original_append(rows)
                 if rows:self.status.update(last_received_at=time.time(),last_as_of=str(max(row['date'] for row in rows)))
-                if added:self.accept(rows)
+                if added:self.accept(collector.index.last_added_rows)
                 return added
             collector.index.append=append
             original_collect=collector.collect_once
@@ -106,6 +107,8 @@ class OperationsRuntime:
                 try:return original_collect()
                 finally:self.feed_cycle.set()
             collector.collect_once=collect_once
+            self.policy_thread=threading.Thread(target=self.process_updates,name='policy-updates',daemon=True)
+            self.policy_thread.start()
             if collector.broker_provider=='kiwoom':
                 from .kiwoom_data import BrokerStreams
                 broker=BrokerStreams(collector);broker.start();collector.broker_thread=broker.thread
@@ -121,12 +124,16 @@ class OperationsRuntime:
             with self.lock:
                 self.controls['feed']=False;self.collector=None
                 if self.status.get('status')!='failed':self.status['status']='stopped'
+            self.feed_cycle.set()
 
     def accept(self,rows):
         frame=pd.DataFrame(rows)
         if frame.empty:return
         for stamp,group in frame.sort_values('date').groupby('date',sort=True):
-            records=group.to_dict('records');symbols=[r['symbol'] for r in records]
+            with self.lock:
+                records=[r for r in group.to_dict('records') if r['symbol'] not in self.quotes or _moment(r['date'])>_moment(self.quotes[r['symbol']]['date'])]
+            if not records:continue
+            symbols=[r['symbol'] for r in records]
             features=np.zeros((1,len(records),8),dtype=float)
             for index,row in enumerate(records):
                 bid,ask=row.get('bid'),row.get('ask')
@@ -139,11 +146,22 @@ class OperationsRuntime:
                 self.quotes.update({r['symbol']:r for r in records})
                 self.ledger().process_bar(panel,0,self.controls['paper'])
                 self.ledger().save()
-                self.status.update(last_as_of=str(stamp),received_symbols=len(self.quotes))
+                self.status['received_symbols']=len(self.quotes)
+                previous=self.status.get('last_as_of')
+                if previous is None or _moment(stamp)>_moment(previous):self.status['last_as_of']=str(stamp)
+        self.feed_cycle.set()
+
+    def process_updates(self):
+        while self.controls['feed']:
+            self.feed_cycle.wait();self.feed_cycle.clear()
+            if not self.controls['feed']:break
             if self.controls['engine']:
                 try:self.sac_decision()
-                except Exception as exc:self.status['policy_error']=str(exc)
-            if self.controls['learning']:self.queue_learning(symbols)
+                except Exception as exc:
+                    with self.lock:self.status['policy_error']=str(exc)
+            if self.controls['learning']:
+                with self.lock:symbols=list(self.quotes)
+                self.queue_learning(symbols)
 
     def queue_learning(self,symbols):
         with system.job_lock,self.lock:
@@ -155,7 +173,12 @@ class OperationsRuntime:
                 self.status['learning_error']='운영 모델을 선택·로드한 뒤 지속학습을 켜세요.';return
             for currency,path in policies.items():
                 identity=read_json((ROOT/'runtime/official'/path).parent/'dataset.json')
-                if set(identity.get('symbols',[]))&set(symbols) and currency not in self.learning_pending:self.learning_pending.append(currency)
+                if not set(identity.get('symbols',[]))&set(symbols):continue
+                frame=prices(currency,identity['symbols'])
+                if frame.empty:continue
+                version=sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest()
+                if self.learning_versions.get(currency)==version:continue
+                if currency not in self.learning_pending:self.learning_pending.append(currency)
             if system.job_state()['running'] or not self.learning_pending:return
             currency=self.learning_pending.pop(0)
             try:
@@ -163,6 +186,8 @@ class OperationsRuntime:
                 request=api.RunRequest(currency=currency,symbols=identity['symbols'],algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
                 result=api.launch('train',request,preserve_output=True)
                 self.learning_job=result['job']['id']
+                frame=prices(currency,identity['symbols'])
+                self.learning_versions[currency]=sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest()
                 self.status.update(learning_status=identity.get('algorithm','sac').upper()+' 이어 학습 실행',learning_job=self.learning_job)
                 self.status.pop('learning_error',None)
             except Exception as exc:self.status.update(learning_status='학습 요청 실패',learning_error=str(exc))
@@ -179,6 +204,11 @@ class OperationsRuntime:
                 frame=prices(currency,[symbol])
                 if frame.empty:raise ValueError('실제 저장 가격이나 수신 시세가 없습니다.')
                 row=frame.sort_values('date').iloc[-1].to_dict();source='stored'
+            from ..live_feed import LIVE_QUOTE_MAX_AGE_SECONDS
+            stamp=pd.Timestamp(row['date'])
+            if stamp.tzinfo is None:stamp=stamp.tz_localize('UTC')
+            age=(pd.Timestamp.now(tz='UTC')-stamp).total_seconds()
+            if age<0 or age>LIVE_QUOTE_MAX_AGE_SECONDS:raise ValueError('유효한 최신 시세가 없어 즉시 체결할 수 없습니다.')
             price=float(row['close']);bid=row.get('bid');ask=row.get('ask')
             spread=(float(ask)-float(bid))/price if bid and ask else 0
             fill=self.ledger()._fill(symbol,currency,action,price,spread,
@@ -255,12 +285,11 @@ class OperationsRuntime:
             selected=read_json(ROOT/'runtime/operations/policies.json')
             if not selected:raise ValueError('운영 정책 미승인: 모델 선택 화면에서 직접 승인하세요.')
             files=[(ROOT/'runtime/official'/path).resolve().parent for path in selected.values()]
-            with self.lock:
-                self.decisions=[]
-                for folder in files:
-                    if not folder.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('운영 정책 경로가 runtime/official 밖에 있습니다.')
-                    if self.cancel_inference.is_set() or not self.controls['engine']:break
-                    self._sac_decision(folder)
+            with self.lock:self.decisions=[]
+            for folder in files:
+                if not folder.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('운영 정책 경로가 runtime/official 밖에 있습니다.')
+                if self.cancel_inference.is_set() or not self.controls['engine']:break
+                self._sac_decision(folder)
         finally:self.inference_active-=1
 
     def check_policy(self,files,*,load=False):
@@ -296,6 +325,12 @@ class OperationsRuntime:
         if frame.empty:
             self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'실제 저장 가격이 없습니다.'}
             return
+        counts=frame.groupby('date').symbol.nunique()
+        complete=counts[counts==len(symbols)].index
+        if len(complete)==0:
+            self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'모든 종목이 있는 완료 일봉을 기다립니다.'}
+            return
+        frame=frame[frame.date<=complete.max()]
         input_stamp=str(frame.date.max());latest_rows=frame[frame.date==frame.date.max()]
         if len(latest_rows)!=len(symbols) or latest_rows.symbol.nunique()!=len(symbols):
             self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','as_of':input_stamp,'missing_symbols':sorted(set(symbols)-set(latest_rows.symbol))}
@@ -313,9 +348,14 @@ class OperationsRuntime:
             self.policy_models[currency]={'path':path,'algorithm':identity.get('algorithm','sac'),'signature':(stat.st_mtime_ns,stat.st_size),
                 'device':str(model.device),'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
                 'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
-            book=self.ledger().snapshot()['books'][currency]
-            wrapped.live_account={'currency':currency,'nav':book['equity'],'cash':book['cash'],
-                'positions':{symbol:row['quantity'] for symbol,row in book['positions'].items()}}
+            with self.lock:
+                ledger=self.ledger();book=ledger.snapshot()['books'][currency]
+                history=ledger.state['books'][currency].setdefault('equity_history',[])
+                if history and history[-1]['date']==input_stamp:history[-1]['nav']=book['equity']
+                else:history.append({'date':input_stamp,'nav':book['equity']})
+                wrapped.live_account={'currency':currency,'nav':book['equity'],'cash':book['cash'],'initial_cash':book['initial_cash'],
+                    'marks':dict(book['marks']),'equity_history':[dict(point) for point in history],
+                    'positions':{symbol:row['quantity'] for symbol,row in book['positions'].items()}}
             observation=wrapped.observation(latest._state)
             action,_=model.predict(observation,deterministic=True)
             import math
@@ -329,6 +369,10 @@ class OperationsRuntime:
                 features=np.zeros((1,len(symbols),8)))
             with self.lock:
                 book=self.ledger().snapshot()['books'][currency];nav=book['equity']
+                if book['cash']!=wrapped.live_account['cash'] or {s:row['quantity'] for s,row in book['positions'].items()}!=wrapped.live_account['positions']:
+                    self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'추론 중 보유 상태가 변경되어 다시 판단합니다.'}
+                    self.feed_cycle.set();return
+                panel.dates=[pd.Timestamp.now(tz='UTC').isoformat()]
                 current=[book['positions'].get(s,{}).get('quantity',0)*float(bars.loc[s,'close'])/nav if nav else 0 for s in symbols]
                 actions=np.array([2 if weight>held else 0 if weight<held else 1 for weight,held in zip(weights,current)])
                 self.ledger().queue_decisions(panel,0,np.tile([0.,1.,0.],(len(symbols),1)),self.controls['paper'],

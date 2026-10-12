@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 from .paths import ensure_project_path
 from .market_storage import AppendOnlyMarketCSV, FEED_COLUMNS
 from .multiscale import DailyBarStore, TIMEFRAME_NAMES
+LIVE_QUOTE_MAX_AGE_SECONDS=300
 
 import pandas as pd
 import requests
@@ -301,7 +302,9 @@ class LiveMarketCollector:
             if not future.done():
                 continue
             try:
-                daily_fetched+=self.daily_store.upsert(future.result())
+                daily_rows=future.result()
+                daily_fetched+=self.daily_store.upsert(daily_rows)
+                self.index._save_prices(pd.DataFrame(daily_rows))
                 self.daily_failures[name]=0
                 self.daily_next_due[name]=now+86_400.0
             except Exception as exc:
@@ -336,7 +339,7 @@ class LiveMarketCollector:
                 self.latest_completed[symbol] = max(stamp, self.latest_completed.get(symbol, 0.0))
             except (KeyError, ValueError, TypeError):
                 continue
-        freshness_cutoff = time.time() - 300
+        freshness_cutoff = time.time() - LIVE_QUOTE_MAX_AGE_SECONDS
         fresh_symbols = sorted(symbol for symbol, stamp in self.latest_completed.items()
                                if stamp >= freshness_cutoff)
         added = self.index.append(rows)

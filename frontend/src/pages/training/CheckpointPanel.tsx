@@ -1,29 +1,21 @@
-import {apiUrl} from '../../data/api';
-import {Panel} from '../../ui/Panel';
-import {Empty,Status} from '../../ui/Primitives';
-import {bytes,date,number} from '../../ui/format';
-import {Capability} from '../../ui/Capability';
 import {useState} from 'react';
-import {Button,ErrorMessage} from '../../ui/Primitives';
-import {inputClass} from '../../ui/Primitives';
+import {apiUrl} from '../../data/api';
 import {useSystemState,useOperations} from '../../data/Operations';
-import type {Champion} from '../../data/library';
-import type {Currency} from '../../data/types';
+import {Panel,KeyValues} from '../../ui/Panel';
+import {Button,Empty,ErrorMessage,Status,inputClass} from '../../ui/Primitives';
+import {bytes,date,number} from '../../ui/format';
 import {ChampionSpec} from '../../ui/ChampionSpec';
-export function CheckpointPanel({operating=false}:{operating?:boolean}){const {state:s,execute,pending}=useOperations();const [error,setError]=useState(''),[message,setMessage]=useState(''),[currency,setCurrency]=useState<Currency>('USD'),[path,setPath]=useState('');const champions=useSystemState<{items:Champion[]}>(operating?'champions':null);if(!s)return null;
- if(operating){const selected=s.operations?.policies?.[currency],options=s.checkpoints.filter(c=>c.identity.currency===currency),chosenPath=options.some(c=>c.path===path)?path:selected?.path??'',chosen=options.find(c=>c.path===chosenPath),model=champions.data?.items.find(c=>c.checkpoint===chosenPath);
-  return <Panel title="운영 정책 직접 승인" description="학습 완료만으로 운영 정책이 바뀌지 않습니다. 선택한 정책을 직접 승인하고 로드합니다. Expert는 추론 시 모델에 저장된 구성으로 사용합니다.">
-   <div className="flex flex-wrap items-center gap-3"><select aria-label="운영 모델 통화" className={inputClass+' !w-auto'} value={currency} onChange={e=>{setCurrency(e.target.value as Currency);setPath('');setMessage('');setError('')}}><option value="USD">USD</option><option value="KRW">KRW</option></select><select aria-label="운영 FinRL 모델 선택" className={inputClass+' min-w-64 !w-auto flex-1'} value={chosenPath} onChange={e=>{setPath(e.target.value);setMessage('');setError('')}}><option value="">운영 모델 선택</option>{options.map(c=><option key={c.path} value={c.path}>{c.name} · {String(c.identity.algorithm??'').toUpperCase()} · {c.num_timesteps===0?'미학습':number(c.num_timesteps,0)+'단계'}</option>)}</select><Button tone="primary" disabled={!chosen||s.job.running} busy={pending.has('checkpoints/restore')} onClick={async()=>{setError('');try{const r=await execute<{message:string}>('checkpoints/restore',{path:chosenPath});setMessage(r.message)}catch(e){setError(e instanceof Error?e.message:'모델 로딩 실패')}}}>선택 정책 승인·로드</Button></div>
-   {!options.length&&<p className="mt-3 text-xs text-amber-700">{currency}의 FinRL 체크포인트가 없습니다.</p>}
-   <div className="mt-3"><Status tone={selected?.loaded?'good':'idle'}>{selected?.loaded?'중앙 정책 로드됨 · '+selected.device:selected?.path?'운영 모델 선택됨 · 중앙 정책 미로드':'운영 모델 미선택'}</Status>{selected?.path&&<p className="mt-2 break-all text-xs text-slate-500">현재 운영: {selected.path}{selected.loaded?' · 관측 '+selected.observation_shape?.join(' × ')+' · 행동 '+selected.action_shape?.join(' × '):''}</p>}</div>
-   <ErrorMessage message={error||champions.error}/>{message&&<p className="mt-3 text-xs text-emerald-700">{message}</p>}
-   {model&&<div className="mt-4 rounded-xl bg-slate-50 p-4"><ChampionSpec model={model}/></div>}
-   {chosen&&!model&&<p className="mt-3 text-xs text-slate-500">{chosen.identity.currency as string} · {(chosen.identity.symbols as string[]|undefined)?.length??0}종목 · 정책 {bytes(chosen.file.bytes)} · {number(chosen.num_timesteps,0)}단계 / {number(chosen.updates,0)} 업데이트</p>}
-  </Panel>
- }
- return <Panel title="저장 정책 · 체크포인트" description="현재 FinRL 정책과 보관된 실제 파일 · 원본 경로는 종료 시 저장">
- {s.checkpoints.length?s.checkpoints.map(c=><div key={c.path} className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 py-4"><div><b className="text-sm">{c.name} · {String(c.identity.algorithm??'').toUpperCase()}</b><p className="mt-1 text-xs text-slate-400">{date(c.file.modified)} · {bytes(c.file.bytes)} · {number(c.num_timesteps,0)}단계 / {number(c.updates,0)} 업데이트</p><Status tone={c.compatible?'good':'warn'}>{c.compatible?'현재 설정 식별정보와 호환':'이전 환경 / 정보 부족'}</Status></div><div className="flex gap-3"><a className="text-xs font-semibold text-blue-600" href={apiUrl('checkpoint',{path:c.path})} download>정책 다운로드</a><a className="text-xs font-semibold text-blue-600" href="#control">운영 화면에서 승인</a></div></div>):<Empty title="저장된 정책 파일이 없습니다."/>}
+import type {Champion} from '../../data/library';
+export function CheckpointPanel(){
+ const {state:s,execute,pending}=useOperations(),champions=useSystemState<{items:Champion[]}>('champions');
+ const [path,setPath]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState('');
+ if(!s)return null;
+ const chosen=s.checkpoints.find(item=>item.path===path),model=champions.data?.items.find(item=>item.checkpoint===path);
+ const loaded=chosen?Object.values(s.operations?.policies??{}).find(item=>item.path===chosen.path):undefined;
+ const load=async()=>{if(!chosen)return;setError('');setMessage('');try{await execute('checkpoints/restore',{path:chosen.path});setMessage('모델을 메모리에 로드했습니다.')}catch(e){setError(e instanceof Error?e.message:'모델 로딩 실패')}};
+ return <Panel title="저장 모델" description="FinRL · SB3 학습 결과를 선택해 로드하고 이후 실행에 사용합니다.">
+ {s.checkpoints.length?<><div className="flex flex-wrap items-center gap-2"><select aria-label="저장 모델 선택" className={inputClass+' min-w-0 flex-1'} value={chosen?.path??''} onChange={e=>{setPath(e.target.value);setMessage('');setError('')}}><option value="">저장 모델 선택</option>{s.checkpoints.map(item=><option key={item.path} value={item.path}>{item.name} · {String(item.identity.algorithm??'').toUpperCase()} · {item.num_timesteps===0?'미학습':number(item.num_timesteps,0)+'단계'}{item.compatible?'':' · 환경 미호환'}</option>)}</select><Button tone="primary" disabled={!chosen||!chosen.compatible||s.job.running} busy={pending.has('checkpoints/restore')} onClick={()=>void load()}>모델 로드</Button>{chosen&&<a className="text-xs font-semibold text-blue-600" href={apiUrl('checkpoint',{path:chosen.path})} download>모델 다운로드</a>}</div>
+ {chosen&&<div className="mt-3"><Status tone={loaded?.loaded?'good':chosen.compatible?'idle':'warn'}>{loaded?.loaded?'로드됨 · '+loaded.device:chosen.compatible?'로드 확인 없음':'현재 환경과 미호환'}</Status><KeyValues items={[['모델 파일',chosen.path],['저장 시각',date(chosen.file.modified)],['모델 크기',bytes(chosen.file.bytes)],['학습 알고리즘',String(chosen.identity.algorithm??'').toUpperCase()],['학습 단계',number(chosen.num_timesteps,0)],['가중치 업데이트',number(chosen.updates,0)]]}/>{model&&<details className="mt-3"><summary className="cursor-pointer text-xs text-blue-600">모델 세부 구조</summary><div className="mt-3"><ChampionSpec model={model}/></div></details>}</div>}</>:<Empty title="저장된 학습 모델이 없습니다."/>}
  <ErrorMessage message={error}/>{message&&<p className="mt-3 text-xs text-emerald-700">{message}</p>}
- <div className="mt-4"><Capability name="checkpoint_restore" label="과거 정책 버전 복원"/></div>
  </Panel>;
 }

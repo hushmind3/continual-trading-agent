@@ -8,7 +8,7 @@ import '../ui/Workspace.css';
 const reference=lazy(()=>import('../pages/ReferenceWorkspace').then(m=>({default:m.ReferenceWorkspace})));
 export const navigation=[
  {hash:'markets',name:'시장 · 저장 데이터',group:'거래 운영',icon:Database,component:lazy(()=>import('../pages/MarketScanner').then(m=>({default:m.MarketScanner}))),required:['data']},
- {hash:'control',name:'운영 제어',group:'거래 운영',icon:Activity,component:lazy(()=>import('../pages/OperationsBoard').then(m=>({default:m.OperationsBoard}))),required:['operations','resources','model','job','checkpoints','capabilities']},
+ {hash:'control',name:'운영 제어',group:'거래 운영',icon:Activity,component:lazy(()=>import('../pages/OperationsBoard').then(m=>({default:m.OperationsBoard}))),required:['operations','resources','job','capabilities']},
  {hash:'paper',name:'가상계좌 · 주문',group:'거래 운영',icon:Landmark,component:lazy(()=>import('../pages/OperatingWorkspace').then(m=>({default:m.PaperWorkspace}))),required:['operations']},
  {hash:'learning',name:'정책 학습',group:'정책 · 모델',icon:GraduationCap,component:lazy(()=>import('../pages/TrainingWorkspace').then(m=>({default:m.TrainingWorkspace}))),required:['settings','model','data','experts','job','checkpoints','resources']},
  {hash:'portfolio',name:'정책 평가 · 백테스트',group:'정책 · 모델',icon:ChartNoAxesCombined,component:lazy(()=>import('../pages/PortfolioWorkspace').then(m=>({default:m.PortfolioWorkspace}))),required:['settings','model','evaluation','job','checkpoints']},

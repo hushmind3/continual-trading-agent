@@ -25,3 +25,5 @@ React 소스는 `src/`, 공통 컴포넌트는 `src/ui/`, 화면은 `src/pages/`
 ## 자동검증
 
 `npm run typecheck`, `npm run build`, `npm run test:api`로 타입·운영 빌드·전송 회귀 4개를 검사합니다. 실행 중인 로컬 서버 `http://127.0.0.1:8766`에서 `npm run test:browser`는 38개 등록 화면·시장 표 페이지 이동과 구역별 오류/진단 표시를 검사합니다. Chromium은 `npx playwright install chromium`으로 준비하며 `FINRL_BASE_URL`로 검사 주소를 지정할 수 있습니다. 로그·스크린샷·trace는 Git 제외 결과 폴더에 남습니다. 일반 요청은 60초, Champion 생성은 30분 제한이며 모듈 오류는 관련 구역과 공통 진단에 표시합니다.
+
+Windows lock에서 누락된 Linux Rollup 등 플랫폼별 선택 의존성을 보완했습니다. 기존 패키지 버전은 유지하고, 깨끗한 검증 디렉터리에서 npm이 해석한 공식 플랫폼 패키지 기록을 lock에 반영합니다.

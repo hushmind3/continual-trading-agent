@@ -22,6 +22,31 @@ from rea.project_explorer.projects import _inside
 _gate=threading.Lock()
 _cancel=threading.Event()
 _processes=[]
+_state_lock=threading.RLock()
+_state={'stage':'idle','detail':'','project':None}
+
+def _publish(stage,detail,project=None):
+    with _state_lock:
+        _state.update(stage=stage,detail=detail)
+        if project is not None:_state['project']=dict(project)
+
+def analysis_status():
+    with _state_lock:result={**_state,'project':dict(_state['project']) if _state['project'] else None}
+    result['active']=_gate.locked()
+    project=result['project']
+    if not result['active'] and project and not (Path(project['folder'])/'project.json').is_file():
+        result['project']=None;project=None
+    if not result['active'] and not project and result['stage']=='idle':
+        from rea.project_explorer.projects import catalog
+        items=catalog()['items'];project=items[0] if items else None
+        result['project']=project
+        if project:
+            if project['state']=='analyzing':
+                project={**project,'state':'unconfirmed','error':'이전 분석의 완료 상태를 확인할 수 없습니다. 저장된 자료를 확인하거나 다시 분석하세요.'}
+                result.update(project=project,stage='failed',detail=project['error'])
+            else:result.update(stage=project['state'],detail=project.get('error',''))
+            with _state_lock:_state.update(stage=result['stage'],detail=result['detail'],project=project)
+    return result
 
 def _check():
     if _cancel.is_set():raise RuntimeError('사용자가 분석을 중지했습니다.')
@@ -74,6 +99,7 @@ root.destroy();print(json.dumps({'path':value},ensure_ascii=False))
 
 
 def _javascript(target,folder):
+    _publish('structure','REA로 파일·모듈·함수 구조를 분석하고 있습니다.')
     node,_=node_runtime();analysis=folder/'analysis'
     with (analysis/'evidence.json').open('wb') as output,(analysis/'progress.log').open('wb') as log:
         process=_spawn([node,str(ROOT/'node_modules/rea-agents/scripts/rea.mjs'),'analyze-javascript-application',str(target),'--json'],cwd=BASE,stdout=output,stderr=log)
@@ -125,6 +151,7 @@ def _asar(target,destination,analysis):
     return result['unavailable']
 
 def _web(url,folder):
+    _publish('browser','웹페이지를 열고 브라우저에 전달된 자료를 수집하고 있습니다.')
     parsed=urlparse(url)
     if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError('분석할 http/https 웹사이트 주소를 입력하세요.')
@@ -181,6 +208,13 @@ def analyze(kind,target):
     folder=None;metadata={}
     try:
         _cancel.clear();_processes.clear();identifier=uuid.uuid4().hex
+        with _state_lock:_state.update(stage='starting',detail='선택한 입력과 저장 경로를 확인하고 있습니다.',project=None)
+        source=None
+        if kind!='web':
+            validate_arguments(target);source=Path(target).expanduser().resolve()
+            if not source.exists():raise ValueError('선택한 경로가 없습니다.')
+            if kind=='file' and not source.is_file():raise ValueError('파일 선택에는 실제 파일 경로가 필요합니다.')
+            if kind=='folder' and not source.is_dir():raise ValueError('폴더 선택에는 실제 폴더 경로가 필요합니다.')
         display=urlparse(target).hostname if kind=='web' else Path(target).name
         display=re.sub(r'[^A-Za-z0-9._-]+','_',display or '').strip(' ._')[:90] or {'file':'file_project','folder':'folder_project','web':'website_project'}[kind]
         if display.upper().split('.')[0] in {'CON','PRN','AUX','NUL',*[f'COM{i}' for i in range(1,10)],*[f'LPT{i}' for i in range(1,10)]}:display='target_'+display
@@ -191,12 +225,11 @@ def analyze(kind,target):
                   'input':target,'kind':kind,'state':'analyzing','folder':str(folder),
                   'created_at':datetime.now(timezone.utc).isoformat()}
         atomic_json(metadata,folder/'project.json')
+        _publish('extract','원본 파일을 로컬 프로젝트 폴더에 추출하고 있습니다.',metadata)
         unavailable=[];limitations=[]
         if kind=='web':
             metadata['artifact']='웹사이트 프론트엔드';limitations=_web(target,folder)
         else:
-            validate_arguments(target);source=Path(target).expanduser().resolve()
-            if not source.exists():raise ValueError('선택한 경로가 없습니다.')
             asar=source if source.suffix.lower()=='.asar' else next((candidate for candidate in
                 [(source if source.is_dir() else source.parent)/'resources/app.asar',
                  (source if source.is_dir() else source.parent)/'app.asar'] if candidate.is_file()),None)
@@ -204,10 +237,10 @@ def analyze(kind,target):
                 metadata['artifact']='Electron / ASAR';limitations=_javascript(asar,folder)
                 unavailable=_asar(asar,folder/'original',folder/'analysis')
             elif source.is_dir():
-                metadata['artifact']='JavaScript / 소스 폴더'
+                metadata['artifact']='소스 폴더'
                 unavailable=_copy_directory(source,folder/'original/source')
                 limitations=_javascript(folder/'original/source',folder)
-            elif source.suffix.lower() in ('.js','.jsx','.mjs','.cjs','.ts','.tsx','.html','.css','.json','.py','.c','.cpp','.h','.rs','.go','.java','.cs'):
+            elif source.suffix.lower() in ('.js','.jsx','.mjs','.cjs','.ts','.tsx','.html','.css','.json','.py','.c','.cpp','.h','.rs','.go','.java','.cs','.md','.txt','.yaml','.yml','.xml','.svg','.ini','.toml','.sh','.ps1','.cmd','.bat'):
                 metadata['artifact']='소스 파일';shutil.copyfile(source,folder/'original'/source.name)
                 if source.suffix.lower() in ('.js','.jsx','.mjs','.cjs','.ts','.tsx','.html'):
                     limitations=_javascript(folder/'original',folder)
@@ -223,10 +256,13 @@ def analyze(kind,target):
                         output.parent.mkdir(parents=True,exist_ok=True)
                         with archive.open(item) as incoming,output.open('xb') as outgoing:shutil.copyfileobj(incoming,outgoing)
                 if source.suffix.lower()=='.apk':atomic_json(_observe('inspect_android_package',{'path':str(source)}),folder/'analysis/android.json')
-                limitations=['패키지 파일·리소스를 추출했습니다. DEX/ARM/Mach-O 원본 소스나 서버 구현을 복원한 것이 아닙니다.']
+                if any(path.is_file() and path.suffix.lower() in ('.js','.jsx','.mjs','.cjs','.ts','.tsx','.html') for path in (folder/'original').rglob('*')):
+                    limitations=_javascript(folder/'original',folder)
+                limitations+=['패키지 파일·리소스를 추출했습니다. DEX/ARM/Mach-O 원본 소스나 서버 구현을 복원한 것이 아닙니다.']
             else:
-                metadata['artifact']='네이티브 PE';shutil.copyfile(source,folder/'original'/source.name)
-                recovered=native_recover(str(source))
+                metadata['artifact']='네이티브 바이너리';shutil.copyfile(source,folder/'original'/source.name)
+                recovered=native_recover(str(source),progress=_publish)
+                metadata.update(function_total=recovered['total'],decompiled_functions=recovered['succeeded'],unavailable_functions=recovered['failed'])
                 (folder/'inferred/decompiled.c').write_text(recovered['source'],encoding='utf8')
                 functions=folder/'inferred/functions';functions.mkdir()
                 for item in recovered['items']:
@@ -234,19 +270,24 @@ def analyze(kind,target):
                 atomic_json(recovered['items'],folder/'analysis/functions.json')
                 atomic_json({'sha256':recovered['sha256'],'total':recovered['total'],'decompiled':recovered['succeeded'],'unavailable':recovered['failed']},folder/'analysis/structure.json')
                 limitations=recovered['limitations']+['네이티브 C 의사코드는 추론된 결과입니다. 컴파일 전 원본 소스가 아닙니다.']
+        _publish('save','원본·추론·구조 자료와 출처를 저장하고 있습니다.',metadata)
         _check();atomic_json(unavailable,folder/'analysis/unavailable.json')
         original=[path for path in (folder/'original').rglob('*') if path.is_file()]
+        if kind=='folder' and any(path.suffix.lower() in ('.py','.c','.cpp','.h','.rs','.go','.java','.cs','.sh','.ps1','.cmd','.bat') for path in original):
+            limitations.append('비 JavaScript 언어는 원문 파일을 보관했습니다. 현재 JavaScript 구조 분석기가 이 언어의 함수·모듈 의미 그래프를 생성한 것은 아닙니다.')
         manifest=[{'path':path.relative_to(folder).as_posix(),'bytes':path.stat().st_size} for path in original]
         atomic_json(manifest,folder/'analysis/module-files.json')
         metadata.update(state='saved',original_files=len(original),
             inferred_files=sum(1 for path in (folder/'inferred').rglob('*') if path.is_file()),limitations=limitations,unavailable=len(unavailable))
         readme='# '+str(metadata['name'])+' — REA 분석 자료\n\noriginal/: 관측·추출한 원문/파일. 네이티브 바이너리 자체는 원본 소스코드가 아닙니다.\ninferred/: Ghidra 의사코드 및 REA 추론. 원문과 구분합니다.\nanalysis/: 구조·함수·모듈 정보, 출처와 한계.\n\n코딩 에이전트 호출·프로그램 재구현·추출 프로그램 실행은 수행하지 않았습니다.\n\n## 분석 범위\n'+('\n'.join('- '+str(item) for item in limitations) or '- 관측한 입력 범위의 정적 분석 자료입니다.')+'\n'
         (folder/'README.md').write_text(readme,encoding='utf8')
-        atomic_json(metadata,folder/'project.json');return metadata
+        atomic_json(metadata,folder/'project.json');_publish('saved','로컬 프로젝트 저장을 완료했습니다.',metadata);return metadata
     except Exception as error:
-        metadata.update(state='stopped' if _cancel.is_set() else 'failed',error=str(error))
+        metadata.update(state='stopped' if _cancel.is_set() else 'failed',error='손상되었거나 지원하지 않는 ZIP/APK/IPA 패키지입니다.' if isinstance(error,(zipfile.BadZipFile,zipfile.LargeZipFile)) else str(error))
         if metadata and folder is not None and folder.is_dir():
+            metadata.update(original_files=sum(1 for path in (folder/'original').rglob('*') if path.is_file()),inferred_files=sum(1 for path in (folder/'inferred').rglob('*') if path.is_file()))
             try:atomic_json(metadata,folder/'project.json')
             except OSError:pass
+        _publish(metadata['state'],metadata['error'],metadata if folder is not None and 'id' in metadata else None)
         raise
     finally:_processes.clear();_gate.release()

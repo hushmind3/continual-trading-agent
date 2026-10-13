@@ -164,7 +164,7 @@ def engine_settings():
 
 
 
-def native_recover(path):
+def native_recover(path,progress=None):
     """Compose official Ghidra tools for the file explicitly selected by the user."""
     import hashlib
     if not isinstance(path,str) or not path:raise ValueError('복원할 파일을 선택하세요.')
@@ -193,14 +193,17 @@ def native_recover(path):
             digest=hashlib.sha256()
             with target.open('rb') as stream:
                 while chunk:=stream.read(1024*1024):digest.update(chunk)
+            if progress:progress('native-open','Ghidra로 실행파일을 열고 정적 분석을 준비하고 있습니다.')
             opened=observe('open_binary',{'path':str(target),'provider_id':'ghidra'})
             if opened['result'].get('sha256')!=digest.hexdigest():
                 raise RuntimeError('선택한 파일이 분석 중 변경됐습니다. 파일을 다시 선택하세요.')
+            if progress:progress('native-functions','분석 가능한 함수 목록을 수집하고 있습니다.')
             inventory=observe('list_procedures',{})
             procedures=inventory['normalized_result']
             if not isinstance(procedures,list):
                 raise RuntimeError('원본 함수 목록이 배열 형식이 아닙니다.')
             addresses=[item['address'] for item in procedures]
+            if progress:progress('native-decompile',str(len(addresses))+'개 함수의 의사코드를 복원하고 있습니다.')
             batch=observe('batch_decompile',{'addresses':addresses})
             value=batch['normalized_result']
             if not isinstance(value,dict) or not isinstance(value.get('items'),list):

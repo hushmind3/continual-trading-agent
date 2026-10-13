@@ -189,3 +189,49 @@ test('native runner preserves JSON-looking strings and rejects array argument ob
   await expect(page.getByRole('button',{name:'원본 함수 실행',exact:true})).toBeEnabled();
   await page.unrouteAll({behavior:'wait'});
 });
+
+test('REA displays partial native recovery counts in analysis and project explorer', async ({page}) => {
+  const id='c'.repeat(32),project={id,name:'fixture.exe',kind:'file',artifact:'네이티브 바이너리',state:'saved',folder:'temporary fixture',created_at:'2026-10-14T00:00:00Z',original_files:1,inferred_files:2,function_total:2,decompiled_functions:1,unavailable_functions:1};
+  await page.route('**/api*',async route=>{
+    const request=route.request(),url=new URL(request.url());
+    const envelope=request.method()==='GET'?{operation:url.searchParams.get('operation')}:request.postDataJSON();
+    if(envelope?.operation==='rea/status'){await route.fulfill({json:{active:false,stage:'saved',detail:'저장 완료',project}});return;}
+    if(envelope?.operation==='rea/pick'){await route.fulfill({json:{path:'temporary-fixture.exe'}});return;}
+    if(envelope?.operation==='rea/analyze'){await route.fulfill({json:project});return;}
+    if(envelope?.operation==='rea/projects'){await route.fulfill({json:{items:[project]}});return;}
+    if(envelope?.operation==='rea/project/tree'){await route.fulfill({json:{items:[],path:''}});return;}
+    await route.continue();
+  });
+  await page.goto('/#rea/program_analysis',{waitUntil:'networkidle'});
+  await page.getByRole('button',{name:'파일 선택',exact:true}).click();
+  await expect(page.locator('main')).toContainText('함수 2개 · 의사코드 복원 1개 · 복원 불가 1개');
+  await page.getByRole('link',{name:'프로젝트 탐색',exact:true}).last().click();
+  await expect(page.getByRole('combobox',{name:'저장 프로젝트 선택',exact:true})).toHaveValue(id);
+  await expect(page.locator('main')).toContainText('함수 2개 · 의사코드 복원 1개 · 복원 불가 1개');
+  await page.unrouteAll({behavior:'wait'});
+});
+
+test('REA resumes the visible analysis after navigation and stops polling when complete', async ({page}) => {
+  const id='d'.repeat(32);let active=true,statusRequests=0;
+  const project={id,input:'fixture.exe',name:'fixture.exe',kind:'file',state:'analyzing',folder:'temporary fixture',created_at:'2026-10-14T00:00:00Z',original_files:1,inferred_files:556,function_total:639,decompiled_functions:555,unavailable_functions:84};
+  await page.route('**/api*',async route=>{
+    const request=route.request(),url=new URL(request.url());
+    const operation=request.method()==='GET'?url.searchParams.get('operation'):request.postDataJSON()?.operation;
+    if(operation==='rea/status'){
+      statusRequests++;await route.fulfill({json:{active,stage:active?'native-decompile':'saved',detail:active?'639개 함수의 의사코드를 복원하고 있습니다.':'로컬 저장 완료',project:{...project,state:active?'analyzing':'saved'}}});return;
+    }
+    await route.continue();
+  });
+  await page.goto('/#rea/program_analysis',{waitUntil:'networkidle'});
+  await expect(page.getByRole('status')).toContainText('639개 함수');
+  await expect(page.getByRole('button',{name:'파일 선택',exact:true})).toBeDisabled();
+  await page.locator('aside a[href="#finance/operation_control"]').click();
+  await page.locator('aside a[href="#rea/program_analysis"]').click();
+  await expect(page.getByRole('status')).toContainText('639개 함수');
+  active=false;
+  await expect(page.locator('main')).toContainText('함수 639개 · 의사코드 복원 555개 · 복원 불가 84개');
+  await expect(page.getByRole('button',{name:'파일 선택',exact:true})).toBeEnabled();
+  const completed=statusRequests;await page.waitForTimeout(2100);
+  expect(statusRequests).toBe(completed);
+  await page.unrouteAll({behavior:'wait'});
+});

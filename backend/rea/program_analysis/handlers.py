@@ -3,8 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter
 from api_transport import FiniteJSONResponse
 from fastapi import HTTPException
+from zipfile import BadZipFile,LargeZipFile
 
 router=APIRouter(default_response_class=FiniteJSONResponse)
+
+@router.get('/api/rea/status')
+def rea_status():
+    from rea.program_analysis.extract import analysis_status
+    return analysis_status()
 
 @router.post('/api/rea/pick')
 def rea_pick(request:dict):
@@ -17,6 +23,7 @@ def rea_pick(request:dict):
 def rea_analyze(request:dict):
     from rea.program_analysis.extract import analyze
     try:return analyze(request.get('kind'),request.get('target'))
+    except (BadZipFile,LargeZipFile) as exc:raise HTTPException(400,'손상되었거나 지원하지 않는 ZIP/APK/IPA 패키지입니다.') from exc
     except (OSError,ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
 
 

@@ -8,6 +8,7 @@ test('all registered local screens render and continue receiving state', async (
   page.on('response', response => {if (response.url().includes('/api') && response.status() >= 500) failures.push(`${response.status()} ${response.url()}`);});
   await page.goto('/', {waitUntil: 'networkidle'});
   await expect(page.getByText('서버 연결', {exact: true})).toBeVisible();
+  await expect(page.locator('aside a[href="#rea"]')).toBeVisible();
   const links = await page.locator('aside a').evaluateAll(elements => elements
     .map(element => ({href: element.getAttribute('href') || '', name: element.textContent || ''}))
     .filter(element => element.href.startsWith('#')));

@@ -22,6 +22,8 @@ def main():
             subprocess.run([*command,'-r',str(ROOT/'requirements/verification.txt')],cwd=ROOT,env=env,check=True)
             subprocess.run([str(python),'-m','pip','install','--no-deps','-e',str(ROOT)],cwd=ROOT,check=True)
         subprocess.run([str(python),'-m','pip','check'],cwd=ROOT,check=True)
-    print('주 실행 환경과 키움 SDK 의존성 검사 완료. 서버켜기.cmd를 실행하세요.')
+    rea_env=env.copy();rea_env['PYTHONPATH']=str(ROOT/'backend')
+    subprocess.run([str(ROOT/'.venv/Scripts/python.exe'),'-c','from stockrl.rea.operations import install;install()'],cwd=ROOT,env=rea_env,check=True)
+    print('주 실행 환경·키움 SDK·REA 설치 완료. 서버켜기.cmd를 실행하세요.')
 
 if __name__=='__main__':main()

@@ -1,11 +1,12 @@
-"""Import five large-menu managers; expose their existing backend connections."""
+"""Import large-menu managers; expose their existing backend connections."""
 from .trading.trading_menu_manager import GROUP as TRADING
 from .finrl.finrl_menu_manager import GROUP as FINRL
 from .finrl_trading.finrl_trading_menu_manager import GROUP as FINRL_TRADING
 from .extensions.extensions_menu_manager import GROUP as EXTENSIONS
 from .management.management_menu_manager import GROUP as MANAGEMENT
+from .rea.rea_menu_manager import GROUP as REA
 
-GROUPS=(TRADING,FINRL,FINRL_TRADING,EXTENSIONS,MANAGEMENT)
+GROUPS=(TRADING,FINRL,FINRL_TRADING,REA,EXTENSIONS,MANAGEMENT)
 _routes_by_menu={}
 
 def owner(operation):

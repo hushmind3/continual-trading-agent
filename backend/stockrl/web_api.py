@@ -1,5 +1,6 @@
 """Local HTTP adapter for official_cli, DataStore files and frozen Expert registry."""
 from __future__ import annotations
+import subprocess
 
 import ast
 import csv
@@ -436,6 +437,7 @@ def state_view(path):
         'menu_catalog':(menu_catalog,lambda:()),
         'algorithms':(algorithms,lambda:()),
         'framework':(framework_catalog,None),
+        'rea':(rea_status,lambda:state_stamp(ROOT/'backend/stockrl/rea/package-lock.json',ROOT/'backend/stockrl/rea/node_modules/rea-agents/package.json')),
         'framework/providers':(framework_providers,None),
         'connections':(connections,None),
         'provider':(provider,None),
@@ -1017,8 +1019,36 @@ def open_model_directory():
     return {'path':str(MODEL_DIR)}
 
 
+
+@private_api.get('/api/rea')
+def rea_status():
+    from .rea.operations import status
+    return status()
+
+@private_api.post('/api/rea/run')
+def rea_run(request:dict):
+    from .rea.operations import call_tool
+    arguments=request.get('arguments',{})
+    if not isinstance(arguments,dict):raise HTTPException(400,'REA 도구 입력은 JSON 객체여야 합니다.')
+    try:return call_tool(request.get('tool',''),arguments)
+    except (OSError,ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
+
+@private_api.post('/api/rea/doctor')
+def rea_doctor():
+    from .rea.operations import doctor
+    try:return doctor()
+    except (OSError,ValueError,RuntimeError,subprocess.TimeoutExpired) as exc:raise HTTPException(400,str(exc)) from exc
+
+@private_api.post('/api/rea/stop')
+def rea_stop():
+    from .rea.operations import connection
+    connection.close()
+    return {'message':'REA 분석을 중지하고 원본 MCP 세션을 닫았습니다.'}
+
 @app.on_event("shutdown")
 def close_operations():
+    from .rea.operations import connection
+    connection.close()
     runtime.close()
     system.close_models()
 

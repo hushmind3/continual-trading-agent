@@ -2,7 +2,7 @@ export function apiUrl(operation:string,payload:Record<string,unknown>={}) {
   return '/api?'+new URLSearchParams({operation,payload:JSON.stringify(payload)}).toString();
 }
 export const REQUEST_TIMEOUT_MS = 60_000;
-export async function request<T>(path: string, body?: unknown, method: 'GET'|'POST' = 'POST', timeoutMs = path === 'champions/create' ? 1_800_000 : REQUEST_TIMEOUT_MS): Promise<T> {
+export async function request<T>(path: string, body?: unknown, method: 'GET'|'POST' = 'POST', timeoutMs = path === 'champions/create' ? 1_800_000 : path.startsWith('rea/') ? 660_000 : REQUEST_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

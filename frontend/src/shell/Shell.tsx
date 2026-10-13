@@ -21,6 +21,7 @@ function destination(hash:string,items=navigation){
 }
 export function route(hash:string){const name=hash.replace(/^#/,'').split('?')[0];return name.startsWith('feature-')||name==='backend-browser'?name:destination(hash).hash;}
 function errorSection(name:string){
+ if(name==='rea'||name==='view:rea'||name.includes('stockrl.rea.'))return {group:'REA',target:'rea'};
  if(name.includes('FinRL-X:')||name.includes('stockrl.finrl_trading.'))return {group:'FinRL-Trading · 보조',target:'finrl-trading'};
  if(name.includes('FinRL:')||name.includes('stockrl.finrl.')||['model','models_by_currency','checkpoints'].includes(name))return {group:'FinRL · 메인',target:'frameworks'};
  if(['experts','library','models'].includes(name)||name.startsWith('champion:')||name==='view:champions'||name.includes('platform.expert_')||name.includes('platform.assets')||name.includes('platform.sac_champion'))return {group:'프로젝트 확장',target:'moe'};

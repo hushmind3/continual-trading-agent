@@ -29,3 +29,5 @@ configs/local/
 .env
 
 results/
+
+/backend/stockrl/rea/node_modules/

@@ -188,4 +188,17 @@ class IntegrityTests(unittest.TestCase):
   expected={'adaptive_download','adaptive_single','adaptive_backtest','calendar','config_check'}
   self.assertEqual(set(ACTIONS),expected)
   self.assertEqual(set(combined),expected|{'native_call'})
+ def test_rea_refuses_project_trash_inputs(self):
+  from stockrl.rea.operations import validate_arguments
+  with self.assertRaisesRegex(ValueError,'휴지통'):
+   validate_arguments({'arguments':{'input_path':str(ROOT/'휴지통/sample')}})
+  validate_arguments({'input_path':str(ROOT/'frontend/src')})
+ def test_rea_timeout_closes_the_session(self):
+  import io,queue
+  from stockrl.rea.operations import REAConnection
+  connection=REAConnection();connection.process=SimpleNamespace(poll=lambda:None,stdin=io.StringIO());connection.responses=queue.Queue()
+  with patch.object(connection,'close') as close:
+   with self.assertRaisesRegex(RuntimeError,'응답 시간이 초과'):
+    connection.request({'operation':'tools'},timeout=.001)
+   close.assert_called_once()
 if __name__=='__main__':unittest.main()

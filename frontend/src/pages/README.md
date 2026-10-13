@@ -12,3 +12,5 @@
 | 진단·로그·적용 | [system/](system/README.md) |
 
 폴더명은 기능 소유권을 구분합니다. API 전송은 공통 data/, 메뉴와 오류 구역은 shell/, 재사용 UI는 ui/에서 담당합니다.
+
+| REA 분석·진단 | [rea/](rea/README.md) |

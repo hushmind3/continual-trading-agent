@@ -23,6 +23,6 @@ export function FrameworkWorkspace({framework}:{framework?:FrameworkScope}={}){
  return <div className="space-y-6">
   {framework==='FinRL'&&<p className="text-xs text-slate-600">FinRL · 기본 프레임워크 — SB3 알고리즘·공식 데이터 처리·학습·평가 기능</p>}
   <ModuleCatalog scope={framework} onRun={setSelected}/>
-  {framework==='stockrl'?<Panel title="프로젝트 실행 API" description="프로젝트 모듈은 소속 작은 메뉴의 등록 API로 실행합니다."><a className="text-xs text-blue-700" href="#backend-browser?tab=commands">큰 메뉴 · 작은 메뉴별 API와 입력값 열기</a></Panel>:<NativeModuleRunner framework={framework} selectedModule={selected} onSelect={setSelected}/>}
+  {framework==='stockrl'?<Panel title="프로젝트 실행 API" description="프로젝트 모듈은 소속 작은 메뉴의 등록 API로 실행합니다."><a className="text-xs text-blue-700" href="#finance/all_backend_features?tab=commands">큰 메뉴 · 작은 메뉴별 API와 입력값 열기</a></Panel>:<NativeModuleRunner framework={framework} selectedModule={selected} onSelect={setSelected}/>}
  </div>;
 }

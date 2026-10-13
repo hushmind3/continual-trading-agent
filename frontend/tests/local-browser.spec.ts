@@ -38,13 +38,13 @@ test('model errors remain visible in MoE and diagnostics without becoming a tran
     state.module_errors = {...state.module_errors, 'champion:validation-only': '검증용 모델 형식 오류'};
     await route.fulfill({response, json: state});
   });
-  await page.goto('/#control', {waitUntil: 'networkidle'});
+  await page.goto('/#finance/operation_control', {waitUntil: 'networkidle'});
   await expect(page.locator('main')).toContainText('다른 기능 오류');
   await expect(page.locator('main')).not.toContainText('검증용 모델 형식 오류');
   await expect(page.locator('main')).not.toContainText('통합 API 연결:');
-  await page.locator('aside a[href="#moe"]').click();
+  await page.locator('aside a[href="#finance/moe"]').click();
   await expect(page.locator('main')).toContainText('검증용 모델 형식 오류');
-  await page.locator('aside a[href="#system"]').click();
+  await page.locator('aside a[href="#finance/diagnostics_logs_code_apply"]').click();
   await expect(page.locator('main')).toContainText('검증용 모델 형식 오류');
 });
 

@@ -2,8 +2,8 @@
 
 취합: `finance_menu_manager.ts`. 이 파일만 상위 menu_registry가 import합니다.
 
-- [운영 제어](control/README.md): control/
-- [가상계좌 · 주문](paper_account/README.md): paper_account/
+- [운영 제어](operation_control/README.md): control/
+- [가상계좌 · 주문](virtual_account_orders/README.md): paper_account/
 
 취합: submenu_manager.ts → finance_menu_manager.ts(대메뉴 등록) → 전체 menu_registry → API. 새 기능 구현은 소속 하위 폴더에 추가하고 소메뉴 매니저에 등록합니다.
 

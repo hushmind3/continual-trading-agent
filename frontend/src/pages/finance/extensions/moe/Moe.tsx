@@ -7,7 +7,7 @@ import {Button,ErrorMessage,Skeleton} from '../../../../ui/Primitives';
 import {ExpertLibraryPanel} from './ExpertLibraryPanel';
 import {ModelGuide} from './ModelGuide';
 
-export function ModelWorkspace(){
+export function Moe(){
  const {state}=useOperations();const [error,setError]=useState(''),[source,setSource]=useState('');
  if(!state)return <Skeleton/>;
  return <div className="space-y-6">
@@ -24,6 +24,6 @@ export function ModelWorkspace(){
   <ModelGuide/>
   {error&&<ErrorMessage message={error}/>}
   <ExpertLibraryPanel initialSource={source}/><ModelFiles onPick={setSource}/>
-  <a href="#learning" className="text-xs font-semibold text-blue-600">FinRL 정책 학습 →</a>
+  <a href="#finance/policy_learning" className="text-xs font-semibold text-blue-600">FinRL 정책 학습 →</a>
  </div>;
 }

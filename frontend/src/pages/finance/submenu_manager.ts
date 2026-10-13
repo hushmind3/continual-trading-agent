@@ -6,6 +6,6 @@ import {menus as extensions} from './extensions/submenu_manager';
 import {menus as management} from './management/submenu_manager';
 import {actionMenus,type MenuItem} from '../../shell/menu_groups/menu_types';
 import type {BackendAction} from '../../data/menu_types';
-const feature=lazy(()=>import('./management/backend_browser/FeatureWorkspace').then(m=>({default:m.FeatureWorkspace})));
+const feature=lazy(()=>import('./management/all_backend_features/AllBackendFeatures').then(m=>({default:m.AllBackendFeatures})));
 export const menus:MenuItem[]=[...trading,...finrl,...extensions,...management].map(menu=>({...menu,group:'금융'}));
 export function registeredMenus(actions:BackendAction[]){return [...menus,...actionMenus(actions,'finance','금융',feature,Workflow)];}

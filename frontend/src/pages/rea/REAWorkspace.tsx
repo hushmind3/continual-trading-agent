@@ -2,26 +2,61 @@ import {useState} from 'react';
 import {useOperations,useSystemState} from '../../data/Operations';
 import {Panel,KeyValues} from '../../ui/Panel';
 import {Button,ErrorMessage,inputClass} from '../../ui/Primitives';
-interface Tool {name:string;description?:string;inputSchema:Record<string,unknown>;annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}
+interface Schema {type?:string;title?:string;description?:string;enum?:unknown[];properties?:Record<string,Schema>;required?:string[];anyOf?:Schema[];oneOf?:Schema[];$ref?:string;$defs?:Record<string,Schema>;minimum?:number;maximum?:number;default?:unknown}
+interface Tool {name:string;description?:string;inputSchema:Schema;annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}
 interface ReaStatus {installed:boolean;version?:string;source:string;node_version?:string;tools:Tool[];tool_count?:number;reason?:string;session_connected?:boolean}
+const toolLabels:Record<string,string>={analyze_javascript_application:'JavaScript · Electron 분석',inspect_analysis_view:'분석 결과 이어서 조회',capabilities:'분석 기능 확인'};
 export function REAWorkspace(){
  const {execute,pending}=useOperations(),status=useSystemState<ReaStatus>('rea');
- const [selected,setSelected]=useState('analyze_javascript_application'),[query,setQuery]=useState(''),[argumentsJson,setArgumentsJson]=useState('{}'),[result,setResult]=useState<unknown>(null),[error,setError]=useState('');
- const data=status.data,tools=data?.tools??[],visible=tools.filter(t=>(t.name+' '+(t.description??'')).toLowerCase().includes(query.toLowerCase())),tool=tools.find(t=>t.name===selected)??tools[0];
- const run=async()=>{setError('');try{const argumentsValue=JSON.parse(argumentsJson);if(!argumentsValue||Array.isArray(argumentsValue)||typeof argumentsValue!=='object')throw new Error('도구 입력은 JSON 객체로 작성하세요.');setResult(await execute('rea/run',{tool:tool?.name,arguments:argumentsValue}));}catch(e){setError(e instanceof Error?e.message:'REA 실행 실패')}};
+ const [selected,setSelected]=useState('analyze_javascript_application'),[query,setQuery]=useState(''),[mode,setMode]=useState<'form'|'json'>('form'),[inputs,setInputs]=useState<Record<string,string>>({}),[argumentsJson,setArgumentsJson]=useState('{}'),[result,setResult]=useState<unknown>(null),[error,setError]=useState('');
+ const data=status.data,tools=data?.tools??[],tool=tools.find(t=>t.name===selected)??tools[0],busy=pending.has('rea/run');
+ const visible=tools.filter(t=>(t.name+' '+(toolLabels[t.name]??'')+' '+(t.description??'')).toLowerCase().includes(query.toLowerCase()));
+ const options=tool&&!visible.some(t=>t.name===tool.name)?[tool,...visible]:visible;
+ const schema=tool?.inputSchema??{},required=schema.required??[];
+ const resolve=(original:Schema):Schema=>{const referenced=original.$ref?.startsWith('#/$defs/')?schema.$defs?.[original.$ref.slice(8)]:undefined;const value=referenced??original;return value.anyOf?.find(item=>item.type!=='null')??value;};
+ const properties=Object.entries(schema.properties??{});
+ const formArguments=()=>{const values:Record<string,unknown>={};for(const [name,original] of properties){const property=resolve(original),text=inputs[name];if(text==null||text==='')continue;
+  if(property.enum||property.type==='boolean'||property.type==='object'||property.type==='array'||property.oneOf||property.anyOf)values[name]=JSON.parse(text);
+  else if(property.type==='number'||property.type==='integer'){const value=Number(text);if(!Number.isFinite(value)||property.type==='integer'&&!Number.isInteger(value))throw new Error(name+': 유효한 숫자를 입력하세요.');values[name]=value;}
+  else values[name]=text;
+ }return values;};
+ const argumentsValue=()=>{const value=mode==='json'||!properties.length?JSON.parse(argumentsJson):formArguments();if(!value||Array.isArray(value)||typeof value!=='object')throw new Error('도구 입력은 JSON 객체여야 합니다.');for(const name of required)if(value[name]===undefined||value[name]==='')throw new Error(name+': 필수 입력을 채우세요.');return value;};
+ const changeMode=(next:'form'|'json')=>{if(next===mode)return;setError('');try{if(next==='json')setArgumentsJson(JSON.stringify(formArguments(),null,2));else{const value=JSON.parse(argumentsJson);if(!value||Array.isArray(value)||typeof value!=='object')throw new Error('JSON 객체를 입력하세요.');const fields:Record<string,string>={};for(const [name,item] of Object.entries(value)){const property=resolve(schema.properties?.[name]??{});fields[name]=typeof item==='string'&&!property.enum&&(!property.type||property.type==='string')?item:JSON.stringify(item);}const extra=Object.keys(value).filter(name=>!schema.properties?.[name]);if(extra.length)throw new Error('원본 양식에 없는 입력은 JSON 모드에서 유지하세요: '+extra.join(', '));setInputs(fields);}setMode(next);}catch(e){setError(e instanceof Error?e.message:'입력 형식을 확인하세요.')}};
+ const choose=(name:string)=>{setSelected(name);setInputs({});setArgumentsJson('{}');setResult(null);setError('');};
+ const run=async()=>{setError('');try{if(!tool)throw new Error('실행할 도구를 선택하세요.');const args=argumentsValue();setResult(null);setResult(await execute('rea/run',{tool:tool.name,arguments:args}));}catch(e){setError(e instanceof Error?e.message:'REA 실행 실패')}};
  const doctor=async()=>{setError('');try{setResult(await execute('rea/doctor',{}));}catch(e){setError(e instanceof Error?e.message:'환경 진단 실패')}};
- const stop=async()=>{try{const r=await execute('rea/stop',{});setResult(r);}catch(e){setError(e instanceof Error?e.message:'REA 중지 실패')}};
- return <div className="space-y-5"><Panel title="REA · Reverse Engineer Anything" description="공식 REA 도구로 바이너리·JavaScript·관리 코드·브라우저 동작을 분석합니다.">
- <KeyValues items={[["설치",data?.installed?'확인됨':'준비 필요'],['REA 버전',data?.version??'—'],['Node',data?.node_version??'—'],['원본 MCP 도구',String(data?.tool_count??0)]]}/>
- <a className="text-xs text-blue-700" href={data?.source??'https://github.com/morluto/rea'} target="_blank" rel="noreferrer">원본 GitHub</a>
- <ErrorMessage message={status.error||data?.reason||''}/><div className="mt-4 flex gap-2"><Button onClick={()=>void status.refresh()} busy={status.loading}>설치 확인</Button><Button onClick={()=>void doctor()} busy={pending.has('rea/doctor')} disabled={!data?.installed}>환경 진단</Button></div>
- <p className="mt-3 text-xs text-slate-500">심층 분석 엔진·플랫폼별 도구의 준비 여부는 원본 환경 진단 결과로 확인합니다.</p></Panel>
- <Panel title="원본 도구 실행" description="도구와 실제 입력을 직접 선택합니다. 분석 세션은 다음 호출에도 유지됩니다.">
- <input aria-label="REA 도구 검색" className={inputClass+' mb-3'} value={query} onChange={e=>setQuery(e.target.value)} placeholder="도구 이름·설명 검색"/>
- <select aria-label="REA 도구 선택" className={inputClass} value={tool?.name??''} onChange={e=>{setSelected(e.target.value);setArgumentsJson('{}');setResult(null)}}>{visible.map(t=><option key={t.name} value={t.name}>{t.name}</option>)}</select>
- <p className="my-3 text-xs text-slate-600">{tool?.description}</p><p className="text-xs text-slate-500">{tool?.annotations?.readOnlyHint?'읽기 도구':'원본 도구의 입력·대상 변경 조건을 확인하세요.'}</p>
- <details className="my-3 text-xs"><summary>원본 입력 스키마</summary><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap">{JSON.stringify(tool?.inputSchema??{},null,2)}</pre></details>
- <label className="block text-xs">도구 입력 JSON<textarea aria-label="REA 도구 입력" className={inputClass+' mt-2 min-h-36 font-mono'} value={argumentsJson} onChange={e=>setArgumentsJson(e.target.value)}/></label>
- <div className="mt-3 flex gap-2"><Button tone="primary" onClick={()=>void run()} disabled={!data?.installed||!tool} busy={pending.has('rea/run')}>실행</Button><Button onClick={()=>void stop()} disabled={!pending.has('rea/run')}>분석 중지</Button></div><ErrorMessage message={error}/>
- </Panel>{result!==null&&<Panel title="REA 원본 결과"><pre className="max-h-[38rem] overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(result,null,2)}</pre></Panel>}</div>;
+ const stop=async()=>{try{setResult(await execute('rea/stop',{}));}catch(e){setError(e instanceof Error?e.message:'REA 중지 실패')}};
+ const renderField=([name,original]:[string,Schema])=>{const property=resolve(original),value=inputs[name]??'',isRequired=required.includes(name),complex=property.type==='object'||property.type==='array'||!!property.oneOf||!!property.anyOf;
+  const update=(text:string)=>setInputs(previous=>({...previous,[name]:text}));
+  const label=property.title&&property.title!==name?property.title+' · '+name:name;
+  return <label key={name} className={'block text-sm text-slate-700 '+(complex?'sm:col-span-2':'')}><span className="font-medium">{label}</span><span className="ml-2 text-xs text-slate-400">{isRequired?'필수':'선택'}</span>
+   {property.enum?<select aria-label={name} required={isRequired} className={inputClass+' mt-2'} value={value} onChange={e=>update(e.target.value)}><option value="">선택하세요</option>{property.enum.map(item=><option key={JSON.stringify(item)} value={JSON.stringify(item)}>{String(item)}</option>)}</select>:
+   property.type==='boolean'?<select aria-label={name} required={isRequired} className={inputClass+' mt-2'} value={value} onChange={e=>update(e.target.value)}><option value="">원본 기본값 사용</option><option value="true">예 · true</option><option value="false">아니요 · false</option></select>:
+   complex?<textarea aria-label={name} required={isRequired} className={inputClass+' mt-2 min-h-24 font-mono text-xs'} value={value} placeholder={property.type==='array'?'JSON 배열 입력':'JSON 객체 입력 · 아래 원본 입력 설명 참고'} onChange={e=>update(e.target.value)}/>:
+   <input aria-label={name} required={isRequired} className={inputClass+' mt-2'} type={property.type==='number'||property.type==='integer'?'number':'text'} step={property.type==='integer'?1:'any'} min={property.minimum} max={property.maximum} value={value} placeholder={property.default!==undefined?'생략 시 원본 기본값: '+String(property.default):/path|directory/i.test(name)?'분석할 실제 파일·폴더의 전체 경로':'값을 입력하세요'} onChange={e=>update(e.target.value)}/>}
+   {property.description&&<span className="mt-2 block whitespace-pre-wrap text-xs leading-5 text-slate-500">{property.description}</span>}
+   {complex&&<details className="mt-2 text-xs text-slate-500"><summary>이 항목의 원본 입력 설명</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap">{JSON.stringify(property,null,2)}</pre></details>}
+  </label>;
+ };
+ const resultObject=result&&typeof result==='object'?result as Record<string,unknown>:undefined;
+ const originalResult=resultObject?.result&&typeof resultObject.result==='object'?resultObject.result as Record<string,unknown>:resultObject;
+ const textBlocks=Array.isArray(originalResult?.content)?originalResult.content.filter((block):block is {type:string;text:string}=>!!block&&typeof block==='object'&&block.type==='text'&&typeof block.text==='string'):[];
+ return <div className="space-y-5"><Panel title="REA 분석" description="분석 도구를 선택하고 대상 경로와 필수 입력을 채워 실행하세요.">
+ <KeyValues items={[['설치',data?.installed?'확인됨':'준비 필요'],['버전',data?.version??'—'],['분석 도구',String(data?.tool_count??0)]]}/>
+ <ErrorMessage message={status.error||data?.reason||''}/>
+ <details className="mt-3 text-xs text-slate-500"><summary>설치 · 실행 환경</summary><p className="my-3">Node {data?.node_version??'—'} · 독립 REA 프로세스 · 심층 분석 엔진의 준비 여부는 환경 진단에서 확인합니다.</p><a className="text-blue-700" href={data?.source??'https://github.com/morluto/rea'} target="_blank" rel="noreferrer">원본 GitHub</a><div className="mt-3 flex gap-2"><Button onClick={()=>void status.refresh()} busy={status.loading}>목록 새로고침</Button><Button onClick={()=>void doctor()} busy={pending.has('rea/doctor')} disabled={!data?.installed||busy}>환경 진단</Button></div></details>
+ </Panel><Panel title="분석 실행" description="선택 입력을 비우면 REA 원본 기본값을 사용합니다.">
+ <form onSubmit={e=>{e.preventDefault();void run();}}>
+ <input aria-label="REA 도구 검색" className={inputClass+' mb-3'} value={query} onChange={e=>setQuery(e.target.value)} placeholder="JavaScript, 바이너리, 도구 이름·설명 검색"/>
+ <select aria-label="REA 도구 선택" className={inputClass} value={tool?.name??''} disabled={busy} onChange={e=>choose(e.target.value)}>{options.map(t=><option key={t.name} value={t.name}>{toolLabels[t.name]?toolLabels[t.name]+' · ':''}{t.name}</option>)}</select>
+ <p className="my-3 whitespace-pre-wrap text-xs leading-5 text-slate-600">{tool?.description}</p>
+ {tool?.annotations?.destructiveHint&&<p className="mb-3 text-xs text-amber-700">이 원본 도구는 대상을 변경할 수 있습니다. 도구 설명과 입력을 확인하세요.</p>}
+ {properties.length>0&&<div className="mb-4 flex gap-3 text-xs"><button type="button" className={mode==='form'?'font-bold text-blue-700':'text-slate-500'} onClick={()=>changeMode('form')}>입력 양식</button><button type="button" className={mode==='json'?'font-bold text-blue-700':'text-slate-500'} onClick={()=>changeMode('json')}>전체 JSON 입력</button></div>}
+ {mode==='form'&&properties.length>0?<><div className="grid gap-4 sm:grid-cols-2">{properties.filter(([name])=>required.includes(name)).map(renderField)}</div>{properties.some(([name])=>!required.includes(name))&&<details className="my-4"><summary className="cursor-pointer text-sm text-slate-600">선택 입력 · 원본 기본값 변경</summary><div className="mt-4 grid gap-4 sm:grid-cols-2">{properties.filter(([name])=>!required.includes(name)).map(renderField)}</div></details>}</>:
+ <label className="block text-sm">전체 도구 입력 JSON<textarea aria-label="REA 도구 입력" className={inputClass+' mt-2 min-h-40 font-mono text-xs'} value={argumentsJson} onChange={e=>setArgumentsJson(e.target.value)}/></label>}
+ <details className="my-4 text-xs text-slate-500"><summary>원본 전체 입력 스키마</summary><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap">{JSON.stringify(schema,null,2)}</pre></details>
+ <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-slate-100 bg-white py-3"><Button type="submit" tone="primary" disabled={!data?.installed||!tool||busy} busy={busy}>{busy?'분석 실행 중':'선택 도구 실행'}</Button><Button type="button" onClick={()=>void stop()} disabled={!busy}>분석 중지</Button>{busy&&<span className="text-xs text-slate-500">결과를 기다리는 중입니다.</span>}</div>
+ <ErrorMessage message={error}/></form></Panel>
+ {result!==null&&<Panel title={originalResult?.isError?'REA 실행 오류':'REA 실행 결과'}>{textBlocks.length>0?<><div className="space-y-3">{textBlocks.map((block,index)=><pre key={index} className="max-h-[38rem] overflow-auto whitespace-pre-wrap break-words rounded bg-slate-50 p-3 text-xs">{block.text}</pre>)}</div><details className="mt-4 text-xs text-slate-500"><summary>원본 전체 결과 JSON</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap">{JSON.stringify(result,null,2)}</pre></details></>:<pre className="max-h-[38rem] overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(result,null,2)}</pre>}</Panel>}
+ </div>;
 }

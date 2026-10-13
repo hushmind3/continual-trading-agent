@@ -14,7 +14,7 @@ class OrderRequest(BaseModel):
     currency:Literal["KRW","USD"]
     symbol:str
     action:Literal["BUY","SELL"]
-    quantity:int=Field(gt=0)
+    quantity:int=Field(gt=0,strict=True)
 
 
 @router.post("/api/orders")

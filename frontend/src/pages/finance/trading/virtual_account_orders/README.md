@@ -9,3 +9,5 @@
 소속 대메뉴：금융. 이 폴더는 금융 내부 기능 분류이며 독립 대메뉴로 등록하지 않습니다. 하위 기능 → 분류 submenu_manager → 금융 submenu_manager → finance_menu_manager → 전체 menu_registry → /api.
 
 - 주소: `#finance/virtual_account_orders`. 메뉴 등록 ID와 프론트 폴더 이름을 일치시킵니다.
+
+2026-10-14: 소수 수량은 매수·매도 버튼을 비활성화하고 정수 안내를 표시합니다. 요청 자체가 전송되지 않는 브라우저 회귀 검사 통과. backend 422 입력 검증 오류는 수량 등 해당 필드와 사유로 표시합니다.

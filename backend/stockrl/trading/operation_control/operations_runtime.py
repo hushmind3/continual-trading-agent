@@ -216,11 +216,21 @@ class OperationsRuntime:
                 row=frame.sort_values('date').iloc[-1].to_dict();source='stored'
             from stockrl.live_feed import LIVE_QUOTE_MAX_AGE_SECONDS
             stamp=pd.Timestamp(row['date'])
+            if pd.isna(stamp):raise ValueError('시세 시각을 확인할 수 없어 즉시 체결할 수 없습니다.')
             if stamp.tzinfo is None:stamp=stamp.tz_localize('UTC')
             age=(pd.Timestamp.now(tz='UTC')-stamp).total_seconds()
             if age<0 or age>LIVE_QUOTE_MAX_AGE_SECONDS:raise ValueError('유효한 최신 시세가 없어 즉시 체결할 수 없습니다.')
-            price=float(row['close']);bid=row.get('bid');ask=row.get('ask')
-            spread=(float(ask)-float(bid))/price if bid and ask else 0
+            import math
+            try:price=float(row.get('close'))
+            except (TypeError,ValueError) as exc:raise ValueError('유효한 시세 가격이 없습니다.') from exc
+            if not math.isfinite(price) or price<=0:raise ValueError('시세 가격은 유한한 양수여야 합니다.')
+            bid=row.get('bid');ask=row.get('ask');spread=0
+            if bid is not None and ask is not None:
+                try:bid=float(bid);ask=float(ask)
+                except (TypeError,ValueError) as exc:raise ValueError('호가 가격을 확인할 수 없습니다.') from exc
+                if not all(math.isfinite(value) and value>0 for value in (bid,ask)) or ask<bid:
+                    raise ValueError('유효한 매수·매도 호가가 없습니다.')
+                spread=(ask-bid)/price
             fill=self.ledger()._fill(symbol,currency,action,price,spread,
                 float(quantity) if action=='SELL' else price*quantity,
                 str(row['date']),requested_quantity=quantity if action=='BUY' else None)

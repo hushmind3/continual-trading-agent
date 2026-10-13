@@ -37,5 +37,11 @@ def update(values):
             value=current[group][name]
             if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<0 or (group=='data' and value==0):
                 raise ValueError(group+'.'+name+': 유한한 '+('양수' if group=='data' else '0 이상의 값')+'가 필요합니다.')
+    symbols=current.get('symbols',[])
+    if not isinstance(symbols,list) or any(not isinstance(symbol,str) or not symbol.strip() for symbol in symbols):
+        raise ValueError('symbols: 비어 있지 않은 종목 문자열 목록이 필요합니다.')
+    devices=current.get('expert_devices',{})
+    if not isinstance(devices,dict) or any(not isinstance(device,str) or not device.strip() for device in devices.values()):
+        raise ValueError('expert_devices: 모델별 장치 문자열이 필요합니다.')
     atomic_json(current,CONFIG_PATH)
     return current

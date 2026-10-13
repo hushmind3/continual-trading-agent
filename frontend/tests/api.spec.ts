@@ -33,3 +33,10 @@ test('GET payloads use the same API envelope without losing special characters',
   expect(url.searchParams.get('operation')).toBe('state');
   expect(JSON.parse(url.searchParams.get('payload')!)).toEqual({views: '["framework?symbol=^GSPC"]'});
 });
+
+test('validation errors identify the field without exposing submitted secrets', async () => {
+  const original=globalThis.fetch;
+  globalThis.fetch=(async()=>new Response(JSON.stringify({detail:[{loc:['body','quantity'],type:'int_type',msg:'Input should be a valid integer',input:'SECRET MUST NOT APPEAR'}]}),{status:422})) as typeof fetch;
+  try{await expect(request('orders',{})).rejects.toThrow('수량: 정수를 입력하세요.');}
+  finally{globalThis.fetch=original;}
+});

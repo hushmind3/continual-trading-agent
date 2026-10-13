@@ -23,7 +23,7 @@ def operation_control(name:Literal["feed","paper","engine","learning"],request:C
 @router.post('/api/system/start')
 def start_system(values:dict):
     currencies=values.get('currencies',['USD','KRW'])
-    if not currencies or not set(currencies)<= {'USD','KRW'}:raise HTTPException(400,'USD/KRW 운영 통화를 선택하세요.')
+    if not isinstance(currencies,list) or not currencies or any(not isinstance(value,str) or value not in {'USD','KRW'} for value in currencies):raise HTTPException(400,'USD/KRW 운영 통화를 선택하세요.')
     try:return system.start(list(dict.fromkeys(currencies)))
     except ValueError as exc:raise HTTPException(409,str(exc))
 

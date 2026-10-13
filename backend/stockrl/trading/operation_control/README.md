@@ -11,3 +11,5 @@
 프론트 메뉴 주소: `#finance/operation_control`; 화면: `frontend/src/pages/finance/trading/operation_control/OperationControl.tsx`. 백엔드 폴더·import 이름은 프론트 소메뉴 폴더와 일치합니다. API 작업명은 유지합니다.
 
 Expert 모델 설정 경로는 operations_settings.settings().model_dir 및 registry_file에서 제공합니다. 실제 등록·선택 정보는 바탕화면 모델/experts/expert_registry.json과 각 모델 폴더의 expert.json에 있습니다. 프로젝트 configs/experts.json을 읽지 않습니다.
+
+2026-10-14: 가상주문에서 NaT/누락 시각, 0·누락·NaN·무한 가격, 잘못된 호가를 원장 변경 전에 거부합니다. 통화 목록과 종목·장치 설정 자료형을 저장/실행 전에 확인합니다. 임시 계좌·설정 및 가짜 실행기로 검사했으며 알고리즘·수수료·슬리피지 기본값은 변경하지 않았습니다.

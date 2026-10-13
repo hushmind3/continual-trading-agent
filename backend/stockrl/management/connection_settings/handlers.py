@@ -16,7 +16,7 @@ def connections():
     info=collection_status()
     return {"api":{"status":"connected"},"data":info,"brokers":[
         {"name":name,"status":capabilities()[key]["status"],"reason":capabilities()[key]["reason"]}
-        for name,key in (("키움","kiwoom"),("Alpaca","alpaca"))]}
+        for name,key in (("키움","kiwoom"),)]}
 
 
 class CredentialRequest(BaseModel):

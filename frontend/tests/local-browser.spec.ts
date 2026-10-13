@@ -130,3 +130,26 @@ test('project explorer keeps the latest file when earlier responses arrive late'
   releaseOld();await oldFinished;
   await expect(page.locator('main pre')).toHaveText('LATEST CONTENT');
 });
+
+test('paper order rejects fractional quantities before sending a request', async ({page}) => {
+  let orders=0;
+  await page.route('**/api', async route=>{
+    const envelope=route.request().postDataJSON();
+    if(envelope?.operation==='orders'){orders++;await route.fulfill({json:{price_source:'live'}});return;}
+    if(envelope?.operation==='state'){
+      const response=await route.fetch(),state=await response.json();
+      state.data.instruments=[...state.data.instruments.filter((item:{symbol:string})=>item.symbol!=='QUANTITY_FIXTURE'),{symbol:'QUANTITY_FIXTURE',name:'수량 검사',currency:'USD',eligible:true}];
+      await route.fulfill({response,json:state});return;
+    }
+    await route.continue();
+  });
+  await page.goto('/#finance/virtual_account_orders',{waitUntil:'networkidle'});
+  await page.getByRole('combobox',{name:'종목',exact:true}).selectOption('QUANTITY_FIXTURE');
+  await page.getByRole('spinbutton',{name:'수량',exact:true}).fill('1.5');
+  await expect(page.getByRole('button',{name:'가상 매수',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'가상 매도',exact:true})).toBeDisabled();
+  await expect(page.getByRole('alert')).toContainText('정수');
+  expect(orders).toBe(0);
+  await page.getByRole('spinbutton',{name:'수량',exact:true}).fill('1');
+  await expect(page.getByRole('button',{name:'가상 매수',exact:true})).toBeEnabled();
+});

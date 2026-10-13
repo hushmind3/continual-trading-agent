@@ -19,6 +19,14 @@ export async function request<T>(path: string, body?: unknown, method: 'GET'|'PO
     if (controller.signal.aborted) throw error;
     throw new Error(`서버의 JSON 응답을 읽을 수 없습니다. (HTTP ${response.status})`);
   }
+  if (!response.ok && Array.isArray(data.detail)) {
+    const errors=data.detail.filter((issue:unknown):issue is {loc?:unknown[];msg:string;type?:string}=>!!issue&&typeof issue==='object'&&typeof (issue as {msg?:unknown}).msg==='string').map((issue:{loc?:unknown[];msg:string;type?:string})=>{
+      const field=issue.loc?.filter(part=>!['body','query','path'].includes(String(part))).join('.')||'입력값';
+      const message=['int_type','int_parsing','int_from_float'].includes(issue.type??'')?'정수를 입력하세요.':issue.msg;
+      return (field==='quantity'?'수량':field)+': '+message;
+    });
+    throw new Error(errors.join(' · ')||`요청 실패 (${response.status})`);
+  }
   if (!response.ok)
     throw new Error(
       typeof data.detail === "string"

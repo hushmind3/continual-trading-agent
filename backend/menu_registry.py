@@ -1,9 +1,14 @@
 """Import large-menu managers; expose their existing backend connections."""
-from .trading.trading_menu_manager import GROUP as TRADING, ROUTERS as TRADING_ROUTERS
-from .finrl.finrl_menu_manager import GROUP as FINRL, ROUTERS as FINRL_ROUTERS
-from .extensions.extensions_menu_manager import GROUP as EXTENSIONS, ROUTERS as EXTENSIONS_ROUTERS
-from .management.management_menu_manager import GROUP as MANAGEMENT, ROUTERS as MANAGEMENT_ROUTERS
-from .rea.rea_menu_manager import GROUP as REA, ROUTERS as REA_ROUTERS
+from stockrl.trading.trading_menu_manager import GROUP as TRADING
+from stockrl.trading.trading_menu_manager import ROUTERS as TRADING_ROUTERS
+from stockrl.finrl.finrl_menu_manager import GROUP as FINRL
+from stockrl.finrl.finrl_menu_manager import ROUTERS as FINRL_ROUTERS
+from stockrl.extensions.extensions_menu_manager import GROUP as EXTENSIONS
+from stockrl.extensions.extensions_menu_manager import ROUTERS as EXTENSIONS_ROUTERS
+from stockrl.management.management_menu_manager import GROUP as MANAGEMENT
+from stockrl.management.management_menu_manager import ROUTERS as MANAGEMENT_ROUTERS
+from rea.rea_menu_manager import GROUP as REA
+from rea.rea_menu_manager import ROUTERS as REA_ROUTERS
 
 GROUPS=(TRADING,FINRL,REA,EXTENSIONS,MANAGEMENT)
 _routes_by_menu={}
@@ -42,7 +47,7 @@ def dispatch(scope,parameters):
 
 def catalog(routes):
     from pydantic import TypeAdapter
-    from .platform.framework_operations import action_list
+    from stockrl.platform.framework_operations import action_list
     actions=action_list()
     for action in actions:
         action['group'],action['menu_id']=owner('framework/'+action['id'])
@@ -89,8 +94,11 @@ def catalog(routes):
         'actions':actions,'commands':commands}
 
 
-def register_api(api):
+def register_api(api,app):
     """Collect small-menu routers through the five large-menu coordinators."""
     for routers in (TRADING_ROUTERS,FINRL_ROUTERS,REA_ROUTERS,EXTENSIONS_ROUTERS,MANAGEMENT_ROUTERS):
-        for router in routers:api.include_router(router)
+        for router in routers:
+            api.include_router(router)
+            app.router.on_startup.extend(router.on_startup)
+            app.router.on_shutdown.extend(router.on_shutdown)
     bind(api.routes)

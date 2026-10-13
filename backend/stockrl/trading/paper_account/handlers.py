@@ -1,6 +1,12 @@
 """가상계좌 · 주문 — existing API handlers."""
 from __future__ import annotations
-from stockrl.api_context import APIRouter, BaseModel, Field, FiniteJSONResponse, HTTPException, Literal, runtime
+from api_context import APIRouter
+from api_context import BaseModel
+from api_context import Field
+from api_context import FiniteJSONResponse
+from api_context import HTTPException
+from api_context import Literal
+from api_context import runtime
 
 router=APIRouter(default_response_class=FiniteJSONResponse)
 

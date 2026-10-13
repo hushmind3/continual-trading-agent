@@ -175,7 +175,7 @@ class OperationsRuntime:
     def queue_learning(self,symbols):
         with system.job_lock,self.lock:
             if not self.controls['learning']:return
-            from stockrl import web_api as api
+            from stockrl.finrl.policy_learning import handlers as _policy_learning_api
             from stockrl.finrl.framework import policy_files
             policies=read_json(ROOT/'runtime/operations/policies.json')
             if not policies:
@@ -192,8 +192,8 @@ class OperationsRuntime:
             currency=self.learning_pending.pop(0)
             try:
                 identity=read_json(policy_files(currency)/'dataset.json')
-                request=api.RunRequest(currency=currency,symbols=identity['symbols'],algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
-                result=api.launch('train',request,preserve_output=True)
+                request=_policy_learning_api.RunRequest(currency=currency,symbols=identity['symbols'],algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
+                result=_policy_learning_api.launch('train',request,preserve_output=True)
                 self.learning_job=result['job']['id']
                 frame=prices(currency,identity['symbols'])
                 self.learning_versions[currency]=sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest()

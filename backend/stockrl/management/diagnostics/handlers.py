@@ -1,6 +1,32 @@
 """진단 · 로그 · 코드 적용 — existing API handlers."""
 from __future__ import annotations
-from stockrl.api_context import private_api, APIRouter, DB, FiniteJSONResponse, HTTPException, MODEL_DIR, Path, ROOT, RUNTIME, app, apply_state, busy, check_system, database_cache, datetime, json, library_manager, os, policy_checkpoint, policy_files, read_json, resource_monitor, runtime, sqlite3, start_apply, system, timezone
+from api_context import private_api
+from api_context import APIRouter
+from api_context import DB
+from api_context import FiniteJSONResponse
+from api_context import HTTPException
+from api_context import MODEL_DIR
+from api_context import Path
+from api_context import ROOT
+from api_context import RUNTIME
+from api_context import app
+from api_context import apply_state
+from api_context import busy
+from api_context import check_system
+from api_context import database_cache
+from api_context import datetime
+from api_context import json
+from api_context import library_manager
+from api_context import os
+from api_context import policy_checkpoint
+from api_context import policy_files
+from api_context import read_json
+from api_context import resource_monitor
+from api_context import runtime
+from api_context import sqlite3
+from api_context import start_apply
+from api_context import system
+from api_context import timezone
 
 router=APIRouter(default_response_class=FiniteJSONResponse)
 
@@ -83,7 +109,7 @@ def modules():
 
 
 def menu_catalog():
-    from stockrl.menu_registry import catalog
+    from menu_registry import catalog
     return catalog(private_api.routes)
 
 
@@ -232,8 +258,6 @@ def system_check():
 
 @app.on_event("shutdown")
 def close_operations():
-    from stockrl.rea.analysis.operations import connection
-    connection.close()
     runtime.close()
     system.close_models()
 

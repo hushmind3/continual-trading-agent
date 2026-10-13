@@ -281,4 +281,4 @@ FinRL-Trading 큰 메뉴와 보조 화면 6개를 제거했습니다. 전용 메
 
 ## REA 역공학
 
-프로그램 분석(파일 선택·폴더 선택·웹사이트 분석)과 프로젝트 탐색 두 작은 메뉴를 제공합니다. 백엔드 모듈은 backend/stockrl/rea, 프론트는 frontend/src/pages/rea, 실제 결과는 Git에 포함하지 않는 backend/rea_projects/<ID>에 저장합니다. original/ 원문·원본 파일, inferred/ 추론·의사코드, analysis/ 구조·함수·모듈·근거를 구분해 사용자 버튼으로 저장 폴더를 엽니다. 코딩 에이전트 호출·자동 재구현·추출 프로그램 실행은 연결하지 않습니다. 자세한 범위는 [REA 백엔드](backend/stockrl/rea/README.md)를 확인하세요.
+프로그램 분석(파일 선택·폴더 선택·웹사이트 분석)과 프로젝트 탐색 두 작은 메뉴를 제공합니다. 백엔드 모듈은 backend/rea, 프론트는 frontend/src/pages/rea, 실제 결과는 Git에 포함하지 않는 backend/rea_projects/<ID>에 저장합니다. original/ 원문·원본 파일, inferred/ 추론·의사코드, analysis/ 구조·함수·모듈·근거를 구분해 사용자 버튼으로 저장 폴더를 엽니다. 코딩 에이전트 호출·자동 재구현·추출 프로그램 실행은 연결하지 않습니다. 자세한 범위는 [REA 백엔드](backend/rea/README.md)를 확인하세요.

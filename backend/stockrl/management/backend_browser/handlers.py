@@ -1,6 +1,15 @@
 """백엔드 기능 전체 — existing API handlers."""
 from __future__ import annotations
-from stockrl.api_context import APIRouter, FileResponse, FiniteJSONResponse, HTTPException, Literal, RUNTIME, re, read_json, system, uuid
+from api_context import APIRouter
+from api_context import FileResponse
+from api_context import FiniteJSONResponse
+from api_context import HTTPException
+from api_context import Literal
+from api_context import RUNTIME
+from api_context import re
+from api_context import read_json
+from api_context import system
+from api_context import uuid
 
 router=APIRouter(default_response_class=FiniteJSONResponse)
 

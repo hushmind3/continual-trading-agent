@@ -55,7 +55,10 @@ def busy():
     return items
 
 def check_system():
-    from .. import web_api as api
+    from stockrl.extensions.moe import handlers as _moe_api
+    from stockrl.finrl.policy_learning import handlers as _policy_learning_api
+    from stockrl.management.connection_settings import handlers as _connection_settings_api
+    from stockrl.management.diagnostics import handlers as _diagnostics_api
     from stockrl.trading.control.operations_runtime import runtime
     from stockrl.trading.control.operations_settings import settings
     from stockrl.management.connection_settings.provider_credentials import public_status
@@ -66,24 +69,24 @@ def check_system():
         except Exception as exc:items.append(dict(id=key,title=title,status='failed',detail=str(exc)))
     cfg=settings()
     def framework():
-        value=api.source_settings()
+        value=_policy_learning_api.source_settings()
         return 'complete','원본 SAC 설정·환경 경로·설치 버전 조회: '+str(value['versions'])+'; 학습 미실행'
     check('framework','FinRL-X · FinRL · SB3',framework)
     def policy():
-        value=api.model_state(api.source_settings())
+        value=_policy_learning_api.model_state(_policy_learning_api.source_settings())
         if not value['policy_compatible']:return 'blocked','SAC 관측·행동 구조 비호환: '+' · '.join(value['structure_reasons'])
         if not value['compatible']:return 'blocked','정책 구조는 호환; 이어 학습 상태 미충족: '+' · '.join(value['resume_reasons'])
         return 'complete','현재 SAC 구조·이어 학습 Replay 호환; Expert 추론·시세 수신과 별도 확인'
     check('policy','SAC 체크포인트 · Replay',policy)
     check('models','외부 모델 폴더',lambda:('complete',str(cfg.model_dir)) if cfg.model_dir.is_dir() else ('blocked','모델 폴더 없음: '+str(cfg.model_dir)))
     def experts():
-        value=api.expert_state();active=[row for row in value['items'] if row['active']]
+        value=_moe_api.expert_state();active=[row for row in value['items'] if row['active']]
         missing=[row['id'] for row in active if not row['package_available']]
         return ('blocked','선택 패키지 없음/크기 불일치: '+', '.join(missing)) if missing else ('complete',f"등록 {len(value['items'])}, 선택 {len(active)}, API 적재 {sum(row['loaded'] for row in value['items'])}; 파일 존재·크기 확인, 추론 미실행")
     check('experts','Frozen Expert 등록 · 선택 · 적재',experts)
     check('accounts','KRW/USD 가상계좌',lambda:('complete','기존 PaperAccount 원장 조회; 주문·초기화 미실행; 통화 '+', '.join(runtime.ledger().snapshot()['books'])))
     def data():
-        value=api.database()
+        value=_diagnostics_api.database()
         if value.get('error'):return 'failed',value['error']
         return ('complete',f"저장 가격 {value['rows']}행 / {value['tickers']}종목") if value['rows'] else ('blocked','저장 가격 없음')
     check('data','저장 데이터',data)
@@ -94,7 +97,7 @@ def check_system():
         return 'complete',value['provider_name']+' 설정 조회; 외부 인증 요청 미실행'
     check('provider','저장 인증 · 시세 공급원',provider)
     def collection():
-        value=api.connections()['data']
+        value=_connection_settings_api.connections()['data']
         return ('complete','공식 가격 수집 공급원 설정 있음; 원격 수집 미실행') if value['status']=='configured' else ('blocked',value.get('reason') or value['status'])
     check('collection','FinRL-X 가격 수집 연결',collection)
     def feed():
@@ -354,7 +357,7 @@ class SystemOperations:
             threading.Thread(target=self.run,name='system-start',daemon=True).start()
             return self.snapshot()
     def run(self):
-        from .. import web_api as api
+        
         from stockrl.trading.control.operations_runtime import runtime
         from stockrl.trading.control.operations_settings import settings
         from stockrl.management.connection_settings.provider_credentials import public_status

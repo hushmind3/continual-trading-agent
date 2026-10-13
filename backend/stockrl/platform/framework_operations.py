@@ -266,11 +266,12 @@ def execute(action,parameters,output):
 def source_catalog():
     """Inventory every real Python source, without executing package import side effects."""
     finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    roots=[('stockrl',ROOT/'backend/stockrl'),('FinRL-X',ROOT/'FinRL-X/src'),('FinRL',finrl_root)]
+    roots=[('stockrl',ROOT/'backend/stockrl'),('REA',ROOT/'backend/rea'),('Platform',ROOT/'backend'),('FinRL-X',ROOT/'FinRL-X/src'),('FinRL',finrl_root)]
     items=[]
     for framework,root in roots:
         sources=[]
         for directory,folders,files in os.walk(root):
+            if framework=='Platform':folders[:]=[]
             folders[:]=sorted(folder for folder in folders if folder not in ('node_modules','__pycache__','.git','dist','build'))
             sources.extend(Path(directory)/name for name in files if name.endswith('.py'))
         for path in sorted(sources):
@@ -324,7 +325,8 @@ def catalog():
     from .system_operations import system
     items=[dict(item) for item in source_catalog()];by_id={item['id']:item for item in items}
     roots={row[2]:[key] for key,row in ACTIONS.items() if row[2]}
-    for module in ('web_api','__main__','finrl.policy_learning.official_cli','job_worker','platform.kiwoom_worker'):
+    roots['Platform:web_api']=[]
+    for module in ('__main__','finrl.policy_learning.official_cli','job_worker','platform.kiwoom_worker'):
         roots['stockrl:'+module]=[]
     edges={}
     for item in items:
@@ -337,13 +339,15 @@ def catalog():
                 target=item['framework']+':'+'.'.join(part for part in [*parts,imported.lstrip('.')] if part)
             elif imported.startswith('src.'):target='FinRL-X:'+imported[4:]
             elif imported.startswith('finrl.'):target='FinRL:'+imported[6:]
+            elif imported.startswith('rea.'):target='REA:'+imported[4:]
+            elif imported in ('web_api','menu_registry','api_context','api_transport'):target='Platform:'+imported
             elif imported.startswith('stockrl.'):target='stockrl:'+imported[8:]
             elif item['framework']=='FinRL-X' and imported.startswith(('strategies.','data.','config.','trading.','backtest.')):target='FinRL-X:'+imported
             else:continue
             if target in by_id:deps.append(target)
         parts=item['id'].split(':',1)[1].split('.')
         parents=[item['framework']+':'+'.'.join(parts[:level]) for level in range(1,len(parts))]
-        if item['framework']=='stockrl':parents.append('stockrl:__init__')
+        parents.append(item['framework']+':__init__')
         deps.extend(parent for parent in parents if parent in by_id and by_id[parent].get('package'))
         edges[item['id']]=sorted(set(deps))
     connected=set(roots);queue=list(roots)
@@ -372,7 +376,11 @@ def catalog():
         item['native_operation']='framework/native_call' if native else None
         imported=system.states.get('import:'+item['id'])
         import_error=system.state_errors.get('import:'+item['id'])
-        item['imported']=bool(imported and imported.get('imported')) or (('src' if item['framework']=='FinRL-X' else 'finrl' if item['framework']=='FinRL' else 'stockrl')+'.'+item['id'].split(':',1)[1]) in sys.modules
+        namespace={'FinRL-X':'src','FinRL':'finrl','stockrl':'stockrl','REA':'rea','Platform':''}[item['framework']]
+        module_part=item['id'].split(':',1)[1]
+        if module_part=='__init__':module_part=''
+        module_name='.'.join(part for part in (namespace,module_part) if part)
+        item['imported']=bool(imported and imported.get('imported')) or module_name in sys.modules
         item['import_error']=import_error
         item['verified_functions']=sorted(set(verified.get(item['id'],[])))
         item['execution_status']='실행 확인' if item['verified_functions'] else '실행 미확인'

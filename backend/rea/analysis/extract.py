@@ -8,16 +8,17 @@ from urllib.request import urlopen
 import psutil
 from stockrl import ROOT
 from stockrl.state_io import atomic_json
-from stockrl.rea.analysis.operations import BASE
-from stockrl.rea.analysis.operations import WORK
-from stockrl.rea.analysis.operations import call_tool
-from stockrl.rea.analysis.operations import connection
-from stockrl.rea.analysis.operations import native_recover
-from stockrl.rea.analysis.operations import node_runtime
-from stockrl.rea.analysis.operations import runtime_environment
-from stockrl.rea.analysis.operations import validate_arguments
+from rea.analysis.operations import BASE
+from rea.analysis.operations import WORK
+from rea.analysis.operations import call_tool
+from rea.analysis.operations import connection
+from rea.analysis.operations import native_recover
+from rea.analysis.operations import node_runtime
+from rea.analysis.operations import runtime_environment
+from rea.analysis.operations import validate_arguments
 
-from stockrl.rea.project_browser.projects import OUTPUT,_inside
+from rea.project_browser.projects import OUTPUT
+from rea.project_browser.projects import _inside
 _gate=threading.Lock()
 _cancel=threading.Event()
 _processes=[]

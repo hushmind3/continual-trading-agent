@@ -4,7 +4,8 @@ from urllib.parse import urlencode
 from fastapi import APIRouter,FastAPI,HTTPException,Request
 from fastapi.testclient import TestClient
 from starlette.routing import Match,Route
-from stockrl.api_transport import FiniteJSONResponse,UnifiedAPI
+from api_transport import FiniteJSONResponse
+from api_transport import UnifiedAPI
 
 
 class HTTPTransportTests(unittest.TestCase):

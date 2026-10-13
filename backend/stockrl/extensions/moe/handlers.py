@@ -1,6 +1,23 @@
 """MoE — existing API handlers."""
 from __future__ import annotations
-from stockrl.api_context import APIRouter, BaseModel, ExpertRegistry, Field, FiniteJSONResponse, HTTPException, Literal, MODEL_DIR, ROOT, RUNTIME, champion_structure_environment, library_manager, lru_cache, os, re, read_json, runtime, system
+from api_context import APIRouter
+from api_context import BaseModel
+from api_context import ExpertRegistry
+from api_context import Field
+from api_context import FiniteJSONResponse
+from api_context import HTTPException
+from api_context import Literal
+from api_context import MODEL_DIR
+from api_context import ROOT
+from api_context import RUNTIME
+from api_context import champion_structure_environment
+from api_context import library_manager
+from api_context import lru_cache
+from api_context import os
+from api_context import re
+from api_context import read_json
+from api_context import runtime
+from api_context import system
 
 router=APIRouter(default_response_class=FiniteJSONResponse)
 

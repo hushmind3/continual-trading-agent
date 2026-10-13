@@ -152,7 +152,7 @@ class IntegrityTests(unittest.TestCase):
   api=SimpleNamespace(RunRequest=lambda **kwargs:SimpleNamespace(**kwargs),launch=launch)
   identity={'symbols':['AAPL'],'currency':'USD','algorithm':'sac'}
   def read(path):return {'USD':'policies/x/sac.zip'} if path.name=='policies.json' else identity
-  with patch.dict(sys.modules,{'stockrl.web_api':api}),patch.object(operations_runtime,'read_json',read),patch.object(operations_runtime,'prices',return_value=frame) as prices,patch.object(framework,'policy_files',return_value=ROOT/'runtime/official/policies/x'),patch.object(operations_runtime.system,'job_state',return_value={'running':False}):
+  with patch.dict(sys.modules,{'stockrl.finrl.policy_learning.handlers':api}),patch.object(operations_runtime,'read_json',read),patch.object(operations_runtime,'prices',return_value=frame) as prices,patch.object(framework,'policy_files',return_value=ROOT/'runtime/official/policies/x'),patch.object(operations_runtime.system,'job_state',return_value={'running':False}):
    runtime.queue_learning(['AAPL']);runtime.queue_learning(['AAPL'])
    self.assertEqual(len(launched),1)
    prices.return_value=frame.assign(close=101)
@@ -183,18 +183,18 @@ class IntegrityTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'실제 과거 일봉'):
    complete_policy_day(history,['AAPL','META','T'])
  def test_trading_menu_and_dedicated_actions_are_removed(self):
-  from stockrl.menu_registry import GROUPS
+  from menu_registry import GROUPS
   from stockrl.platform.framework_operations import ACTIONS
   self.assertEqual(set(ACTIONS),{'native_call'})
   self.assertNotIn('finrl_trading',{group['id'] for group in GROUPS})
  def test_rea_refuses_project_trash_inputs(self):
-  from stockrl.rea.analysis.operations import validate_arguments
+  from rea.analysis.operations import validate_arguments
   with self.assertRaisesRegex(ValueError,'휴지통'):
    validate_arguments({'arguments':{'input_path':str(ROOT/'휴지통/sample')}})
   validate_arguments({'input_path':str(ROOT/'frontend/src')})
  def test_rea_timeout_closes_the_session(self):
   import io,queue
-  from stockrl.rea.analysis.operations import REAConnection
+  from rea.analysis.operations import REAConnection
   connection=REAConnection();connection.process=SimpleNamespace(poll=lambda:None,stdin=io.StringIO());connection.responses=queue.Queue()
   with patch.object(connection,'close') as close:
    with self.assertRaisesRegex(RuntimeError,'응답 시간이 초과'):
@@ -203,13 +203,13 @@ class IntegrityTests(unittest.TestCase):
 
 class REAProjectStorageTests(unittest.TestCase):
  def test_project_reader_cannot_leave_saved_folder(self):
-  from stockrl.rea.project_browser.projects import _inside
+  from rea.project_browser.projects import _inside
   with self.assertRaisesRegex(ValueError,'프로젝트 내부'):
    _inside(ROOT/'backend/rea_projects/example','../../../configs/experts.json')
  def test_folder_snapshot_does_not_copy_generated_output_into_itself(self):
   import tempfile
   from unittest.mock import patch
-  from stockrl.rea.analysis import extract
+  from rea.analysis import extract
   with tempfile.TemporaryDirectory() as temporary:
    source=Path(temporary);(source/'app.js').write_text('export const value=7;',encoding='utf8')
    output=source/'backend/rea_projects';destination=output/'test/original/source'

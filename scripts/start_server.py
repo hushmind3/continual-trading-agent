@@ -19,7 +19,7 @@ def same_path(left,right):
 
 def classify(process):
     command=process.cmdline()
-    if same_path(process.cwd(),ROOT) and 'stockrl.web_api:app' in command and 'uvicorn' in command:return 'api'
+    if same_path(process.cwd(),ROOT) and any(arg.rsplit('.',1)[-1]=='web_api:app' for arg in command) and 'uvicorn' in command:return 'api'
     return None
 
 
@@ -191,7 +191,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                 for record in current:stop_verified(record)
                 env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_APPLY_ID=operation['id'])
                 with (RUNTIME/'server.stdout.log').open('ab') as output,(RUNTIME/'server.stderr.log').open('ab') as errors:
-                    child=subprocess.Popen([sys.executable,'-m','uvicorn','stockrl.web_api:app','--host','127.0.0.1','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+                    child=subprocess.Popen([sys.executable,'-m','uvicorn','web_api:app','--host','127.0.0.1','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
                 for _ in range(100):
                     if child.poll() is not None:raise RuntimeError('서버 시작 실패: runtime/official/server.stderr.log')
                     if ready():break

@@ -1,6 +1,33 @@
 """정책 학습 — existing API handlers."""
 from __future__ import annotations
-from stockrl.api_context import APIRouter, BaseModel, CASH_ENVIRONMENT, ENVIRONMENT, Field, FileResponse, FiniteJSONResponse, HTTPException, Literal, MODELS, MODEL_DIR, OffPolicyAlgorithm, Path, ROOT, RUNTIME, atomic_json, finrl_file, json, lru_cache, policy_checkpoint, policy_files, read_json, runtime, sac_example, system, update_json, uuid, zipfile
+from api_context import APIRouter
+from api_context import BaseModel
+from api_context import CASH_ENVIRONMENT
+from api_context import ENVIRONMENT
+from api_context import Field
+from api_context import FileResponse
+from api_context import FiniteJSONResponse
+from api_context import HTTPException
+from api_context import Literal
+from api_context import MODELS
+from api_context import MODEL_DIR
+from api_context import OffPolicyAlgorithm
+from api_context import Path
+from api_context import ROOT
+from api_context import RUNTIME
+from api_context import atomic_json
+from api_context import finrl_file
+from api_context import json
+from api_context import lru_cache
+from api_context import policy_checkpoint
+from api_context import policy_files
+from api_context import read_json
+from api_context import runtime
+from api_context import sac_example
+from api_context import system
+from api_context import update_json
+from api_context import uuid
+from api_context import zipfile
 
 router=APIRouter(default_response_class=FiniteJSONResponse)
 

@@ -29,7 +29,13 @@ class UnifiedAPI:
 
 
 async def local_writes(request: Request, call_next):
-    from stockrl.api_context import JSONResponse, Request, app, apply_running, apply_state, json, system
+    from api_context import JSONResponse
+    from api_context import Request
+    from api_context import app
+    from api_context import apply_running
+    from api_context import apply_state
+    from api_context import json
+    from api_context import system
     path=request.url.path;method=request.method
     if path=='/api':
         from urllib.parse import urlencode
@@ -43,7 +49,7 @@ async def local_writes(request: Request, call_next):
             for internal_method in (('GET',) if method=='GET' else ('POST','GET')):
                 forwarded={**request.scope,'path':path,'raw_path':path.encode('utf-8'),'method':internal_method,
                     'query_string':urlencode(parameters,doseq=True).encode() if internal_method=='GET' else b''}
-                from stockrl.menu_registry import dispatch
+                from menu_registry import dispatch
                 matched=dispatch(forwarded,parameters)
                 if matched:break
             if not matched:return JSONResponse({'detail':'등록되지 않은 백엔드 명령입니다.'},status_code=404)
@@ -72,7 +78,10 @@ async def local_writes(request: Request, call_next):
 
 
 def react_index():
-    from stockrl.api_context import FRONTEND_DIST, FileResponse, HTTPException, app
+    from api_context import FRONTEND_DIST
+    from api_context import FileResponse
+    from api_context import HTTPException
+    from api_context import app
     index = FRONTEND_DIST / "index.html"
     if not index.is_file():
         raise HTTPException(503, "React 빌드가 없습니다. 서버켜기.cmd를 실행하세요.")

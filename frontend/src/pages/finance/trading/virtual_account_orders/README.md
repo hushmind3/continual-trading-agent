@@ -9,5 +9,3 @@
 소속 대메뉴：금융. 이 폴더는 금융 내부 기능 분류이며 독립 대메뉴로 등록하지 않습니다. 하위 기능 → 분류 submenu_manager → 금융 submenu_manager → finance_menu_manager → 전체 menu_registry → /api.
 
 - 주소: `#finance/virtual_account_orders`. 메뉴 등록 ID와 프론트 폴더 이름을 일치시킵니다.
-
-원화와 달러 가상계좌를 동시에 표시합니다. USD 단일 기본 탭은 제거했으며 계좌 초기화·거래는 자동 실행하지 않습니다.

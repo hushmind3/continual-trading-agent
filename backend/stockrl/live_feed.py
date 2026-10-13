@@ -141,8 +141,8 @@ class LiveMarketCollector:
             from stockrl.management.connection_settings.provider_credentials import read_settings
             broker_settings = read_settings(self.runtime_dir)
         except Exception:
-            broker_settings = {"provider": "kiwoom", "environment": "real"}
-        self.broker_provider = "kiwoom"
+            broker_settings = {"provider": "yahoo", "environment": "paper"}
+        self.broker_provider = broker_settings.get("provider", "yahoo")
         self.broker_instruments = [x for x in self.instruments
             if self.output.parent.name == "live" and self.broker_provider == "kiwoom"
             and x.get("market") in (("KRX", "KOSDAQ") if broker_settings.get("environment") == "real" else ("KRX",))
@@ -223,8 +223,6 @@ class LiveMarketCollector:
         market_now = datetime.now(timezone.utc)
         due = []
         for item in self.instruments:
-            if self.output.parent.name == "live":
-                continue  # Live trading receives Kiwoom broker events only.
             if self.stop_file is not None and self.stop_file.exists():
                 break
             name = item["symbol"]

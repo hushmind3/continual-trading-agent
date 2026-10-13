@@ -9,5 +9,3 @@
 소속 대메뉴：금융. 이 폴더는 금융 내부 기능 분류이며 독립 대메뉴로 등록하지 않습니다. 하위 기능 → 분류 submenu_manager → 금융 submenu_manager → finance_menu_manager → 전체 menu_registry → /api.
 
 - 주소: `#finance/moe`. 메뉴 등록 ID와 프론트 폴더 이름을 일치시킵니다.
-
-Champion 생성은 원화·달러 별도 버튼으로 명시적으로 요청합니다. 정책 학습의 오래된 통화·종목 sessionStorage 선택값을 읽지 않으며 각 통화 등록 학습 대상 종목 전체를 전달합니다. 자동 생성은 실행하지 않습니다.

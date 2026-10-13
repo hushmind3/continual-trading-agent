@@ -56,6 +56,15 @@ def check_provider(request:CredentialRequest):
     except (ValueError,RuntimeError,OSError) as exc:raise HTTPException(400,str(exc))
 
 
+@router.post("/api/provider/public")
+def public_feed():
+    if runtime.controls['feed']:raise HTTPException(409,'시세 수신을 중지한 뒤 공급원을 변경하세요.')
+    from stockrl.management.connection_settings.provider_credentials import _write_settings
+    from stockrl.management.connection_settings.provider_credentials import read_settings
+    from stockrl.trading.control.operations_settings import settings
+    root=settings().state_dir;value=read_settings(root);value['provider']='yahoo'
+    _write_settings(root,value)
+    return {"message":"기존 공개 시세 공급원을 선택했습니다."}
 
 
 @router.post('/api/provider/disconnect')

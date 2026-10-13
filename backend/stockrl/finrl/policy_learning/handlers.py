@@ -41,14 +41,8 @@ class RunRequest(BaseModel):
 
 
 def algorithms():
-    import inspect
-    def defaults(model):
-        return {key:value.default if isinstance(value.default,(str,int,float,bool,type(None))) else str(value.default)
-            for key,value in inspect.signature(model.__init__).parameters.items()
-            if value.default is not inspect.Parameter.empty}
     return {'default':'sac','items':[{'name':name,'parameters':sac_example(name)[1],
-        'steps_per_run':sac_example(name)[2],'uses_replay':issubclass(model,OffPolicyAlgorithm),
-        'sb3_defaults':defaults(model),'parameter_source':"FinRL DRLAgent.MODEL_KWARGS['"+name+"'] · "+model.__module__+'.'+model.__name__+'.__init__'} for name,model in MODELS.items()]}
+        'steps_per_run':sac_example(name)[2],'uses_replay':issubclass(model,OffPolicyAlgorithm)} for name,model in MODELS.items()]}
 
 
 @lru_cache(maxsize=1)

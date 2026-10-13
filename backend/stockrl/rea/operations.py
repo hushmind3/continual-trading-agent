@@ -108,20 +108,6 @@ def call_tool(name,arguments):
     if name not in {tool['name'] for tool in available['tools']}:raise ValueError('원본 REA에 등록된 도구를 선택하세요.')
     return connection.request({'operation':'call','tool':name,'arguments':arguments})
 
-def doctor(provider=None):
-    node,_=node_runtime();WORK.mkdir(parents=True,exist_ok=True)
-    if provider not in (None,'ghidra','hopper'):raise ValueError('지원하는 엔진을 선택하세요.')
-    args=[node,str(BASE/'node_modules/rea-agents/scripts/rea.mjs'),'doctor','--format','json']
-    if provider:args+=['--provider',provider]
-    env=runtime_environment()
-    result=subprocess.run(args,env=env,cwd=WORK,capture_output=True,text=True,encoding='utf8',timeout=60,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-    try:data=json.loads(result.stdout)
-    except ValueError:data={'output':result.stdout,'error':result.stderr}
-    report={'exit_code':result.returncode,'result':data}
-    if provider:
-        from ..state_io import atomic_json
-        atomic_json({**report,'settings':{key:env.get(key,'') for key in ENGINE_FIELDS}},WORK/(provider+'-readiness.json'))
-    return report
 
 def install():
     node,_=node_runtime();npm=shutil.which('npm')
@@ -176,26 +162,73 @@ def engine_settings():
             'state':'플랫폼 미지원' if not supported else '경로 설정 필요' if missing else '원본 엔진 준비 확인 통과' if verified else '필수 파일 확인 · 엔진 실행 미확인'})
     return {'values':values,'providers':providers,'platform':sys.platform}
 
-def save_engine_settings(values):
-    from ..state_io import atomic_json
-    if not isinstance(values,dict) or set(values)-set(ENGINE_FIELDS):
-        raise ValueError('Ghidra·JDK·Hopper의 원본 경로 설정만 저장할 수 있습니다.')
-    validate_arguments(values)
-    for key,value in values.items():
-        if not isinstance(value,str):raise ValueError(key+': 경로는 문자열이어야 합니다.')
-        if value and (not Path(value).is_absolute() or not Path(value).exists()):
-            raise ValueError(key+': 존재하는 전체 경로를 입력하세요.')
-        if key=='HOPPER_LAUNCHER_PATH' and value and os.name=='nt':
-            raise ValueError('Hopper는 이 Windows 실행 환경에서 지원하지 않습니다.')
-    if not connection.lock.acquire(blocking=False):
-        raise ValueError('분석이 끝난 후 엔진 경로를 저장하세요.')
-    try:
-        updated=engine_environment()
-        for key,value in values.items():
-            if value:updated[key]=value
-            else:updated.pop(key,None)
-        atomic_json(updated,ENGINE_CONFIG)
-        connection.close()
-        tool_catalog.cache_clear()
-        return engine_settings()
-    finally:connection.lock.release()
+
+
+def native_recover(path):
+    """Compose official Ghidra tools for the file explicitly selected by the user."""
+    import hashlib
+    if not isinstance(path,str) or not path:raise ValueError('복원할 파일을 선택하세요.')
+    validate_arguments(path)
+    target=Path(path).expanduser().resolve()
+    if not target.is_file():
+        raise ValueError('복원할 실제 실행파일·라이브러리를 선택하세요.')
+    def observe(tool,arguments):
+        response=call_tool(tool,arguments)
+        if response.get('isError'):
+            messages=[block.get('text','') for block in response.get('content',[]) if block.get('type')=='text']
+            raise RuntimeError('\n'.join(messages) or '원본 디컴파일 도구 실행 실패')
+        record=response.get('structuredContent')
+        if not isinstance(record,dict):
+            record=next((json.loads(block['text']) for block in response.get('content',[]) if block.get('type')=='text'),None)
+        if tool=='open_binary':
+            if not isinstance(record,dict) or not isinstance(record.get('result'),dict):
+                raise RuntimeError('원본 파일 열기 결과를 확인할 수 없습니다.')
+            return record
+        if not isinstance(record,dict) or 'normalized_result' not in record:
+            raise RuntimeError('원본 도구의 분석 결과 형식을 확인할 수 없습니다.')
+        return record
+    with connection.lock:
+        opened=None
+        try:
+            digest=hashlib.sha256()
+            with target.open('rb') as stream:
+                while chunk:=stream.read(1024*1024):digest.update(chunk)
+            opened=observe('open_binary',{'path':str(target),'provider_id':'ghidra'})
+            if opened['result'].get('sha256')!=digest.hexdigest():
+                raise RuntimeError('선택한 파일이 분석 중 변경됐습니다. 파일을 다시 선택하세요.')
+            inventory=observe('list_procedures',{})
+            procedures=inventory['normalized_result']
+            if not isinstance(procedures,list):
+                raise RuntimeError('원본 함수 목록이 배열 형식이 아닙니다.')
+            addresses=[item['address'] for item in procedures]
+            batch=observe('batch_decompile',{'addresses':addresses})
+            value=batch['normalized_result']
+            if not isinstance(value,dict) or not isinstance(value.get('items'),list):
+                raise RuntimeError('원본 일괄 디컴파일 결과를 확인할 수 없습니다.')
+            lines=['/* Ghidra decompiled C-like code. Not the original source project.',
+                   ' * File: '+target.name,' * SHA256: '+digest.hexdigest(),' */','']
+            for item in value['items']:
+                name=(item.get('procedure') or {}).get('name') or item['address']
+                lines.append('/* '+str(name).replace('*/','* /')+' @ '+item['address']+' */')
+                if item.get('status')=='ok' and isinstance(item.get('pseudocode'),str):
+                    lines.append(item['pseudocode'])
+                else:
+                    lines.append('/* Decompilation unavailable: '+json.dumps(item.get('error'),ensure_ascii=False).replace('*/','* /')+' */')
+                lines.append('')
+            source='\n'.join(lines)
+            from ..state_io import atomic_json
+            import uuid
+            output=WORK/'recovered'/uuid.uuid4().hex
+            output.mkdir(parents=True)
+            (output/(target.stem+'.decompiled.c')).write_text(source,encoding='utf8')
+            atomic_json(batch,output/'evidence.json')
+            return {'name':target.name,'path':str(target),'sha256':digest.hexdigest(),
+                'total':value['total'],'succeeded':value['succeeded'],'failed':value['failed'],
+                'items':value['items'],'source':source,
+                'output':str(output.relative_to(ROOT)),'limitations':batch.get('limitations',[])}
+
+        finally:
+            if opened and connection.process and connection.process.poll() is None:
+                response=call_tool('close_binary',{})
+                if response.get('isError'):
+                    connection.close();raise RuntimeError('원본 분석 종료 실패로 소유 REA 세션을 정리했습니다.')

@@ -1,2 +1,3 @@
-"""REA analysis and readiness page registration."""
-MENU={'id':'rea','title':'분석 · 진단','operations':['rea','rea/run','rea/doctor','rea/stop','rea/settings'],'views':['rea','job'],'frontend':'pages/rea/REAWorkspace.tsx','manager':'stockrl.rea.rea_tools_menu'}
+"""REA input and saved-project pages."""
+MENU={'id':'rea','title':'프로그램 분석','operations':['rea/pick','rea/analyze','rea/stop'],'views':[],'frontend':'pages/rea/REAWorkspace.tsx','manager':'stockrl.rea.rea_tools_menu'}
+PROJECTS={'id':'rea-projects','title':'프로젝트 탐색','operations':['rea/projects','rea/project/tree','rea/project/file','rea/project/open'],'views':[],'frontend':'pages/rea/REAWorkspace.tsx','manager':'stockrl.rea.rea_tools_menu'}

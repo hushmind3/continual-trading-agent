@@ -1,20 +1,14 @@
-# REA 전용 연결
+# REA 백엔드
 
-원본: https://github.com/morluto/rea. 공식 npm rea-agents 6.4.0과 같은 원본 MCP Client 2.3.1을 package-lock으로 고정합니다. 원본 구현은 수정하지 않습니다.
+- operations.py: 공식 REA 세션·환경·Ghidra 읽기 전용 디컴파일.
+- projects.py: 파일·폴더·웹 입력, 원문 추출, 실제 프로젝트 폴더 저장·탐색·열기.
+- artifacts.mjs: 설치된 공식 @electron/asar로 ASAR 파일 원문 추출.
+- bridge.mjs: 원본 REA MCP 연결. 코딩 에이전트가 아닙니다.
 
-- package.json/package-lock.json: 이 폴더에 독립적으로 설치하는 Node 의존성.
-- bridge.mjs: 공식 CLI의 --mcp와 공식 Client/stdio를 연결합니다.
-- operations.py: 기존 단일 API에 상태·원본 도구 호출·진단·중지를 제공합니다.
-- rea_menu_manager.py/rea_tools_menu.py: REA 큰 메뉴와 분석·진단 화면 등록.
+저장 위치: ../../rea_projects/<프로젝트 ID>/, Git 제외. original은 관측·추출 파일, inferred는 의사코드·추론, analysis는 구조·함수·모듈·출처·한계입니다. 프로그램마다 README와 project.json을 저장합니다. original에는 네이티브 바이너리 자체가 있을 수 있으며 이는 원본 소스코드를 뜻하지 않습니다.
 
-Node는 ^22.19.0, ^24.11.0 또는 >=26.0.0이 필요합니다. STOCKRL_REA_NODE로 지정하거나 기존 설치 중 지원 버전을 사용합니다. 설치.cmd는 공식 npm ci를 이 폴더에서 실행하며 다른 Python·프론트 의존성을 REA 버전에 맞춰 바꾸지 않습니다.
+프론트: frontend/src/pages/rea/REAWorkspace.tsx. 단일 /api의 rea/pick·rea/analyze·rea/stop·rea/projects·rea/project/tree,file,open을 사용합니다. 기존 임의 도구 실행·JSON·진단·설정 UI와 전용 공개 경로는 제거했습니다.
 
-MCP 세션은 같은 서버 안에서 유지되어 대상·Evidence 문맥을 다음 호출에서 재사용합니다. 분석 중지는 원본 자식 프로세스와 세션을 닫으며 서버 종료 때도 정리합니다. 호출은 shell 없이 JSON/stdio로 전달합니다. 휴지통은 입력·출력으로 사용하지 않습니다.
+파일 선택은 실제 로컬 선택창, 폴더 선택은 선택 디렉터리의 정적 소스 사본, 웹은 별도 브라우저에서 전달된 프론트 자료를 관측합니다. 로그인·사용자 동작·코딩 에이전트 호출·프로그램 재구현·추출 프로그램 실행을 수행하지 않습니다. 서버 내부 코드 및 관측하지 못한 데이터는 복원했다고 표시하지 않습니다.
 
-원본 170개 도구의 JSON 스키마와 결과를 전달합니다. 설치·등록은 모든 플랫폼의 분석 성공을 의미하지 않습니다. 현재 Windows에서 JavaScript 디렉터리 분석을 실행 확인했습니다. inspect_binary_layout의 pwntools 프로필은 원본이 Linux x64 전용 오류를 반환했으며 대체 구현하지 않았습니다. 심층 분석용 Ghidra/Hopper 등은 미설정이며 원본 doctor의 부족 항목을 표시합니다. Codex 등 다른 에이전트 설정을 setup으로 자동 변경하지 않습니다.
-
-REA는 Codex 종속 프로젝트가 아닙니다. 공식 CLI도 지원하며 현재 React/FastAPI 연결은 독립 Node 자식 프로세스의 MCP/stdio를 사용합니다. Codex MCP 설정이나 로그인 없이 실행합니다. 로컬 CLI 진입점은 `node_modules/rea-agents/scripts/rea.mjs`이며 지원 Node로 `--help`를 실행하면 원본 명령을 확인할 수 있습니다.
-
-엔진 경로 저장 API rea/settings는 GHIDRA_INSTALL_DIR/JAVA_HOME/HOPPER_LAUNCHER_PATH만 configs/local/rea.json에 저장하며 원본 MCP 및 엔진별 doctor 환경에 전달합니다. 전역 환경·Codex 설정은 변경하지 않습니다. 분석 중 저장은 거부하며 저장 후 소유 세션을 닫습니다. 엔진 설치 파일은 사용자가 별도로 설치·지정합니다.
-
-현재 로컬 설치: 공식 Ghidra 12.1.4와 Temurin JDK 21.0.12.1+1을 %LOCALAPPDATA%/stockrl-rea/engines에 설치하고 rea/settings로 연결했습니다. 공식 배포 SHA-256 두 개를 확인했습니다. 한글 경로의 Java home 판독 문제를 영문 설치 경로로 해결했으며 원본은 수정하지 않았습니다. 원본 Ghidra scoped doctor는 exit 0, 단일 API의 실제 javac.exe open_binary/binary_overview/close_binary가 성공했습니다. Windows REA 소유 자식 프로세스는 두 CPU 코어·낮은 우선순위를 사용하며 Ghidra 자식도 이를 상속합니다.
+Ghidra 12.1.4/JDK 21은 기존 연결을 사용합니다. Windows 네이티브 분석은 원본 지원 대상에 한합니다. 작업 프로세스는 CPU 두 코어·낮은 우선순위를 사용하며 Chrome GPU를 임의 비활성화하지 않습니다.

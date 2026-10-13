@@ -280,6 +280,6 @@ FinRL 메인은 정책 학습과 FinRL 모듈·도구 2개 작은 메뉴를 제�
 
 FinRL-Trading 큰 메뉴와 보조 화면 6개를 제거했습니다. 전용 메뉴 등록·화면·Adaptive Rotation 원형 실행 3개·거래일·설정 검사 어댑터와 기존 13개 추가 기능은 제공하지 않습니다. 공통 가격 조회·수집·인증과 공식 원본은 남은 기능의 의존성으로 유지합니다.
 
-## REA 큰 메뉴
+## REA 역공학
 
-REA는 [morluto/rea](https://github.com/morluto/rea)의 공식 rea-agents 6.4.0을 backend/stockrl/rea에 독립 설치합니다. REA 큰 메뉴의 분석·진단 화면은 원본 MCP 도구 170개의 스키마·원본 결과를 연결하고 설치·환경 진단·분석 중지를 제공합니다. 기존 단일 /api와 동일 메뉴 등록표를 사용하며 별도 HTTP 서버를 만들지 않습니다. MCP 세션은 대상/Evidence 문맥을 유지합니다. Node ^22.19.0/^24.11.0/>=26 중 기존 지원 설치를 사용합니다. 현재 Windows JavaScript 디렉터리 분석을 확인했고 깊은 바이너리 엔진은 미설정입니다. 자세한 범위는 [REA 연결](backend/stockrl/rea/README.md)을 확인하세요.
+프로그램 분석(파일 선택·폴더 선택·웹사이트 분석)과 프로젝트 탐색 두 작은 메뉴를 제공합니다. 백엔드 모듈은 backend/stockrl/rea, 프론트는 frontend/src/pages/rea, 실제 결과는 Git에 포함하지 않는 backend/rea_projects/<ID>에 저장합니다. original/ 원문·원본 파일, inferred/ 추론·의사코드, analysis/ 구조·함수·모듈·근거를 구분해 사용자 버튼으로 저장 폴더를 엽니다. 코딩 에이전트 호출·자동 재구현·추출 프로그램 실행은 연결하지 않습니다. 자세한 범위는 [REA 백엔드](backend/stockrl/rea/README.md)를 확인하세요.

@@ -31,3 +31,5 @@ configs/local/
 results/
 
 /backend/stockrl/rea/node_modules/
+
+/backend/rea_projects/

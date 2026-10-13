@@ -437,7 +437,6 @@ def state_view(path):
         'menu_catalog':(menu_catalog,lambda:()),
         'algorithms':(algorithms,lambda:()),
         'framework':(framework_catalog,None),
-        'rea':(rea_status,lambda:state_stamp(ROOT/'backend/stockrl/rea/package-lock.json',ROOT/'backend/stockrl/rea/node_modules/rea-agents/package.json')),
         'framework/providers':(framework_providers,None),
         'connections':(connections,None),
         'provider':(provider,None),
@@ -1020,36 +1019,45 @@ def open_model_directory():
 
 
 
-@private_api.get('/api/rea')
-def rea_status():
-    from .rea.operations import status
-    return status()
-
-@private_api.post('/api/rea/run')
-def rea_run(request:dict):
-    from .rea.operations import call_tool
-    arguments=request.get('arguments',{})
-    if not isinstance(arguments,dict):raise HTTPException(400,'REA 도구 입력은 JSON 객체여야 합니다.')
-    try:return call_tool(request.get('tool',''),arguments)
+@private_api.post('/api/rea/pick')
+def rea_pick(request:dict):
+    from .rea.projects import pick
+    try:return pick(request.get('kind','file'))
     except (OSError,ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
 
-@private_api.post('/api/rea/doctor')
-def rea_doctor(request:dict|None=None):
-    from .rea.operations import doctor
-    try:return doctor((request or {}).get('provider'))
-    except (OSError,ValueError,RuntimeError,subprocess.TimeoutExpired) as exc:raise HTTPException(400,str(exc)) from exc
+@private_api.post('/api/rea/analyze')
+def rea_analyze(request:dict):
+    from .rea.projects import analyze
+    try:return analyze(request.get('kind'),request.get('target'))
+    except (OSError,ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
 
-@private_api.post('/api/rea/settings')
-def rea_settings(request:dict):
-    from .rea.operations import save_engine_settings
-    try:return save_engine_settings(request)
+@private_api.get('/api/rea/projects')
+def rea_projects():
+    from .rea.projects import catalog
+    return catalog()
+
+@private_api.get('/api/rea/project/tree')
+def rea_project_tree(id:str,path:str=''):
+    from .rea.projects import tree
+    try:return tree(id,path)
+    except (OSError,ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
+
+@private_api.get('/api/rea/project/file')
+def rea_project_file(id:str,path:str):
+    from .rea.projects import read_file
+    try:return read_file(id,path)
+    except (OSError,ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
+
+@private_api.post('/api/rea/project/open')
+def rea_project_open(request:dict):
+    from .rea.projects import open_folder
+    try:return open_folder(request.get('id'))
     except (OSError,ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
 
 @private_api.post('/api/rea/stop')
 def rea_stop():
-    from .rea.operations import connection
-    connection.close()
-    return {'message':'REA 분석을 중지하고 원본 MCP 세션을 닫았습니다.'}
+    from .rea.projects import stop
+    stop();return {'message':'사용자가 REA 분석을 중지했습니다.'}
 
 @app.on_event("shutdown")
 def close_operations():

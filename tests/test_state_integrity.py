@@ -174,17 +174,6 @@ class IntegrityTests(unittest.TestCase):
    self.assertTrue(attempted.wait(1));self.assertTrue(worker.is_alive())
   finally:runtime.controls['feed']=False;runtime.feed_cycle.set();worker.join(3)
   self.assertEqual(runtime.status.get('learning_error'),'ambiguous daily input')
- def test_backtest_cli_preserves_expert_warmup_history(self):
-  import sys,importlib
-  frame=pd.DataFrame({'date':pd.date_range('2024-01-01',periods=800),'symbol':['AAPL']*800,'close':[100.]*800})
-  registry=SimpleNamespace(close=lambda **kwargs:None)
-  with patch.dict(sys.modules,{'stockrl.expert_registry_native':SimpleNamespace(ExpertRegistry=lambda:registry)}):
-   cli=importlib.import_module('stockrl.official_cli')
-  result=SimpleNamespace(to_metrics_dataframe=lambda:pd.DataFrame({'metric':[1.]}),portfolio_values=pd.Series([100.]),weights_history=pd.DataFrame({'AAPL':[1.]}),trades=pd.DataFrame())
-  with tempfile.TemporaryDirectory(dir=ROOT/'runtime') as folder,patch.object(sys,'argv',['stockrl','backtest','--symbols','AAPL','--output',folder]),patch.object(cli,'ExpertRegistry',return_value=registry),patch.object(cli,'prices',return_value=frame),patch('stockrl.platform.system_operations.system.close_models'),patch.object(cli,'backtest',return_value=result) as evaluate:
-   cli.main()
-   self.assertEqual(len(evaluate.call_args.args[0]),800)
-   self.assertEqual(evaluate.call_args.args[0].date.min(),frame.date.min())
  def test_stock_expert_uses_latest_complete_past_session(self):
   from stockrl.platform.expert_inference import complete_policy_day
   history=pd.DataFrame({'Date':pd.to_datetime(['2026-10-07','2026-10-07','2026-10-08']),'Ticker':['AAPL','META','AAPL'],'Close':[100,200,110]})
@@ -193,19 +182,4 @@ class IntegrityTests(unittest.TestCase):
   self.assertEqual(actual.Close.tolist(),[100,200])
   with self.assertRaisesRegex(ValueError,'실제 과거 일봉'):
    complete_policy_day(history,['AAPL','META','T'])
- def test_backtest_terminal_response_does_not_repeat_last_allocation(self):
-  from stockrl.finrl import framework
-  raw=SimpleNamespace(_terminal=False,_actions_memory=[],_info={},_sorted_times=pd.date_range('2026-01-01',periods=3))
-  updates=iter([('2026-01-02',False),('2026-01-03',False),('2026-01-03',True)])
-  def step(action):
-   date,terminal=next(updates);raw._info['end_time']=pd.Timestamp(date);raw._terminal=terminal
-   if not terminal:raw._actions_memory.append(np.array([.5,.5]))
-   return np.zeros(1),0,terminal,False,{}
-  env=SimpleNamespace(currency='USD',symbols=['AAPL'],unwrapped=SimpleNamespace(gym_env=raw),reset=lambda:(np.zeros(1),{}),step=step,close=lambda:None)
-  model=SimpleNamespace(predict=lambda *args,**kwargs:(np.array([.5,.5]),None))
-  identity={'environment':framework.CASH_ENVIRONMENT,'currency':'USD','symbols':['AAPL'],'algorithm':'sac'}
-  with patch.object(framework,'policy_files',return_value=ROOT/'runtime'),patch.object(framework,'policy_checkpoint',return_value=ROOT/'runtime/sac.zip'),patch('stockrl.state_io.read_json',return_value=identity),patch.object(framework,'training_environment',return_value=env),patch('stockrl.platform.system_operations.system.model',return_value=model),patch('stockrl.finrl_trading.backtest.evaluate_weights',return_value='complete') as evaluate:
-   self.assertEqual(framework.backtest(pd.DataFrame(),None,'USD'),'complete')
-   weights=evaluate.call_args.args[1]
-   self.assertTrue(weights.index.is_unique);self.assertEqual(len(weights),2)
 if __name__=='__main__':unittest.main()

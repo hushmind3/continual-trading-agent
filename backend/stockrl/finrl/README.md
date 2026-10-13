@@ -4,16 +4,12 @@
 
 | 파일 | 역할·진입점 |
 | --- | --- |
-| framework.py | 공식 환경, training_environment, train, backtest, 정책 선택·체크포인트 경로 |
-| operations.py | FinRL ACTIONS와 execute; stock_data/stock_train/stock_backtest, Yahoo, features, data_split, finrl_stats, 공식 CLI |
+| framework.py | 공식 환경, training_environment, train, 정책 선택·체크포인트 경로 |
 
 ## 연결
 
 - 정책 학습: web_api → job_worker → official_cli → framework.train.
-- 공식 기능: 공통 framework_operations → operations.execute.
-- 상태: stock_state → 단일 state 응답의 finrl 조회 항목.
 - 운영 환경과 주식거래 환경의 계약을 구분합니다. 동일 알고리즘이라고 모델 호환으로 처리하지 않습니다.
-- 기존 DataStore 가격은 finrl_trading.data.prices, 비중 평가 결과는 finrl_trading.backtest.evaluate_weights를 사용합니다.
 - 프론트 대응 구역: FinRL · 메인.
 
 ## 메뉴 연결 파일
@@ -23,14 +19,10 @@ finrl_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
 | 화면 | 연결 파일 | 프론트 담당 파일 |
 | --- | --- | --- |
 | 정책 학습 | policy_learning_menu.py | pages/training/TrainingWorkspace.tsx |
-| 정책 평가 · 백테스트 | policy_evaluation_menu.py | pages/portfolio/PortfolioWorkspace.tsx |
-| 주식거래 데이터 준비 | stock_data_menu.py | pages/finrl/FinrlWorkspace.tsx |
-| 주식거래 알고리즘 학습 | stock_training_menu.py | pages/finrl/FinrlWorkspace.tsx |
-| 주식거래 백테스트 | stock_backtest_menu.py | pages/finrl/FinrlWorkspace.tsx |
 | FinRL 모듈 · 도구 | finrl_tools_menu.py | pages/frameworks/FrameworkWorkspace.tsx |
 
 Champion 학습은 identity.algorithm과 요청 algorithm의 일치를 확인하며 해당 공식 SB3 모델을 적재합니다. 새 정책 학습과 MoE 생성은 구형 저장 모델의 호환 여부를 요구하지 않습니다.
 
-백테스트 CLI는 평가 이전 가격 이력을 유지합니다. `training_environment(training=False)`가 실제 거래 기간을 구분하고 `ExpertObservation`은 각 관측 시점 이하 이력만 Expert에 전달합니다. 평가 첫 관측의 최소 32일 이력 부족과 미래 데이터 사용을 방지합니다. 원본 FinRL 환경은 수정하지 않습니다.
 
-PortfolioOptimizationEnv의 종료 step은 날짜·행동을 진행하지 않고 마지막 상태를 다시 반환합니다. 평가 연결은 그 응답을 가중치 행으로 재기록하지 않아 중복 날짜를 방지합니다.
+
+현재 작은 메뉴는 정책 학습과 FinRL 모듈·도구 2개입니다. StockTradingEnv 예제·FinRL 원형/Yahoo/전처리/분할/성과의 전용 실행 모듈 operations.py와 4개 삭제 메뉴 연결 파일은 휴지통으로 이동했습니다. 주 학습 framework.py와 공식 라이브러리는 다른 실제 사용 경로의 공통 코드입니다.

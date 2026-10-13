@@ -6,9 +6,7 @@
 | 운영 제어 | [operations/](operations/README.md) |
 | 가상계좌·주문 | [paper/](paper/README.md) |
 | FinRL 정책 학습·저장 모델 | [training/](training/README.md) |
-| FinRL 정책 평가·백테스트 | [portfolio/](portfolio/README.md) |
 | MoE·Expert 프로젝트 확장 | [model/](model/README.md) |
-| FinRL 주식거래 기능 | [finrl/](finrl/README.md) |
 | 프레임워크별 공통 도구 화면 | [frameworks/](frameworks/README.md) |
 | 연결·설정 | [settings/](settings/README.md) |
 | 진단·로그·적용 | [system/](system/README.md) |

@@ -15,7 +15,7 @@ export {navigation} from './menu_groups/menu_registry';
 function destination(hash:string,items=navigation){
  const [name,query='']=hash.replace(/^#/,'').split('?'),params=new URLSearchParams(query);
  let selected=name;
- if(name==='workspace')selected=params.get('tab')==='train'?'learning':params.get('tab')==='evaluate'?'portfolio':params.get('tab')==='examples'?(params.get('ref')==='train'?'stock-training':params.get('ref')==='backtest'?'backtest':'finrl'):'markets';
+ if(name==='workspace')selected=params.get('tab')==='train'?'learning':'markets';
  if(name==='settings')selected=params.get('tab')==='modules'?'frameworks':params.get('tab')==='diagnostics'?'system':'connection';
  return items.find(item=>item.hash===selected)||items[0];
 }
@@ -23,7 +23,6 @@ export function route(hash:string){const name=hash.replace(/^#/,'').split('?')[0
 function errorSection(name:string){
  if(name.includes('FinRL-X:')||name.includes('stockrl.finrl_trading.'))return {group:'FinRL-Trading · 보조',target:'finrl-trading'};
  if(name.includes('FinRL:')||name.includes('stockrl.finrl.')||['model','models_by_currency','checkpoints'].includes(name))return {group:'FinRL · 메인',target:'frameworks'};
- if(name==='evaluation')return {group:'FinRL · 메인',target:'portfolio'};
  if(['experts','library','models'].includes(name)||name.startsWith('champion:')||name==='view:champions'||name.includes('platform.expert_')||name.includes('platform.assets')||name.includes('platform.sac_champion'))return {group:'프로젝트 확장',target:'moe'};
  if(name==='data')return {group:'거래 운영',target:'markets'};
  if(name==='operations')return {group:'거래 운영',target:'control'};
@@ -32,7 +31,7 @@ function errorSection(name:string){
 export function Page({active}:{active:string}){
  const {state}=useOperations(),items=useNavigation(),page=destination(location.hash,items),Component=page.component;
  const missing=state?page.required.filter(key=>state[key as keyof typeof state]==null):[];
- return <>{missing.length?<ErrorMessage message={missing.map(key=>key+': '+(state?.module_errors?.[key]||'상태 조회 실패')).join(' · ')}/>:<Suspense fallback={<p className="text-xs text-slate-500">화면을 여는 중입니다.</p>}><Component key={['finrl','stock-training','backtest'].includes(active)?'finrl-reference':active}/></Suspense>}</>;
+ return <>{missing.length?<ErrorMessage message={missing.map(key=>key+': '+(state?.module_errors?.[key]||'상태 조회 실패')).join(' · ')}/>:<Suspense fallback={<p className="text-xs text-slate-500">화면을 여는 중입니다.</p>}><Component key={active}/></Suspense>}</>;
 }
 export function Shell({active,children}:{active:string;children:ReactNode}){
  const {state,error,refresh}=useOperations(),[alerts,setAlerts]=useState(false),[compact,setCompact]=useState(false),[closedGroups,setClosedGroups]=useState(new Set<string>()),close=useCallback(()=>setAlerts(false),[]);

@@ -17,10 +17,9 @@ from ..finrl_trading.operations import provider_environment
 from ..state_io import atomic_json,read_json
 
 # Shared registry; execution belongs to each framework folder.
-from ..finrl.operations import ACTIONS as FINRL_ACTIONS
 from ..finrl_trading.operations import ACTIONS as TRADING_ACTIONS
 
-ACTIONS={**FINRL_ACTIONS,**TRADING_ACTIONS,"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'env_kwargs', 'steps', 'argv', 'symbols', 'source'])}
+ACTIONS={**TRADING_ACTIONS,"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'env_kwargs', 'steps', 'argv', 'symbols', 'source'])}
 
 
 
@@ -225,10 +224,7 @@ def _execute(action,parameters,output):
     if action=='native_call':
         output=Path(output);output.mkdir(parents=True,exist_ok=True)
         return native_call({k:v for k,v in parameters.items() if v not in ('',None,[])},output)
-    if action in FINRL_ACTIONS:
-        from ..finrl.operations import execute
-    else:
-        from ..finrl_trading.operations import execute
+    from ..finrl_trading.operations import execute
     return execute(action,parameters,output)
 
 def execute(action,parameters,output):

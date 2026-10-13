@@ -6,7 +6,6 @@
 | --- | --- |
 | __init__.py | finrlx: 필요한 원본 모듈을 지연 import |
 | data.py | prices: 기존 DataStore 가격 조회·일봉 구분 |
-| backtest.py | evaluate_weights: 기존 StrategyResult·BacktestEngine 호출 |
 | operations.py | 보조 ACTIONS·execute; 추가 수집·처리·전략·성과·공급원 보안 설정 |
 
 ## 연결
@@ -27,4 +26,5 @@ finrl_trading_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
 
 `finrlx()`는 고정된 `FinRL-X` submodule 루트와 `src`를 import 경로에 추가하고 `src.<모듈>`을 적재합니다. 원본의 `data`·`strategies` 등 절대 import를 유지합니다. 중복 `finrl-trading` 배포판 대신 이 원본을 사용하며 필요한 공급원 패키지는 운영 명세에 선언합니다. 외부 원본은 수정하지 않습니다.
 
-현재 고정 원본 BacktestEngine은 가치·지표를 반환하지만 `weights_history`·`trades`에는 빈 DataFrame을 반환합니다. 따라서 해당 CSV/표가 비어 있을 수 있으며 이를 실제 거래 내역으로 만들어 채우지 않습니다.
+
+정책 평가 메뉴 전용 backtest.py 어댑터는 제거했습니다. 보조 원본 도구·데이터·전략 실행과 공식 소스는 유지합니다.

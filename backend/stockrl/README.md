@@ -35,3 +35,5 @@ menu_registry.py는 큰 메뉴 연결 파일 5개만 import합니다. 각 큰 �
 ## 응답·환경 검증
 
 `api_transport.py`가 `UnifiedAPI`, 유한 숫자 JSON 응답 및 내부 요청 전달을 담당하고 `web_api.py`는 실제 핸들러·React 제공을 연결합니다. `tests/test_http_transport.py`는 실제 FastAPI 요청으로 조회·실행·오류 전달을 검사합니다. 주 환경은 시스템 패키지를 공유하지 않는 `.venv`, 키움 SDK는 별도 `.venv-kiwoom`입니다.
+
+정책 평가·백테스트와 FinRL 예제/추가 기능 8개의 전용 메뉴·실행 어댑터는 제거했습니다. 단일 API는 해당 평가 실행·조회·다운로드를 더 이상 제공하지 않습니다. 정책 학습과 운영·모델 선택의 공통 경로를 유지합니다.

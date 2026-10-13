@@ -27,7 +27,7 @@
 | 설정 | 현재 값 | 출처 / 의미 |
 |---|---:|---|
 | 가격 저장·조회 | FinRL-X `DataStore` | 원본 FinRL-X API |
-| 정책 가격 전처리 | `normalize_df='by_previous_time'` | `PortfolioOptimizationEnv` 원본 기본값. 별도 StockTradingEnv 화면은 `FeatureEngineer` 사용 |
+| 정책 가격 전처리 | `normalize_df='by_previous_time'` | `PortfolioOptimizationEnv` 원본 기본값. 전용 StockTradingEnv 예제 화면은 제거됨 |
 | 학습·평가 구간 나누기 | FinRL `data_split()` | `training_environment()`에서 원본 함수 호출 |
 | rolling 시작 범위 / 평가 구간 | 1,095일 / 365일 | 프로젝트가 마지막 가격 다음 날을 기준으로 학습 종료·평가 시작을 계산 |
 | 포트폴리오 환경 | FinRL `PortfolioOptimizationEnv` + Shimmy + `ExpertObservation` | `cash_environment()`의 현재 환경 |
@@ -40,9 +40,9 @@
 | 가격 특성 | `close`, `high`, `low` | 환경 원본 `features` 기본값 |
 | 관측 시간창 | `time_window=1` | 환경 원본 기본값 |
 
-현재 주 정책 경로는 FinRL의 현금 포함 `PortfolioOptimizationEnv`다. 과거 `StockPortfolioEnv`의 관측·행동 규격과 다르며 구형 체크포인트는 호환 검사에서 차단한다. 원본의 Gym 환경은 Shimmy로 Gymnasium 계약에 연결하고 가격 행렬의 날짜별 종목 누락·중복을 학습 전에 검사한다. 별도 주식거래 메뉴의 `StockTradingEnv` 결과를 MoE Champion과 호환이라고 표시하지 않는다.
+현재 주 정책 경로는 FinRL의 현금 포함 `PortfolioOptimizationEnv`다. 과거 `StockPortfolioEnv`의 관측·행동 규격과 다르며 구형 체크포인트는 호환 검사에서 차단한다. 원본의 Gym 환경은 Shimmy로 Gymnasium 계약에 연결하고 가격 행렬의 날짜별 종목 누락·중복을 학습 전에 검사한다. StockTradingEnv 전용 메뉴·실행 어댑터는 제거됐다.
 
-환경의 가격 정규화·보상·수수료 동작은 설치된 `PortfolioOptimizationEnv` 원본을 따른다. 학습 환경과 운영 `PaperAccount`의 체결·비용 계산은 별도이며 실제 증권사 주문을 실행하지 않는다. 정책 백테스트는 원본 환경의 비중을 FinRL-X `StrategyResult`·`BacktestEngine`에 전달한다.
+환경의 가격 정규화·보상·수수료 동작은 설치된 `PortfolioOptimizationEnv` 원본을 따른다. 학습 환경과 운영 `PaperAccount`의 체결·비용 계산은 별도이며 실제 증권사 주문을 실행하지 않는다. 정책 평가·백테스트 메뉴와 해당 실행·조회 연결은 제거됐다.
 
 ## Expert 연결과 프로젝트 전용 값
 
@@ -82,7 +82,7 @@ GGUF 실행은 설치된 `llama-server`를 사용한다. 컨텍스트 길이, CP
 
 - 학습 입력은 FinRL-X `DataStore`에 저장된 과거 가격이다.
 - FinRL-X의 `StrategyResult`와 `BacktestEngine` 원본 API를 호출한다.
-- 학습·백테스트는 저장 가격을 사용한다. 운영 시세 수신은 별도 Yahoo/Kraken/키움 경로이며 실제 증권사 주문은 호출하지 않는다.
+- 정책 학습은 저장 가격을 사용한다. 운영 시세 수신은 별도 Yahoo/Kraken/키움 경로이며 실제 증권사 주문은 호출하지 않는다.
 - 2026-10-13 현재 선택된 11개 Expert, AAPL/MSFT·USD·SAC로 신규 모델 생성과 105단계 진단 학습(업데이트 5회)을 실제 실행했다. 기본 5,000단계를 변경한 것이 아니며 수익성·수렴 검증이 아니다. 관측 726D와 현금 포함 행동 3D를 확인했다.
 - 원본 FinRL-X 서브모듈 소스는 수정하지 않는다.
 

@@ -45,7 +45,7 @@ export interface Snapshot {
     parameters?:Record<string,unknown>;replay_state:{status:string;error?:string;size?:number;capacity?:number;position?:number;full?:boolean;n_envs?:number;array_bytes?:number}};
   data:{path?:string;error:string|null;rows:number;tickers:number;start?:string;end?:string;instruments:Instrument[]};
   experts:{active:string[];items:Expert[];as_of?:string;reported?:string;observation_connection:{size:number;configured:boolean;last_success:{market:number;action:number};recorded:boolean}};
-  job:Job;evaluation:{points:{date:string;value:number}[];file:FileState;report:{currency?:Currency;symbols?:string[];strategies?:Record<string,Record<string,number|null>>}};
+  job:Job;
   resources:{cpu_percent:number;ram_total_bytes:number;ram_used_bytes:number;ram_available_bytes:number;disk_free_bytes:number;
     gpu:{name?:string;total_bytes?:number;used_bytes?:number;utilization_percent?:number;error?:string};
     processes:{role:string;pid:number;rss_bytes:number;cpu_percent:number;threads:number;read_bytes:number;write_bytes:number}[]};
@@ -56,8 +56,7 @@ export interface Snapshot {
   automation?:AutomationState;
   capabilities:Record<string,{status:"supported"|"not_connected"|"removed"|"requires_configuration";reason:string;source:string}>;
 }
-export interface Preflight {ok:boolean;errors:string[];symbols:string[];currency:Currency;mode:string;steps_per_run:number;periods:{training_observations:number;test_observations:number;train_start:string;train_end_exclusive:string}|null}
-export interface ResultTable {columns:string[];rows:Record<string,unknown>[];total:number}
+export interface Preflight {ok:boolean;errors:string[];symbols:string[];currency:Currency;mode:string;steps_per_run:number;periods:{training_observations:number;train_start:string;train_end_exclusive:string}|null}
 export interface Connections {api:{status:string};data:{status:string;source:string|null;available_sources:string[];reason?:string};brokers:{name:string;status:string;reason:string}[]}
 export interface OperationsState {
   policies?:Partial<Record<Currency,{path:string;loaded:boolean;device?:string;observation_shape?:number[];action_shape?:number[];num_timesteps?:number;updates?:number}>>;

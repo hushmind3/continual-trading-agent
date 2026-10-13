@@ -12,7 +12,7 @@
 
 FinRL 메인과 FinRL-Trading 보조의 경계를 유지합니다. 새 기능 연결·파일 이동 시 해당 폴더 문서와 메뉴·오류 표시를 함께 갱신합니다.
 
-접이식 큰 메뉴 5개 아래 작은 메뉴 15개와 백엔드 등록 추가 기능을 연결합니다. 전체 구조, 메뉴별 API, SAC·Expert·시세·가상계좌 연결 상태는 [루트 README](../README.md)를 참조합니다.
+접이식 큰 메뉴 5개 아래 작은 메뉴 11개와 백엔드 등록 추가 기능을 연결합니다. 전체 구조, 메뉴별 API, SAC·Expert·시세·가상계좌 연결 상태는 [루트 README](../README.md)를 참조합니다.
 
 운영 접속: 루트 `서버켜기.cmd` → `http://127.0.0.1:8766/` (FastAPI + React 정적 파일).
 
@@ -24,8 +24,10 @@ React 소스는 `src/`, 공통 컴포넌트는 `src/ui/`, 화면은 `src/pages/`
 
 ## 자동검증
 
-`npm run typecheck`, `npm run build`, `npm run test:api`로 타입·운영 빌드·전송 회귀 4개를 검사합니다. 실행 중인 로컬 서버 `http://127.0.0.1:8766`에서 `npm run test:browser`는 38개 등록 화면·시장 표 페이지 이동과 구역별 오류/진단 표시를 검사합니다. Chromium은 `npx playwright install chromium`으로 준비하며 `FINRL_BASE_URL`로 검사 주소를 지정할 수 있습니다. 로그·스크린샷·trace는 Git 제외 결과 폴더에 남습니다. 일반 요청은 60초, Champion 생성은 30분 제한이며 모듈 오류는 관련 구역과 공통 진단에 표시합니다.
+`npm run typecheck`, `npm run build`, `npm run test:api`로 타입·운영 빌드·전송 회귀 4개를 검사합니다. 실행 중인 로컬 서버 `http://127.0.0.1:8766`에서 `npm run test:browser`는 현재 등록된 화면·시장 표 페이지 이동과 구역별 오류/진단 표시를 검사합니다. Chromium은 `npx playwright install chromium`으로 준비하며 `FINRL_BASE_URL`로 검사 주소를 지정할 수 있습니다. 로그·스크린샷·trace는 Git 제외 결과 폴더에 남습니다. 일반 요청은 60초, Champion 생성은 30분 제한이며 모듈 오류는 관련 구역과 공통 진단에 표시합니다.
 
 Windows lock에서 누락된 Linux Rollup 등 플랫폼별 선택 의존성을 보완했습니다. 기존 패키지 버전은 유지하고, 깨끗한 검증 디렉터리에서 npm이 해석한 공식 플랫폼 패키지 기록을 lock에 반영합니다.
 
 미사용 설치 정리: 임시 검증 디렉터리의 node_modules 2곳과 현재 Windows Node가 사용하지 않는 `@rollup/rollup-win32-x64-gnu` 설치 폴더를 프로젝트 휴지통의 동일 상대 경로로 이동했습니다. 실제 사용하는 MSVC 패키지와 플랫폼별 lock 기록은 유지합니다. 새 설치 시 npm이 선택 패키지를 다시 설치할 수 있습니다.
+
+FinRL 메인에는 정책 학습과 FinRL 모듈·도구만 남습니다. 정책 평가 화면·StockTradingEnv 예제 화면·관련 추가 기능 5개는 등록과 전용 파일을 모두 제거했습니다. 폐기한 화면의 hash/API 연결도 제거했습니다.

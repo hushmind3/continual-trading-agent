@@ -237,7 +237,7 @@ class SystemOperations:
         from ..finrl.framework import finrl_file
         modules={
             'stockrl':['live_feed','platform.kiwoom_data','platform.assets','platform.expert_inference','platform.expert_conversion','platform.sac_champion'],
-            'FinRL':['meta.env_portfolio_optimization.env_portfolio_optimization','meta.env_stock_trading.env_stocktrading','meta.preprocessor.preprocessors','meta.preprocessor.yahoodownloader','agents.stablebaselines3.models'],
+            'FinRL':['meta.env_portfolio_optimization.env_portfolio_optimization','meta.preprocessor.preprocessors','agents.stablebaselines3.models'],
             'FinRL-X':['data.data_store','strategies.base_strategy','backtest.backtest_engine','data.data_fetcher','data.trading_calendar']}
         result={}
         for framework,names in modules.items():

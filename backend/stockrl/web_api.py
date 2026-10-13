@@ -87,7 +87,7 @@ async def local_writes(request: Request, call_next):
         allowed_stop=path in ('/api/stop','/api/system/stop','/api/system/prepare-restart','/api/library/stop') or path.startswith('/api/controls/') and parameters.get('enabled') is False
         if ((apply_running() and apply_state().get('target')!='frontend') or system.restarting) and not allowed_stop and path!='/api/system/apply':
             return JSONResponse({'detail':'변경 적용/서버 갱신 중입니다. 기존 작업은 보존합니다.'},status_code=409)
-        conflict=path in ('/api/train','/api/backtest','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/framework/') or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
+        conflict=path in ('/api/train','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/framework/') or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
         if conflict:
             system.cancel()
     response=await call_next(request)
@@ -100,7 +100,6 @@ class RunRequest(BaseModel):
     symbols: list[str] = Field(default_factory=list, max_length=1000)
     resume: bool = False
     champion_path: str | None = None
-    checkpoint_path: str | None = None
     algorithm: str = 'sac'
     total_timesteps: int | None = Field(default=None,ge=1)
 
@@ -382,29 +381,8 @@ def expert_state():
 
 
 
-def evaluation_root(currency=None):
-    if not currency:return RUNTIME
-    root=RUNTIME/'backtests'/currency
-    if (root/'backtest.csv').is_file():return root
-    return RUNTIME if read_json(RUNTIME/'backtest_metrics.json').get('currency')==currency else root
 
 
-def evaluation(currency:Literal['KRW','USD']|None=None):
-    root=evaluation_root(currency);path = root / "backtest.csv"
-    points = []
-    if path.is_file():
-        with path.open(encoding="utf-8-sig", newline="") as stream:
-            reader = csv.reader(stream)
-            next(reader, None)
-            for row in reader:
-                try:
-                    value = float(row[-1])
-                    if math.isfinite(value):
-                        points.append({"date": row[0], "value": value})
-                except (ValueError, IndexError):
-                    continue
-    return {"points": points, "file": file_info(path),
-            "report": read_json(root / "backtest_metrics.json")}
 
 
 @private_api.get("/api/health")
@@ -430,15 +408,6 @@ def menu_catalog():
     return catalog(private_api.routes)
 
 
-def result_table(kind: Literal["weights", "trades"], limit: int = Query(1000, ge=1, le=5000),currency:Literal['KRW','USD']|None=None):
-    path = evaluation_root(currency) / ("backtest_" + kind + ".csv")
-    if not path.is_file():
-        return {"columns": [], "rows": [], "total": 0}
-    import pandas as pd
-    frame = pd.read_csv(path)
-    frame.columns = [str(c).replace("Unnamed: 0", "index") for c in frame.columns]
-    finite = frame.replace([float("inf"), -float("inf")], None).astype(object).where(frame.notna(), None)
-    return {"columns": list(frame.columns), "rows": finite.tail(limit).to_dict("records"), "total": len(frame)}
 
 
 def currency_models(settings):
@@ -466,7 +435,6 @@ def state_view(path):
     providers={
         'menu_catalog':(menu_catalog,lambda:()),
         'algorithms':(algorithms,lambda:()),
-        'finrl':(finrl_workspace,lambda:state_stamp(official/'job.json',*(official/'framework-jobs').glob('*/result.json'))),
         'framework':(framework_catalog,None),
         'framework/providers':(framework_providers,None),
         'connections':(connections,None),
@@ -476,12 +444,7 @@ def state_view(path):
         'champions':(champions,lambda:state_stamp(*MODEL_DIR.glob('*_champion_*.pt'))),
         'logs':(logs,lambda:state_stamp(*(official/name for name in ('api.stderr.log','api.stdout.log','server.stderr.log','training.log')))),
     }
-    if key=='evaluation':
-        folder=evaluation_root(currency);providers[key]=(lambda:evaluation(currency),state_stamp(folder/'backtest.csv',folder/'backtest_metrics.json'))
-    elif key in ('result/weights','result/trades'):
-        kind=key.rsplit('/',1)[1];folder=evaluation_root(currency)
-        providers[key]=(lambda:result_table(kind,1000,currency),state_stamp(folder/('backtest_'+kind+'.csv')))
-    elif key=='prices':
+    if key=='prices':
         symbol=query.get('symbol',[''])[0];limit=int(query.get('limit',['300'])[0])
         if not symbol or not 1<=limit<=2000:raise ValueError('종목과 기존 가격 조회 범위를 확인하세요.')
         providers[key]=(lambda:price_history(symbol,limit),state_stamp(DB,DB.with_name(DB.name+'-wal')))
@@ -520,7 +483,6 @@ def state(views:str='[]',refresh_views:bool=False):
         currencies=[policy_files(currency) for currency in ('KRW','USD')]
         return state_stamp(ROOT/'runtime/operations/policies.json',RUNTIME/'active-checkpoint.json',*(file for root in currencies for file in (policy_checkpoint(root),root/'dataset.json',root/'replay.pkl')))
     models=system.state_value('models_by_currency',lambda:currency_models(settings),currency_signature)
-    evaluations=system.state_value('evaluation',evaluation,lambda:state_stamp(evaluation_root()/'backtest.csv',evaluation_root()/'backtest_metrics.json'))
     def checkpoint_signature():
         files=[*RUNTIME.glob('*.zip'),*(RUNTIME/'policies').glob('*/*.zip'),*(RUNTIME/'champions').glob('*/*.zip'),*(RUNTIME/'archives').glob('*/*.zip')]
         return state_stamp(*files,*(file.parent/'dataset.json' for file in files))
@@ -535,7 +497,7 @@ def state(views:str='[]',refresh_views:bool=False):
     workers={'learner':{'pid':(job or {}).get('pid'),'alive':(job or {}).get('running',False)}}
     resources=system.state_value('resources',lambda:resource_monitor.snapshot(workers))
     return {'architecture':'finrl-unified-v3','updated_at':now(),'settings':settings,'model':model,'data':db,'experts':experts,'job':job,
-        'evaluation':evaluations,'models_by_currency':models,'checkpoints':revisions,'capabilities':system.state_value('capabilities',capabilities,()),
+        'models_by_currency':models,'checkpoints':revisions,'capabilities':system.state_value('capabilities',capabilities,()),
         'operations':operations_state,'library':library,'automation':automation,'resources':resources,'views':selected,
         'state_revision':system.state_revision,'module_errors':dict(system.state_errors),'module_updated_at':dict(system.state_updates),'resident_models':system.resident_models(),'imports':imports,
         'commands':system.commands(),'frontend_revision':system.state_value('frontend_revision',lambda:read_json(RUNTIME/'applied-sources.json').get('dist_sha256'),lambda:state_stamp(RUNTIME/'applied-sources.json'))}
@@ -577,8 +539,8 @@ def price_history(symbol: str, limit: int = Query(300, ge=1, le=2000)):
 
 
 @private_api.get("/api/download/{name}")
-def download(name: Literal["backtest.csv", "backtest_metrics.json", "backtest_weights.csv", "backtest_trades.csv", "sac.zip", "dataset.json"],currency:Literal['KRW','USD']|None=None):
-    path = (policy_files(currency) if name in ('sac.zip','dataset.json') else evaluation_root(currency)) / name
+def download(name: Literal["sac.zip", "dataset.json"],currency:Literal['KRW','USD']|None=None):
+    path = policy_files(currency) / name
     if not path.is_file():
         raise HTTPException(404, "결과 파일이 없습니다.")
     return FileResponse(path, filename=name)
@@ -604,18 +566,15 @@ def preflight(req, command):
             errors.append(symbol + ": 공식 환경 실행에는 최소 2개 가격 관측이 필요합니다.")
     settings = source_settings()
     model={'identity':{}}
-    if command=='backtest' and not req.champion_path or req.resume:
+    if req.resume:
         try:
-            selected=policy_files(req.currency,req.checkpoint_path if command=='backtest' else None)
+            selected=policy_files(req.currency)
             model=model_state(settings,selected)
         except (ValueError,OSError) as exc:
             errors.append(str(exc));model=model_state(settings)
-    if req.checkpoint_path and command!='backtest':errors.append('정책 경로 선택은 운영 승인 전 평가에만 사용합니다.')
-    if req.checkpoint_path and req.champion_path:errors.append('평가할 정책 또는 Champion 중 하나를 선택하세요.')
     try:_,_,steps=sac_example(req.algorithm)
     except ValueError as exc:errors.append(str(exc));steps=settings['steps_per_run']
     if req.resume and model['identity'].get('algorithm','sac')!=req.algorithm:errors.append('이어 학습 알고리즘이 저장 정책과 다릅니다.')
-    if command=='backtest' and not req.champion_path and model['identity'].get('algorithm','sac')!=req.algorithm:errors.append('평가 알고리즘이 저장 정책과 다릅니다.')
     if req.champion_path:
         from .platform.sac_champion import champion_info,MODEL_DIR
         source=Path(req.champion_path).expanduser().resolve()
@@ -633,10 +592,10 @@ def preflight(req, command):
                 raise ValueError('선택한 Champion의 통화·종목 구성이 다릅니다.')
         except (ValueError,OSError,KeyError,RuntimeError) as exc:
             errors.append('MoE Champion: '+str(exc))
-    if (command == "backtest" or req.resume) and not req.champion_path:
-        compatible=model["compatible"] if req.resume else model["policy_compatible"]
+    if req.resume and not req.champion_path:
+        compatible=model["compatible"]
         if not compatible:
-            errors.extend(model["reasons"] if req.resume else model["structure_reasons"])
+            errors.extend(model["reasons"])
         if model["identity"].get("currency") != req.currency or model["identity"].get("symbols") != symbols:
             errors.append("저장 정책의 통화·종목 구성과 다릅니다.")
     if not req.champion_path:
@@ -654,29 +613,26 @@ def preflight(req, command):
         else:
             dates=to_datetime(frame.date,utc=True);trade=dates.max()+Timedelta(days=1)
             train_mask=(dates>=trade-Timedelta(days=1095))&(dates<trade-Timedelta(days=365))
-            test_mask=(dates>=trade-Timedelta(days=365))&(dates<trade)
-            train_count=int(dates[train_mask].nunique());test_count=int(dates[test_mask].nunique())
-            if train_count<2 and command=='train':errors.append('공식 rolling 학습 구간에 데이터가 부족합니다.')
-            if test_count<2:errors.append('rolling 평가 구간에 데이터가 부족합니다.')
-            for label,mask in ([('학습',train_mask)] if command=='train' else [])+[('평가',test_mask)]:
-                try:validate_price_panel(frame[mask],symbols)
-                except ValueError as exc:errors.append(label+': '+str(exc))
-            periods={'training_observations':train_count,'test_observations':test_count,'trade_date':str(trade),
+            train_count=int(dates[train_mask].nunique())
+            if train_count<2:errors.append('공식 rolling 학습 구간에 데이터가 부족합니다.')
+            try:validate_price_panel(frame[train_mask],symbols)
+            except ValueError as exc:errors.append('학습: '+str(exc))
+            periods={'training_observations':train_count,'trade_date':str(trade),
                 'train_start':str(trade-Timedelta(days=1095)),'train_end_exclusive':str(trade-Timedelta(days=365))}
     return {"ok": not errors, "errors": errors, "symbols": symbols, "currency": req.currency, "periods": periods,
-            "mode": "이어 학습" if req.resume else "새 학습" if command == "train" else "백테스트",
+            "mode": "이어 학습" if req.resume else "새 학습",
             "steps_per_run": req.total_timesteps or steps}
 
 
-@private_api.post("/api/preflight/{command}")
-def check(command: Literal["train", "backtest"], req: RunRequest):
-    return preflight(req, command)
+@private_api.post("/api/preflight/train")
+def check(req: RunRequest):
+    return preflight(req, "train")
 
 
 def launch(command, req,preserve_output=False):
     with system.job_lock:
         if system.job_state()["running"]:
-            raise HTTPException(409, "학습 또는 평가가 실행 중입니다.")
+            raise HTTPException(409, "학습 작업이 실행 중입니다.")
         checked = preflight(req, command)
         if not checked["ok"]:
             raise HTTPException(400, "\n".join(checked["errors"]))
@@ -686,18 +642,14 @@ def launch(command, req,preserve_output=False):
                "symbols": checked["symbols"], "resume": req.resume, "started_at": now(),
                "log": f"jobs/{job_id}.log", "finished_at": None, "exit_code": None}
         job.update(algorithm=req.algorithm,total_timesteps=req.total_timesteps)
-        if command=='backtest':
-            job['output']='backtests/'+req.currency
-            if req.checkpoint_path:job['checkpoint_path']=req.checkpoint_path
-            if req.champion_path:job['champion_path']=str(Path(req.champion_path).expanduser().resolve())
-        elif req.champion_path:
+        if req.champion_path:
             from .platform.sac_champion import _next_version
             _,target=_next_version(req.algorithm)
             job.update(champion_path=str(Path(req.champion_path).expanduser().resolve()),
                 champion_output=str(target),output='champions/'+target.stem)
         elif command=='train' or preserve_output:job['output']='policies/'+job_id
         system.start_job(job)
-        return {"message": "학습을 시작했습니다." if command == "train" else "백테스트를 시작했습니다.", "job": job}
+        return {"message": "학습을 시작했습니다.", "job": job}
 
 
 
@@ -707,10 +659,6 @@ def framework_catalog():
     return catalog()
 
 
-def finrl_workspace():
-    from .finrl.operations import stock_state
-    try:return stock_state()
-    except (ValueError,OSError,RuntimeError) as exc:raise HTTPException(503,str(exc)) from exc
 
 
 def framework_providers():
@@ -764,9 +712,6 @@ def train(req: RunRequest):
     return launch("train", req)
 
 
-@private_api.post("/api/backtest")
-def backtest(req: RunRequest):
-    return launch("backtest", req)
 
 
 @private_api.post("/api/collect")
@@ -802,10 +747,10 @@ def champions():
 
 @private_api.post("/api/champions/create")
 def champion_create(request:ChampionRequest):
-    if system.job_state()["running"]:raise HTTPException(409,"현재 학습·수집·백테스트가 끝난 뒤 생성하세요.")
+    if system.job_state()["running"]:raise HTTPException(409,"현재 학습·수집이 끝난 뒤 생성하세요.")
     from .platform.operations_settings import settings
     recent=read_json(RUNTIME/"job.json")
-    if recent.get('command') not in ('train','backtest'):recent={}
+    if recent.get('command')!='train':recent={}
     request.currency=request.currency or recent.get("currency") or "USD"
     if not request.symbols:
         configured=settings().symbols

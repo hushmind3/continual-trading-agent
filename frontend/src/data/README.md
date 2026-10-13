@@ -19,3 +19,5 @@ BackendAction.menu_id는 담당 작은 메뉴이며 추가 입력 허용 여부�
 OperationsProvider의 algorithm/selectAlgorithm은 학습·MoE가 공유하는 선택값이며 세션에 유지합니다. Champion 응답은 identity.algorithm과 policy_spaces를 사용합니다.
 
 전송 시간 제한은 일반 조회·실행 60초, 동결 Expert 스냅샷을 저장하는 `champions/create` 30분입니다. AbortController로 종료하고 후속 조회가 다시 진행되도록 합니다. 비 JSON 응답은 HTTP 상태를, JSON 오류는 백엔드의 구체적 이유를 표시합니다. `tests/api.spec.ts`에서 정체·복구·오류·GET 계약을 검사합니다.
+
+state의 evaluation, finrl, result/weights, result/trades 조회 계약과 평가용 checkpoint_path 입력은 전용 메뉴 제거와 함께 폐기했습니다. 남은 화면은 해당 항목을 구독하지 않습니다.

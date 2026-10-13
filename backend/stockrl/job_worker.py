@@ -49,7 +49,6 @@ def main():
         if job.get('output'):args.extend(['--output',str(root/job['output'])])
         if job.get('champion_path'):args.extend(['--champion-path',job['champion_path']])
         if job.get('champion_output'):args.extend(['--champion-output',job['champion_output']])
-        if job.get('checkpoint_path'):args.extend(['--checkpoint-path',job['checkpoint_path']])
         sys.argv = args
         from .official_cli import main as official_main
         official_main()

@@ -148,52 +148,14 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
 
 
 
-def backtest(frame,registry,currency=None,champion_path=None,checkpoint_path=None):
-    """Convert original environment holdings to the official StrategyResult API."""
-    import pandas as pd
-    from ..platform.system_operations import system
-    saved=policy_files(currency,checkpoint_path)
-    champion=None
-    if champion_path:
-        from ..platform.sac_champion import load_spec
-        champion=load_spec(champion_path)
-        checkpoint=Path(champion['checkpoint'])
-        if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/official'/checkpoint
-        checkpoint=checkpoint.resolve()
-        if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()) or not checkpoint.is_file():raise ValueError('선택한 Champion의 실제 운영 폴더 체크포인트가 필요합니다.')
-        saved=checkpoint.parent
-    from ..state_io import read_json
-    identity=read_json(saved/'dataset.json')
-    if identity.get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경 정책은 백테스트하지 않습니다.')
-    if identity.get('champion_file'):
-        registry=system.expert_registry(saved,None,champion=champion,champion_path=champion_path)
-        champion_ids=identity['champion_experts']
-    else:champion_ids=None
-    env=training_environment(frame,registry,training=False,champion_ids=identity.get('champion_experts',[]))
-    try:
-        if identity.get('currency')!=env.currency or identity.get('symbols')!=env.symbols:raise ValueError('저장된 정책과 통화·종목 구성이 다릅니다.')
-        model=system.model(policy_checkpoint(saved),identity.get('algorithm','sac'),env)
-        observation,_=env.reset();raw=env.unwrapped.gym_env;rows=[]
-        while not raw._terminal:
-            action,_=model.predict(observation,deterministic=True)
-            observation,_,terminal,truncated,_=env.step(action)
-            # Upstream termination returns the previous date/action without advancing.
-            if terminal:break
-            allocation=raw._actions_memory[-1]
-            rows.append({'date':raw._info['end_time'],**dict(zip(env.symbols,allocation[1:])), 'CASH':float(allocation[0])})
-            if terminal or truncated:break
-        weights=pd.DataFrame(rows).set_index('date')
-        from ..finrl_trading.backtest import evaluate_weights
-        return evaluate_weights(frame,weights,raw._sorted_times,'FinRL '+identity.get('algorithm','sac').upper())
-    finally:env.close()
 
 
-def policy_files(currency=None,checkpoint_path=None):
+def policy_files(currency=None):
     """Select an existing native SB3 revision without modifying its weights."""
     from ..state_io import read_json
     root=ROOT/'runtime/official'
     selected=read_json(ROOT/'runtime/operations/policies.json').get(currency) if currency else None
-    selection={'path':checkpoint_path} if checkpoint_path else {'path':selected} if selected else read_json(root/'active-checkpoint.json')
+    selection={'path':selected} if selected else read_json(root/'active-checkpoint.json')
     if not selection:return root
     path=(root/selection['path']).resolve()
     from finrl.agents.stablebaselines3.models import MODELS

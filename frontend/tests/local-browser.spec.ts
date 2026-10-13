@@ -13,6 +13,8 @@ test('all registered local screens render and continue receiving state', async (
     .filter(element => element.href.startsWith('#')));
   const unique = [...new Map(links.map(link => [link.href, link])).values()];
   expect(unique.length).toBeGreaterThanOrEqual(15);
+  const removed = ['portfolio','finrl','stock-training','backtest','feature-finrl_workflow','feature-yahoo','feature-features','feature-data_split','feature-finrl_stats'];
+  expect(unique.filter(link => removed.includes(link.href.slice(1))).map(link => link.href)).toEqual([]);
   for (const link of unique) {
     await page.locator(`aside a[href="${link.href}"]`).click();
     await expect(page.locator('main h1')).toContainText(link.name.trim());

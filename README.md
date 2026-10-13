@@ -2,15 +2,13 @@
 
 구조부터 확인: [백엔드 폴더 안내](backend/stockrl/README.md) · [프론트 폴더 안내](frontend/README.md). 각 기능 폴더의 README를 먼저 읽고 해당 진입점과 import/API 연결만 확인합니다.
 
-React의 접이식 메뉴는 `FinRL · 메인`과 `FinRL-Trading · 보조` 구역을 구분합니다. FinRL 구역에는 정책 학습·평가, 주식거래 데이터·알고리즘 학습·백테스트, FinRL 모듈·도구를 제공합니다. FinRL-Trading(FinRL-X) 구역에는 보조 데이터·전략·설정 도구를 제공합니다. 도구·모듈·원본 함수 선택 목록은 각 구역의 프레임워크만 표시하며 같은 통합 API를 사용합니다. MoE와 프로젝트 모듈은 프로젝트 확장 구역, 시장·운영·계좌와 연결·진단은 공통 운영/관리 구역에 둡니다. MoE 외 화면의 공통 패널은 접고 펼칠 수 있으며 기존 실행 기능을 유지합니다. 프론트 적용은 React 파일만 갱신하고 백엔드 적용은 별도로 선택합니다. 실제 등록된 백엔드 명령은 통합 관리자가 동적으로 조회·중계합니다.
+React의 접이식 메뉴는 FinRL 메인과 FinRL-Trading 보조 구역을 구분합니다. FinRL 메인에는 정책 학습과 모듈·도구가 있고, 거래 운영·프로젝트 확장·연결 관리 기능을 별도 구역에서 제공합니다.
 
-모든 프론트 JSON 상태 조회는 `/api`의 `state` 요청 한 요청으로 수행하며 기존 `/api/framework/stock_data`, `/api/framework/stock_train`, `/api/framework/stock_backtest` 및 작업 중지 API를 사용합니다. 데이터는 YahooDownloader·FeatureEngineer·data_split, 학습은 StockTradingEnv·DRLAgent로 실행합니다. 원본의 A2C/DDPG/PPO/TD3/SAC 실행 플래그, 모델별 20,000단계와 예제별 모델 설정을 읽습니다. 백테스트는 DRL_prediction과 원본 예제의 MVO·DJIA 계산을 사용하며 실제 결과가 생성된 뒤 표·그래프·파일을 표시합니다.
 
 통합 소유자는 기존 `SystemOperations.system`입니다. 각 모듈의 JSON 결과 갱신을 보관하고 파일 버전이 바뀐 상태만 다시 계산합니다. `/api`의 `state` 요청는 현재 화면이 사용하는 조회 항목과 전체 운영·작업·모델·자원 상태를 함께 반환합니다. 조회 선택자는 공통 Context를 구독하며 개별 GET·별도 폴링을 하지 않습니다. 명령은 기존 POST API, 파일 전송은 결과 다운로드 경로를 사용합니다.
 
 정책 인스턴스는 프로세스 내에서 체크포인트 절대 경로·파일 버전·알고리즘으로 캐시하며 변경 없는 모델은 재사용합니다. Champion Registry와 기본 ExpertPool도 재사용합니다. 신규 학습·작업은 기존 격리 프로세스를 유지하므로 학습 중인 가중치를 운영 추론에 공유하지 않습니다. 운영 제어는 운영 메뉴, 모델 선택·로딩은 정책 학습의 저장 모델 영역에서 한 번 제공합니다.
 
-원본 예제 세 파일은 설치 Git 커밋에 고정하여 `runtime/official/finrl-source/`에서 읽으며 수정하지 않습니다. 작업별 CSV·학습 모델·비교 그래프는 기존 `runtime/official/framework-jobs/{job_id}/`에 저장합니다. Frozen Expert 정책 학습은 MoE 화면의 보조 도구로 제공하며 원형 StockTradingEnv 결과와 PortfolioOptimizationEnv Champion을 호환 정책으로 표시하지 않습니다.
 
 ## 폴더와 진입점
 
@@ -20,7 +18,6 @@ frontend/
   src/shell/                  기존 화면 레이아웃
   src/pages/                  운영·MoE·시장·계좌·학습·연결·진단 화면
   src/pages/model/            Expert 등록·선택·적재·추론·변환·외부 폴더
-  src/pages/portfolio/        가상계좌·백테스트 결과 표
   src/pages/training/         SAC 제어·Actor/Critic·체크포인트
   src/data/                   HTTP 요청·폴링·타입·Expert 분류
   src/ui/                     공통 Button·Panel·Drawer·표·상태·로그
@@ -35,7 +32,6 @@ backend/stockrl/
     operations.py             FinRL 실행 등록·주식거래 데이터/학습/평가
   finrl_trading/              보조 FinRL-Trading 전용 호출
     data.py                   기존 DataStore 가격 조회
-    backtest.py               비중 기반 BacktestEngine 평가
     operations.py             추가 데이터·전략·공급원 실행 등록
   job_worker.py               별도 SAC/백테스트/수집 작업과 저장 기록
   platform/system_operations.py 통합 시작·중지·점검, 런처 적용 요청
@@ -93,13 +89,10 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 | 운영 `#control` | GET state, POST controls/{feed,paper,engine} | `web_api.state`, `OperationsRuntime.command` |
 | MoE `#moe` | GET state (모델·Library 통합 항목), POST experts/register, experts/select, library/{kind}, champions/create | `ExpertRegistry.register/select`, `model_files`, `LibraryOperations.start/_execute` |
 | 시장 `#markets` | GET state (데이터·가격·연결 통합 항목), POST collect, controls/feed | `price_history`, `job_worker.main` → FinRL-X `fetch_price_data`; `LiveMarketCollector.run` |
-| 계좌 `#portfolio` | GET state (평가·가중치·거래 통합 항목), POST orders, preflight/backtest, backtest | `OperationsRuntime.manual_order` → `PaperAccount._fill`; `finrl.framework.backtest` → `BacktestEngine.run_backtest` |
-| 학습 `#learning` | GET state, POST framework/stock_train | 원본 StockTradingEnv·DRLAgent 모델별 학습 |
-| 백테스트 `#backtest` | GET state, POST framework/stock_backtest | 학습 모델·MVO·DJIA 비교 |
 | 연결 `#connection` | GET state (연결·인증·설정 통합 항목), POST provider/{connect,test,public}, settings | 기존 `connect_credentials/test_connection`, `operations_settings.update` |
 | 진단 `#system` | GET state (로그·자원·모듈 통합 항목) | `ResourceMonitor.snapshot`, 실제 저장 로그·소스 함수 목록 |
 
-다운로드는 GET `/api/download/{name}`으로 기존 백테스트 결과·현재 SAC 파일을 제공합니다. 체크포인트 다운로드는 GET `/api/checkpoint?path=...`입니다. 등록·선택·교체·해제는 같은 `configs/experts.json`의 슬롯/활성 목록을 사용합니다. 별도 Registry를 만들지 않습니다.
+다운로드는 단일 `/api`의 download/{name}으로 현재 SAC 정책·dataset 파일을 제공합니다. 체크포인트 다운로드는 GET `/api/checkpoint?path=...`입니다. 등록·선택·교체·해제는 같은 `configs/experts.json`의 슬롯/활성 목록을 사용합니다. 별도 Registry를 만들지 않습니다.
 
 `library/{kind}` 작업: `inspect`, `import`, `probe`, `probe_all`, `load`, `unload`, `search`, `acquire`, `convert`, `optimize`, `optimize_all`, `apply`, `compare`. 작업 결과·진행·오류는 `runtime/operations/library-job.json`에 기록되어 React에서 표시됩니다. API 요청 수락과 실제 작업 성공은 구분합니다.
 
@@ -128,7 +121,6 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 
 `job_worker`는 학습 실행 전에 현재 SAC·Replay·dataset을 `runtime/official/archives/{job_id}`에 보관합니다. `restore_checkpoint()`는 환경·예제 식별정보와 SB3 로딩을 확인한 뒤 `active-checkpoint.json`에 선택 경로만 기록합니다. 가중치 파일을 덮어써 복원하지 않습니다. `finrl.framework.policy_files()`가 선택한 폴더에서 정책·Replay·식별정보를 읽고, 이후 학습 결과는 현재 경로에 저장합니다. 현재 종목·통화와 맞지 않는 이어 학습은 기존 식별 검사를 사용합니다.
 
-백테스트: `official_cli.main` → `finrl.framework.backtest` → FinRL `training_environment(training=False)` → 통합 관리자의 해당 SB3 알고리즘 모델 → `model.predict`·공식 환경 `step` → FinRL-X `StrategyResult`·`BacktestEngine.run_backtest`의 보조 비중 평가. 결과 가치·지표·가중치·거래 기록을 `backtest.csv`, `backtest_metrics.json`, `backtest_weights.csv`, `backtest_trades.csv`로 기록하고 React가 조회합니다. 원본 BacktestEngine의 비중 정규화·비용 계산은 유지합니다.
 
 이전 `StockPortfolioEnv` 체크포인트와 Replay는 보존합니다. 새 `PortfolioOptimizationEnv` 계약으로 현재 선택된 11개 Expert와 AAPL/MSFT·USD·SAC 모델을 생성하고 105단계 진단 학습(실제 업데이트 5회)을 완료했습니다. 관측은 726D, 행동은 현금 포함 3D입니다. 기본 학습 단계 5,000은 유지하며 진단 학습 결과를 수익성 검증으로 설명하지 않습니다.
 
@@ -176,14 +168,13 @@ $env:PYTHONPATH="backend"
 $env:PYTHONUTF8="1"
 .\.venv\Scripts\python.exe -m stockrl train --currency USD --symbols AAPL MSFT
 .\.venv\Scripts\python.exe -m stockrl train --currency USD --symbols AAPL MSFT --resume
-.\.venv\Scripts\python.exe -m stockrl backtest --currency USD --symbols AAPL MSFT
 ```
 
 현재 작업 폴더에는 이전부터 `.gitmodules`, `SETTINGS.md`, `pyproject.toml`, `설치.cmd`의 미커밋 삭제 표시가 있습니다. 이번 커밋은 이 네 삭제를 포함하지 않습니다. GitHub에는 기존 버전이 유지됩니다. 로컬 설치 실행이 확인됐다고 기록하지 않습니다.
 
 ## 구현 상태와 보존 범위
 
-- **실제 실행 확인**: API·시세 입력·삭제 파일 캐시·GPU 계산·11개 Expert를 연결한 신규 SAC 진단 학습과 38개 화면 검사를 완료했습니다. 세부 범위는 검토 보고서에 기록합니다. 키움 원격 인증/전체 종목 수신·선택하지 않은 외부 모델 변환/최적화·정책 수익성은 검증 범위 밖입니다.
+- **실제 실행 확인**: API·시세 입력·삭제 파일 캐시·GPU 계산·11개 Expert를 연결한 신규 SAC 진단 학습과 현재 등록된 화면 검사를 완료했습니다. 세부 범위는 검토 보고서에 기록합니다. 키움 원격 인증/전체 종목 수신·선택하지 않은 외부 모델 변환/최적화·정책 수익성은 검증 범위 밖입니다.
 - **기존 연결 유지**: 공식 SAC 학습·Replay·백테스트·저장 가격 조회·FMP 수집·기존 동결 관측 구조. 새로운 실행 성공을 주장하지 않습니다.
 - **미연결**: 실제 증권 계좌 주문, Alpaca 주문. **사용 조건 미충족**: 현재 저장된 이전 SAC는 원본 환경과 호환되지 않으며 원본 학습 종목·필수 지표의 실제 이력이 없는 주식 정책 Expert는 입력 오류를 표시합니다.
 - **제거한 실행 대상**: 루트 Streamlit 화면, 구형 화면 테스트/설정, 감사 보고서/임시 프론트 백업, 호출되지 않는 구형 operating_rules·package_disposal. 확인한 미사용 파일만 프로젝트 휴지통으로 이동했습니다. 공식 프레임워크와 정상 사용 모듈은 유지합니다.
@@ -226,11 +217,11 @@ React의 상태 조회·버튼 명령·파일 다운로드는 단일 `/api` 통�
 
 시장·운영 화면의 시세 수신·자동 판단·가상매매 버튼은 상단에 배치합니다. 운영 화면의 `코드 변경 적용`은 기존 React 빌드·8766 서버 갱신·연결 상태 조회이며 오류 자동 복구가 아닙니다. `자동 운영 시작`은 기존 system/start 절차로, 호환 정책 준비(정책이 없으면 SAC 학습) 이후 시세 수신·판단·가상매매를 시작합니다. 개별 제어와 실행 결과는 같은 상단 운영 패널에 표시합니다.
 
-운영의 실시간 SAC 지속학습 버튼은 완료 시세가 저장되는 기존 `accept` 경로에서 선택 통화의 SAC 이어 학습 작업을 요청합니다. 기존 공식 설정·Replay 복원 경로를 사용하며 진행 중 작업은 대기하고 새 정책/Champion 버전으로 저장합니다. 끄기와 전체 중지는 이 버튼으로 시작한 학습만 중지합니다. 실제 시세·학습 성공은 런타임 상태·작업 로그로 확인해야 합니다. KRW/USD 학습·백테스트는 통화별 선택 정책을 사용하며 백테스트 결과는 `runtime/official/backtests/{currency}`에 분리합니다. 평가 조회·거래/가중치 표·다운로드에도 통화를 전달합니다. 기존 전역 결과 파일과 체크포인트는 보존합니다.
+운영의 실시간 SAC 지속학습 버튼은 완료 시세가 저장되는 기존 `accept` 경로에서 선택 통화의 SAC 이어 학습 작업을 요청합니다. 기존 공식 설정·Replay 복원 경로를 사용하며 진행 중 작업은 대기하고 새 정책/Champion 버전으로 저장합니다. 끄기와 전체 중지는 이 버튼으로 시작한 학습만 중지합니다. 실제 시세·학습 성공은 런타임 상태·작업 로그로 확인해야 합니다. KRW/USD 학습은 통화별 선택 정책을 사용합니다. 기존 전역 결과 파일과 체크포인트는 보존합니다.
 
 ## 공식 시스템 이식 · React 실행 메뉴
 
-`#frameworks`는 Python 모듈을 브라우저에서 import하지 않습니다. React → `/api/framework/{action}` → 기존 `job_worker` → `platform/framework_operations.py` → `finrl/operations.py` 또는 `finrl_trading/operations.py` → 공식 Python 함수·클래스·CLI 순서입니다. Streamlit 화면은 이식·실행에서 제외합니다.
+`#frameworks`는 Python 모듈을 브라우저에서 import하지 않습니다. React → `/api/framework/{action}` → 기존 `job_worker` → `platform/framework_operations.py` → `finrl_trading/operations.py` 또는 원본 native_call → 공식 Python 함수·클래스·CLI 순서입니다. Streamlit 화면은 이식·실행에서 제외합니다.
 
 FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합니다. 별도의 알고리즘 학습 도구는 두지 않습니다. FinRL에 없는 거래 달력·FMP 재무/뉴스·추가 데이터 처리·TSMOM·Adaptive Rotation·전략/백테스트 엔진은 FinRL-X 보조 기능으로 실행합니다. 원형 FinRL CLI와 FinRL-X deploy 데이터 준비·Rotation 실행도 연결합니다. FinRL·SB3는 백엔드 Python에서 import·실행하며 React는 API 설정·목록·상태·결과를 표시합니다.
 
@@ -279,6 +270,10 @@ CI 워크플로가 main에 설치되기 전에는 수신기가 waiting_for_main_
 
 주 `.venv`와 키움 `.venv-kiwoom`은 시스템 패키지를 공유하지 않습니다. 설치 스크립트는 운영/키움 명세와 lock 제약을 적용하고 양쪽 `pip check`를 실행합니다. 주 Torch 2.14.0+cu132·torchvision 0.29.1+cu132·SB3 2.9.0과 FinRL 고정 커밋을 유지합니다. 키움 SDK는 별도 프로세스의 JSON 이벤트로 수집기에 연결해 Alpaca/키움 websockets 버전 충돌을 해소합니다. FinCast 실행에 필요한 beartype/einx/colt5-attention도 명시합니다. 미사용 이전 환경은 사용자 지시에 따라 `휴지통/.venv-previous-20261012-232811/`로 이동했습니다. 휴지통은 실행 경로에 연결하지 않습니다.
 
-Python 3.13에서 `python -m unittest discover -s tests`는 정합성 20개와 실제 FastAPI 전송 3개를 검사합니다. React 타입·빌드와 전송 테스트 4개는 CI에서도 실행합니다. 로컬 서버의 실제 38개 화면 검사는 `frontend`에서 `npm run test:browser`로 실행합니다. GPU 모델·외부 인증은 이 최소 CI의 범위에 포함하지 않습니다. 자세한 실행 근거와 제한은 기존 [검토 보고서](프로젝트_검토보고서.md)를 확인하세요.
+Python 3.13에서 `python -m unittest discover -s tests`는 정합성 18개와 실제 FastAPI 전송 3개를 검사합니다. React 타입·빌드와 전송 테스트 4개는 CI에서도 실행합니다. 로컬 서버의 실제 현재 등록된 화면 검사는 `frontend`에서 `npm run test:browser`로 실행합니다. GPU 모델·외부 인증은 이 최소 CI의 범위에 포함하지 않습니다. 자세한 실행 근거와 제한은 기존 [검토 보고서](프로젝트_검토보고서.md)를 확인하세요.
 
 2026-10-13 실행 검증: 신규 SAC의 11개 Expert 모두 CUDA 추론, 105단계 진단 학습·업데이트 5회, 평가 251개 거래일과 공식 가치·지표 저장을 완료했습니다. 현재 USD 선택은 추가 작업 전 `champions/sac_champion_003/sac.zip`으로 복원했으며 구형 모델·Replay와 이전 선택 경로는 보존합니다. 원본 BacktestEngine의 가중치 이력·거래 DataFrame은 비어 있으므로 해당 표를 체결 내역으로 취급하지 않습니다.
+
+## 현재 FinRL 메뉴 범위
+
+FinRL 메인은 정책 학습과 FinRL 모듈·도구 2개 작은 메뉴를 제공합니다. 정책 평가·백테스트, 주식거래 데이터 준비·알고리즘 학습·백테스트, FinRL 원형 학습·평가·모의매매, Yahoo 수집, 기술지표·전처리, 기간 분할, 백테스트 성과의 9개 메뉴와 전용 화면·실행 어댑터·평가 API/CLI·결과 조회를 제거했습니다. 공통 FinRL/SB3 학습·정책 구조와 가상계좌·시세·Expert 경로는 유지합니다. 전체 기본 작은 메뉴는 11개입니다. 폐기 소스는 휴지통에 동일 상대 경로로 보존하며 저장 모델·가격·계좌·기존 산출물은 삭제하지 않습니다.

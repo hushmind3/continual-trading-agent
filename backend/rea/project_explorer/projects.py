@@ -2,7 +2,7 @@
 from pathlib import Path
 import json,os,re
 from stockrl import ROOT
-OUTPUT=ROOT/'backend/rea/project_browser/saved_projects'
+OUTPUT=ROOT/'backend/rea/project_explorer/saved_projects'
 
 def _project(identifier):
     if not re.fullmatch(r'[a-f0-9]{32}',identifier or ''):raise ValueError('저장 프로젝트를 선택하세요.')

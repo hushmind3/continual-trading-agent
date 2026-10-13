@@ -4,7 +4,7 @@ import {Panel} from '../../../ui/Panel';
 import {Button,ErrorMessage,inputClass} from '../../../ui/Primitives';
 interface Project {id:string;name:string;kind:string;artifact?:string;state:string;folder:string;created_at:string;original_files?:number;inferred_files?:number;unavailable?:number;limitations?:string[];error?:string}
 interface Entry {name:string;path:string;folder:boolean;bytes?:number}
-export function REAProjects(){
+export function ProjectExplorer(){
  const [projects,setProjects]=useState<Project[]>([]),[id,setId]=useState(()=>new URLSearchParams(location.hash.split('?')[1]??'').get('id')??''),[path,setPath]=useState(''),[entries,setEntries]=useState<Entry[]>([]),[selected,setSelected]=useState(''),[content,setContent]=useState(''),[preview,setPreview]=useState(''),[error,setError]=useState(''),[query,setQuery]=useState(''),[page,setPage]=useState(0);
  const project=projects.find(item=>item.id===id);
  const refresh=async()=>{try{const data=await request<{items:Project[]}>('rea/projects',{},'GET');setProjects(data.items);if(!id&&data.items.length)setId(data.items[0].id);}catch(e){setError(e instanceof Error?e.message:'목록 조회 실패')}};

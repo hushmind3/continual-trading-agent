@@ -8,17 +8,17 @@ from urllib.request import urlopen
 import psutil
 from stockrl import ROOT
 from stockrl.state_io import atomic_json
-from rea.analysis.operations import BASE
-from rea.analysis.operations import WORK
-from rea.analysis.operations import call_tool
-from rea.analysis.operations import connection
-from rea.analysis.operations import native_recover
-from rea.analysis.operations import node_runtime
-from rea.analysis.operations import runtime_environment
-from rea.analysis.operations import validate_arguments
+from rea.program_analysis.operations import BASE
+from rea.program_analysis.operations import WORK
+from rea.program_analysis.operations import call_tool
+from rea.program_analysis.operations import connection
+from rea.program_analysis.operations import native_recover
+from rea.program_analysis.operations import node_runtime
+from rea.program_analysis.operations import runtime_environment
+from rea.program_analysis.operations import validate_arguments
 
-from rea.project_browser.projects import OUTPUT
-from rea.project_browser.projects import _inside
+from rea.project_explorer.projects import OUTPUT
+from rea.project_explorer.projects import _inside
 _gate=threading.Lock()
 _cancel=threading.Event()
 _processes=[]
@@ -118,7 +118,7 @@ def _copy_directory(target,destination):
 
 def _asar(target,destination,analysis):
     node,_=node_runtime()
-    process=_spawn([node,str(BASE/'analysis/artifacts.mjs'),str(target),str(destination)],cwd=BASE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    process=_spawn([node,str(BASE/'program_analysis/artifacts.mjs'),str(target),str(destination)],cwd=BASE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     output,error=process.communicate();_check()
     if process.returncode:raise RuntimeError(error.decode('utf8',errors='replace')[-1500:])
     result=json.loads(output);atomic_json(result,analysis/'extraction.json')

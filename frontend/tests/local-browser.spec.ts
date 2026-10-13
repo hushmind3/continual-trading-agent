@@ -8,7 +8,7 @@ test('all registered local screens render and continue receiving state', async (
   page.on('response', response => {if (response.url().includes('/api') && response.status() >= 500) failures.push(`${response.status()} ${response.url()}`);});
   await page.goto('/', {waitUntil: 'networkidle'});
   await expect(page.getByText('서버 연결', {exact: true})).toBeVisible();
-  await expect(page.locator('aside a[href="#rea"]')).toBeVisible();
+  await expect(page.locator('aside a[href="#rea/program_analysis"]')).toBeVisible();
   expect((await page.locator('aside details > summary').allTextContents()).map(text=>text.replace(/\s*오류\s*\d+\s*$/,'').trim())).toEqual(['금융','REA 역공학']);
   const links = await page.locator('aside a').evaluateAll(elements => elements
     .map(element => ({href: element.getAttribute('href') || '', name: element.textContent || ''}))
@@ -51,14 +51,14 @@ test('model errors remain visible in MoE and diagnostics without becoming a tran
 test('REA has three input buttons and browses real saved source files without agent controls', async ({page}) => {
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
-  await page.goto('/#rea',{waitUntil:'networkidle'});
+  await page.goto('/#rea/program_analysis',{waitUntil:'networkidle'});
   await expect(page.getByRole('button',{name:'파일 선택',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'폴더 선택',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'웹사이트 분석',exact:true}).click();
   await expect(page.getByRole('textbox',{name:'분석할 웹사이트 주소'})).toBeVisible();
   await expect(page.locator('main')).not.toContainText('도구 입력 JSON');
   await expect(page.locator('main')).not.toContainText('AI 재구성');
-  await page.locator('aside a[href="#rea-projects"]').click();
+  await page.locator('aside a[href="#rea/project_explorer"]').click();
   await expect(page.getByRole('combobox',{name:'저장 프로젝트 선택'})).toBeVisible();
   const select=page.getByRole('combobox',{name:'저장 프로젝트 선택'});
   const value=await select.locator('option').evaluateAll(options=>options.map(option=>option as HTMLOptionElement).find(option=>option.value&&option.text.includes('저장 완료'))?.value);

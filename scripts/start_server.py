@@ -91,7 +91,7 @@ def sources():
     groups={name:{} for name in ('frontend','backend','launcher','configuration')}
     for name in sorted(names):
         if name.startswith('frontend/src/') or name in ('frontend/index.html','frontend/package.json','frontend/package-lock.json','frontend/tsconfig.json','frontend/vite.config.ts'):group='frontend'
-        elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('backend/rea/project_browser/saved_projects/') or name.startswith('scripts/requirements/'):group='backend'
+        elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('backend/rea/project_explorer/saved_projects/') or name.startswith('scripts/requirements/'):group='backend'
         elif name.startswith('scripts/') and name.endswith('.py') or name=='서버켜기.cmd':group='launcher'
         elif name in ('configs/experts.json','configs/instruments.json'):group='configuration'
         else:continue

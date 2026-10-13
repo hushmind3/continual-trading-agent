@@ -188,13 +188,13 @@ class IntegrityTests(unittest.TestCase):
   self.assertEqual(set(ACTIONS),{'native_call'})
   self.assertEqual([group['id'] for group in GROUPS],['finance','rea'])
  def test_rea_refuses_project_trash_inputs(self):
-  from rea.analysis.operations import validate_arguments
+  from rea.program_analysis.operations import validate_arguments
   with self.assertRaisesRegex(ValueError,'휴지통'):
    validate_arguments({'arguments':{'input_path':str(ROOT/'휴지통/sample')}})
   validate_arguments({'input_path':str(ROOT/'frontend/src')})
  def test_rea_timeout_closes_the_session(self):
   import io,queue
-  from rea.analysis.operations import REAConnection
+  from rea.program_analysis.operations import REAConnection
   connection=REAConnection();connection.process=SimpleNamespace(poll=lambda:None,stdin=io.StringIO());connection.responses=queue.Queue()
   with patch.object(connection,'close') as close:
    with self.assertRaisesRegex(RuntimeError,'응답 시간이 초과'):
@@ -203,19 +203,19 @@ class IntegrityTests(unittest.TestCase):
 
 class REAProjectStorageTests(unittest.TestCase):
  def test_project_reader_cannot_leave_saved_folder(self):
-  from rea.project_browser.projects import _inside
+  from rea.project_explorer.projects import _inside
   with self.assertRaisesRegex(ValueError,'프로젝트 내부'):
-   _inside(ROOT/'backend/rea/project_browser/saved_projects/example','../../../configs/experts.json')
+   _inside(ROOT/'backend/rea/project_explorer/saved_projects/example','../../../configs/experts.json')
  def test_folder_snapshot_does_not_copy_generated_output_into_itself(self):
   import tempfile
   from unittest.mock import patch
-  from rea.analysis import extract
+  from rea.program_analysis import extract
   with tempfile.TemporaryDirectory() as temporary:
    source=Path(temporary);(source/'app.js').write_text('export const value=7;',encoding='utf8')
-   output=source/'backend/rea/project_browser/saved_projects';destination=output/'test/original/source'
+   output=source/'backend/rea/project_explorer/saved_projects';destination=output/'test/original/source'
    with patch.object(projects,'OUTPUT',output):
     projects._copy_directory(source,destination)
    self.assertEqual((destination/'app.js').read_text(encoding='utf8'),'export const value=7;')
-   self.assertFalse((destination/'backend/rea/project_browser/saved_projects').exists())
+   self.assertFalse((destination/'backend/rea/project_explorer/saved_projects').exists())
 
 if __name__=='__main__':unittest.main()

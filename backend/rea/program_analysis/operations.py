@@ -41,7 +41,7 @@ class REAConnection:
         node,_=node_runtime();WORK.mkdir(parents=True,exist_ok=True);responses=queue.Queue();self.responses=responses
         env=runtime_environment()
         with (WORK/'mcp.stderr.log').open('ab') as errors:
-            self.process=subprocess.Popen([node,str(BASE/'analysis/bridge.mjs')],cwd=WORK,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=errors,text=True,encoding='utf8',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            self.process=subprocess.Popen([node,str(BASE/'program_analysis/bridge.mjs')],cwd=WORK,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=errors,text=True,encoding='utf8',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         if os.name=='nt':
             try:
                 owner=psutil.Process(self.process.pid)

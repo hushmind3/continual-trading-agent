@@ -2,9 +2,29 @@
 from ... import ROOT
 from .. import finrlx
 
+def price_store(directory=None):
+    store=finrlx('data.data_store').DataStore
+    return store() if directory is None else store(str(directory))
+
+
+def price_processor(directory):
+    return finrlx('data.data_processor').DataProcessor(str(directory))
+
+
+def collection_status():
+    try:
+        manager=finrlx('data.data_fetcher').get_data_manager()
+        sources=[name for name,source in manager.data_sources if source.is_available()]
+        return {'status':'configured' if sources else 'requires_configuration',
+            'source':getattr(manager,'current_source_name',None),'available_sources':sources,
+            'reason':None if sources else 'FMP 인증이 없어 원격 가격 수집을 실행할 수 없습니다.'}
+    except Exception as exc:
+        return {'status':'unavailable','source':None,'available_sources':[],'reason':str(exc)}
+
+
 def prices(currency='USD',symbols=None):
     import pandas as pd
-    store=finrlx('data.data_store').DataStore()
+    store=price_store()
     import sqlite3
     from contextlib import closing
     with closing(sqlite3.connect(store.db_path)) as connection:

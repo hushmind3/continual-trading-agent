@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 
-from .paths import ensure_project_path
+from ...paths import ensure_project_path
 
 FEED_COLUMNS = [
     "date", "symbol", "market", "asset_class", "open", "high", "low", "close", "volume",
@@ -25,10 +25,10 @@ class AppendOnlyMarketCSV:
     def __init__(self, path: str | Path):
         self.path = ensure_project_path(path, "market data")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        from . import ROOT
-        from .finrl_trading import finrlx
-        self.store=finrlx('data.data_store').DataStore(str(ROOT/'data'))
-        self.processor=finrlx('data.data_processor').DataProcessor(str(self.path.parent/'data'))
+        from ... import ROOT
+        from .operations import price_store,price_processor
+        self.store=price_store(ROOT/'data')
+        self.processor=price_processor(self.path.parent/'data')
         self.db_path=self.store.db_path
         self.raw_path=self.path.with_name("timeframes.sqlite3")
         self.last_added_rows=[]

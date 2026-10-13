@@ -5,7 +5,7 @@ from api_context import BaseModel
 from api_context import FiniteJSONResponse
 from api_context import HTTPException
 from api_context import Literal
-from api_context import finrlx
+from stockrl.finrl_trading.price_data.operations import collection_status
 from api_context import runtime
 from api_context import system
 
@@ -13,14 +13,7 @@ router=APIRouter(default_response_class=FiniteJSONResponse)
 
 def connections():
     from stockrl.management.diagnostics_logs_code_apply.handlers import capabilities
-    try:
-        manager=finrlx("data.data_fetcher").get_data_manager()
-        sources=[name for name,source in manager.data_sources if source.is_available()]
-        info={"status":"configured" if sources else "requires_configuration",
-              "source":getattr(manager,"current_source_name",None),"available_sources":sources,
-              "reason":None if sources else "FMP 인증이 없어 원격 가격 수집을 실행할 수 없습니다."}
-    except Exception as exc:
-        info={"status":"unavailable","source":None,"available_sources":[],"reason":str(exc)}
+    info=collection_status()
     return {"api":{"status":"connected"},"data":info,"brokers":[
         {"name":name,"status":capabilities()[key]["status"],"reason":capabilities()[key]["reason"]}
         for name,key in (("키움","kiwoom"),("Alpaca","alpaca"))]}

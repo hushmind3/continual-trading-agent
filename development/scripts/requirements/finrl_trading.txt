@@ -1,0 +1,10 @@
+# Requested runtime imports of the pinned FinRL-X source.
+# These packages may also be shared with FinRL or Experts; this is not an uninstall list.
+# Versions are unchanged. operations.txt includes this file in the existing main environment.
+finnhub-python>=2.4.19
+lightgbm>=4.0.0
+xgboost>=2.0.0
+plotly>=5.15.0
+streamlit==1.45.1
+openai>=1.40.0
+pydantic-settings>=2.1.0

@@ -20,11 +20,10 @@ def prepare_inputs(entry, frame, account, context_frames=None):
         spec=entry['stock_policy']
         if spec['kind'] in ('a2c','ppo','sac'):
             from .. import ROOT
-            from ..finrl_trading.price_data.operations import prices
-            from ..finrl_trading import finrlx
+            from ..finrl_trading.price_data.operations import prices,price_store
             from ..moe_stock_policies import StockPolicyExpert,history_frame
             from pathlib import Path
-            store=finrlx('data.data_store').DataStore()
+            store=price_store()
             database=Path(store.db_path)
             version=tuple((p.stat().st_mtime_ns,p.stat().st_size) if p.exists() else None
                 for p in (database,Path(str(database)+'-wal'),ROOT/'runtime/operations/live/timeframes.sqlite3',ROOT/'runtime/operations/live/timeframes.sqlite3-wal'))

@@ -29,7 +29,6 @@ from stockrl.finrl.framework import policy_checkpoint
 from stockrl.finrl.framework import sac_example
 from stockrl.finrl.framework import finrl_file
 from stockrl.finrl.framework import champion_structure_environment
-from stockrl.finrl_trading import finrlx
 from stockrl.state_io import atomic_json
 from stockrl.state_io import read_json
 from stockrl.state_io import update_json

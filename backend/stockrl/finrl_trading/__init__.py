@@ -1,4 +1,4 @@
-"""Optional FinRL-Trading integrations."""
+"""FinRL-Trading import boundary for price, provider and native tool integrations."""
 import importlib
 import sys
 import threading

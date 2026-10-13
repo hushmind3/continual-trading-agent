@@ -1,4 +1,5 @@
 """Shared CMD/React orchestration of existing operations; no learner implementation."""
+from ..expert_registry import read_catalog
 import os,subprocess,sys,threading,time,uuid
 from pathlib import Path
 from datetime import datetime,timezone
@@ -363,7 +364,7 @@ class SystemOperations:
             runtime.ledger().save();self.phase(key,title,'complete','기존 잔고·보유·체결 원장 유지')
             self.interrupted();key='experts';title='선택 Frozen Expert 적재';self.phase(key,title)
             if not cfg.model_dir.is_dir():raise ValueError('모델 폴더 없음: '+str(cfg.model_dir))
-            catalog=read_json(cfg.registry_file)
+            catalog=read_catalog(cfg.registry_file)
             selected_policies=read_json(ROOT/'runtime/operations/policies.json')
             embedded_models=all(read_json((RUNTIME/selected_policies.get(currency,'')).parent/'dataset.json').get('champion_file') for currency in self.value['currencies'])
             preload=[] if embedded_models else catalog.get('active',[])

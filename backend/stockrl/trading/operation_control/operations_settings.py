@@ -18,7 +18,7 @@ def settings():
         ram_reserve_gib=0,vram_reserve_gib=0,disk_reserve_gib=0)
     root=ROOT/'runtime/operations'
     root.mkdir(parents=True,exist_ok=True)
-    return SimpleNamespace(registry_file=ROOT/'configs/experts.json',model_dir=model_dir,
+    return SimpleNamespace(registry_file=model_dir/'expert_registry.json',model_dir=model_dir,
         expert_checkpoint=str(model_dir/'champion.pt'),state_dir=root,
         resolve=lambda path:Path(path) if Path(path).is_absolute() else ROOT/path,
         resources=resources,risk=risk,data=data,symbols=values.get('symbols',[]))

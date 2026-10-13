@@ -1,5 +1,6 @@
 """Connect recovered account/feed/Expert modules to the current native SAC path."""
 from __future__ import annotations
+from stockrl.expert_registry import read_catalog
 import json
 import threading
 import time
@@ -230,7 +231,7 @@ class OperationsRuntime:
 
     def expert_pool(self):
         from stockrl.platform.assets import ExpertPool
-        catalog=read_json(ROOT/'configs/experts.json')
+        catalog=read_catalog()
         # Test status updates do not change the loaded Expert weights or selection.
         signature=json.dumps({'active':catalog.get('active',[]),
             'packages':{key:item.get('package') for key,item in catalog.get('experts',{}).items()}},sort_keys=True)

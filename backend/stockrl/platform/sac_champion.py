@@ -1,5 +1,6 @@
 """Versioned FinRL/SB3 policies assembled with frozen, per-Expert MoE inputs."""
 from __future__ import annotations
+from ..expert_registry import read_catalog
 
 import hashlib
 import json
@@ -168,8 +169,9 @@ def _next_version(algorithm='sac'):
 
 
 def _expert_payload(active):
-    catalog = read_json(ROOT / "configs/experts.json", {"experts": {}, "active": []})
-    expert_registry = MODEL_DIR / "expert_registry.json"
+    catalog = read_catalog()
+    from ..trading.operation_control.operations_settings import settings
+    expert_registry = settings().model_dir / "expert_registry.json"
     packages, counts, roles = {}, {}, {}
     for key in active:
         if key not in catalog.get("experts", {}):

@@ -1,4 +1,5 @@
 """Frozen Expert registration and inference; no trainable central model."""
+from .expert_registry import read_catalog,write_catalog
 from pathlib import Path
 from types import SimpleNamespace
 import json
@@ -17,13 +18,13 @@ class ExpertRegistry:
         self.pool_provider=pool_provider
         self._embedded_temp=None;self.champion_catalog=None
         if champion is None:
-            self.registry_file=ROOT/'configs/experts.json';self.model_dir=Path.home()/'Desktop'/'모델'/'experts'
+            self.model_dir=Path.home()/'Desktop'/'모델'/'experts';self.registry_file=self.model_dir/'expert_registry.json'
             self.state_dir=ROOT/'runtime/experts';self.state_dir.mkdir(parents=True,exist_ok=True)
         else:
             import tempfile,torch
             self._embedded_temp=tempfile.TemporaryDirectory(prefix='sac-champion-experts-')
             root=Path(self._embedded_temp.name);self.model_dir=root/'models';self.model_dir.mkdir()
-            self.registry_file=root/'configs'/'experts.json';self.registry_file.parent.mkdir()
+            self.registry_file=self.model_dir/'expert_registry.json'
             (self.model_dir/'expert_registry.json').write_text('{}',encoding='utf8')
             experts={};active=list(champion.get('identity',{}).get('champion_experts',[]))
             for key in active:
@@ -47,16 +48,12 @@ class ExpertRegistry:
 
     def catalog(self):
         if self.champion_catalog is not None:return self.champion_catalog
-        stamp=self.registry_file.stat() if self.registry_file.is_file() else None
-        signature=(stamp.st_mtime_ns,stamp.st_size) if stamp else None
-        if self._catalog_value is None or signature!=self._catalog_stamp:
-            self._catalog_value=read_json(self.registry_file);self._catalog_stamp=signature
-        return self._catalog_value
+        return read_catalog(self.registry_file)
 
     def select(self,active):
         catalog=self.catalog()
         if not set(active)<=set(catalog['experts']):raise ValueError('등록되지 않은 Expert입니다.')
-        catalog['active']=list(active);atomic_json(catalog,self.registry_file)
+        catalog['active']=list(active);write_catalog(catalog,self.registry_file)
         self.close()
 
     def register(self,path,slot):
@@ -77,7 +74,7 @@ class ExpertRegistry:
         if target.resolve()!=source:shutil.copyfile(source,target)
         ref={'file':target.relative_to(self.model_dir).as_posix(),'sha256':checksum,'bytes':target.stat().st_size}
         catalog=self.catalog();catalog.setdefault('experts',{})[slot]=descriptor(slot,package,ref)
-        atomic_json(catalog,self.registry_file)
+        write_catalog(catalog,self.registry_file)
         self.close()
 
     def outputs(self,frame,account,champion_ids=None):

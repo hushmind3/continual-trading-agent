@@ -1,5 +1,6 @@
 """Lazy, measured residency for the original frozen Expert assets only."""
 from __future__ import annotations
+from ..expert_registry import read_catalog
 
 from collections import OrderedDict
 import gc
@@ -25,7 +26,7 @@ class ExpertPool:
         self.keep_device=keep_device
         self.live=live
         from ..state_io import read_json
-        catalog=read_json(settings.registry_file)
+        catalog=read_catalog(settings.registry_file)
         for key,reference in (extra_packages or {}).items():
             catalog.setdefault('experts',{})[key]={'package':reference}
         self.path=settings.model_dir/'expert_registry.json'

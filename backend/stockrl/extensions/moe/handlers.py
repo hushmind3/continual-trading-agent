@@ -1,5 +1,6 @@
 """MoE — existing API handlers."""
 from __future__ import annotations
+from ...expert_registry import read_catalog
 from api_context import APIRouter
 from api_context import BaseModel
 from api_context import ExpertRegistry
@@ -40,7 +41,7 @@ def expert_state():
     from stockrl.management.diagnostics_logs_code_apply.handlers import file_info
     from stockrl.trading.operation_control.operations_settings import settings
     model_dir=settings().model_dir
-    registry = read_json(ROOT / "configs/experts.json", {"active": [], "experts": {}})
+    registry = read_catalog()
     status = read_json(ROOT / "runtime/experts/status.json")
     rows = []
     for key, item in registry.get("experts", {}).items():
@@ -119,7 +120,7 @@ def register(req: Registration):
         with system.job_lock:
             if system.job_state()["running"]:
                 raise HTTPException(409, "실행을 마친 뒤 패키지를 등록하세요.")
-            registry = read_json(ROOT / "configs/experts.json")
+            registry = read_catalog()
             if req.slot in registry.get("experts", {}):
                 raise HTTPException(409, "이미 사용 중인 슬롯 이름입니다. 다른 이름으로 등록하세요.")
             try:
@@ -141,7 +142,7 @@ def library_job(kind:str,payload:dict):
 def model_files():
     from stockrl.trading.operation_control.operations_settings import settings
     model_dir=settings().model_dir
-    registry=read_json(ROOT/'configs/experts.json');registered={(model_dir/item['package']['file']).resolve():key for key,item in registry.get('experts',{}).items()}
+    registry=read_catalog();registered={(model_dir/item['package']['file']).resolve():key for key,item in registry.get('experts',{}).items()}
     for key,item in registry.get('experts',{}).items():
         if item['package']['file'].endswith('.json'):
             package=read_json(model_dir/item['package']['file'])

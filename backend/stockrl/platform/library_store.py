@@ -1,4 +1,5 @@
 """Candidate discovery and immutable package registration; no portfolio effects."""
+from ..expert_registry import read_catalog,write_catalog
 import re
 import time
 from pathlib import Path
@@ -14,7 +15,7 @@ def catalog_path(settings):return settings.registry_file
 
 
 def save_catalog(settings,header,catalog=None):
-    path=catalog_path(settings);catalog=catalog or read_json(path) or dict(experts={})
+    path=catalog_path(settings);catalog=catalog or read_catalog(path) or dict(experts={})
     for key,reference in header['expert_packages'].items():
         package=load_package(settings.resolve(settings.expert_checkpoint),reference)
         value=descriptor(key,package,reference)
@@ -25,7 +26,7 @@ def save_catalog(settings,header,catalog=None):
         catalog['experts'][key]=value
     catalog.update(active=catalog.get('active',header.get('active_experts',sorted(header['expert_mapping']))),
                    installed={k:r['sha256'] for k,r in header['expert_packages'].items()},updated=time.time())
-    atomic_json(catalog,path);return catalog
+    write_catalog(catalog,path);return catalog
 
 
 def fetch_source(settings,source,progress,root=None):
@@ -59,7 +60,7 @@ def inspect_source(path,settings=None,catalog=None):
         from .gguf_registration import inspect_gguf
         return [inspect_gguf(path)]
     from .native_upgrade import read_native,inspect_native
-    saved=read_json(path) if path.suffix.lower()=='.json' else read_native(path)
+    saved=read_catalog(path) if path.suffix.lower()=='.json' else read_native(path)
     if saved.get('format')==PACKAGE_FORMAT:
         entries={saved['id']:saved['entry']}
     elif saved.get('format') in ('registered_vertical_trading_moe_v1',HEADER_FORMAT):entries=saved['expert_mapping']

@@ -24,3 +24,5 @@
 npm 의존성: 루트 package.json·package-lock.json·node_modules/에서 통합 관리합니다. frontend/와 backend/rea/는 package.json을 갖는 npm workspaces입니다. 설치는 루트 npm ci, 프론트 실행·빌드는 npm run dev/build --workspace frontend입니다.
 
 현재 가격 DB는 data/market_prices.sqlite3입니다. FinRL-X와 Streamlit은 설치·실행 연결에서 제거했습니다. Expert 원본·패키지는 바탕화면 모델/experts/market(시장·시계열) 및 action(행동·정책)에 분류합니다. 최신 검증·정리 결과는 development/docs/finrl_x_removal.md를 읽습니다.
+
+Expert 설정은 바탕화면 모델/experts/expert_registry.json(경로·선택 취합)과 각 원본 모델 폴더의 expert.json(모델 등록·설정·기록)에 있습니다. 프로젝트 configs/experts.json은 모델 폴더로 이동했습니다. 가중치와 원본 config 파일은 변경하지 않았습니다.

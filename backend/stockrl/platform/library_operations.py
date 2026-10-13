@@ -1,4 +1,5 @@
 """Recovered library job interface; delegate to existing modules, not old learners."""
+from ..expert_registry import read_catalog,write_catalog
 import threading
 import time
 from pathlib import Path
@@ -16,7 +17,7 @@ class LibraryOperations:
         self.catalog_path=settings().registry_file
 
     def snapshot(self):
-        return dict(catalog=read_json(self.catalog_path),job={**read_json(self.status_path),'busy':self.active})
+        return dict(catalog=read_catalog(self.catalog_path),job={**read_json(self.status_path),'busy':self.active})
 
     def start(self,kind,payload):
         if kind not in ('inspect','import','probe','probe_all','load','unload','remove','search','acquire','convert','quantize','quantize_all','optimize','optimize_all','apply','compare'):
@@ -45,13 +46,13 @@ class LibraryOperations:
             atomic_json(dict(stage='stopped',kind=kind,detail=str(exc),started=started,finished=time.time()),self.status_path)
         except Exception as exc:
             if kind=='convert' and payload.get('id') and payload.get('precision'):
-                latest=read_json(self.catalog_path);base=payload['id'];precision=payload['precision']
+                latest=read_catalog(self.catalog_path);base=payload['id'];precision=payload['precision']
                 if base in latest.get('experts',{}):
                     record=latest.setdefault('optimizations',{}).setdefault(base,{})
                     record.update(stage='partial',finished=time.time())
                     record.setdefault('attempts',{})[precision]={'status':'failed','detail':str(exc)}
                     record['failures']=[row for row in record.get('failures',[]) if row.get('precision')!=precision]+[{'precision':precision,'detail':str(exc)}]
-                    atomic_json(latest,self.catalog_path)
+                    write_catalog(latest,self.catalog_path)
             atomic_json(dict(stage='error',kind=kind,error=str(exc),finished=time.time()),self.status_path)
         finally:self.active=False
 
@@ -59,7 +60,7 @@ class LibraryOperations:
         from .expert_comparison import comparison_result,measure
         from .expert_optimizer import measurement_summary
         import random,numpy as np,torch
-        key=item['id'];cfg=settings();catalog=read_json(cfg.registry_file)
+        key=item['id'];cfg=settings();catalog=read_catalog(cfg.registry_file)
         if not base or base==key or base not in catalog.get('experts',{}):
             return dict(comparison_status='no_original',comparison_error='비양자화 원본이 등록되어 있지 않아 원본 출력과 비교할 수 없습니다.')
         progress(stage='quantization_compare',detail=f'{base} ↔ {key} · 동일 입력 원본 출력 비교')
@@ -106,7 +107,7 @@ class LibraryOperations:
                 if not was_loaded:runtime.unload(key)
 
     def _execute(self,kind,payload,progress):
-        cfg=settings();catalog=read_json(cfg.registry_file)
+        cfg=settings();catalog=read_catalog(cfg.registry_file)
         if kind=='quantize_all':
             import re
             experts=catalog.get('experts',{})
@@ -146,9 +147,9 @@ class LibraryOperations:
                 precision='int'+bits.group(1) if bits else label
                 row={'id':key,'status':'existing','precision':precision,'representation':label,'bytes':weight.stat().st_size,'detail':'이미 양자화된 GGUF 파일입니다. '+label,
                     'comparison_status':'no_original','comparison_error':'등록된 GGUF는 이미 양자화된 파일이며 비교할 비양자화 원본이 없습니다.'}
-                latest=read_json(cfg.registry_file)
+                latest=read_catalog(cfg.registry_file)
                 latest.setdefault('quantizations',{})[key]={'stage':'complete','finished':time.time(),'reports':[row],'attempts':{},'failures':[]}
-                atomic_json(latest,cfg.registry_file)
+                write_catalog(latest,cfg.registry_file)
                 return {'total':1,'created':0,'existing':1,'failed':0,'compared':0,'comparison_unavailable':1,'items':[row]}
             if package.get('quantization'):
                 conversion=package.get('conversion') or {}
@@ -158,9 +159,9 @@ class LibraryOperations:
                 try:row.update(self._compare_quantized(source,entry,progress,cache))
                 finally:
                     if cache.get('release_base'):runtime.unload(source)
-                latest=read_json(cfg.registry_file);latest['experts'][key]=entry
+                latest=read_catalog(cfg.registry_file);latest['experts'][key]=entry
                 latest.setdefault('quantizations',{})[key]={'stage':'complete' if row['comparison_status']=='measured' else 'partial','finished':time.time(),'reports':[row],'attempts':{},'failures':[]}
-                atomic_json(latest,cfg.registry_file)
+                write_catalog(latest,cfg.registry_file)
                 return {'total':1,'created':0,'existing':1,'failed':0,'compared':int(row['comparison_status']=='measured'),
                     'comparison_failed':int(row['comparison_status']=='failed'),'comparison_unavailable':int(row['comparison_status'] in ('input_unavailable','no_original')),'items':[row]}
             source=(package.get('conversion') or {}).get('source_id') or (entry.get('conversion') or {}).get('source_id')
@@ -173,7 +174,7 @@ class LibraryOperations:
                     started=time.perf_counter();slot=key+'_'+precision
                     record['attempts'][precision]={'status':'running','detail':'양자화 가중치 생성'}
                     try:
-                        latest=read_json(cfg.registry_file)
+                        latest=read_catalog(cfg.registry_file)
                         candidate=next((item for item in latest.get('experts',{}).values() if (item.get('conversion') or {}).get('source_id')==key and (item.get('conversion') or {}).get('precision')==precision),None) or latest.get('experts',{}).get(slot)
                         if candidate is not None:
                             from .expert_contracts import descriptor
@@ -189,20 +190,20 @@ class LibraryOperations:
                         row={'id':candidate['id'],'precision':precision,'status':status,'bytes':candidate.get('weight_bytes') or candidate['package']['bytes'],
                             'package_bytes':candidate['package']['bytes'],'seconds':time.perf_counter()-started,'conversion':candidate.get('conversion',{}),
                             'detail':'양자화 완료' if status=='created' else '기존 양자화 버전이 있습니다.'}
-                        latest=read_json(cfg.registry_file);latest['experts'][candidate['id']]=candidate;atomic_json(latest,cfg.registry_file)
+                        latest=read_catalog(cfg.registry_file);latest['experts'][candidate['id']]=candidate;write_catalog(latest,cfg.registry_file)
                         row.update(self._compare_quantized(key,candidate,progress,comparison_cache))
                         row['conversion']=candidate.get('conversion',{})
-                        latest=read_json(cfg.registry_file);latest['experts'][candidate['id']]=candidate
+                        latest=read_catalog(cfg.registry_file);latest['experts'][candidate['id']]=candidate
                         record['attempts'][precision]={'status':'complete','detail':row['detail']}
                     except InterruptedError:raise
                     except Exception as exc:
                         row={'id':slot,'precision':precision,'status':'failed','detail':str(exc),'seconds':time.perf_counter()-started}
                         record['attempts'][precision]={'status':'failed','detail':str(exc)}
                         record['failures'].append({'precision':precision,'detail':str(exc)})
-                        latest=read_json(cfg.registry_file)
-                    record['reports'].append(row);latest.setdefault('quantizations',{})[key]=record;atomic_json(latest,cfg.registry_file)
+                        latest=read_catalog(cfg.registry_file)
+                    record['reports'].append(row);latest.setdefault('quantizations',{})[key]=record;write_catalog(latest,cfg.registry_file)
                 record.update(stage='partial' if record['failures'] or any(row.get('comparison_status')!='measured' for row in record['reports']) else 'complete',finished=time.time())
-                latest=read_json(cfg.registry_file);latest.setdefault('quantizations',{})[key]=record;atomic_json(latest,cfg.registry_file)
+                latest=read_catalog(cfg.registry_file);latest.setdefault('quantizations',{})[key]=record;write_catalog(latest,cfg.registry_file)
             finally:
                 if pool:pool.close()
                 if comparison_cache.get('release_base'):runtime.unload(key)
@@ -278,14 +279,14 @@ class LibraryOperations:
                 finally:
                     if kind=='probe_all' and not was_loaded:runtime.unload(key)
             if kind=='probe_all':
-                latest=read_json(cfg.registry_file)
+                latest=read_catalog(cfg.registry_file)
                 for row in results:
                     current=latest.get('experts',{}).get(row['id'])
                     if current is not None and current.get('package')==experts[row['id']].get('package'):
                         current['check']={'status':row['status'],
                             'detail':row.get('detail','실제 입력 전체 묶음 추론·출력 계약 통과'),
                             'tested':time.time(),**({'metrics':row['metrics'],'seconds':row.get('seconds')} if row.get('metrics') else {})}
-                atomic_json(latest,cfg.registry_file)
+                write_catalog(latest,cfg.registry_file)
             progress(stage=kind,completed=len(keys),total=len(keys),detail='전체 원본 Expert 처리 완료')
             return {'total':len(keys),'passed':sum(x['status']=='passed' for x in results),
                 'failed':sum(x['status']=='failed' for x in results),
@@ -307,10 +308,10 @@ class LibraryOperations:
                         cache=caches.setdefault(base,{'device':payload.get('device','auto')})
                         measured=self._compare_quantized(base,item,progress,cache)
                         row={'id':key,'status':'existing','precision':(item.get('conversion') or {}).get('precision'),'bytes':item.get('weight_bytes') or entry['package']['bytes'],**measured}
-                        rows.append(row);latest=read_json(cfg.registry_file);latest['experts'][key]=item
+                        rows.append(row);latest=read_catalog(cfg.registry_file);latest['experts'][key]=item
                         record=latest.setdefault('quantizations',{}).setdefault(base,{'reports':[],'failures':[]})
                         record['reports']=[existing for existing in record.get('reports',[]) if existing.get('id')!=key]+[row]
-                        record['finished']=time.time();atomic_json(latest,cfg.registry_file)
+                        record['finished']=time.time();write_catalog(latest,cfg.registry_file)
                 finally:
                     for base,cache in caches.items():
                         if cache.get('release_base'):runtime.unload(base)
@@ -325,7 +326,7 @@ class LibraryOperations:
             for key in keys:
                 progress(stage='comparison',detail=key);results.append(measure(runtime,key,fixture))
             result=comparison_result(items,results,fixture);catalog['comparison']=result
-            atomic_json(catalog,cfg.registry_file);return result
+            write_catalog(catalog,cfg.registry_file);return result
         if kind=='apply':
             from ..expert_registry_native import ExpertRegistry
             ExpertRegistry().select(payload['active'])
@@ -364,7 +365,7 @@ class LibraryOperations:
                 for field in ('selected','previous'):
                     if record.get(field) in ids:record[field]=None
                 if not (record['reports'] or record['failures'] or record['attempts']):records.pop(source)
-            atomic_json(catalog,cfg.registry_file)
+            write_catalog(catalog,cfg.registry_file)
             return {'removed':ids,'removed_failures':failure_records,'model_files_preserved':True}
         if kind=='probe':
             key=payload['id'];started=time.time();metrics={}
@@ -379,16 +380,16 @@ class LibraryOperations:
                 result={'id':key,'status':'failed','failed':1,'detail':str(exc)}
                 current=system.expert_pool.metrics.get(key,{}) if system.expert_pool else {}
                 if max(current.get('last_completed_at',0),current.get('last_attempted_at',0))>=started:metrics=dict(current)
-            latest=read_json(cfg.registry_file);entry=latest.get('experts',{}).get(key)
+            latest=read_catalog(cfg.registry_file);entry=latest.get('experts',{}).get(key)
             if entry is not None and entry.get('package')==catalog.get('experts',{}).get(key,{}).get('package'):
                 entry['check']={'status':result['status'],'detail':result.get('detail','실제 입력 전체 묶음·출력 계약 통과'),
                     'tested':time.time(),'seconds':time.time()-started,**({'metrics':metrics} if metrics else {})}
-                atomic_json(latest,cfg.registry_file)
+                write_catalog(latest,cfg.registry_file)
             return result
         if kind=='search':
             from .expert_discovery import search
             result=search(cfg,catalog,payload,progress)
-            catalog['discovery']=result;atomic_json(catalog,cfg.registry_file)
+            catalog['discovery']=result;write_catalog(catalog,cfg.registry_file)
             return result
         if kind=='inspect':
             from .library_store import inspect_source
@@ -424,7 +425,7 @@ class LibraryOperations:
                 else:
                     item=import_package(cfg,path,payload.get('expert_id'),slot,progress,
                         template=catalog['experts'].get(payload.get('template')))
-            catalog=read_json(cfg.registry_file)
+            catalog=read_catalog(cfg.registry_file)
             catalog.setdefault('experts',{})[item['id']]=item
             if kind=='convert' and catalog.get('optimizations',{}).get(payload['id']):
                 record=catalog['optimizations'][payload['id']];precision=payload['precision']
@@ -432,7 +433,7 @@ class LibraryOperations:
                 record['failures']=[row for row in record.get('failures',[]) if row.get('precision')!=precision]
             if payload.get('activate',kind=='acquire'):
                 catalog['active']=sorted(set([*catalog.get('active',[]),item['id']]))
-            atomic_json(catalog,cfg.registry_file)
+            write_catalog(catalog,cfg.registry_file)
             return item
         if kind=='optimize':
             from .expert_optimizer import best_precision,measurement_summary
@@ -450,15 +451,15 @@ class LibraryOperations:
             except Exception as exc:baseline_error=str(exc)
             for precision in payload.get('precisions',['nf4','int4','int8']):
                 slot=base+'_'+precision
-                catalog=read_json(cfg.registry_file);item=catalog['experts'].get(slot)
+                catalog=read_catalog(cfg.registry_file);item=catalog['experts'].get(slot)
                 record['attempts'][precision]={'status':'running','detail':'버전 생성·실제 출력 검사'}
-                catalog.setdefault('optimizations',{})[base]=record;atomic_json(catalog,cfg.registry_file)
+                catalog.setdefault('optimizations',{})[base]=record;write_catalog(catalog,cfg.registry_file)
                 try:
                     if item is None:
                         item=convert(cfg,catalog,{'id':base,'precision':precision,'slot':slot,
                             'device':payload.get('device','auto')},progress)
-                        catalog=read_json(cfg.registry_file);catalog['experts'][slot]=item
-                        catalog.setdefault('optimizations',{})[base]=record;atomic_json(catalog,cfg.registry_file)
+                        catalog=read_catalog(cfg.registry_file);catalog['experts'][slot]=item
+                        catalog.setdefault('optimizations',{})[base]=record;write_catalog(catalog,cfg.registry_file)
                     if first is not None:
                         variant=measure(runtime,slot,fixture)
                         compared=comparison_result({base:catalog['experts'][base],slot:item},[first,variant],fixture)
@@ -480,9 +481,9 @@ class LibraryOperations:
                     if item is not None:item['check']={'status':'failed','detail':detail}
                     else:record['failures'].append({'precision':precision,'detail':detail})
                     rows.append({'id':slot,'precision':precision,'passed':False,'status':'failed','detail':detail})
-                latest=read_json(cfg.registry_file)
+                latest=read_catalog(cfg.registry_file)
                 if item is not None:latest['experts'][slot]=item
-                latest.setdefault('optimizations',{})[base]=record;atomic_json(latest,cfg.registry_file)
+                latest.setdefault('optimizations',{})[base]=record;write_catalog(latest,cfg.registry_file)
                 catalog=latest
             from .resources import ResourceMonitor
             resources=ResourceMonitor(cfg.state_dir).snapshot({})
@@ -492,7 +493,7 @@ class LibraryOperations:
             record.update(stage='partial' if failed or skipped else 'complete',selected=selected['id'] if selected else None,
                 finished=time.time(),total=len(rows),failed=failed,skipped=skipped,passed=sum(row['status']=='passed' for row in rows),
                 detail=input_error or baseline_error or (str(failed)+'개 버전 실패' if failed else '버전 생성·검사 완료'))
-            latest=read_json(cfg.registry_file);latest.setdefault('optimizations',{})[base]=record;atomic_json(latest,cfg.registry_file)
+            latest=read_catalog(cfg.registry_file);latest.setdefault('optimizations',{})[base]=record;write_catalog(latest,cfg.registry_file)
             return record
 
 library=LibraryOperations()

@@ -96,10 +96,19 @@ def sources():
         if name.startswith('frontend/src/') or name in ('frontend/index.html','frontend/package.json','frontend/tsconfig.json','frontend/vite.config.ts'):group='frontend'
         elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('backend/rea/project_explorer/saved_projects/') or name.startswith('development/scripts/requirements/'):group='backend'
         elif name.startswith('development/scripts/') and name.endswith('.py') or name=='서버켜기.cmd':group='launcher'
-        elif name in ('configs/experts.json','configs/instruments.json'):group='configuration'
+        elif name=='configs/instruments.json':group='configuration'
         else:continue
         path=ROOT/name
         groups[group][name]=hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else 'missing'
+    model_root=Path.home()/'Desktop'/'모델'/'experts'
+    registry=model_root/'expert_registry.json'
+    if registry.is_file():
+        groups['configuration']['models/expert_registry.json']=hashlib.sha256(registry.read_bytes()).hexdigest()
+        index=json.loads(registry.read_text(encoding='utf8'))
+        for relative in index.get('models',[]):
+            manifest=(model_root/relative).resolve()
+            if not manifest.is_relative_to(model_root.resolve()):raise ValueError('모델 JSON이 모델 폴더 밖에 있습니다.')
+            groups['configuration']['models/'+relative]=hashlib.sha256(manifest.read_bytes()).hexdigest() if manifest.is_file() else 'missing'
     revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     return groups,revision
 

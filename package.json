@@ -1,0 +1,19 @@
+{
+  "name": "project-platform",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend/rea"
+  ],
+  "engines": {
+    "node": "^22.19.0 || ^24.11.0 || >=26.0.0"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "typecheck": "npm run typecheck --workspace frontend",
+    "test:api": "npm run test:api --workspace frontend",
+    "test:browser": "npm run test:browser --workspace frontend"
+  }
+}

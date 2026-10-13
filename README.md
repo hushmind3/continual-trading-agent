@@ -23,3 +23,5 @@
 변경 작업은 관련 작은 메뉴 README부터 읽습니다. 검사 명령은 [scripts 안내](scripts/README.md)에 있습니다.
 
 정리 보류: 빈 src/는 휴지통의 같은 경로가 이미 있어 이동하지 않았습니다. 현재 실행 소스는 backend/·frontend/·vendor/에 있습니다.
+
+npm 의존성: 루트 package.json·package-lock.json·node_modules/에서 통합 관리합니다. frontend/와 backend/rea/는 package.json을 갖는 npm workspaces입니다. 설치는 루트 npm ci, 프론트 실행·빌드는 npm run dev/build --workspace frontend입니다.

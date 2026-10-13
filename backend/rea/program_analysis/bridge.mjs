@@ -3,7 +3,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import {createInterface} from 'node:readline';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-const root=fileURLToPath(new URL('.',import.meta.url));
+const root=fileURLToPath(new URL('../../../',import.meta.url));
 const client=new Client({name:'stockrl-rea',version:'0.1.0'});
 const transport=new StdioClientTransport({command:process.execPath,args:[resolve(root,'node_modules/rea-agents/scripts/rea.mjs'),'--mcp'],cwd:process.cwd(),env:{...process.env,NO_COLOR:'1'},stderr:'inherit'});
 try {

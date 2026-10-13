@@ -76,7 +76,7 @@ root.destroy();print(json.dumps({'path':value},ensure_ascii=False))
 def _javascript(target,folder):
     node,_=node_runtime();analysis=folder/'analysis'
     with (analysis/'evidence.json').open('wb') as output,(analysis/'progress.log').open('wb') as log:
-        process=_spawn([node,str(BASE/'node_modules/rea-agents/scripts/rea.mjs'),'analyze-javascript-application',str(target),'--json'],cwd=BASE,stdout=output,stderr=log)
+        process=_spawn([node,str(ROOT/'node_modules/rea-agents/scripts/rea.mjs'),'analyze-javascript-application',str(target),'--json'],cwd=BASE,stdout=output,stderr=log)
         code=process.wait()
     _check()
     if code:raise RuntimeError('REA JavaScript 분석 실패: '+(analysis/'progress.log').read_text(encoding='utf8',errors='replace')[-2000:])

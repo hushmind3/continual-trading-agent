@@ -90,7 +90,10 @@ def sources():
     names=set(subprocess.check_output(['git','ls-files','-co','--exclude-standard','-z'],cwd=ROOT).decode('utf8').split('\0'))
     groups={name:{} for name in ('frontend','backend','launcher','configuration')}
     for name in sorted(names):
-        if name.startswith('frontend/src/') or name in ('frontend/index.html','frontend/package.json','frontend/package-lock.json','frontend/tsconfig.json','frontend/vite.config.ts'):group='frontend'
+        if name in ('package.json','package-lock.json'):
+            for target in ('frontend','backend'):groups[target][name]=hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
+            continue
+        if name.startswith('frontend/src/') or name in ('frontend/index.html','frontend/package.json','frontend/tsconfig.json','frontend/vite.config.ts'):group='frontend'
         elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('backend/rea/project_explorer/saved_projects/') or name.startswith('scripts/requirements/'):group='backend'
         elif name.startswith('scripts/') and name.endswith('.py') or name=='서버켜기.cmd':group='launcher'
         elif name in ('configs/experts.json','configs/instruments.json'):group='configuration'
@@ -143,7 +146,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                 phase(stage,'실행 중 작업 보존','complete','기존 작업을 종료하지 않았습니다.')
             stage='build';phase(stage,'React 변경 적용')
             if frontend_changed and not skip_build:
-                node=shutil.which('node');vite=FRONTEND/'node_modules/vite/bin/vite.js';tsc=FRONTEND/'node_modules/typescript/bin/tsc'
+                node=shutil.which('node');vite=ROOT/'node_modules/vite/bin/vite.js';tsc=ROOT/'node_modules/typescript/bin/tsc'
                 if not node or not vite.is_file() or not tsc.is_file():raise RuntimeError('설치된 Node/Vite/TypeScript가 필요합니다. 패키지를 자동 설치하지 않습니다.')
                 log=RUNTIME/'apply-build.log';operation['build_log']=str(log)
                 with log.open('w',encoding='utf8') as output:

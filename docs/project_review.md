@@ -328,3 +328,12 @@ REA 작은 메뉴를 파일 복원·디컴파일로 변경했다. 메인 화면�
 ### 2026-10-13 플랫폼 전수 정리
 
 Python 109개·프론트 65개 참조 조사 결과 추가 미참조 소스 파일은 없었습니다. 현재 빌드 파일 19개를 보존하고 과거 빌드 87개·Python 캐시 122개·생성 보고서/캐시 폴더 3개를 휴지통으로 이동했습니다. 0개는 경로 충돌 등으로 보류했습니다. README와 설치 의존성·실행 코드·사용자 데이터는 유지했습니다. 코드/빌드/서버는 변경하지 않았고 테스트·타입·브라우저 검증은 미실행입니다. 상세 경로는 platform_cleanup_audit.md에 기록했습니다.
+
+
+### 2026-10-13 npm workspace와 공통 의존성 통합
+
+- 루트 package.json·package-lock.json·node_modules/로 통합했습니다. frontend/·backend/rea/에는 각 package.json을 유지하고 npm workspaces로 등록했습니다. 기존 두 lockfile과 설치 트리는 휴지통으로 이동했습니다.
+- 기존 lock의 패키지 버전을 유지했습니다. Babel·Playwright 등의 서로 다른 버전은 루트 node_modules 내부의 전이 의존성으로 공존합니다. workspace 내부 node_modules 경로는 없습니다. npm ci --ignore-scripts --no-audit --no-fund 성공(234개 설치); 버전 변경 없음. 기존 루트 Node 24.21.0을 사용했으며 Node/라이브러리 업그레이드는 수행하지 않았습니다.
+- REA CLI·브리지·원본 추출·상태·설치는 루트 node_modules를 사용합니다. Vite·TypeScript 실행 경로·개발 CMD·CI lockfile·기존 런처의 소스 감지도 루트 통합 경로를 반영했습니다. Vite 개발 캐시는 루트 node_modules/.cache/vite/frontend에 둡니다.
+- 기존 workspace 로컬 설치 트리를 제거한 뒤 루트 의존성으로 프론트 빌드 성공(3.52초). 타입·단위·브라우저·REA 엔진 실제 검사는 사용자 직접 검사 지침에 따라 미실행입니다. 사용자 검사: 루트 npm run typecheck, npm run test:api, npm run test:browser; Python은 scripts/README.md 명령을 사용합니다. 정책 생성·학습·AI 에이전트·추출 프로그램 실행은 수행하지 않았습니다.
+- FinRL-X 분리 단위의 확인은 이번 npm 구조 통합 뒤로 보류합니다. 관련 조사 초안은 현재 작업 커밋에 포함하지 않습니다.

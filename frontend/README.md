@@ -35,3 +35,7 @@ FinRL 메인에는 정책 학습과 FinRL 모듈·도구만 남습니다. 정책
 FinRL-Trading의 이미지에 지정된 13개 추가 메뉴와 전용 입력폼은 제거했습니다. 남은 추가 메뉴 5개와 원본 모듈·도구 화면은 유지하며 메뉴와 입력은 백엔드 등록표에서 동일하게 생성합니다. 현재 전체 화면은 16개입니다.
 
 REA 큰 메뉴와 분석·진단 작은 메뉴를 추가했습니다. 기본 작은 메뉴 12개·추가 메뉴 5개로 총 17개 화면이며 원본 REA 스키마/입력/결과를 표시합니다. REA 실행은 사용자 버튼 요청으로만 호출하고 원본 미지원·엔진 부족 오류를 그대로 보여줍니다.
+
+## npm workspace
+
+실제 node_modules와 package-lock.json은 프로젝트 루트에 있습니다. 이 폴더의 package.json은 React/Vite workspace 선언입니다. 루트에서 npm ci, npm run dev --workspace frontend, npm run build --workspace frontend를 사용합니다.

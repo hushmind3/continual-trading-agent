@@ -94,8 +94,8 @@ connection=REAConnection()
 def tool_catalog(version):return connection.request({'operation':'tools'},60)['tools']
 
 def status():
-    package=BASE/'node_modules/rea-agents/package.json'
-    if not package.is_file():return {'installed':False,'source':SOURCE,'tools':[],'reason':'REA가 설치되지 않았습니다. 설치.cmd 또는 REA 폴더의 npm ci를 실행하세요.'}
+    package=ROOT/'node_modules/rea-agents/package.json'
+    if not package.is_file():return {'installed':False,'source':SOURCE,'tools':[],'reason':'REA가 설치되지 않았습니다. 설치.cmd 또는 프로젝트 루트의 npm ci를 실행하세요.'}
     metadata=json.loads(package.read_text(encoding='utf8'))
     try:
         node,version=node_runtime();tools=tool_catalog(metadata['version']);engines=engine_settings()
@@ -117,7 +117,7 @@ def install():
     if not npm_path.is_file():raise RuntimeError('npm-cli.js를 찾을 수 없습니다.')
     env=os.environ.copy();env['PATH']=str(Path(node).parent)+os.pathsep+env.get('PATH','')
     if os.name=='nt':env['ComSpec']=str(Path(os.environ.get('SystemRoot','C:/Windows'))/'System32/cmd.exe')
-    subprocess.run([node,str(npm_path),'ci','--no-audit','--no-fund'],cwd=BASE,env=env,check=True)
+    subprocess.run([node,str(npm_path),'ci','--no-audit','--no-fund'],cwd=ROOT,env=env,check=True)
 
 # Project-scoped engine settings; never edit Codex/client/global environment.
 ENGINE_CONFIG=ROOT/'configs/local/rea.json'

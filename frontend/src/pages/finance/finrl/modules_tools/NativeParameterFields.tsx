@@ -1,4 +1,4 @@
-import {inputClass,ErrorMessage} from '../../../ui/Primitives';
+import {inputClass,ErrorMessage} from '../../../../ui/Primitives';
 export interface NativeParameter {name:string;annotation?:string;required:boolean;default?:string;kind?:string}
 export function NativeParameterFields({title,parameters,value,onChange}:{title:string;parameters:NativeParameter[];value:string;onChange:(value:string)=>void}){
  let values:Record<string,unknown>;

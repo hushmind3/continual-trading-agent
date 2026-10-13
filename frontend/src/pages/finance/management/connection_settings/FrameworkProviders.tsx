@@ -1,7 +1,7 @@
 import {useState} from 'react';
-import {useSystemState,useOperations} from '../../../data/Operations';
-import {Panel} from '../../../ui/Panel';
-import {Button,ErrorMessage,inputClass} from '../../../ui/Primitives';
+import {useSystemState,useOperations} from '../../../../data/Operations';
+import {Panel} from '../../../../ui/Panel';
+import {Button,ErrorMessage,inputClass} from '../../../../ui/Primitives';
 export function FrameworkProviders(){
  const provider=useSystemState<{items:{name:string;fields:string[];configured:boolean;status:string}[]}>('framework/providers'),{execute,pending}=useOperations();
  const [values,setValues]=useState<Record<string,string>>({}),[error,setError]=useState(''),[message,setMessage]=useState('');

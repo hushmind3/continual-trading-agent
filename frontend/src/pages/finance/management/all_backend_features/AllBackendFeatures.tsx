@@ -2,8 +2,8 @@ import {useEffect,useState} from 'react';
 import {useOperations,useSystemState} from '../../../../data/Operations';
 import {apiUrl} from '../../../../data/api';
 import type {BackendMenuCatalog,JsonSchema} from '../../../../data/menu_types';
-import {NativeModuleRunner} from '../../../shared/frameworks/NativeModuleRunner';
-import {ModuleCatalog} from '../../../shared/frameworks/FrameworkWorkspace';
+import {NativeModuleRunner} from '../../finrl/modules_tools/NativeModuleRunner';
+import {ModuleCatalog} from '../../finrl/modules_tools/FrameworkWorkspace';
 import {Panel} from '../../../../ui/Panel';
 import {Button,ErrorMessage,Tabs,inputClass} from '../../../../ui/Primitives';
 

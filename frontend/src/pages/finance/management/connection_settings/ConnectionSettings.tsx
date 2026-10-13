@@ -1,4 +1,4 @@
-import {FrameworkProviders} from '../../../shared/frameworks/FrameworkProviders';
+import {FrameworkProviders} from './FrameworkProviders';
 import {useState} from 'react';
 import {Link2,RefreshCw} from 'lucide-react';
 import {useSystemState,useOperations} from '../../../../data/Operations';

@@ -7,3 +7,5 @@
 - 의존성: 기존 framework 뷰, NativeModuleRunner의 FinRL 원본 실행, 프로젝트 API는 all_backend_features?tab=commands로 연결합니다.
 - 정리: 별도 프로젝트 모듈 메뉴·화면·등록 폴더는 의존성을 제거한 뒤 휴지통으로 이동했습니다. 실제 금융 기능·공식 원본·API 작업명·데이터는 변경하지 않았습니다.
 - 확인 상태: 이번 통합 후 브라우저·타입·함수 실행 검사는 미실행입니다.
+
+실제 모듈 목록·원본 함수 입력·실행·결과 화면은 모두 이 작은 메뉴 폴더에 있습니다: FrameworkWorkspace.tsx, NativeModuleRunner.tsx, NativeParameterFields.tsx, FrameworkResult.tsx. 공급원 설정 화면은 management/connection_settings/FrameworkProviders.tsx입니다. 금융 밖 shared/frameworks/ 구현은 없습니다.

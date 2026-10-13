@@ -32,6 +32,7 @@ class ExpertPool:
         self.path=settings.model_dir/'expert_registry.json'
         self.entries={};references={};sizes={};counts={}
         for key,item in catalog.get('experts',{}).items():
+            if item.get('executor')=='repository_source':continue
             package=load_package(self.path,item['package'])
             self.entries[key]={**package['entry'],'id':key};references[key]=item['package']
             sizes[key]=package['feature_size'];counts[key]=package['module_count']
@@ -55,6 +56,7 @@ class ExpertPool:
             if key not in references:
                 for values in (self.entries,self.references,self.counts,self.roots,self.metrics):values.pop(key,None)
                 continue
+            if catalog['experts'][key].get('executor')=='repository_source':continue
             package=load_package(self.path,references[key])
             self.entries[key]={**package['entry'],'id':key}
             self.references[key]=references[key];self.counts[key]=package['module_count'];self.roots[key]=self.root

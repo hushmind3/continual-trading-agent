@@ -2,12 +2,45 @@
 from ..expert_registry import read_catalog,write_catalog
 import threading
 import time
+import hashlib
+import json
 from pathlib import Path
 from ..state_io import atomic_json,read_json
 from stockrl.trading.operation_control.operations_settings import settings
 from stockrl.trading.operation_control.operations_runtime import runtime
 from .system_operations import system
 from .observations import InputUnavailable
+
+
+def inspection_signature(item,model_root=None):
+    package=item.get('package',{})
+    configuration={key:item.get(key) for key in ('backend','executor','input','representation','origin','configuration')}
+    configuration['precision']=(item.get('conversion') or {}).get('precision')
+    configuration['package']={key:package.get(key) for key in ('sha256','bytes')}
+    if model_root is not None:
+        source=Path(model_root)/package.get('file','')
+        stamp=source.stat() if source.is_file() else None
+        configuration['file_version']=[stamp.st_mtime_ns,stamp.st_size] if stamp else None
+    return hashlib.sha256(json.dumps(configuration,sort_keys=True,default=str).encode()).hexdigest()
+
+
+def inspection_is_current(item,model_root=None):
+    check=item.get('check') or {}
+    if check.get('status')!='passed':return False
+    if model_root is not None:
+        source=Path(model_root)/item.get('package',{}).get('file','')
+        if not source.is_file() or source.stat().st_size!=item.get('package',{}).get('bytes'):return False
+    # Managed import/conversion replaces the entry with an untested descriptor.
+    # Preserve previously successful records attached to the unchanged immutable package.
+    return not check.get('signature') or check['signature']==inspection_signature(item,model_root)
+
+def precision_bits(value):
+    import re
+    value=str(value or '').upper()
+    if 'NF4' in value:return 4
+    match=re.search(r'(?:INT|FP|BF|I?Q)(\d+)',value)
+    return int(match.group(1)) if match else None
+
 
 class LibraryOperations:
     def __init__(self):
@@ -20,7 +53,7 @@ class LibraryOperations:
         return dict(catalog=read_catalog(self.catalog_path),job={**read_json(self.status_path),'busy':self.active})
 
     def start(self,kind,payload):
-        if kind not in ('inspect','import','probe','probe_all','load','unload','remove','search','acquire','convert','quantize','quantize_all','optimize','optimize_all','apply','compare'):
+        if kind not in ('inspect','import','probe','probe_all','load','unload','remove','search','download','convert','quantize','quantize_all','optimize','optimize_all','apply','compare'):
             raise ValueError('지원하는 Expert 작업을 선택하세요.')
         with self.lock:
             if self.active:raise ValueError('진행 중인 Expert 작업이 있습니다.')
@@ -108,6 +141,40 @@ class LibraryOperations:
 
     def _execute(self,kind,payload,progress):
         cfg=settings();catalog=read_catalog(cfg.registry_file)
+        if kind=='download':
+            from .expert_acquisition import download_source
+            from .expert_packages import digest
+            from ..state_io import atomic_json
+            import re
+            result=download_source(cfg,catalog,payload,progress)
+            selected=next(row for row in catalog['discovery']['models'] if row['id']==payload['id'])
+            folder=Path(result['destination']);metadata=folder/'download.json'
+            result.update(registered=True,format='model_repository_source_v1')
+            atomic_json(result,metadata)
+            config_path=folder/'config.json'
+            source_config=read_json(config_path) if config_path.is_file() else {}
+            quantization_config=source_config.get('quantization_config') or {}
+            declared_bits=quantization_config.get('bits') or quantization_config.get('bit_width')
+            if quantization_config.get('load_in_4bit'):declared_bits=4
+            elif quantization_config.get('load_in_8bit'):declared_bits=8
+            source_precision=('INT'+str(declared_bits)) if declared_bits else {'float16':'FP16','bfloat16':'BF16','float32':'FP32'}.get(source_config.get('torch_dtype') or source_config.get('dtype'))
+            key=re.sub('[^a-z0-9_]','_',result['repository'].lower())
+            existing=next((name for name,row in catalog.get('experts',{}).items() if row.get('executor')=='repository_source' and (row.get('origin') or {}).get('repository')==result['repository']),None)
+            if existing is not None:key=existing
+            elif key in catalog.get('experts',{}):raise ValueError('원본 등록 이름이 기존 모델과 겹칩니다.')
+            role=selected.get('role') if selected.get('role') in ('market','action') else 'market'
+            catalog.setdefault('experts',{})[key]={'id':key,'name':result['repository'],
+                'role':role,'category':'trading' if role=='action' else 'forecast','executor':'repository_source',
+                'backend':'repository_source','runtime_ready':False,'runtime_status':'입력·실행기 미설정',
+                'representation':source_precision,'quantized':bool(declared_bits and int(declared_bits)<16) if declared_bits else None,
+                'precision_source':'원본 config.json 선언' if source_precision else '원본 정밀도 정보 미기재',
+                'origin':{'repository':result['repository'],'revision':result['revision']},
+                'input':{'supported':False,'reason':'원본은 등록됐으며 조립할 입력·실행기는 사용자가 설정합니다.'},
+                'package':{'file':metadata.relative_to(cfg.model_dir).as_posix(),'bytes':metadata.stat().st_size,'sha256':digest(metadata)},
+                'check':{'status':'untested','detail':'원본 다운로드·등록 완료 · 실행 검사 안 함'}}
+            write_catalog(catalog,cfg.registry_file)
+            result['expert_id']=key
+            return result
         if kind=='quantize_all':
             import re
             experts=catalog.get('experts',{})
@@ -119,7 +186,7 @@ class LibraryOperations:
             results=[]
             for index,key in enumerate(keys):
                 progress(stage='quantize_all',completed=index,total=len(keys),detail=f'{index+1}/{len(keys)} · {key} 양자화')
-                try:result=self._execute('quantize',{'id':key,'device':payload.get('device','auto')},progress)
+                try:result=self._execute('quantize',{'id':key,'device':payload.get('device','auto'),'precision':payload.get('precision','int4')},progress)
                 except InterruptedError:raise
                 except Exception as exc:result={'items':[{'id':key,'status':'failed','detail':str(exc)}]}
                 results.extend(result['items'])
@@ -135,6 +202,29 @@ class LibraryOperations:
             from .quantized_linear import linear_layers
             key=payload['id'];entry=catalog.get('experts',{}).get(key)
             if entry is None:raise ValueError('최초 원본 Expert가 Registry에 없습니다: '+key)
+            if not (cfg.model_dir/entry.get('package',{}).get('file','')).is_file():raise ValueError('등록 원본 파일이 없습니다. 기존 결과로 표시하지 않습니다.')
+            requested=payload.get('precisions') or [payload.get('precision','int4')]
+            if any(value not in ('fp16','bf16','int8','int4','nf4') for value in requested):raise ValueError('지원되는 변환 정밀도를 선택하세요. 2비트 변환은 현재 지원하지 않습니다.')
+            if entry.get('executor')=='repository_source':return {'created':0,'existing':0,'failed':0,'items':[{'id':key,'status':'skipped','detail':'등록 원본의 입력·실행기가 아직 설정되지 않았습니다.'}]}
+            declared=(entry.get('conversion') or {}).get('precision') or entry.get('representation')
+            source_bits=precision_bits(declared)
+            model_folder=(cfg.model_dir/entry['package']['file']).parent
+            ready=[];cached=[]
+            for precision in requested:
+                target_bits=precision_bits(precision)
+                candidate=next((row for row in catalog.get('experts',{}).values() if (row.get('conversion') or {}).get('source_id')==key and (row.get('conversion') or {}).get('precision')==precision and (row.get('conversion') or {}).get('source_sha256')==entry['package'].get('sha256')),None)
+                existing_path=model_folder/(precision.upper()+'.pt')
+                if (source_bits is not None and source_bits<=target_bits) or (candidate is not None and (cfg.model_dir/candidate['package']['file']).is_file()) or existing_path.is_file():
+                    cached.append({'id':candidate['id'] if candidate else key,'status':'existing','precision':precision,'detail':'같은/더 낮은 비트 원본 또는 기존 결과가 있음 · 재변환·재검사 제외'})
+                else:ready.append(precision)
+            if not ready:
+                latest=read_catalog(cfg.registry_file)
+                latest.setdefault('quantizations',{})[key]={'stage':'complete','finished':time.time(),'reports':cached,'attempts':{},'failures':[]}
+                write_catalog(latest,cfg.registry_file)
+                return {'total':len(cached),'created':0,'existing':len(cached),'failed':0,'compared':0,'items':cached}
+            requested=ready
+            original=(entry.get('conversion') or {}).get('source_id')
+            if original in catalog.get('experts',{}):key=original;entry=catalog['experts'][key]
             package=load_package(cfg.model_dir/'expert_registry.json',entry['package'],verify=True)
             if package.get('executor')=='llama_cpp':
                 from .expert_packages import package_path
@@ -155,33 +245,23 @@ class LibraryOperations:
                 conversion=package.get('conversion') or {}
                 row={'id':key,'status':'existing','precision':conversion.get('precision'),'bytes':entry.get('weight_bytes') or entry['package']['bytes'],
                     'conversion':conversion,'detail':'이미 양자화된 가중치입니다. 다른 정밀도는 비양자화 원본에서 생성하세요.'}
-                source=conversion.get('source_id');cache={'device':payload.get('device','auto')}
-                try:row.update(self._compare_quantized(source,entry,progress,cache))
-                finally:
-                    if cache.get('release_base'):runtime.unload(source)
-                latest=read_catalog(cfg.registry_file);latest['experts'][key]=entry
-                latest.setdefault('quantizations',{})[key]={'stage':'complete' if row['comparison_status']=='measured' else 'partial','finished':time.time(),'reports':[row],'attempts':{},'failures':[]}
-                write_catalog(latest,cfg.registry_file)
-                return {'total':1,'created':0,'existing':1,'failed':0,'compared':int(row['comparison_status']=='measured'),
-                    'comparison_failed':int(row['comparison_status']=='failed'),'comparison_unavailable':int(row['comparison_status'] in ('input_unavailable','no_original')),'items':[row]}
+                row['detail']='이미 양자화된 가중치 · 재변환·재검사 제외'
+                return {'total':1,'created':0,'existing':1,'failed':0,'compared':0,'items':[row]}
             source=(package.get('conversion') or {}).get('source_id') or (entry.get('conversion') or {}).get('source_id')
             if source in catalog['experts'] and source!=key:
                 key=source;entry=catalog['experts'][key]
                 package=load_package(cfg.model_dir/'expert_registry.json',entry['package'],verify=True)
             record={'stage':'running','started':time.time(),'reports':[],'attempts':{},'failures':[]};pool=None;targets=None;comparison_cache={'device':payload.get('device','auto')}
             try:
-                for precision in payload.get('precisions',['int8','int4','nf4']):
+                for precision in requested:
                     started=time.perf_counter();slot=key+'_'+precision
                     record['attempts'][precision]={'status':'running','detail':'양자화 가중치 생성'}
                     try:
                         latest=read_catalog(cfg.registry_file)
                         candidate=next((item for item in latest.get('experts',{}).values() if (item.get('conversion') or {}).get('source_id')==key and (item.get('conversion') or {}).get('precision')==precision),None) or latest.get('experts',{}).get(slot)
                         if candidate is not None:
-                            from .expert_contracts import descriptor
-                            saved=load_package(cfg.model_dir/'expert_registry.json',candidate['package'],verify=True)
-                            if (saved.get('conversion') or {}).get('precision')!=precision:raise ValueError('등록된 버전 이름과 실제 패키지 정밀도가 다릅니다: '+slot)
-                            candidate=descriptor(candidate['id'],saved,candidate['package'])
-                            status='existing'
+                            record['reports'].append({'id':candidate['id'],'precision':precision,'status':'existing','detail':'기존 결과 · 중복 변환·검사 제외'})
+                            continue
                         else:
                             if targets is None:
                                 pool=ExpertPool(cfg);targets=linear_layers(pool.get(key,structure_only=True))
@@ -217,6 +297,12 @@ class LibraryOperations:
             if kind=='probe_all':
                 keys=list(payload.get('ids') or experts)
                 if any(key not in experts for key in keys):raise ValueError('Registry에 등록된 Expert를 선택하세요.')
+                checked_keys=[key for key in keys if payload.get('skip_checked',True) and inspection_is_current(experts[key],cfg.model_dir)]
+                for key in checked_keys:
+                    experts[key]['check'].setdefault('signature',inspection_signature(experts[key],cfg.model_dir))
+                if checked_keys:write_catalog(catalog,cfg.registry_file)
+                keys=[key for key in keys if key not in checked_keys]
+                if not keys:return {'total':len(checked_keys),'passed':0,'failed':0,'skipped_checked':len(checked_keys),'items':[{'id':key,'status':'already_checked','detail':'기존 성공 기록 · 중복 검사 제외'} for key in checked_keys]}
             else:
                 keys=[]
                 for expert_id,item in experts.items():
@@ -230,7 +316,7 @@ class LibraryOperations:
                     if root not in keys:keys.append(root)
             if not keys:raise ValueError('검사할 등록 Expert가 없습니다.' if kind=='probe_all' else '사용 중인 Expert가 없습니다.')
             shared_frame=shared_account=None
-            if kind=='probe_all':
+            if kind=='probe_all' and any(experts[key].get('input',{}).get('supported',False) for key in keys):
                 from ..finrl.price_data.operations import prices
                 shared_frame=prices('USD')
                 book=runtime.ledger().snapshot()['books']['USD']
@@ -284,11 +370,14 @@ class LibraryOperations:
                     current=latest.get('experts',{}).get(row['id'])
                     if current is not None and current.get('package')==experts[row['id']].get('package'):
                         current['check']={'status':row['status'],
+                            'signature':inspection_signature(current,cfg.model_dir),
                             'detail':row.get('detail','실제 입력 전체 묶음 추론·출력 계약 통과'),
                             'tested':time.time(),**({'metrics':row['metrics'],'seconds':row.get('seconds')} if row.get('metrics') else {})}
                 write_catalog(latest,cfg.registry_file)
             progress(stage=kind,completed=len(keys),total=len(keys),detail='전체 원본 Expert 처리 완료')
-            return {'total':len(keys),'passed':sum(x['status']=='passed' for x in results),
+            if kind=='probe_all':results.extend({'id':key,'status':'already_checked','detail':'기존 성공 기록 · 중복 검사 제외'} for key in checked_keys)
+            return {'total':len(results),'passed':sum(x['status']=='passed' for x in results),
+                'skipped_checked':len(checked_keys) if kind=='probe_all' else 0,
                 'failed':sum(x['status']=='failed' for x in results),
                 'skipped':sum(x['status']=='skipped' for x in results),'items':results}
         if kind=='compare':
@@ -396,10 +485,7 @@ class LibraryOperations:
             path=Path(payload['source']).expanduser().resolve()
             return {'source':str(path),'experts':inspect_source(path,cfg,catalog)}
         if kind in ('import','acquire','convert'):
-            if kind=='acquire':
-                from .expert_acquisition import acquire
-                item,_=acquire(cfg,catalog,payload,progress)
-            elif kind=='convert':
+            if kind=='convert':
                 from .expert_conversion import convert
                 item=convert(cfg,catalog,payload,progress)
             else:
@@ -431,7 +517,7 @@ class LibraryOperations:
                 record=catalog['optimizations'][payload['id']];precision=payload['precision']
                 record.setdefault('attempts',{})[precision]={'status':'complete','detail':'변환 완료 · 실제 추론 검사 전'}
                 record['failures']=[row for row in record.get('failures',[]) if row.get('precision')!=precision]
-            if payload.get('activate',kind=='acquire'):
+            if payload.get('activate',False):
                 catalog['active']=sorted(set([*catalog.get('active',[]),item['id']]))
             write_catalog(catalog,cfg.registry_file)
             return item

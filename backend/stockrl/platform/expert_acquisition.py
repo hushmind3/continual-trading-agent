@@ -1,62 +1,61 @@
-"""Download a discovered revision, match its input template and register one frozen package."""
-import hashlib
-import io
+"""Download original repositories without creating weight packages or executing models."""
 import json
 from pathlib import Path
 import shutil
-import tempfile
 import zipfile
-from .expert_discovery import candidate,slot_name
-from .expert_packages import load_package,digest
-from .native_upgrade import read_native,match_weights
-from .library_store import fetch_source,register_package
 
 
-def acquire(settings,catalog,payload,progress):
-    selected=candidate(catalog,payload);key=selected.get('template');template=catalog['experts'].get(key)
-    for item in catalog['experts'].values():
-        try:origin=load_package(settings.resolve(settings.expert_checkpoint),item['package'])['entry'].get('origin') or {}
-        except (OSError,ValueError):continue
-        if origin.get('repository')==selected['repository'] and origin.get('revision')==selected['revision']:
-            raise ValueError('이 원본 revision은 이미 라이브러리에 보관되어 있습니다. 중복 다운로드하지 않았습니다.')
-    root=settings.resolve(settings.expert_checkpoint).parent/('action' if (template or {}).get('stock_policy') else 'market');root.mkdir(exist_ok=True)
-    total=selected['bytes']
-    if shutil.disk_usage(root).free<total*2+settings.resources.disk_reserve_gib*2**30:raise ValueError('다운로드와 패키지 생성에 필요한 디스크 공간이 부족합니다.')
-    weights={};provenance=[]
-    with tempfile.TemporaryDirectory(prefix='.download-',dir=root) as temporary:
-        for index,file in enumerate(selected['files']):
-            progress(stage='acquiring',detail=f"원본 {index+1}/{len(selected['files'])} 다운로드 · {selected['repository']}")
-            path=fetch_source(settings,file['url'],progress,root=Path(temporary))
-            checksum=digest(path)
-            if file.get('sha256') and checksum!=file['sha256']:raise ValueError('다운로드 파일 checksum이 원본과 다릅니다.')
-            if selected.get('executor')=='llama_cpp':
-                from .gguf_registration import register_gguf
-                slot=slot_name(selected,catalog);item=register_gguf(settings,path,slot,progress,origin=dict(repository=selected['repository'],revision=selected['revision']))
-                return item,None
-            values=read_native(path)
-            if len(selected['files'])==1:weights=values
-            else:
-                if set(weights).intersection(values):raise ValueError('checkpoint shard에 중복 tensor가 있습니다.')
-                weights.update(values)
-            provenance.append(dict(name=file['name'],sha256=checksum,bytes=path.stat().st_size))
-        if selected.get('executor')=='hf_forecast':
-            from .hf_forecast import construct
-            from .expert_packages import PACKAGE_FORMAT
-            import torch
-            # Metadata only: actual bytes are restored from the downloaded tensors below.
-            with torch.device('meta'):model=construct(selected['model_config'],selected['backend'])
-            definitions=io.BytesIO()
-            with zipfile.ZipFile(definitions,'w'):pass
-            package=dict(format=PACKAGE_FORMAT,executor='hf_forecast',module_count=1,feature_size=12,
-                state_dict={'models.0.'+k:v for k,v in model.state_dict().items()},
-                entry=dict(backend=selected['backend'],parameters=selected['parameters'],frozen=True),
-                metadata=dict(architecture_sources=definitions.getvalue(),native_runner_source='',model_config=selected['model_config']))
-        else:package=load_package(settings.resolve(settings.expert_checkpoint),template['package'],verify=True)
-        matched=match_weights(weights,package)
-        if matched is None:raise ValueError('다운로드한 실제 tensor가 검증된 입력 템플릿과 일치하지 않습니다. 구성에 추가하지 않았습니다.')
-        fingerprint=hashlib.sha256(json.dumps(provenance,sort_keys=True).encode()).hexdigest()
-        package={**package,'state_dict':matched,'entry':{**package['entry'],'name':selected['repository'],
-            'checkpoint_sha256':fingerprint,'weight_bytes':sum(v.numel()*v.element_size() for v in matched.values()),
-            'origin':dict(repository=selected['repository'],revision=selected['revision'],files=provenance)},
-            'metadata':{**package['metadata'],**({'input_template_sha256':template['package']['sha256']} if template else {})}}
-        return register_package(settings,package,slot_name(selected,catalog),progress),key
+def download_source(settings,catalog,payload,progress):
+    """Download public source files without inspecting weights or registering an executor."""
+    import re,requests
+    from ..state_io import atomic_json
+    selected=next((row for row in catalog.get('discovery',{}).get('models',[]) if row['id']==payload.get('id')),None)
+    if not selected:raise ValueError('검색 결과에서 다운로드할 항목을 선택하세요.')
+    repository=selected['repository'];revision=selected.get('revision')
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+',repository) or not revision:raise ValueError('저장소 경로·버전 정보가 부족합니다.')
+    requested_revision=revision
+    if selected.get('source')=='GitHub':
+        commit=requests.get('https://api.github.com/repos/'+repository+'/commits/'+revision,timeout=(5,15))
+        commit.raise_for_status();revision=commit.json()['sha']
+    role=selected.get('role') if selected.get('role') in ('market','action') else 'market'
+    root=settings.model_dir.resolve();destination=root/role/repository.split('/')[-1]
+    if not destination.resolve().is_relative_to(root):raise ValueError('다운로드 경로가 모델 폴더 밖에 있습니다.')
+    metadata=destination/'download.json'
+    if metadata.exists():
+        saved=json.loads(metadata.read_text(encoding='utf8'))
+        if saved.get('repository')==repository and saved.get('revision')==revision:return {**saved,'existing':True}
+        raise ValueError('이 모델 폴더에 다른 버전이 있습니다. 기존 원본을 덮어쓰지 않습니다.')
+    destination.mkdir(parents=True,exist_ok=True)
+    progress(stage='downloading',detail='원본 저장 경로: '+str(destination))
+    if selected.get('source')=='GitHub':
+        archive=destination/'source.zip'
+        if archive.exists():raise ValueError('기존 source.zip을 덮어쓰지 않습니다.')
+        url='https://codeload.github.com/'+repository+'/zip/'+revision
+        with requests.get(url,stream=True,timeout=(10,60)) as response:
+            response.raise_for_status()
+            with archive.open('xb') as stream:
+                for block in response.iter_content(1024*1024):
+                    if progress(stage='downloading',detail='저장소 원본 다운로드: '+str(destination)) is False:raise InterruptedError('다운로드 중지')
+                    stream.write(block)
+        with zipfile.ZipFile(archive) as source:
+            for member in source.infolist():
+                parts=Path(member.filename).parts[1:]
+                if not parts or member.is_dir():continue
+                target=destination.joinpath(*parts).resolve()
+                if not target.is_relative_to(destination.resolve()):raise ValueError('원본 압축 파일에 잘못된 경로가 있습니다.')
+                if target.exists():raise ValueError('기존 모델 파일과 원본 압축 경로가 겹칩니다: '+target.name)
+                target.parent.mkdir(parents=True,exist_ok=True)
+                with source.open(member) as original,target.open('xb') as output:shutil.copyfileobj(original,output)
+        kind='source_repository'
+    else:
+        from huggingface_hub import snapshot_download,HfApi
+        names=HfApi(token=False).list_repo_files(repository,revision=revision)
+        collisions=[name for name in names if (destination/name).exists()]
+        if collisions:raise ValueError('기존 원본 파일을 덮어쓰지 않습니다: '+', '.join(collisions[:3]))
+        snapshot_download(repo_id=repository,revision=revision,local_dir=str(destination),token=False,max_workers=2)
+        kind='model_repository'
+    result={'repository':repository,'revision':revision,'requested_revision':requested_revision,'destination':str(destination),'source':selected.get('source'),
+        'kind':kind,'registered':False,'requires_fit':selected.get('requires_fit',False),'runtime_status':'입력·실행기 연결은 별도','documentation':selected.get('input_evidence',{})}
+    atomic_json(result,metadata)
+    return result
+

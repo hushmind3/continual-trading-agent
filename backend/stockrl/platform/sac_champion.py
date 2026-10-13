@@ -177,6 +177,7 @@ def _expert_payload(active):
         if key not in catalog.get("experts", {}):
             raise ValueError(f"등록되지 않은 Expert: {key}")
         entry = catalog["experts"][key]
+        if entry.get('executor')=='repository_source':raise ValueError('등록 원본의 입력·실행기를 설정한 뒤 조립하세요: '+key)
         package = load_package(expert_registry, entry["package"], verify=True)
         contract=input_contract(package['entry'])
         if not contract.get('supported'):

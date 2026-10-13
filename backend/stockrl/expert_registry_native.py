@@ -53,6 +53,7 @@ class ExpertRegistry:
     def select(self,active):
         catalog=self.catalog()
         if not set(active)<=set(catalog['experts']):raise ValueError('등록되지 않은 Expert입니다.')
+        if any(catalog['experts'][key].get('executor')=='repository_source' for key in active):raise ValueError('원본은 등록됐습니다. 실행 활성화 전에 입력·실행기를 설정하세요.')
         catalog['active']=list(active);write_catalog(catalog,self.registry_file)
         self.close()
 

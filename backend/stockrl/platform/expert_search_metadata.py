@@ -4,6 +4,28 @@ import re
 import requests
 
 
+def github_documentation(row):
+    """Read public repository documentation; never import remote code."""
+    url='https://raw.githubusercontent.com/'+row['repository']+'/'+row['revision']+'/README.md'
+    try:
+        with requests.get(url,stream=True,timeout=(5,10)) as response:
+            response.raise_for_status();body=bytearray()
+            for block in response.iter_content(8192):
+                body.extend(block)
+                if len(body)>=65536:break
+        text=body[:65536].decode('utf8',errors='replace')
+        patterns=r'polars|DataFrame|forecasting_horizon|\.fit\(|API.key|time.series|pre.trained'
+        snippets=[re.sub(r'\s+',' ',line).strip()[:240] for line in text.splitlines() if re.search(patterns,line,re.I)]
+        row['input_evidence']={'source':url,'snippets':snippets[:4]}
+        if re.search(r'polars',text,re.I):row['input_summary']='문서 입력: Polars DataFrame · 정확한 열/형식은 원본 문서 참조'
+        if re.search(r'\.fit\(',text):
+            row['requires_fit']=True
+            row['detail']='예측 라이브러리·소스 프로젝트 · fit/학습이 필요한 예제 있음 · 다운로드 후 자동 학습하지 않음'
+        if re.search(r'API[_ ]KEY|API endpoint',text,re.I):row['api_requirement']='문서에 API 설정 언급 · 실제 인증 요구 범위 미확인'
+    except requests.RequestException:row['input_evidence']={'source':url,'snippets':[],'unavailable':True}
+    return row
+
+
 def iso(value):return value.isoformat() if hasattr(value,'isoformat') else value or None
 
 

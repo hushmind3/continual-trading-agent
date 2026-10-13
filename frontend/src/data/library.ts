@@ -7,6 +7,7 @@ export interface Champion {
 }
 export type LibraryExpert=Expert;
 export interface DiscoveredExpert {
+    role?:'market'|'action';
   id:string;repository:string;compatible:boolean;same_weights?:boolean;detail?:string;bytes?:number;url:string;
   source?:string;domain?:string;downloads?:number;created?:string;updated?:string;release_date?:string;
   release_source?:string;revision?:string;resource_note?:string;api_requirement?:string;input_summary?:string;

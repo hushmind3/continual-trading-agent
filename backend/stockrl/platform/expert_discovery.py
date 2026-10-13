@@ -7,8 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 import requests
 from huggingface_hub import HfApi
-from .expert_packages import load_package
-from .native_upgrade import weight_signature,match_signature
+from .native_upgrade import match_signature
 from .expert_search_metadata import annotate
 
 FINANCE_QUERIES=('FinText','FinRL','finance','financial','MarketGPT','Chronos','TimesFM','Kronos','FinCast','Time-MoE')
@@ -46,11 +45,10 @@ def tensor_header(url):
 
 def templates(settings,catalog):
     result={}
-    for key,item in catalog['experts'].items():
-        if item['role']!='market' or item.get('conversion') or item.get('executor')=='llama_cpp' or not item['input']['supported']:continue
-        package=load_package(settings.resolve(settings.expert_checkpoint),item['package'])
-        signature=weight_signature(package)
-        if signature:result[key]=dict(item=item,signature=signature,entry=package['entry'],active=key in catalog.get('active',[]))
+    for key,item in catalog.get('experts',{}).items():
+        signature=item.get('weight_signature')
+        if item.get('role')=='market' and signature and item.get('input',{}).get('supported'):
+            result[key]=dict(item=item,signature=signature,entry=item,active=key in catalog.get('active',[]))
     return result
 
 
@@ -59,8 +57,7 @@ def search(settings,catalog,payload,progress):
     stored={};installed={}
     for key,item in catalog['experts'].items():
         if item.get('conversion'):continue
-        try:origin=load_package(settings.resolve(settings.expert_checkpoint),item['package'])['entry'].get('origin')
-        except (OSError,ValueError):continue
+        origin=item.get('origin')
         if origin:
             stored[(origin.get('repository'),origin.get('revision'))]=key
             installed.setdefault(origin.get('repository'),[]).append(dict(id=key,name=item['name'],revision=origin.get('revision'),active=key in catalog.get('active',[])))

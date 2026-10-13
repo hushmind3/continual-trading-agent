@@ -28,8 +28,10 @@ export function ExpertSearchResult({item,busy,onDownload}:{item:DiscoveredExpert
    <p>등록일·수정일을 모델 릴리즈 날짜로 사용하지 않습니다.</p>
    <a className="text-blue-700" href={item.input_evidence?.source??item.url} target="_blank" rel="noreferrer">원본 모델 설명 확인 ↗</a>
    {item.input_evidence?.snippets?.map((line,index)=><blockquote key={index} className="border-l-2 border-slate-200 pl-3">{line}</blockquote>)}
-   {!item.requirements_verified&&<p className="text-amber-700">문서 단서는 입력 계약의 검증 결과가 아닙니다. 실행기·입력 연결이 확인되기 전에는 추가할 수 없습니다.</p>}
+   {!item.requirements_verified&&<p className="text-amber-700">원본은 다운로드할 수 있습니다. 다운로드 후 등록됩니다. 조립·실행 연결은 사용자가 결정합니다.</p>}
   </div></details>
-  <Button disabled={busy||!item.compatible||item.same_weights} tone="primary" onClick={onDownload}><Download size={14}/>다운로드 · 등록 · 구성 추가</Button>
+  <p className="text-xs text-slate-500">저장 위치: 모델/experts/{item.role==='action'?'action':'market'}/{item.repository.split('/').pop()}</p>
+  {busy&&<p className="text-xs text-amber-700">진행 중인 검색·작업이 끝나면 다운로드할 수 있습니다.</p>}
+  <Button disabled={busy||!item.repository||!item.revision} tone="primary" onClick={onDownload}><Download size={14}/>다운로드 · 자동 등록</Button>
  </article>;
 }

@@ -91,14 +91,14 @@ def sources():
     groups={name:{} for name in ('frontend','backend','launcher','configuration')}
     for name in sorted(names):
         if name.startswith('frontend/src/') or name in ('frontend/index.html','frontend/package.json','frontend/package-lock.json','frontend/tsconfig.json','frontend/vite.config.ts'):group='frontend'
-        elif name.startswith('backend/stockrl/') and name.endswith('.py') or name.startswith('requirements/'):group='backend'
+        elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('backend/rea_projects/') or name.startswith('scripts/requirements/'):group='backend'
         elif name.startswith('scripts/') and name.endswith('.py') or name=='서버켜기.cmd':group='launcher'
         elif name in ('configs/experts.json','configs/instruments.json'):group='configuration'
         else:continue
         path=ROOT/name
         groups[group][name]=hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else 'missing'
     revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
-    groups['backend']['FinRL-X']=subprocess.check_output(['git','-C','FinRL-X','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    groups['backend']['FinRL-X']=subprocess.check_output(['git','-C','vendor/FinRL-X','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     return groups,revision
 
 

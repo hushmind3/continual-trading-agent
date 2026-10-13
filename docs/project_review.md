@@ -36,7 +36,7 @@
 
 `OperationsProvider`가 화면의 조회 항목을 모아 `state`를 요청한다. `data/api.ts`가 `operation`·`payload`를 단일 `/api`로 전송하고, `api_transport.UnifiedAPI`와 `menu_registry.dispatch`가 등록된 내부 핸들러로 전달한다. 백엔드 상태 관리자는 `SystemOperations`이며 `/api`는 그 HTTP 어댑터다. 프론트가 화면별로 따로 백엔드 상태를 소유하는 구조가 아니다.
 
-근거: [OperationsProvider](frontend/src/data/Operations.tsx), [API 전송기](frontend/src/data/api.ts), [요청 분배](backend/menu_registry.py), [HTTP 어댑터](backend/web_api.py).
+근거: [OperationsProvider](../frontend/src/data/Operations.tsx), [API 전송기](../frontend/src/data/api.ts), [요청 분배](../backend/menu_registry.py), [HTTP 어댑터](../backend/web_api.py).
 
 ### 3.2 학습·MoE·Expert
 
@@ -46,7 +46,7 @@ MoE 생성과 학습에는 설치된 FinRL의 A2C/DDPG/PPO/TD3/SAC/TQC/CrossQ �
 
 별도 주식거래 메뉴는 공식 `StockTradingEnv` 예제 경로다. 이 결과를 MoE의 현금 포함 환경과 호환 모델로 취급하지 않는다. FinRL-Trading은 `DataStore`, 공급원·전략과 `StrategyResult/BacktestEngine` 평가를 보조한다.
 
-근거: [주 학습·백테스트](backend/stockrl/finrl/framework.py), [관측 계약](backend/stockrl/expert_observation.py), [Champion 생성·형식](backend/stockrl/platform/sac_champion.py), [현재 FinRL 메뉴 연결](backend/stockrl/finrl/finrl_menu_manager.py).
+근거: [주 학습·백테스트](../backend/stockrl/finrl/framework.py), [관측 계약](../backend/stockrl/expert_observation.py), [Champion 생성·형식](../backend/stockrl/platform/sac_champion.py), [현재 FinRL 메뉴 연결](../backend/stockrl/finrl/finrl_menu_manager.py).
 
 ### 3.3 실행 상태·저장 상태
 
@@ -64,7 +64,7 @@ Champion PT는 구성·정체성·체크포인트 참조를 가진 Spec이다. P
 
 `OperationsRuntime.accept`에서 결측값을 `None`으로 처리하고 API JSON 응답에서는 비정상 실수를 `null`로 바꾸도록 수정했다. 저장 가중치·계좌 값을 응답 변환으로 덮어쓰지 않는다. 혼합 공급원 회귀 검사와 중첩 NaN/무한대 응답 검사에 통과했다. 시세 수신을 켜고 5회 반복 조회하는 동안 신규 시세 수가 37→44로 증가했고 모두 HTTP 200과 엄격한 JSON 파싱에 통과했다.
 
-근거: [시세 수신 상태](backend/stockrl/trading/control/operations_runtime.py), [FiniteJSONResponse](backend/api_transport.py). 반영 커밋: `40b3049`.
+근거: [시세 수신 상태](../backend/stockrl/trading/control/operations_runtime.py), [FiniteJSONResponse](../backend/api_transport.py). 반영 커밋: `40b3049`.
 
 ### F2. 삭제한 Champion의 과거 형식 오류가 계속 표시됨 — 수정·실행 확인
 
@@ -76,7 +76,7 @@ Champion PT는 구성·정체성·체크포인트 참조를 가진 Spec이다. P
 
 최종 실행 검사에서는 검증용 비-SAC PT를 잠시 만들어 형식 오류가 발생하는 것을 확인한 뒤 그 파일만 삭제했다. **서버 PID를 그대로 유지한 상태에서 다음 조회의 오류가 제거됐다.** 단순 재시작으로 캐시가 초기화된 결과와 구분되는 검증이다. 검증용 PT는 정리했으며 기존 모델은 수정·삭제하지 않았다.
 
-근거: [캐시 수명 관리](backend/stockrl/platform/system_operations.py), [Champion 목록](backend/stockrl/platform/sac_champion.py), [회귀 검사](tests/test_state_integrity.py).
+근거: [캐시 수명 관리](../backend/stockrl/platform/system_operations.py), [Champion 목록](../backend/stockrl/platform/sac_champion.py), [회귀 검사](../tests/test_state_integrity.py).
 
 ### F3. 저장 정책과 현재 프로젝트 환경·입출력 계약 불일치
 
@@ -93,7 +93,7 @@ Champion PT는 구성·정체성·체크포인트 참조를 가진 Spec이다. P
 
 `preflight/train`의 **새 학습**은 AAPL/MSFT, USD, SAC로 `ok=true`였다. 반면 동일 종목의 `preflight/backtest`는 구형 환경·공간 비호환을 이유로 `ok=false`였다. API 연결은 정상이어도 기존 정책 백테스트와 전체 운영 준비가 차단될 수 있다. 후속 수정에서 선택된 11개 Expert와 AAPL/MSFT·USD·SAC의 신규 `sac_champion_007.pt`를 생성하고 105단계 진단 학습·실제 업데이트 5회를 완료했다. 관측 726D·현금 포함 행동 3D다. 구형 가중치·Replay는 삭제·변환하지 않았다.
 
-근거: [정책 계약 검사](backend/web_api.py), [전체 점검](backend/stockrl/platform/system_operations.py), [환경·학습 연결](backend/stockrl/finrl/framework.py).
+근거: [정책 계약 검사](../backend/web_api.py), [전체 점검](../backend/stockrl/platform/system_operations.py), [환경·학습 연결](../backend/stockrl/finrl/framework.py).
 
 ### F4. 설정·관측 설명이 실제 코드와 다름 — 기존 문서 정정
 
@@ -101,7 +101,7 @@ Champion PT는 구성·정체성·체크포인트 참조를 가진 Spec이다. P
 
 기존 `SETTINGS.md`의 관련 표·설명·출처를 정정하고 루트 README의 8개 신호 설명도 수정했다. FinRL 알고리즘 설정, SB3 자체 기본값, 프로젝트 결합부·환경 지정값을 구분했다. 삭제 캐시와 숫자 처리의 동작·검사는 기존 백엔드 문서와 README에도 반영했다.
 
-근거: [현재 설정](SETTINGS.md), [프로젝트 기준 문서](README.md).
+근거: [현재 설정](settings.md), [프로젝트 기준 문서](history.md).
 
 ### F5. 설치 환경 요구 버전 불일치 — 수정·실행 확인
 
@@ -292,3 +292,15 @@ REA 작은 메뉴를 파일 복원·디컴파일로 변경했다. 메인 화면�
 - 기존 검사 스크립트는 대메뉴 두 개를 반영했습니다. 사용자 직접 검사 지침에 따라 테스트·타입·브라우저 검증은 미실행입니다. 사용자가 실행할 명령: .venv\Scripts\python.exe -m unittest discover -s tests; frontend에서 npm run typecheck, npm run test:api, npm run test:browser.
 
 - 완료 기록: 금융 폴더 4개 이동, 옛 대메뉴 등록 파일 8개·캐시 4개 휴지통 이동. Vite 빌드 성공(5.21초), React·백엔드 적용 완료. 이번 변경의 테스트·타입·브라우저 검증 미실행. AGENTS.md의 기존 로컬 변경은 유지하고 이번 코드 커밋에는 포함하지 않습니다.
+
+
+### 2026-10-13 루트 폴더 정리
+
+- 긴 루트 문서는 docs/history.md, 설정 문서는 docs/settings.md, 검토 보고서는 docs/project_review.md로 실제 이동했습니다. 루트 README는 짧은 현재 구조 안내로 교체했고 문서 링크를 조정했습니다.
+- requirements/를 scripts/requirements/로 이동해 설치·CI 경로를 맞췄습니다. 설치 명세의 버전·내용은 바꾸지 않았습니다.
+- 공식 FinRL-X 서브모듈은 vendor/FinRL-X/로 Git 이동했습니다. 원본 소스·알고리즘·커밋은 유지하며 import·설치 경로만 변경했습니다.
+- src/·logs/·results/는 내용이 없는 폴더임을 확인하고 휴지통 이동을 시도했습니다. 경로 충돌이 있으면 해당 빈 폴더의 이동을 보류합니다.
+- configs/·data/·runtime/·기존 가상환경·금융 모델과 REA 저장 결과는 이동하거나 변경하지 않았습니다. 새 backend/ 루트 API 및 독립 REA Python 소스도 적용 대상에 포함하도록 기존 런처 소스 분류를 조정했습니다.
+- 테스트·타입·브라우저 검증은 사용자 직접 실행 지침대로 미실행입니다. 프론트 소스 변경이 없어 새 프론트 빌드는 실행하지 않습니다. 적용·커밋 결과는 아래 기재합니다.
+
+- 실제 결과: 빈 logs/·results/는 휴지통 이동 완료, 빈 src/는 휴지통 경로 충돌로 보류했습니다. 공식 서브모듈 커밋은 4409abe925c904e570be78ebfb5e77ac3491dff8로 유지됐고 서브모듈 소스 변경은 없습니다. 첫 적용에서 런처의 git -C FinRL-X 참조가 실패해 vendor/FinRL-X로 수정한 뒤 서버 적용 완료했습니다. 테스트·타입·브라우저 검증·새 프론트 빌드는 미실행입니다. 기존 AGENTS.md 로컬 변경은 커밋에서 제외합니다.

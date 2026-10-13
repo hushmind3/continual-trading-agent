@@ -46,7 +46,7 @@
 
 ## Expert 연결과 프로젝트 전용 값
 
-Expert는 동결 자산이며 등록·선택·로딩·해제는 프로젝트 연결 계층이 담당한다. Expert를 학습시키거나 Expert 구조에 SAC 설정을 덮어쓰지 않는다. Gymnasium `ObservationWrapper`는 기존 환경 관측 뒤에 Expert별 실제 출력 64D와 계좌 상대값 16D를 붙인다. `ChampionExtractor`는 이 입력을 공식 알고리즘의 정책·가치 구조에 연결한다. 이는 FinRL-X/SB3 원본 기본 구조가 아니라 프로젝트 관측 계약이다.
+Expert는 동결 자산이며 등록·선택·로딩·해제는 프로젝트 연결 계층이 담당한다. Expert를 학습시키거나 Expert 구조에 SAC 설정을 덮어쓰지 않는다. Gymnasium `ObservationWrapper`는 기존 환경 관측 뒤에 Expert별 실제 출력 64D와 계좌 상대값 16D를 붙인다. `ChampionExtractor`는 이 입력을 공식 알고리즘의 정책·가치 구조에 연결한다. 이는 vendor/FinRL-X/SB3 원본 기본 구조가 아니라 프로젝트 관측 계약이다.
 
 현재 코드에는 프레임워크 기본값이 아닌 Expert 연결 값도 있다.
 
@@ -91,14 +91,14 @@ GGUF 실행은 설치된 `llama-server`를 사용한다. 컨텍스트 길이, CP
 - FinRL-X 서브모듈 커밋: `4409abe925c904e570be78ebfb5e77ac3491dff8`
 - FinRL 설치 소스 커밋: `00f3596facd01cced5217d875d8c1fc413a31665`
 - 현재 알고리즘 설정·기본 단계: 설치된 `finrl/agents/stablebaselines3/models.py`
-- 과거 SAC 예제: `FinRL-X/src/strategies/rl_model.py` (현재 주 학습 경로 아님)
-- rolling 예제 설정: `FinRL-X/src/strategies/fundamental_portfolio_drl.py`
+- 과거 SAC 예제: `vendor/FinRL-X/src/strategies/rl_model.py` (현재 주 학습 경로 아님)
+- rolling 예제 설정: `vendor/FinRL-X/src/strategies/fundamental_portfolio_drl.py`
 - 포트폴리오 환경: 설치된 `finrl/meta/env_portfolio_optimization/env_portfolio_optimization.py`
 - SB3 SAC 기본 정책: 설치된 `stable_baselines3/sac/policies.py`, `stable_baselines3/sac/sac.py`
 
 ## 실행 의존성
 
-운영/키움 요구와 재현 버전은 `requirements/operations.txt`, `operations.lock.txt`, `kiwoom.txt`, `kiwoom.lock.txt`가 관리합니다. `.venv`는 websockets 10.4, `.venv-kiwoom`은 SDK 1.0.2와 websockets 15.0.1을 사용합니다. 주 FinRL/NumPy/Pandas 버전을 SDK 요구에 맞춰 바꾸지 않습니다. `teachers`의 stockstats도 FinRL 요구와 같은 0.5.4입니다. Frozen FinCast의 실제 실행 의존성 beartype 0.22.9/einx 0.4.3/colt5-attention 0.11.2를 포함합니다.
+운영/키움 요구와 재현 버전은 `scripts/requirements/operations.txt`, `operations.lock.txt`, `kiwoom.txt`, `kiwoom.lock.txt`가 관리합니다. `.venv`는 websockets 10.4, `.venv-kiwoom`은 SDK 1.0.2와 websockets 15.0.1을 사용합니다. 주 FinRL/NumPy/Pandas 버전을 SDK 요구에 맞춰 바꾸지 않습니다. `teachers`의 stockstats도 FinRL 요구와 같은 0.5.4입니다. Frozen FinCast의 실제 실행 의존성 beartype 0.22.9/einx 0.4.3/colt5-attention 0.11.2를 포함합니다.
 
 원본 주식 Expert는 전체 학습 종목의 동일 과거 거래일 가격·원본 지표를 요구합니다. 일부 종목만 갱신된 최근 일봉 대신 관측 시점 이전의 가장 최근 완전한 공통 거래일을 사용합니다. 일봉을 만들거나 종목을 제외하지 않습니다.
 

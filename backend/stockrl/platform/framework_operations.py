@@ -225,7 +225,7 @@ def execute(action,parameters,output):
     """Record the actual official functions called by a successful task."""
     called={};previous=sys.getprofile();source_names={}
     finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    source_root=ROOT/'FinRL-X/src'
+    source_root=ROOT/'vendor/FinRL-X/src'
     def trace(frame,event,arg):
         if event!='call':return
         filename=frame.f_code.co_filename
@@ -266,7 +266,7 @@ def execute(action,parameters,output):
 def source_catalog():
     """Inventory every real Python source, without executing package import side effects."""
     finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    roots=[('stockrl',ROOT/'backend/stockrl'),('REA',ROOT/'backend/rea'),('Platform',ROOT/'backend'),('FinRL-X',ROOT/'FinRL-X/src'),('FinRL',finrl_root)]
+    roots=[('stockrl',ROOT/'backend/stockrl'),('REA',ROOT/'backend/rea'),('Platform',ROOT/'backend'),('FinRL-X',ROOT/'vendor/FinRL-X/src'),('FinRL',finrl_root)]
     items=[]
     for framework,root in roots:
         sources=[]
@@ -314,7 +314,7 @@ def source_catalog():
                             key=node.name+'.'+child.name;functions.append(key);signatures[key]=ast.unparse(child.args);parameters[key]=arguments(child,key)
             items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':ast.get_docstring(tree),
                           'package':path.name=='__init__.py','functions':functions,'signatures':signatures,'parameters':parameters,'keyword_contracts':keyword_contracts,'imports':sorted(set(imports)),'calls':sorted(set(calls))})
-    script=ROOT/'FinRL-X/deploy.sh'
+    script=ROOT/'vendor/FinRL-X/deploy.sh'
     if script.is_file():items.append({'id':'FinRL-X:deploy','path':'FinRL-X/deploy.sh','framework':'FinRL-X',
         'description':'공식 배포 스크립트의 데이터 준비 및 전략 실행 절차','functions':[],
         'signatures':{},'imports':[],'calls':['data download','run_single_date','run_backtest']})

@@ -1,12 +1,9 @@
 # 연결 · 관리
 
-## 메뉴 연결 파일
+취합: `management_menu_manager.py`. 이 파일만 상위 menu_registry가 import합니다.
 
-management_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
+- [연결 · 설정](connection_settings/README.md): connection_settings/
+- [진단 · 로그 · 코드 적용](diagnostics/README.md): diagnostics/
+- [백엔드 기능 전체](backend_browser/README.md): backend_browser/
 
-| 화면 | 연결 파일 | 프론트 담당 파일 |
-| --- | --- | --- |
-| 연결 · 설정 | connection_settings_menu.py | pages/settings/ConnectionSettings.tsx |
-| 진단 · 로그 · 코드 적용 | diagnostics_menu.py | pages/system/Diagnostics.tsx |
-
-| 백엔드 기능 전체 | backend_browser_menu.py | pages/frameworks/FeatureWorkspace.tsx |
+취합: submenu_manager.py → management_menu_manager.py(대메뉴 등록) → 전체 menu_registry → API. 새 기능 구현은 소속 하위 폴더에 추가하고 소메뉴 매니저에 등록합니다.

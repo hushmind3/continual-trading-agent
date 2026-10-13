@@ -324,7 +324,7 @@ def catalog():
     from .system_operations import system
     items=[dict(item) for item in source_catalog()];by_id={item['id']:item for item in items}
     roots={row[2]:[key] for key,row in ACTIONS.items() if row[2]}
-    for module in ('web_api','__main__','official_cli','job_worker','platform.kiwoom_worker'):
+    for module in ('web_api','__main__','finrl.policy_learning.official_cli','job_worker','platform.kiwoom_worker'):
         roots['stockrl:'+module]=[]
     edges={}
     for item in items:

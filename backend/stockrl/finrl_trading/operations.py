@@ -8,7 +8,7 @@ PROVIDER_FIELDS={
 }
 
 def provider_environment():
-    from ..provider_credentials import _vault
+    from stockrl.management.connection_settings.provider_credentials import _vault
     vault=_vault()
     return {key:value for keys in PROVIDER_FIELDS.values() for key in keys
         if (value:=vault.get_password('stockrl.official-framework',key))}
@@ -23,7 +23,7 @@ def provider_status():
 
 def save_provider(name,values):
     import os
-    from ..provider_credentials import _vault
+    from stockrl.management.connection_settings.provider_credentials import _vault
     if name not in PROVIDER_FIELDS:raise ValueError('공식 공급원 설정을 선택하세요.')
     vault=_vault()
     for key,value in values.items():

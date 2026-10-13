@@ -1,9 +1,9 @@
 """Import large-menu managers; expose their existing backend connections."""
-from .trading.trading_menu_manager import GROUP as TRADING
-from .finrl.finrl_menu_manager import GROUP as FINRL
-from .extensions.extensions_menu_manager import GROUP as EXTENSIONS
-from .management.management_menu_manager import GROUP as MANAGEMENT
-from .rea.rea_menu_manager import GROUP as REA
+from .trading.trading_menu_manager import GROUP as TRADING, ROUTERS as TRADING_ROUTERS
+from .finrl.finrl_menu_manager import GROUP as FINRL, ROUTERS as FINRL_ROUTERS
+from .extensions.extensions_menu_manager import GROUP as EXTENSIONS, ROUTERS as EXTENSIONS_ROUTERS
+from .management.management_menu_manager import GROUP as MANAGEMENT, ROUTERS as MANAGEMENT_ROUTERS
+from .rea.rea_menu_manager import GROUP as REA, ROUTERS as REA_ROUTERS
 
 GROUPS=(TRADING,FINRL,REA,EXTENSIONS,MANAGEMENT)
 _routes_by_menu={}
@@ -87,3 +87,10 @@ def catalog(routes):
                     'body_schema':{**body,'properties':properties}})
     return {'groups':[{'id':g['id'],'title':g['title'],'menus':list(g['menus'])} for g in GROUPS],
         'actions':actions,'commands':commands}
+
+
+def register_api(api):
+    """Collect small-menu routers through the five large-menu coordinators."""
+    for routers in (TRADING_ROUTERS,FINRL_ROUTERS,REA_ROUTERS,EXTENSIONS_ROUTERS,MANAGEMENT_ROUTERS):
+        for router in routers:api.include_router(router)
+    bind(api.routes)

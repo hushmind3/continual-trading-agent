@@ -9,10 +9,10 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 from stockrl import ROOT
-from stockrl.paper_account import PaperAccount
+from stockrl.trading.paper_account.paper_account import PaperAccount
 from stockrl.expert_observation import ExpertObservation
-from stockrl.platform.operations_runtime import OperationsRuntime
-from stockrl.platform import operations_settings
+from stockrl.trading.control.operations_runtime import OperationsRuntime
+from stockrl.trading.control import operations_settings
 from stockrl.market_storage import AppendOnlyMarketCSV
 def panel(symbol,date,price=100):
  return SimpleNamespace(dates=[date],symbols=[symbol],groups={symbol:('US','equity')},observed=np.ones((1,1),bool),closes=np.array([[price]]),features=np.zeros((1,1,8)))
@@ -144,7 +144,7 @@ class IntegrityTests(unittest.TestCase):
    self.assertEqual(actual.close.tolist(),[100]);self.assertEqual(actual.attrs['timeframe'],'1d')
  def test_unchanged_daily_data_does_not_repeat_learning(self):
   import sys
-  from stockrl.platform import operations_runtime
+  from stockrl.trading.control import operations_runtime
   from stockrl.finrl import framework
   runtime=OperationsRuntime();runtime.controls['learning']=True
   frame=pd.DataFrame([row('AAPL','2026-01-01')]);launched=[]
@@ -159,7 +159,7 @@ class IntegrityTests(unittest.TestCase):
    runtime.queue_learning(['AAPL']);self.assertEqual(len(launched),2)
  def test_old_manual_quote_is_rejected(self):
   import sys
-  from stockrl.platform import operations_runtime
+  from stockrl.trading.control import operations_runtime
   runtime=OperationsRuntime();runtime.account=PaperAccount.in_memory(0,0);runtime.quotes['AAPL']=row('AAPL','2000-01-01')
   with patch.dict(sys.modules,{'stockrl.live_feed':SimpleNamespace(LIVE_QUOTE_MAX_AGE_SECONDS=300)}),patch.object(operations_runtime,'read_json',return_value={'instruments':[{'symbol':'AAPL','market':'US','asset_class':'equity'}]}):
    with self.assertRaisesRegex(ValueError,'최신 시세'):runtime.manual_order('AAPL','USD','BUY',1)
@@ -188,13 +188,13 @@ class IntegrityTests(unittest.TestCase):
   self.assertEqual(set(ACTIONS),{'native_call'})
   self.assertNotIn('finrl_trading',{group['id'] for group in GROUPS})
  def test_rea_refuses_project_trash_inputs(self):
-  from stockrl.rea.operations import validate_arguments
+  from stockrl.rea.analysis.operations import validate_arguments
   with self.assertRaisesRegex(ValueError,'휴지통'):
    validate_arguments({'arguments':{'input_path':str(ROOT/'휴지통/sample')}})
   validate_arguments({'input_path':str(ROOT/'frontend/src')})
  def test_rea_timeout_closes_the_session(self):
   import io,queue
-  from stockrl.rea.operations import REAConnection
+  from stockrl.rea.analysis.operations import REAConnection
   connection=REAConnection();connection.process=SimpleNamespace(poll=lambda:None,stdin=io.StringIO());connection.responses=queue.Queue()
   with patch.object(connection,'close') as close:
    with self.assertRaisesRegex(RuntimeError,'응답 시간이 초과'):
@@ -203,13 +203,13 @@ class IntegrityTests(unittest.TestCase):
 
 class REAProjectStorageTests(unittest.TestCase):
  def test_project_reader_cannot_leave_saved_folder(self):
-  from stockrl.rea.projects import _inside
+  from stockrl.rea.project_browser.projects import _inside
   with self.assertRaisesRegex(ValueError,'프로젝트 내부'):
    _inside(ROOT/'backend/rea_projects/example','../../../configs/experts.json')
  def test_folder_snapshot_does_not_copy_generated_output_into_itself(self):
   import tempfile
   from unittest.mock import patch
-  from stockrl.rea import projects
+  from stockrl.rea.analysis import extract
   with tempfile.TemporaryDirectory() as temporary:
    source=Path(temporary);(source/'app.js').write_text('export const value=7;',encoding='utf8')
    output=source/'backend/rea_projects';destination=output/'test/original/source'

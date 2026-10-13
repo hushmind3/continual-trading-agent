@@ -13,7 +13,8 @@ if os.environ.get('STOCKRL_KIWOOM_WORKER')=='1':
     from kiwoom.core.token_store import MemoryTokenStore
 from .. import ROOT
 from ..kiwoom_stream import KiwoomRealtimeStream,_number
-from ..provider_credentials import get_credentials,read_settings
+from stockrl.management.connection_settings.provider_credentials import get_credentials
+from stockrl.management.connection_settings.provider_credentials import read_settings
 from ..state_io import atomic_json,read_json
 
 

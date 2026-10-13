@@ -44,7 +44,7 @@ def main():
         if job.get('champion_path'):args.extend(['--champion-path',job['champion_path']])
         if job.get('champion_output'):args.extend(['--champion-output',job['champion_output']])
         sys.argv = args
-        from .official_cli import main as official_main
+        from stockrl.finrl.policy_learning.official_cli import main as official_main
         official_main()
         if job["command"]=="train":
             print('학습 결과 저장 완료. 운영 반영은 모델 선택 화면에서 직접 승인하세요.',flush=True)

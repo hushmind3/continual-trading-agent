@@ -1,12 +1,8 @@
 # 프로젝트 확장
 
-## 메뉴 연결 파일
+취합: `extensions_menu_manager.py`. 이 파일만 상위 menu_registry가 import합니다.
 
-extensions_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
+- [MoE](moe/README.md): moe/
+- [프로젝트 모듈](project_modules/README.md): project_modules/
 
-| 화면 | 연결 파일 | 프론트 담당 파일 |
-| --- | --- | --- |
-| MoE | moe_menu.py | pages/model/ModelWorkspace.tsx |
-
-MoE는 algorithms 조회의 공식 목록을 사용하고 champions/create에 선택 algorithm을 전달합니다. 같은 선택값과 생성된 Champion의 알고리즘은 학습 화면에서 이어집니다.
-| 프로젝트 모듈 | project_modules_menu.py | pages/frameworks/FrameworkWorkspace.tsx |
+취합: submenu_manager.py → extensions_menu_manager.py(대메뉴 등록) → 전체 menu_registry → API. 새 기능 구현은 소속 하위 폴더에 추가하고 소메뉴 매니저에 등록합니다.

@@ -42,7 +42,7 @@ def start_apply(target='frontend'):
         return value
 
 def busy():
-    from .operations_runtime import runtime
+    from stockrl.trading.control.operations_runtime import runtime
     from .library_operations import library
     items=[]
     if system.job_state()['running']:items.append('실행 중인 SAC/백테스트/수집 작업')
@@ -56,9 +56,9 @@ def busy():
 
 def check_system():
     from .. import web_api as api
-    from .operations_runtime import runtime
-    from .operations_settings import settings
-    from ..provider_credentials import public_status
+    from stockrl.trading.control.operations_runtime import runtime
+    from stockrl.trading.control.operations_settings import settings
+    from stockrl.management.connection_settings.provider_credentials import public_status
     items=[]
     def check(key,title,function):
         try:
@@ -130,7 +130,7 @@ class SystemOperations:
             process = psutil.Process(int(job["pid"]))
             if job.get("process_created") and abs(process.create_time() - job["process_created"]) > 0.1:
                 return None
-            if process.is_running() and any(x in " ".join(process.cmdline()) for x in ("stockrl.job_worker", "stockrl.official_cli")):
+            if process.is_running() and any(x in " ".join(process.cmdline()) for x in ("stockrl.job_worker", "stockrl.finrl.policy_learning.official_cli")):
                 return process
         except (psutil.Error, KeyError, ValueError):
             pass
@@ -317,7 +317,7 @@ class SystemOperations:
         with self.lock:
             value={**deepcopy(self.value),'active':self.active}
             if value.get('stop_requested'):
-                from .operations_runtime import runtime
+                from stockrl.trading.control.operations_runtime import runtime
                 from .library_operations import library
                 pending=bool(self.active or runtime.inference_active or library.active or runtime.thread and runtime.thread.is_alive())
                 value['status']='running' if pending else 'complete'
@@ -339,7 +339,7 @@ class SystemOperations:
         from .library_operations import library
         with self.lock:
             if self.active:return self.snapshot()
-            from .operations_runtime import runtime
+            from stockrl.trading.control.operations_runtime import runtime
             if self.value.get('status')=='complete' and all(runtime.controls[name] for name in ('feed','paper','engine')) and self.value.get('currencies')==(currencies or ['USD','KRW']):return self.snapshot()
             if apply_running() or self.restarting:raise ValueError('변경 적용이 끝난 후 운영을 시작하세요.')
             if library.active:raise ValueError('현재 모델 작업이 끝난 후 전체 시작을 요청하세요.')
@@ -355,9 +355,10 @@ class SystemOperations:
             return self.snapshot()
     def run(self):
         from .. import web_api as api
-        from .operations_runtime import runtime
-        from .operations_settings import settings
-        from ..provider_credentials import public_status,test_connection
+        from stockrl.trading.control.operations_runtime import runtime
+        from stockrl.trading.control.operations_settings import settings
+        from stockrl.management.connection_settings.provider_credentials import public_status
+        from stockrl.management.connection_settings.provider_credentials import test_connection
         cfg=settings()
         try:
             key='accounts';title='KRW/USD 가상계좌 준비';self.phase(key,title)
@@ -446,7 +447,7 @@ class SystemOperations:
             with self.lock:self.value.update(status='blocked' if isinstance(exc,(InterruptedError,ValueError)) else 'failed',detail=str(exc));atomic_json(self.value,self.path)
         finally:self.active=False
     def stop(self):
-        from .operations_runtime import runtime
+        from stockrl.trading.control.operations_runtime import runtime
         from .library_operations import library
         self.cancel();library.cancelled.set();runtime.cancel_inference.set()
         runtime.command('learning',False);runtime.command('engine',False);runtime.command('paper',False);runtime.command('feed',False)

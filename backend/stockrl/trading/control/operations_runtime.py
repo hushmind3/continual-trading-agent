@@ -1,0 +1,403 @@
+"""Connect recovered account/feed/Expert modules to the current native SAC path."""
+from __future__ import annotations
+import json
+import threading
+import time
+from hashlib import sha256
+from pathlib import Path
+from types import SimpleNamespace
+import numpy as np
+import pandas as pd
+from stockrl import ROOT
+from stockrl.finrl_trading.data import prices
+from stockrl.finrl.framework import training_environment
+from stockrl.state_io import read_json
+from stockrl.state_io import atomic_json
+from stockrl.trading.paper_account.paper_account import PaperAccount
+from stockrl.trading.paper_account.paper_account import _moment
+from stockrl.trading.control.operations_settings import settings
+from stockrl.platform.system_operations import system
+from stockrl.finrl.framework import policy_checkpoint
+from stockrl.finrl.framework import CASH_ENVIRONMENT
+from stockrl.finrl.framework import champion_structure_environment
+
+class OperationsRuntime:
+    def __init__(self):
+        self.lock=threading.RLock()
+        self.controls={'feed':False,'paper':False,'engine':False,'learning':False}
+        self.learning_pending=[];self.learning_job=None;self.learning_versions={}
+        self.collector=None;self.thread=None;self.policy_thread=None
+        self.account=None;self.quotes={};self.decisions=[];self.last_policy_dates={}
+        self.status={'status':'stopped','error':None}
+        self.policy_models={}
+        self.feed_cycle=threading.Event();self.cancel_inference=threading.Event();self.inference_active=0
+
+    def ledger(self):
+        cfg=settings()
+        if self.account is None:self.account=PaperAccount(cfg.state_dir/'paper-account.json',cfg.risk.fee,cfg.risk.slippage)
+        return self.account
+
+    def snapshot(self):
+        with self.lock:
+            account=self.ledger().snapshot()
+            resident={row['path'] for row in system.resident_models()}
+            return {'controls':self.controls.copy(),'account':account,'quotes':self.quotes.copy(),
+                'decisions':self.decisions,'feed':dict(self.status),
+                'broker':dict(self.collector.broker_status) if self.collector else {},
+                'pool':system.expert_pool.catalog() if system.expert_pool else [],
+                'settings':read_json(ROOT/'configs/local/operations.json'),
+                'policies':{currency:{'path':path,'loaded':self.policy_models.get(currency,{}).get('path')==path and str((ROOT/'runtime/official'/path).resolve()) in resident,
+                    **{key:value for key,value in self.policy_models.get(currency,{}).items() if key not in ('model','path','signature')}}
+                    for currency,path in read_json(ROOT/'runtime/operations/policies.json').items()}}
+
+    def command(self,name,enabled):
+        if name=='engine' and not enabled:self.cancel_inference.set()
+        with self.lock:
+            if name not in self.controls:raise ValueError('feed / paper / engine 제어를 선택하세요.')
+            if name in ('engine','learning') and enabled:
+                policies=read_json(ROOT/'runtime/operations/policies.json')
+                if not policies:raise ValueError('운영 정책을 모델 선택 화면에서 직접 승인하세요.')
+                for currency,path in policies.items():
+                    checkpoint=(ROOT/'runtime/official'/path).resolve()
+                    if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('승인 정책 경로가 운영 폴더 밖입니다.')
+                    identity=read_json(checkpoint.parent/'dataset.json')
+                    if identity.get('currency')!=currency or policy_checkpoint(checkpoint.parent)!=checkpoint:raise ValueError('승인 정책 경로·통화 정보가 다릅니다.')
+                    self._check_policy(checkpoint.parent,load=True)
+            if name=='feed':
+                if enabled and not self.controls['feed']:
+                    if self.thread and self.thread.is_alive():raise ValueError('이전 시세 수신 작업이 종료 중입니다.')
+                    self.feed_cycle.clear()
+                    self.controls['feed']=True
+                    self.status={'status':'starting','error':None}
+                    self.thread=threading.Thread(target=self.run,name='market-paper',daemon=True)
+                    self.thread.start()
+                elif not enabled:
+                    self.controls['feed']=False
+                    if self.collector:
+                        self.collector.stop.set();self.collector.broker_stop.set()
+            else:
+                if name=='engine' and enabled:self.cancel_inference.clear()
+                self.controls[name]=bool(enabled)
+                if name=='learning':
+                    self.status['learning_status']='완료 시세 대기' if enabled else '중지'
+                    if not enabled:
+                        self.learning_pending.clear()
+
+            result=self.controls.copy()
+        if name=='learning' and not enabled:
+            with system.job_lock:
+                job=system.job_state()
+                if job.get('running') and job.get('id')==self.learning_job:system.stop_job()
+        return result
+
+    def run(self):
+        collector=None
+        try:
+            from stockrl.live_feed import LiveMarketCollector
+            cfg=settings();source=read_json(ROOT/'configs/instruments.json')
+            if cfg.symbols:source['instruments']=[i for i in source['instruments'] if i['symbol'] in cfg.symbols]
+            config=cfg.state_dir/'live-symbols.json';atomic_json(source,config)
+            collector=LiveMarketCollector(config,cfg.state_dir/'live/market.csv',
+                poll_seconds=cfg.data.poll_seconds,timeout=cfg.data.timeout_seconds)
+            with self.lock:self.collector=collector
+            # Raw bars are persisted separately; only accepted rows update the ledger.
+            original_append=collector.index.append
+            def append(rows):
+                added=original_append(rows)
+                if rows:self.status.update(last_received_at=time.time(),last_as_of=str(max(row['date'] for row in rows)))
+                if added:self.accept(collector.index.last_added_rows)
+                return added
+            collector.index.append=append
+            original_collect=collector.collect_once
+            def collect_once():
+                try:return original_collect()
+                finally:self.feed_cycle.set()
+            collector.collect_once=collect_once
+            self.policy_thread=threading.Thread(target=self.process_updates,name='policy-updates',daemon=True)
+            self.policy_thread.start()
+            if collector.broker_provider=='kiwoom':
+                from stockrl.platform.kiwoom_data import BrokerStreams
+                broker=BrokerStreams(collector);broker.start();collector.broker_thread=broker.thread
+            else:broker=None
+            try:
+                self.status={'status':'running','error':None}
+                collector.run()
+            finally:
+                if broker:broker.close()
+        except Exception as exc:
+            self.status={'status':'failed','error':str(exc)}
+        finally:
+            with self.lock:
+                self.controls['feed']=False;self.collector=None
+                if self.status.get('status')!='failed':self.status['status']='stopped'
+            self.feed_cycle.set()
+
+    def accept(self,rows):
+        frame=pd.DataFrame(rows)
+        if frame.empty:return
+        for stamp,group in frame.sort_values('date').groupby('date',sort=True):
+            group=group.astype(object).where(group.notna(),None)
+            with self.lock:
+                records=[r for r in group.to_dict('records') if r['symbol'] not in self.quotes or _moment(r['date'])>_moment(self.quotes[r['symbol']]['date'])]
+            if not records:continue
+            symbols=[r['symbol'] for r in records]
+            features=np.zeros((1,len(records),8),dtype=float)
+            for index,row in enumerate(records):
+                bid,ask=row.get('bid'),row.get('ask')
+                if bid and ask:features[0,index,7]=(float(ask)-float(bid))/float(row['close'])*10000
+            panel=SimpleNamespace(dates=[str(stamp)],symbols=symbols,
+                groups={r['symbol']:(r['market'],r['asset_class']) for r in records},
+                observed=np.ones((1,len(records)),dtype=bool),
+                closes=np.array([[float(r['close']) for r in records]]),features=features)
+            with self.lock:
+                self.quotes.update({r['symbol']:r for r in records})
+                self.ledger().process_bar(panel,0,self.controls['paper'])
+                self.ledger().save()
+                self.status['received_symbols']=len(self.quotes)
+                previous=self.status.get('last_as_of')
+                if previous is None or _moment(stamp)>_moment(previous):self.status['last_as_of']=str(stamp)
+        self.feed_cycle.set()
+
+    def process_updates(self):
+        while self.controls['feed']:
+            self.feed_cycle.wait();self.feed_cycle.clear()
+            if not self.controls['feed']:break
+            if self.controls['engine']:
+                try:self.sac_decision()
+                except Exception as exc:
+                    with self.lock:self.status['policy_error']=str(exc)
+            if self.controls['learning']:
+                with self.lock:symbols=list(self.quotes)
+                try:self.queue_learning(symbols)
+                except Exception as exc:
+                    with self.lock:self.status.update(learning_status='학습 입력 오류',learning_error=str(exc))
+
+    def queue_learning(self,symbols):
+        with system.job_lock,self.lock:
+            if not self.controls['learning']:return
+            from stockrl import web_api as api
+            from stockrl.finrl.framework import policy_files
+            policies=read_json(ROOT/'runtime/operations/policies.json')
+            if not policies:
+                self.status['learning_error']='운영 모델을 선택·로드한 뒤 지속학습을 켜세요.';return
+            for currency,path in policies.items():
+                identity=read_json((ROOT/'runtime/official'/path).parent/'dataset.json')
+                if not set(identity.get('symbols',[]))&set(symbols):continue
+                frame=prices(currency,identity['symbols'])
+                if frame.empty:continue
+                version=sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest()
+                if self.learning_versions.get(currency)==version:continue
+                if currency not in self.learning_pending:self.learning_pending.append(currency)
+            if system.job_state()['running'] or not self.learning_pending:return
+            currency=self.learning_pending.pop(0)
+            try:
+                identity=read_json(policy_files(currency)/'dataset.json')
+                request=api.RunRequest(currency=currency,symbols=identity['symbols'],algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
+                result=api.launch('train',request,preserve_output=True)
+                self.learning_job=result['job']['id']
+                frame=prices(currency,identity['symbols'])
+                self.learning_versions[currency]=sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest()
+                self.status.update(learning_status=identity.get('algorithm','sac').upper()+' 이어 학습 실행',learning_job=self.learning_job)
+                self.status.pop('learning_error',None)
+            except Exception as exc:self.status.update(learning_status='학습 요청 실패',learning_error=str(exc))
+
+    def manual_order(self,symbol,currency,action,quantity):
+        from stockrl.trading.paper_account.paper_account import _currency
+        items=read_json(ROOT/'configs/instruments.json').get('instruments',[])
+        item=next((i for i in items if i['symbol']==symbol),None)
+        if not item or _currency(item['market'],item['asset_class'])!=currency:raise ValueError('계좌 통화에 맞는 등록 종목을 선택하세요.')
+        with self.lock:
+            row=self.quotes.get(symbol)
+            source='live'
+            if not row:
+                frame=prices(currency,[symbol])
+                if frame.empty:raise ValueError('실제 저장 가격이나 수신 시세가 없습니다.')
+                row=frame.sort_values('date').iloc[-1].to_dict();source='stored'
+            from stockrl.live_feed import LIVE_QUOTE_MAX_AGE_SECONDS
+            stamp=pd.Timestamp(row['date'])
+            if stamp.tzinfo is None:stamp=stamp.tz_localize('UTC')
+            age=(pd.Timestamp.now(tz='UTC')-stamp).total_seconds()
+            if age<0 or age>LIVE_QUOTE_MAX_AGE_SECONDS:raise ValueError('유효한 최신 시세가 없어 즉시 체결할 수 없습니다.')
+            price=float(row['close']);bid=row.get('bid');ask=row.get('ask')
+            spread=(float(ask)-float(bid))/price if bid and ask else 0
+            fill=self.ledger()._fill(symbol,currency,action,price,spread,
+                float(quantity) if action=='SELL' else price*quantity,
+                str(row['date']),requested_quantity=quantity if action=='BUY' else None)
+            if fill is None:raise ValueError('현재 현금 또는 보유 수량으로 체결할 수 없는 주문입니다.')
+            self.ledger().state['books'][currency]['marks'][symbol]=price
+            self.ledger().save()
+            return {'fill':fill,'price_source':source,'quote_as_of':str(row['date'])}
+
+    def expert_pool(self):
+        from stockrl.platform.assets import ExpertPool
+        catalog=read_json(ROOT/'configs/experts.json')
+        # Test status updates do not change the loaded Expert weights or selection.
+        signature=json.dumps({'active':catalog.get('active',[]),
+            'packages':{key:item.get('package') for key,item in catalog.get('experts',{}).items()}},sort_keys=True)
+        if system.expert_pool and signature!=system.expert_pool_signature:
+            system.expert_pool.refresh_catalog(catalog);system.expert_pool_signature=signature
+        if system.expert_pool is None:
+            cfg=settings();cfg.state_dir=ROOT/'runtime/experts'
+            system.expert_pool=ExpertPool(cfg,keep_device=True,live=True);system.expert_pool_signature=signature
+            system.expert_pool.cancelled=self.cancel_inference.is_set
+        return system.expert_pool
+
+    def load(self,key):
+        with self.lock:
+            pool=self.expert_pool();pool.residency.preload([key])
+            metrics=pool.metrics.get(key,{})
+            if not metrics.get('preloaded'):raise ValueError(metrics.get('error','Expert를 적재하지 못했습니다.'))
+            metrics.pop('error',None)
+            return metrics
+
+    def unload(self,key):
+        with self.lock:
+            if system.expert_pool and key in system.expert_pool.loaded:system.expert_pool.release(key)
+
+    def fixture(self,key,*,frame=None,account=None,all_batches=False):
+        from stockrl.platform.expert_inference import prepare_inputs
+        with self.lock:entry=self.expert_pool().entries[key]
+        if frame is None:frame=prices('USD')
+        if frame.empty:raise ValueError('실제 USD 가격 데이터가 없습니다.')
+        if account is None:
+            book=self.ledger().snapshot()['books']['USD']
+            account={'currency':'USD','cash':book['cash'],'nav':book['equity'],
+                     'positions':{symbol:position['quantity'] for symbol,position in book['positions'].items()}}
+        snapshot,batches=prepare_inputs(entry,frame,account)
+        return {'input':batches[0],'inputs':batches if all_batches else batches[:1],'snapshot':snapshot}
+
+    def infer(self,key,fixture=None):
+        self.inference_active+=1
+        try:return self._infer(key,fixture)
+        finally:self.inference_active-=1
+
+    def _infer(self,key,fixture=None):
+        from stockrl.platform.expert_inference import run_batches
+        fixture=fixture or self.fixture(key,all_batches=True)
+        with self.lock:
+            pool=self.expert_pool()
+            packets=run_batches(pool,key,fixture['snapshot'],fixture.get('inputs',[fixture['input']]))
+            values=np.concatenate([np.asarray(packet['native_output'],dtype=float).reshape(-1) for packet in packets])
+            symbols_checked=sum(len(packet['symbols']) for packet in packets)
+            report=read_json(ROOT/'runtime/experts/status.json')
+            report.setdefault('experts',{})[key]={'status':'ready','as_of':fixture['snapshot']['as_of'],
+                'output':values.tolist(),'batches':len(packets),'symbols_checked':symbols_checked}
+            report.update(as_of=fixture['snapshot']['as_of'],resources=pool.metrics)
+            atomic_json(report,ROOT/'runtime/experts/status.json')
+            return {'packet':packets[0],'packets':packets,'metrics':dict(pool.metrics.get(key,{})),
+                'batches':len(packets),'symbols_checked':symbols_checked}
+
+    def sac_decision(self):
+        from stockrl.finrl.framework import policy_files
+        self.inference_active+=1
+        try:
+            selected=read_json(ROOT/'runtime/operations/policies.json')
+            if not selected:raise ValueError('운영 정책 미승인: 모델 선택 화면에서 직접 승인하세요.')
+            files=[(ROOT/'runtime/official'/path).resolve().parent for path in selected.values()]
+            with self.lock:self.decisions=[]
+            for folder in files:
+                if not folder.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('운영 정책 경로가 runtime/official 밖에 있습니다.')
+                if self.cancel_inference.is_set() or not self.controls['engine']:break
+                self._sac_decision(folder)
+        finally:self.inference_active-=1
+
+    def check_policy(self,files,*,load=False):
+        self.inference_active+=1
+        try:
+            with self.lock:return self._check_policy(files,load=load)
+        finally:self.inference_active-=1
+
+    def _check_policy(self,files,*,load=False):
+        identity=read_json(files/'dataset.json')
+        champion_ids=identity.get('champion_experts',[])
+        if identity.get('environment')!=CASH_ENVIRONMENT:raise ValueError('PortfolioOptimizationEnv 정책이 필요합니다. 구형 정책을 실행하지 않습니다.')
+        registry=system.expert_registry(files,self.expert_pool)
+        env=champion_structure_environment(identity['currency'],identity['symbols'],registry,champion_ids)
+        try:
+            model=system.model(policy_checkpoint(files),identity.get('algorithm','sac'),env)
+            info={'path':policy_checkpoint(files).relative_to(ROOT/'runtime/official').as_posix(),'algorithm':identity.get('algorithm','sac'),'device':str(model.device),
+                'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
+                'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
+            if load:
+                file=policy_checkpoint(files);stat=file.stat()
+                self.policy_models[identity['currency']]={**info,'signature':(stat.st_mtime_ns,stat.st_size)}
+                self.last_policy_dates.pop(identity['currency'],None)
+            return info
+        finally:env.close()
+
+    def _sac_decision(self,files):
+        identity=read_json(files/'dataset.json')
+        cash_enabled=identity.get('environment')==CASH_ENVIRONMENT
+        if identity.get('environment')!=CASH_ENVIRONMENT:
+            raise ValueError('현재 저장 SAC는 기존 환경의 파일입니다. 현재 원본 환경으로 학습한 정책이 필요합니다.')
+        symbols=identity['symbols'];currency=identity['currency'];frame=prices(currency,symbols)
+        if frame.empty:
+            self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'실제 저장 가격이 없습니다.'}
+            return
+        counts=frame.groupby('date').symbol.nunique()
+        complete=counts[counts==len(symbols)].index
+        if len(complete)==0:
+            self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'모든 종목이 있는 완료 일봉을 기다립니다.'}
+            return
+        frame=frame[frame.date<=complete.max()]
+        input_stamp=str(frame.date.max());latest_rows=frame[frame.date==frame.date.max()]
+        if len(latest_rows)!=len(symbols) or latest_rows.symbol.nunique()!=len(symbols):
+            self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','as_of':input_stamp,'missing_symbols':sorted(set(symbols)-set(latest_rows.symbol))}
+            return
+        if self.last_policy_dates.get(currency)==input_stamp:return
+        registry=system.expert_registry(files,self.expert_pool);champion_ids=identity.get('champion_experts',[])
+        prepared=training_environment(frame,registry,training=False,champion_ids=champion_ids)
+        latest=prepared.unwrapped.gym_env
+        latest._time_index=len(latest._sorted_times)-1
+        latest._state,latest._info=latest._get_state_and_info_from_time_index(latest._time_index)
+        wrapped=prepared
+        try:
+            file=policy_checkpoint(files);stat=file.stat();path=file.relative_to(ROOT/'runtime/official').as_posix()
+            model=system.model(file,identity.get('algorithm','sac'),wrapped)
+            self.policy_models[currency]={'path':path,'algorithm':identity.get('algorithm','sac'),'signature':(stat.st_mtime_ns,stat.st_size),
+                'device':str(model.device),'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
+                'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
+            with self.lock:
+                ledger=self.ledger();book=ledger.snapshot()['books'][currency]
+                history=ledger.state['books'][currency].setdefault('equity_history',[])
+                if history and history[-1]['date']==input_stamp:history[-1]['nav']=book['equity']
+                else:history.append({'date':input_stamp,'nav':book['equity']})
+                wrapped.live_account={'currency':currency,'nav':book['equity'],'cash':book['cash'],'initial_cash':book['initial_cash'],
+                    'marks':dict(book['marks']),'equity_history':[dict(point) for point in history],
+                    'positions':{symbol:row['quantity'] for symbol,row in book['positions'].items()}}
+            observation=wrapped.observation(latest._state)
+            action,_=model.predict(observation,deterministic=True)
+            import math
+            allocation=action if math.isclose(float(np.sum(action)),1,abs_tol=1e-6) and np.min(action)>=0 else latest._softmax_normalization(action)
+            weights=allocation[1:];cash_weight=float(allocation[0])
+            bars=frame[frame.date==frame.date.max()].set_index('symbol')
+            stamp=str(bars.date.iloc[0])
+            panel=SimpleNamespace(dates=[stamp],symbols=symbols,groups={
+                s:('KRX' if s.endswith('.KS') else 'KOSDAQ' if s.endswith('.KQ') else 'US','equity') for s in symbols},
+                observed=np.ones((1,len(symbols)),dtype=bool),closes=np.array([[float(bars.loc[s,'close']) for s in symbols]]),
+                features=np.zeros((1,len(symbols),8)))
+            with self.lock:
+                book=self.ledger().snapshot()['books'][currency];nav=book['equity']
+                if book['cash']!=wrapped.live_account['cash'] or {s:row['quantity'] for s,row in book['positions'].items()}!=wrapped.live_account['positions']:
+                    self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'추론 중 보유 상태가 변경되어 다시 판단합니다.'}
+                    self.feed_cycle.set();return
+                panel.dates=[pd.Timestamp.now(tz='UTC').isoformat()]
+                current=[book['positions'].get(s,{}).get('quantity',0)*float(bars.loc[s,'close'])/nav if nav else 0 for s in symbols]
+                actions=np.array([2 if weight>held else 0 if weight<held else 1 for weight,held in zip(weights,current)])
+                self.ledger().queue_decisions(panel,0,np.tile([0.,1.,0.],(len(symbols),1)),self.controls['paper'],
+                    allocation=[*weights,cash_weight],actions=actions)
+                self.ledger().save()
+                self.decisions.extend({'symbol':s,'currency':currency,'target_weight':float(weight),'as_of':stamp} for s,weight in zip(symbols,weights))
+                self.decisions.append({'symbol':'CASH','currency':currency,'target_weight':cash_weight,'as_of':stamp,'cash_action':cash_enabled})
+                self.last_policy_dates[currency]=input_stamp
+                self.status.setdefault('policy_inputs',{})[currency]={'status':'ready','as_of':stamp}
+                self.status.pop('policy_error',None)
+        finally:
+            wrapped.close()
+            if wrapped is not prepared:prepared.close()
+
+    def close(self):
+        self.command('feed',False)
+        if system.expert_pool:system.expert_pool.close()
+
+runtime=OperationsRuntime()

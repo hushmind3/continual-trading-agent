@@ -143,7 +143,7 @@ class LiveMarketCollector:
         self.metrics_path = self.output.with_name("live_feed_metrics.json")
         self.runtime_dir = self.output.parent.parent
         try:
-            from .provider_credentials import read_settings
+            from stockrl.management.connection_settings.provider_credentials import read_settings
             broker_settings = read_settings(self.runtime_dir)
         except Exception:
             broker_settings = {"provider": "yahoo", "environment": "paper"}

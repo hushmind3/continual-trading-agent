@@ -15,7 +15,8 @@ from zoneinfo import ZoneInfo
 import requests
 import websockets
 
-from .provider_credentials import get_credentials, read_settings
+from stockrl.management.connection_settings.provider_credentials import get_credentials
+from stockrl.management.connection_settings.provider_credentials import read_settings
 
 WS_URLS = {
     "real": "wss://api.kiwoom.com:10000/api/dostk/websocket",

@@ -1,8 +1,8 @@
-# REA 프론트
+# REA 역공학
 
-REAWorkspace: 파일 선택·폴더 선택·웹사이트 분석 세 버튼과 실제 저장 결과·폴더 열기.
-REAProjects: 저장 프로젝트 선택, 폴더·파일 탐색/검색, 원문 미리보기, 저장 폴더 열기.
+취합: `rea_menu_manager.ts`. 이 파일만 상위 menu_registry가 import합니다.
 
-백엔드 실행·추출·저장은 backend/stockrl/rea/projects.py에 있으며 결과는 backend/rea_projects에 저장합니다. 프론트는 파일을 실행하거나 코딩 에이전트를 호출하지 않습니다. 임의 도구·JSON 입력·엔진 설정 화면은 제거했습니다.
+- [프로그램 분석](analysis/README.md): analysis/
+- [프로젝트 탐색](project_browser/README.md): project_browser/
 
-original/ 원문·원본파일, inferred/ 추론·의사코드, analysis/ 관측 구조·근거·한계를 분리합니다. 미리보기가 제한돼도 디스크 파일은 전체를 저장합니다. 네이티브 바이너리가 원래 프로젝트로 완벽히 복원된다고 표시하지 않습니다.
+취합: submenu_manager.ts → rea_menu_manager.ts(대메뉴 등록) → 전체 menu_registry → API. 새 기능 구현은 소속 하위 폴더에 추가하고 소메뉴 매니저에 등록합니다.

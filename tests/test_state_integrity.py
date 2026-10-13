@@ -205,17 +205,17 @@ class REAProjectStorageTests(unittest.TestCase):
  def test_project_reader_cannot_leave_saved_folder(self):
   from rea.project_browser.projects import _inside
   with self.assertRaisesRegex(ValueError,'프로젝트 내부'):
-   _inside(ROOT/'backend/rea_projects/example','../../../configs/experts.json')
+   _inside(ROOT/'backend/rea/project_browser/saved_projects/example','../../../configs/experts.json')
  def test_folder_snapshot_does_not_copy_generated_output_into_itself(self):
   import tempfile
   from unittest.mock import patch
   from rea.analysis import extract
   with tempfile.TemporaryDirectory() as temporary:
    source=Path(temporary);(source/'app.js').write_text('export const value=7;',encoding='utf8')
-   output=source/'backend/rea_projects';destination=output/'test/original/source'
+   output=source/'backend/rea/project_browser/saved_projects';destination=output/'test/original/source'
    with patch.object(projects,'OUTPUT',output):
     projects._copy_directory(source,destination)
    self.assertEqual((destination/'app.js').read_text(encoding='utf8'),'export const value=7;')
-   self.assertFalse((destination/'backend/rea_projects').exists())
+   self.assertFalse((destination/'backend/rea/project_browser/saved_projects').exists())
 
 if __name__=='__main__':unittest.main()

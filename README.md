@@ -13,7 +13,7 @@
 | configs/ | 금융 설정·계약·인증 참조 |
 | data/ | 실제 저장 데이터 |
 | runtime/ | 실행 상태·작업·모델 도구 결과 |
-| backend/rea_projects/ | 저장된 REA 원본·추론 자료 (Git 제외) |
+| backend/rea/project_browser/saved_projects/ | 저장된 REA 원본·추론 자료 (Git 제외) |
 
 `.git/`·`.github/`는 Git/CI, `.venv/`·`.venv-kiwoom/`은 기존 설치 환경입니다. 데이터·설정·실행 상태·설치 환경은 현재 경로를 유지합니다. `휴지통/`은 폐기 전용이며 열람·실행·Git 등록 대상으로 사용하지 않습니다.
 

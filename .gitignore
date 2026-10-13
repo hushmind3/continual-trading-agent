@@ -31,6 +31,6 @@ configs/local/
 results/
 
 
-/backend/rea_projects/
+/backend/rea/project_browser/saved_projects/
 
 /backend/rea/node_modules/

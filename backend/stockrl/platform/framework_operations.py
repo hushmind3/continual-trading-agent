@@ -272,6 +272,7 @@ def source_catalog():
         sources=[]
         for directory,folders,files in os.walk(root):
             if framework=='Platform':folders[:]=[]
+            if framework=='REA':folders[:]=[folder for folder in folders if folder!='saved_projects']
             folders[:]=sorted(folder for folder in folders if folder not in ('node_modules','__pycache__','.git','dist','build'))
             sources.extend(Path(directory)/name for name in files if name.endswith('.py'))
         for path in sorted(sources):

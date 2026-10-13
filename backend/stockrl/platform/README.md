@@ -33,3 +33,5 @@ MoE Champion 생성은 요청 algorithm의 공식 DRLAgent 모델·기본 설정
 `kiwoom_data.BrokerStreams`는 `.venv-kiwoom`의 `kiwoom_worker` 자식 프로세스로 SDK를 실행합니다. stdin/stdout의 `stockrl-kiwoom-v1` JSON 이벤트가 기존 시세 수집기에 전달되며 추가 HTTP 서버는 없습니다. 인증은 자식의 OS keyring에서 읽고 이벤트에는 인증 정보를 넣지 않습니다. 주 환경 Alpaca의 websockets 10.4와 SDK의 15.0.1 요구를 분리하며 종료 시 자식도 정리합니다. SDK import 검사는 `python -m stockrl.platform.kiwoom_worker --check`로 실행합니다.
 
 원본 포트폴리오 주식 Expert의 입력은 관측 시점 이전 데이터에서 전체 학습 종목이 모두 존재하는 가장 최근 공통 일봉을 선택합니다. 서로 다른 날짜를 섞거나 빠진 가격을 채우지 않습니다. 공통 일봉이 없으면 입력 오류를 반환합니다.
+
+FinRL-Trading 보조 등록 실행은 5개만 중계합니다. 제거한 13개 action은 등록·명령 카탈로그와 실행 라우팅에 포함하지 않습니다. csv_input은 원본 native_call의 CSV 입력에서도 쓰므로 유지하며 삭제된 전용 실행에서는 더 이상 참조하지 않습니다.

@@ -6,7 +6,7 @@
 | --- | --- |
 | __init__.py | finrlx: 필요한 원본 모듈을 지연 import |
 | data.py | prices: 기존 DataStore 가격 조회·일봉 구분 |
-| operations.py | 보조 ACTIONS·execute; 추가 수집·처리·전략·성과·공급원 보안 설정 |
+| operations.py | 보조 ACTIONS·execute; 원형 Adaptive Rotation 데이터 준비/단일 실행/백테스트·거래일·설정 유효성·공급원 보안 설정 |
 
 ## 연결
 
@@ -28,3 +28,5 @@ finrl_trading_menu_manager.py가 이 구역의 작은 메뉴만 import합니다.
 
 
 정책 평가 메뉴 전용 backtest.py 어댑터는 제거했습니다. 보조 원본 도구·데이터·전략 실행과 공식 소스는 유지합니다.
+
+ACTIONS/execute는 adaptive_download, adaptive_single, adaptive_backtest, calendar, config_check만 연결합니다. 제거한 13개 항목의 실행 분기·가격/종목 입력·CSV 처리 의존성을 삭제했습니다. 이전 operations.py와 컴파일 캐시는 휴지통에 보관하고 같은 파일에는 남은 실행·공급원 공통 코드만 유지합니다. DataStore/DataFetcher/DataProcessor/Adaptive Rotation 원본은 가격 저장·수집과 남은 원형 실행에서 사용하므로 수정하지 않습니다.

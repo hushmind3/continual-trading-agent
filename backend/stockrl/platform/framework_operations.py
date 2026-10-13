@@ -25,7 +25,7 @@ ACTIONS={**TRADING_ACTIONS,"native_call":('공식 모듈 직접 실행', 'native
 
 def action_list():
     return [{'id':key,'name':row[0],'menu':row[1],'module':row[2] or '요청에서 선택한 공식 모듈','function':row[3],
-             'fields':row[4],'defaults':{'currency':'USD'},
+             'fields':row[4],'defaults':{},
              'api':'/api','operation':'framework/'+key,'stop_api':'/api','stop_operation':'stop'} for key,row in ACTIONS.items()]
 
 

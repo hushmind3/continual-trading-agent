@@ -270,10 +270,12 @@ CI 워크플로가 main에 설치되기 전에는 수신기가 waiting_for_main_
 
 주 `.venv`와 키움 `.venv-kiwoom`은 시스템 패키지를 공유하지 않습니다. 설치 스크립트는 운영/키움 명세와 lock 제약을 적용하고 양쪽 `pip check`를 실행합니다. 주 Torch 2.14.0+cu132·torchvision 0.29.1+cu132·SB3 2.9.0과 FinRL 고정 커밋을 유지합니다. 키움 SDK는 별도 프로세스의 JSON 이벤트로 수집기에 연결해 Alpaca/키움 websockets 버전 충돌을 해소합니다. FinCast 실행에 필요한 beartype/einx/colt5-attention도 명시합니다. 미사용 이전 환경은 사용자 지시에 따라 `휴지통/.venv-previous-20261012-232811/`로 이동했습니다. 휴지통은 실행 경로에 연결하지 않습니다.
 
-Python 3.13에서 `python -m unittest discover -s tests`는 정합성 18개와 실제 FastAPI 전송 3개를 검사합니다. React 타입·빌드와 전송 테스트 4개는 CI에서도 실행합니다. 로컬 서버의 실제 현재 등록된 화면 검사는 `frontend`에서 `npm run test:browser`로 실행합니다. GPU 모델·외부 인증은 이 최소 CI의 범위에 포함하지 않습니다. 자세한 실행 근거와 제한은 기존 [검토 보고서](프로젝트_검토보고서.md)를 확인하세요.
+Python 3.13에서 `python -m unittest discover -s tests`는 정합성 19개와 실제 FastAPI 전송 3개를 검사합니다. React 타입·빌드와 전송 테스트 4개는 CI에서도 실행합니다. 로컬 서버의 실제 현재 등록된 화면 검사는 `frontend`에서 `npm run test:browser`로 실행합니다. GPU 모델·외부 인증은 이 최소 CI의 범위에 포함하지 않습니다. 자세한 실행 근거와 제한은 기존 [검토 보고서](프로젝트_검토보고서.md)를 확인하세요.
 
 2026-10-13 실행 검증: 신규 SAC의 11개 Expert 모두 CUDA 추론, 105단계 진단 학습·업데이트 5회, 평가 251개 거래일과 공식 가치·지표 저장을 완료했습니다. 현재 USD 선택은 추가 작업 전 `champions/sac_champion_003/sac.zip`으로 복원했으며 구형 모델·Replay와 이전 선택 경로는 보존합니다. 원본 BacktestEngine의 가중치 이력·거래 DataFrame은 비어 있으므로 해당 표를 체결 내역으로 취급하지 않습니다.
 
 ## 현재 FinRL 메뉴 범위
 
 FinRL 메인은 정책 학습과 FinRL 모듈·도구 2개 작은 메뉴를 제공합니다. 정책 평가·백테스트, 주식거래 데이터 준비·알고리즘 학습·백테스트, FinRL 원형 학습·평가·모의매매, Yahoo 수집, 기술지표·전처리, 기간 분할, 백테스트 성과의 9개 메뉴와 전용 화면·실행 어댑터·평가 API/CLI·결과 조회를 제거했습니다. 공통 FinRL/SB3 학습·정책 구조와 가상계좌·시세·Expert 경로는 유지합니다. 전체 기본 작은 메뉴는 11개입니다. 폐기 소스는 휴지통에 동일 상대 경로로 보존하며 저장 모델·가격·계좌·기존 산출물은 삭제하지 않습니다.
+
+FinRL-Trading 보조 메뉴는 Adaptive Rotation 원형 데이터 준비·단일 실행·전체 백테스트, 시장 거래일, 설정 유효성의 5개 추가 기능만 제공합니다. FMP 재무/뉴스, NASDAQ 100/S&P 500, CSV 전처리 2개, ML 데이터, TSMOM, Adaptive Rotation 개별 어댑터, 동일 비중, ML/산업별 ML 선택, 수익·성과의 13개 기능은 전용 등록·실행·화면 입력을 제거했습니다. 공통 가격 조회·가격 수집·공급원 인증과 공식 원본은 실제 남은 경로에 사용하므로 유지합니다.

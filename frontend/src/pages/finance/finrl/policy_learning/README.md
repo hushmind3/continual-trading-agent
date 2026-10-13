@@ -9,3 +9,5 @@
 소속 대메뉴：금융. 이 폴더는 금융 내부 기능 분류이며 독립 대메뉴로 등록하지 않습니다. 하위 기능 → 분류 submenu_manager → 금융 submenu_manager → finance_menu_manager → 전체 menu_registry → /api.
 
 - 주소: `#finance/policy_learning`. 메뉴 등록 ID와 프론트 폴더 이름을 일치시킵니다.
+
+- 종목 선택 표·검색·선택 버튼은 제거했습니다. 새 정책은 해당 통화의 등록 종목을 백엔드에서 결정하며, 이어 학습·Champion 학습은 저장된 정책의 종목 구성을 사용합니다. 과거 training_symbols 선택값은 읽지 않습니다.

@@ -1,5 +1,5 @@
 export type Currency = "USD" | "KRW";
-export type FrameworkScope = "FinRL" | "FinRL-X" | "stockrl";
+export type FrameworkScope = "FinRL" | "stockrl";
 export type Control = "learning";
 export interface Worker {alive?:boolean;requested?:boolean;status?:string;error?:string}
 export interface FileState {exists:boolean;bytes:number;modified:string|null}

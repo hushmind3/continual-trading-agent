@@ -10,7 +10,7 @@ CONFIG_PATH=ROOT/'configs/local/operations.json'
 
 def settings():
     values=read_json(CONFIG_PATH)
-    model_dir=Path.home()/'Desktop'/'모델'
+    model_dir=Path.home()/'Desktop'/'모델'/'experts'
     # Original paper-account/collector defaults. No learning settings are copied.
     risk=SimpleNamespace(**{'fee':0.001,'slippage':0.0001,**values.get('risk',{})})
     data=SimpleNamespace(**{'poll_seconds':15,'timeout_seconds':10,**values.get('data',{})})

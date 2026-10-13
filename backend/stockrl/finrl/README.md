@@ -3,7 +3,8 @@
 취합: `finance_menu_manager.py`. 이 파일만 상위 menu_registry가 import합니다.
 
 - [정책 학습](policy_learning/README.md): policy_learning/
-- [모듈 · 도구](modules_tools/README.md): modules_tools/
+- [가격 저장·조회](price_data/README.md): price_data/; 기존 데이터 연결 폴더를 이동한 위치입니다.
+- [공급원 설정](provider_settings/README.md): provider_settings/; 기존 인증 연결 폴더를 이동한 위치입니다.
 
 취합: submenu_manager.py → finance_menu_manager.py(대메뉴 등록) → 전체 menu_registry → API. 새 기능 구현은 소속 하위 폴더에 추가하고 소메뉴 매니저에 등록합니다.
 

@@ -13,7 +13,7 @@ from stockrl.trading.virtual_account_orders.paper_account import PaperAccount
 from stockrl.expert_observation import ExpertObservation
 from stockrl.trading.operation_control.operations_runtime import OperationsRuntime
 from stockrl.trading.operation_control import operations_settings
-from stockrl.finrl_trading.price_data.market_storage import AppendOnlyMarketCSV
+from stockrl.finrl.price_data.market_storage import AppendOnlyMarketCSV
 def panel(symbol,date,price=100):
  return SimpleNamespace(dates=[date],symbols=[symbol],groups={symbol:('US','equity')},observed=np.ones((1,1),bool),closes=np.array([[price]]),features=np.zeros((1,1,8)))
 def row(symbol,date,price=100):
@@ -124,7 +124,7 @@ class IntegrityTests(unittest.TestCase):
   self.assertTrue(collector.broker_status['connected']);self.assertEqual(collector.broker_symbols,{'AAPL'})
  def test_daily_read_excludes_intraday_rows(self):
   import sqlite3
-  from stockrl.finrl_trading import data as framework
+  from stockrl.finrl.price_data import operations as framework
   with tempfile.TemporaryDirectory(dir=ROOT/'runtime') as directory:
    root=Path(directory);(root/'configs').mkdir();(root/'configs/instruments.json').write_text(json.dumps({'instruments':[{'symbol':'AAPL','market':'US','asset_class':'equity'}]}),encoding='utf8')
    dbpath=root/'prices.sqlite3'
@@ -139,7 +139,7 @@ class IntegrityTests(unittest.TestCase):
     db.execute('INSERT INTO daily_bars VALUES (?,?,?,?,?,?,?)',('AAPL',pd.Timestamp('2026-01-01T00:00:00Z').value,100,100,100,100,1))
    frame=pd.DataFrame([{'tic':'AAPL','datadate':'2026-01-01','prcod':100,'prchd':100,'prcld':100,'prccd':100,'cshtrd':1},{'tic':'AAPL','datadate':'2026-01-01T10:00:00','prcod':900,'prchd':900,'prcld':900,'prccd':900,'cshtrd':1}])
    store=SimpleNamespace(db_path=dbpath,get_price_data=lambda *args:frame.copy())
-   with patch.object(framework,'ROOT',root),patch.object(framework,'finrlx',lambda name:SimpleNamespace(DataStore=lambda:store)):
+   with patch.object(framework,'ROOT',root),patch.object(framework,'price_store',return_value=store):
     actual=framework.prices('USD',['AAPL'])
    self.assertEqual(actual.close.tolist(),[100]);self.assertEqual(actual.attrs['timeframe'],'1d')
  def test_unchanged_daily_data_does_not_repeat_learning(self):
@@ -149,10 +149,10 @@ class IntegrityTests(unittest.TestCase):
   runtime=OperationsRuntime();runtime.controls['learning']=True
   frame=pd.DataFrame([row('AAPL','2026-01-01')]);launched=[]
   def launch(*args,**kwargs):launched.append(args);return {'job':{'id':str(len(launched))}}
-  api=SimpleNamespace(RunRequest=lambda **kwargs:SimpleNamespace(**kwargs),launch=launch)
+  from stockrl.finrl.policy_learning import handlers as learning
   identity={'symbols':['AAPL'],'currency':'USD','algorithm':'sac'}
   def read(path):return {'USD':'policies/x/sac.zip'} if path.name=='policies.json' else identity
-  with patch.dict(sys.modules,{'stockrl.finrl.policy_learning.handlers':api}),patch.object(operations_runtime,'read_json',read),patch.object(operations_runtime,'prices',return_value=frame) as prices,patch.object(framework,'policy_files',return_value=ROOT/'runtime/official/policies/x'),patch.object(operations_runtime.system,'job_state',return_value={'running':False}):
+  with patch.object(learning,'launch',side_effect=launch),patch.object(operations_runtime,'read_json',read),patch.object(operations_runtime,'prices',return_value=frame) as prices,patch.object(framework,'policy_files',return_value=ROOT/'runtime/official/policies/x'),patch.object(operations_runtime.system,'job_state',return_value={'running':False}):
    runtime.queue_learning(['AAPL']);runtime.queue_learning(['AAPL'])
    self.assertEqual(len(launched),1)
    prices.return_value=frame.assign(close=101)
@@ -286,5 +286,28 @@ class CheckpointAvailabilityTests(unittest.TestCase):
     identity['environment']=handlers.CASH_ENVIRONMENT;metadata.write_text(json.dumps(identity),encoding='utf8')
     policy.unlink()
     self.assertEqual(handlers.checkpoints(settings),[])
+
+class IndependentPriceStoreTests(unittest.TestCase):
+ def test_clean_save_query_and_upsert_without_external_store(self):
+  from stockrl.finrl.price_data.storage import PriceStore,clean_price_data
+  with tempfile.TemporaryDirectory() as temporary:
+   store=PriceStore(temporary)
+   data=pd.DataFrame([{'gvkey':'AAPL','datadate':'2026-01-01','prcod':10,'prchd':12,'prcld':9,'prccd':11,'cshtrd':100,'ajexdi':1},
+                     {'gvkey':'AAPL','datadate':'2026-01-01','prcod':99,'prchd':99,'prcld':99,'prccd':99,'cshtrd':100,'ajexdi':1},
+                     {'gvkey':'MSFT','datadate':'2026-01-01','prcod':1,'prchd':1,'prcld':1,'prccd':-1,'cshtrd':100,'ajexdi':1}])
+   clean=clean_price_data(data)
+   self.assertEqual(store.save_price_data(clean),1)
+   actual=store.get_price_data(['AAPL'],'2026-01-01','2026-01-02')
+   self.assertEqual(actual.prccd.tolist(),[11])
+   clean.loc[:,'prccd']=12;clean.loc[:,'adj_close']=12
+   store.save_price_data(clean)
+   self.assertEqual(store.get_price_data(['AAPL'],'2026-01-01','2026-01-02').prccd.tolist(),[12])
+
+ def test_new_store_has_no_old_records(self):
+  from stockrl.finrl.price_data.storage import PriceStore
+  with tempfile.TemporaryDirectory() as temporary:
+   store=PriceStore(temporary)
+   self.assertEqual(store.db_path.name,'market_prices.sqlite3')
+   self.assertTrue(store.get_price_data(['AAPL'],'2000-01-01','2100-01-01').empty)
 
 if __name__=='__main__':unittest.main()

@@ -19,7 +19,7 @@ def acquire(settings,catalog,payload,progress):
         except (OSError,ValueError):continue
         if origin.get('repository')==selected['repository'] and origin.get('revision')==selected['revision']:
             raise ValueError('이 원본 revision은 이미 라이브러리에 보관되어 있습니다. 중복 다운로드하지 않았습니다.')
-    root=settings.resolve(settings.expert_checkpoint).parent/'expert-packages';root.mkdir(exist_ok=True)
+    root=settings.resolve(settings.expert_checkpoint).parent/('action' if (template or {}).get('stock_policy') else 'market');root.mkdir(exist_ok=True)
     total=selected['bytes']
     if shutil.disk_usage(root).free<total*2+settings.resources.disk_reserve_gib*2**30:raise ValueError('다운로드와 패키지 생성에 필요한 디스크 공간이 부족합니다.')
     weights={};provenance=[]

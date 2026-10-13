@@ -71,7 +71,7 @@ def check_system():
     def framework():
         value=_policy_learning_api.source_settings()
         return 'complete','원본 SAC 설정·환경 경로·설치 버전 조회: '+str(value['versions'])+'; 학습 미실행'
-    check('framework','FinRL-X · FinRL · SB3',framework)
+    check('framework','FinRL · SB3',framework)
     def policy():
         value=_policy_learning_api.model_state(_policy_learning_api.source_settings())
         if not value['policy_compatible']:return 'blocked','SAC 관측·행동 구조 비호환: '+' · '.join(value['structure_reasons'])
@@ -99,7 +99,7 @@ def check_system():
     def collection():
         value=_connection_settings_api.connections()['data']
         return ('complete','공식 가격 수집 공급원 설정 있음; 원격 수집 미실행') if value['status']=='configured' else ('blocked',value.get('reason') or value['status'])
-    check('collection','FinRL-X 가격 수집 연결',collection)
+    check('collection','금융 가격 수집 연결',collection)
     def feed():
         value=runtime.status
         if value.get('error'):return 'failed',value['error']
@@ -165,7 +165,7 @@ class SystemOperations:
         with self.job_lock:
             RUNTIME.mkdir(parents=True,exist_ok=True);(RUNTIME/'jobs').mkdir(exist_ok=True)
             env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1')
-            from ..finrl_trading.provider_settings.operations import provider_environment
+            from ..finrl.provider_settings.operations import provider_environment
             env.update(provider_environment())
             with (RUNTIME/job['log']).open('w',encoding='utf8') as output:
                 process=subprocess.Popen([sys.executable,'-m','stockrl.job_worker',job['id']],cwd=ROOT,env=env,
@@ -240,16 +240,11 @@ class SystemOperations:
         from ..finrl.framework import finrl_file
         modules={
             'stockrl':['live_feed','platform.kiwoom_data','platform.assets','platform.expert_inference','platform.expert_conversion','platform.sac_champion'],
-            'FinRL':['meta.env_portfolio_optimization.env_portfolio_optimization','meta.preprocessor.preprocessors','agents.stablebaselines3.models'],
-            'FinRL-X':['data.data_store','strategies.base_strategy','backtest.backtest_engine','data.data_fetcher','data.trading_calendar']}
+            'FinRL':['meta.env_portfolio_optimization.env_portfolio_optimization','meta.preprocessor.preprocessors','agents.stablebaselines3.models']}
         result={}
         for framework,names in modules.items():
             for name in names:
                 key=framework+':'+name
-                if framework=='FinRL-X':
-                    module=sys.modules.get('src.'+name)
-                    result[key]={'imported':module is not None,'file':getattr(module,'__file__',None),'error':'','optional':True}
-                    continue
                 def load(framework=framework,name=name):
                     if framework=='FinRL' and name.startswith('meta.env_portfolio_optimization.'):
                         module=finrl_file(name.replace('.','/')+'.py')

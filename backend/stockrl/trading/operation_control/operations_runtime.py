@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 from stockrl import ROOT
-from stockrl.finrl_trading.price_data.operations import prices
+from stockrl.finrl.price_data.operations import prices
 from stockrl.finrl.framework import training_environment
 from stockrl.state_io import read_json
 from stockrl.state_io import atomic_json

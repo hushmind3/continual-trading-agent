@@ -1,1 +1,1 @@
-"""FinRL-X portfolio operations with frozen experts and asynchronous learning."""
+"""Shared finance operations with frozen experts and asynchronous learning."""

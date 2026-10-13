@@ -17,7 +17,7 @@ class ExpertRegistry:
         self.pool_provider=pool_provider
         self._embedded_temp=None;self.champion_catalog=None
         if champion is None:
-            self.registry_file=ROOT/'configs/experts.json';self.model_dir=Path.home()/'Desktop'/'모델'
+            self.registry_file=ROOT/'configs/experts.json';self.model_dir=Path.home()/'Desktop'/'모델'/'experts'
             self.state_dir=ROOT/'runtime/experts';self.state_dir.mkdir(parents=True,exist_ok=True)
         else:
             import tempfile,torch
@@ -70,7 +70,9 @@ class ExpertRegistry:
         if package.get('weight_asset'):
             load_package(self.model_dir/'expert_registry.json',{'file':source.relative_to(self.model_dir).as_posix(),'sha256':digest(source),'bytes':source.stat().st_size},verify=True)
         checksum=digest(source)
-        target=source if source.is_relative_to(self.model_dir.resolve()) else self.model_dir/'expert-packages'/(slot+'-'+checksum[:16]+source.suffix)
+        directory=self.model_dir/('action' if package['entry'].get('stock_policy') else 'market')
+        directory.mkdir(exist_ok=True)
+        target=source if source.is_relative_to(directory.resolve()) else directory/(slot+'-'+checksum[:16]+source.suffix)
         target.parent.mkdir(parents=True,exist_ok=True)
         if target.resolve()!=source:shutil.copyfile(source,target)
         ref={'file':target.relative_to(self.model_dir).as_posix(),'sha256':checksum,'bytes':target.stat().st_size}

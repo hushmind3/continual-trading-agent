@@ -41,7 +41,8 @@ def file_info(path):
 
 def database():
     if not DB.is_file():
-        return {"error": "가격 DB가 없습니다.", "rows": 0, "tickers": 0, "instruments": []}
+        from stockrl.finrl.price_data.storage import PriceStore
+        PriceStore(DB.parent)
     wal=DB.with_name(DB.name+'-wal')
     stamp = (DB.stat().st_mtime_ns, DB.stat().st_size,wal.stat().st_mtime_ns if wal.exists() else 0,
              (ROOT / "configs/instruments.json").stat().st_mtime_ns)
@@ -90,7 +91,7 @@ def capabilities():
         "paper_accounts":{"status":"supported","reason":"원본 PaperAccount의 KRW/USD 독립 잔고·보유·체결·손익 기능이 연결되어 있습니다.","source":"stockrl.trading.virtual_account_orders.paper_account.PaperAccount"},
         "live_feed":{"status":"supported","reason":"복구한 LiveMarketCollector와 Kiwoom BrokerStreams의 완료 시세를 DataStore·가상계좌에 전달합니다.","source":"stockrl.live_feed"},
         "kiwoom":{"status":"supported","reason":"기존 보안 저장소·인증·실시간 수신 모듈 연결. 실제 수신에는 유효한 인증이 필요합니다. 실제 주문은 전송하지 않습니다.","source":"stockrl.management.connection_settings.provider_credentials / platform.kiwoom_data"},
-        "alpaca":{"status":"not_connected","reason":"공식 서브모듈에는 Alpaca 모듈이 있지만 현재 SAC 작업에 연결되지 않았습니다.","source":"FinRL-X/src/trading/alpaca_manager.py"},
+        "alpaca":{"status":"not_connected","reason":"Alpaca 연결·매매 도구는 플랫폼에서 제거했습니다.","source":None},
         "conversion":{"status":"supported","reason":"기존 정밀도 변환과 품질 비교·후보 선택 함수를 연결합니다. 변환은 새 파일로 저장됩니다.","source":"stockrl.platform.expert_conversion / expert_optimizer"},
         "discovery":{"status":"supported","reason":"기존 HF/GitHub 검색·가중치 호환 확인·다운로드·자동 등록 함수가 연결되어 있습니다.","source":"stockrl.platform.expert_discovery / expert_acquisition"},
         "checkpoint_restore":{"status":"supported","reason":"기존 SB3 파일을 변경하지 않고 선택하여 복원·이어 학습에 사용합니다. 이전 자체 정책 형식은 호환되지 않습니다.","source":"stockrl.finrl.framework.policy_files"},
@@ -100,7 +101,7 @@ def capabilities():
 
 @router.get("/api/health")
 def health():
-    return {"ok": True, "service": "finrlx-react-sac", "project": str(ROOT.resolve()), "pid": os.getpid(),"deployment_id":os.environ.get('STOCKRL_APPLY_ID')}
+    return {"ok": True, "service": "project-platform", "project": str(ROOT.resolve()), "pid": os.getpid(),"deployment_id":os.environ.get('STOCKRL_APPLY_ID')}
 
 
 def modules():

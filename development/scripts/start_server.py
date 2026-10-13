@@ -66,7 +66,7 @@ def api(path,body=None,timeout=30):
 def ready():
     try:
         value=api('health',timeout=2)
-        return value.get('service')=='finrlx-react-sac' and same_path(value.get('project',''),ROOT)
+        return value.get('service')=='project-platform' and same_path(value.get('project',''),ROOT)
     except (OSError,ValueError):return False
 
 
@@ -101,7 +101,6 @@ def sources():
         path=ROOT/name
         groups[group][name]=hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else 'missing'
     revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
-    groups['backend']['FinRL-X']=subprocess.check_output(['git','-C','backend/stockrl/finrl_trading/library/finrl_x','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     return groups,revision
 
 
@@ -202,7 +201,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                 else:raise RuntimeError('8766 서버 응답 대기 실패')
                 if api('health').get('deployment_id')!=operation['id']:raise RuntimeError('실행 서버가 새 적용 ID와 일치하지 않습니다.')
             actual=listeners(PORT)
-            atomic_json({'project':str(ROOT),'port':PORT,'pid':actual[0][0],'process_created':actual[0][1],'service':'finrlx-react-sac'},RUNTIME/'server.json')
+            atomic_json({'project':str(ROOT),'port':PORT,'pid':actual[0][0],'process_created':actual[0][1],'service':'project-platform'},RUNTIME/'server.json')
             for record in previous:stop_verified(record)
             phase(stage,'8766 서버 갱신','complete','새 코드로 서버 갱신' if restart else '백엔드 변경 없음; 기존 서버 사용')
             stage='react';phase(stage,'React · FastAPI 응답 확인')

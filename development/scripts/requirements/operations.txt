@@ -1,7 +1,5 @@
 # Isolated main environment; compatible auxiliary versions are validated by pip check.
 finrl @ git+https://github.com/AI4Finance-Foundation/FinRL.git@00f3596facd01cced5217d875d8c1fc413a31665
-# FinRL-Trading integrations are listed separately; source remains the pinned submodule.
--r finrl_trading.txt
 stable-baselines3==2.9.0
 sb3-contrib==2.9.0
 gymnasium==1.3.0

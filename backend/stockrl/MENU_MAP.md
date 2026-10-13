@@ -3,7 +3,7 @@
 대메뉴: 금융 하나. 취합은 submenu_manager.py, 대메뉴 등록은 finance_menu_manager.py입니다.
 
 - trading/: operation_control/, virtual_account_orders/
-- finrl/: policy_learning/, modules_tools/
+- finrl/: policy_learning/, price_data/, provider_settings/
 - extensions/: moe/
 - management/: connection_settings/, diagnostics_logs_code_apply/, all_backend_features/
 

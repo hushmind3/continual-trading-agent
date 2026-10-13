@@ -15,9 +15,9 @@ def inspect_gguf(path):
 
 
 def register_gguf(settings,path,slot,progress,origin=None):
-    manifest=settings.resolve(settings.expert_checkpoint).parent/'expert-packages'/(slot+'.json')
+    manifest=settings.resolve(settings.expert_checkpoint).parent/'market'/(slot+'.json')
     if manifest.exists():raise ValueError('기존 모델 manifest를 덮어쓰지 않습니다. 새 슬롯 이름을 지정하세요.')
-    inspect_gguf(path);model=settings.resolve(settings.expert_checkpoint);root=model.parent/'expert-packages';root.mkdir(exist_ok=True)
+    inspect_gguf(path);model=settings.resolve(settings.expert_checkpoint);root=model.parent/'market';root.mkdir(exist_ok=True)
     from .gguf_format import quantize_if_needed
     path,kind=quantize_if_needed(settings,path,progress)
     from .gguf_format import describe,precision_label

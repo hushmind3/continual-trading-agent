@@ -1,3 +1,0 @@
-[submodule "FinRL-X"]
-	path = backend/stockrl/finrl_trading/library/finrl_x
-	url = https://github.com/AI4Finance-Foundation/FinRL-Trading.git

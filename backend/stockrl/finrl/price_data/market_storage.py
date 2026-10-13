@@ -26,9 +26,8 @@ class AppendOnlyMarketCSV:
         self.path = ensure_project_path(path, "market data")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         from ... import ROOT
-        from .operations import price_store,price_processor
+        from .operations import price_store
         self.store=price_store(ROOT/'data')
-        self.processor=price_processor(self.path.parent/'data')
         self.db_path=self.store.db_path
         self.raw_path=self.path.with_name("timeframes.sqlite3")
         self.last_added_rows=[]
@@ -46,7 +45,8 @@ class AppendOnlyMarketCSV:
     def _save_prices(self,frame):
         canonical=frame.rename(columns={'symbol':'gvkey','date':'datadate','open':'prcod','high':'prchd','low':'prcld','close':'prccd','volume':'cshtrd'}).copy()
         canonical['ajexdi']=1.
-        canonical=self.processor._clean_price_data(canonical)
+        from .storage import clean_price_data
+        canonical=clean_price_data(canonical)
         canonical['datadate']=canonical.datadate.map(lambda value:value.isoformat())
         return self.store.save_price_data(canonical)
 

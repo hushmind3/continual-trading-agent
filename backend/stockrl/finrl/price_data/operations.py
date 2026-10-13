@@ -1,25 +1,16 @@
 """Existing FinRL-Trading DataStore reader."""
 from ... import ROOT
-from .. import finrlx
+from .storage import PriceStore
 
 def price_store(directory=None):
-    store=finrlx('data.data_store').DataStore
-    return store() if directory is None else store(str(directory))
-
-
-def price_processor(directory):
-    return finrlx('data.data_processor').DataProcessor(str(directory))
+    return PriceStore(directory)
 
 
 def collection_status():
-    try:
-        manager=finrlx('data.data_fetcher').get_data_manager()
-        sources=[name for name,source in manager.data_sources if source.is_available()]
-        return {'status':'configured' if sources else 'requires_configuration',
-            'source':getattr(manager,'current_source_name',None),'available_sources':sources,
-            'reason':None if sources else 'FMP 인증이 없어 원격 가격 수집을 실행할 수 없습니다.'}
-    except Exception as exc:
-        return {'status':'unavailable','source':None,'available_sources':[],'reason':str(exc)}
+    from ..provider_settings.operations import provider_status
+    sources=[item['name'] for item in provider_status()['items'] if item['name']=='FMP' and item['configured']]
+    return {'status':'configured' if sources else 'requires_configuration','source':'FMP',
+        'available_sources':sources,'reason':None if sources else 'FMP 인증이 없어 원격 가격 수집을 실행할 수 없습니다.'}
 
 
 def prices(currency='USD',symbols=None):

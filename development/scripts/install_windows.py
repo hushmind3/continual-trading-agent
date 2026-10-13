@@ -5,7 +5,6 @@ ROOT=Path(__file__).resolve().parents[2]
 
 def main():
     os.environ['PYTHONUTF8']='1'
-    subprocess.run(['git','submodule','update','--init','backend/stockrl/finrl_trading/library/finrl_x'],cwd=ROOT,check=True)
     env=os.environ.copy();env.update(MSGPACK_PUREPYTHON='1',PYYAML_FORCE_LIBYAML='0')
     for directory,requirements in (('.venv','operations.txt'),('.venv/kiwoom','kiwoom.txt')):
         target=ROOT/directory;python=target/'Scripts/python.exe'

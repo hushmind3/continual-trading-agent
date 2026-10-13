@@ -34,7 +34,7 @@ def fetch_source(settings,source,progress,root=None):
         path=Path(source).expanduser().resolve()
         if not path.is_file():raise ValueError('파일이 없습니다.')
         return path
-    root=Path(root) if root is not None else settings.resolve(settings.expert_checkpoint).parent/'expert-packages'/'incoming';root.mkdir(parents=True,exist_ok=True)
+    root=Path(root) if root is not None else settings.resolve(settings.expert_checkpoint).parent/'incoming';root.mkdir(parents=True,exist_ok=True)
     partial=root/'download.partial'
     try:
         with requests.get(source,stream=True,timeout=(10,30)) as response:
@@ -104,7 +104,7 @@ def register_package(settings,package,slot,progress):
     if not contract['supported']:raise ValueError(contract['reason'])
     if not 3<package['feature_size']<=32768:raise ValueError('출력 크기가 지원 범위를 벗어났습니다.')
     package={**package,'id':slot,'entry':{**package['entry'],'id':slot}}
-    root=settings.resolve(settings.expert_checkpoint).parent/'expert-packages';root.mkdir(parents=True,exist_ok=True)
+    root=settings.resolve(settings.expert_checkpoint).parent/('action' if package['entry'].get('stock_policy') else 'market');root.mkdir(parents=True,exist_ok=True)
     progress(stage='importing',detail='Frozen 패키지를 등록하는 중')
     temporary=atomic_torch_save(package,root/(slot+'.pt'))
     checksum=digest(temporary);target=root/(slot+'-'+checksum[:16]+'.pt')

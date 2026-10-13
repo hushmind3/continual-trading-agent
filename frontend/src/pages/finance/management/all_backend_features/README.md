@@ -9,3 +9,5 @@
 소속 대메뉴：금융. 이 폴더는 금융 내부 기능 분류이며 독립 대메뉴로 등록하지 않습니다. 하위 기능 → 분류 submenu_manager → 금융 submenu_manager → finance_menu_manager → 전체 menu_registry → /api.
 
 - 주소: `#finance/all_backend_features`. 메뉴 등록 ID와 프론트 폴더 이름을 일치시킵니다.
+
+모듈·도구 소메뉴를 흡수했습니다. 원본 모듈·함수 탭의 목록(FrameworkWorkspace/ModuleCatalog), 입력(NativeParameterFields), 실행(NativeModuleRunner), 결과(FrameworkResult)는 같은 프론트 폴더에 있습니다. 별도 modules_tools 메뉴·폴더는 없습니다.

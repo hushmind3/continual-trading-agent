@@ -12,12 +12,11 @@ from functools import lru_cache
 from pathlib import Path
 from .. import ROOT
 from ..finrl.framework import finrl_file
-from ..finrl_trading import finrlx
-from ..finrl_trading.price_data.operations import prices
-from ..finrl_trading.provider_settings.operations import provider_environment
+from ..finrl.price_data.operations import prices
+from ..finrl.provider_settings.operations import provider_environment
 from ..state_io import atomic_json,read_json
 
-REMOVED_BROKER_TOOLS={'FinRL:trade','FinRL:meta.env_stock_trading.env_stock_papertrading','FinRL:meta.data_processors.processor_alpaca','FinRL-X:trading.alpaca_manager'}
+REMOVED_BROKER_TOOLS={'FinRL:trade','FinRL:meta.env_stock_trading.env_stock_papertrading','FinRL:meta.data_processors.processor_alpaca'}
 ACTIONS={"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'env_kwargs', 'steps', 'argv', 'symbols', 'source'])}
 
 
@@ -49,8 +48,7 @@ def validate_native_call(parameters):
     if parameters in REMOVED_BROKER_TOOLS:raise ValueError('키움 외 브로커 매매 도구는 제거했습니다. 키움 연결·설정을 사용하세요.')
     target=parameters.get('module');name=parameters.get('callable','')
     item=next((item for item in source_catalog() if item['id']==target),None)
-    if not item or item['framework'] not in ('FinRL-X','FinRL'):raise ValueError('공식 소스에 존재하는 모듈을 선택하세요.')
-    if item['path'].startswith('FinRL-X/web/'):raise ValueError('Streamlit 화면 모듈은 실행하지 않습니다.')
+    if not item or item['framework'] not in ('FinRL',):raise ValueError('공식 소스에 존재하는 모듈을 선택하세요.')
     if name not in item['functions'] or any(part.startswith('_') for part in name.split('.')):raise ValueError('공식 공개 함수·클래스·메서드를 선택하세요.')
     if name.rsplit('.',1)[-1]=='remove_all_files':raise ValueError('영구 삭제 함수는 실행하지 않습니다.')
     def check(callable_name,value):
@@ -96,7 +94,7 @@ def native_call(parameters,output):
     item=validate_native_call(parameters)
     target=parameters['module'];name=parameters['callable']
     module_name=target.split(':',1)[1]
-    module=finrlx(module_name) if item['framework']=='FinRL-X' else finrl_file(module_name.replace('.','/')+'.py')
+    module=finrl_file(module_name.replace('.','/')+'.py')
     def arguments(key):
         value=parameters.get(key,{})
         if isinstance(value,str):value=json.loads(value or '{}')
@@ -137,7 +135,9 @@ def native_call(parameters,output):
         elif value=='$initial_amount':
             from finrl import config
             context[value]=config.INITIAL_AMOUNT
-        elif value=='$config':context[value]=finrlx('config.settings').get_config()
+        elif value=='$config':
+            from finrl import config
+            context[value]=config
         elif value=='$indicators':
             from finrl import config
             context[value]=config.INDICATORS
@@ -152,7 +152,6 @@ def native_call(parameters,output):
     argv=parameters.get('argv',[])
     if isinstance(argv,str):argv=json.loads(argv or '[]')
     if not isinstance(argv,list) or not all(isinstance(arg,str) for arg in argv):raise ValueError('원본 CLI 인자는 문자열 JSON 배열입니다.')
-    if item['framework']=='FinRL-X' and module_name=='main' and 'dashboard' in argv:raise ValueError('Streamlit 실행은 제외합니다.')
     instance=None
     try:
         sys.argv=[item['path'],*argv]
@@ -227,14 +226,12 @@ def execute(action,parameters,output):
     """Record the actual official functions called by a successful task."""
     called={};previous=sys.getprofile();source_names={}
     finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    source_root=ROOT/'backend/stockrl/finrl_trading/library/finrl_x/src'
     def trace(frame,event,arg):
         if event!='call':return
         filename=frame.f_code.co_filename
         if filename not in source_names:
             path=Path(filename)
-            if path.is_relative_to(source_root):framework='FinRL-X';root=source_root
-            elif path.is_relative_to(finrl_root):framework='FinRL';root=finrl_root
+            if path.is_relative_to(finrl_root):framework='FinRL';root=finrl_root
             else:source_names[filename]=None;return
             source_names[filename]=framework+':'+path.relative_to(root).as_posix().removesuffix('.py').replace('/','.')
         module=source_names[filename]
@@ -268,13 +265,12 @@ def execute(action,parameters,output):
 def source_catalog():
     """Inventory every real Python source, without executing package import side effects."""
     finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    roots=[('stockrl',ROOT/'backend/stockrl'),('REA',ROOT/'backend/rea'),('Platform',ROOT/'backend'),('FinRL-X',ROOT/'backend/stockrl/finrl_trading/library/finrl_x/src'),('FinRL',finrl_root)]
+    roots=[('stockrl',ROOT/'backend/stockrl'),('REA',ROOT/'backend/rea'),('Platform',ROOT/'backend'),('FinRL',finrl_root)]
     items=[]
     for framework,root in roots:
         sources=[]
         for directory,folders,files in os.walk(root):
             if framework=='Platform':folders[:]=[]
-            if framework=='stockrl':folders[:]=[folder for folder in folders if folder!='finrl_x']
             if framework=='REA':folders[:]=[folder for folder in folders if folder!='saved_projects']
             folders[:]=sorted(folder for folder in folders if folder not in ('node_modules','__pycache__','.git','dist','build'))
             sources.extend(Path(directory)/name for name in files if name.endswith('.py'))
@@ -312,8 +308,8 @@ def source_catalog():
                 elif isinstance(node,ast.Import):imports.extend(alias.name for alias in node.names)
                 elif isinstance(node,ast.Call):
                     calls.append(ast.unparse(node.func))
-                    if isinstance(node.func,ast.Name) and node.func.id in ('finrlx','finrl_file') and node.args and isinstance(node.args[0],ast.Constant):
-                        imports.append(('src.' if node.func.id=='finrlx' else 'finrl.')+str(node.args[0].value).removesuffix('.py').replace('/','.'))
+                    if isinstance(node.func,ast.Name) and node.func.id=='finrl_file' and node.args and isinstance(node.args[0],ast.Constant):
+                        imports.append('finrl.'+str(node.args[0].value).removesuffix('.py').replace('/','.'))
             for node in tree.body:
                 if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)):
                     functions.append(node.name);signatures[node.name]=ast.unparse(node.args);parameters[node.name]=arguments(node)
@@ -324,10 +320,6 @@ def source_catalog():
                             key=node.name+'.'+child.name;functions.append(key);signatures[key]=ast.unparse(child.args);parameters[key]=arguments(child,key)
             items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':ast.get_docstring(tree),'credential_inputs':credential_inputs,
                           'package':path.name=='__init__.py','functions':functions,'signatures':signatures,'parameters':parameters,'keyword_contracts':keyword_contracts,'imports':sorted(set(imports)),'calls':sorted(set(calls))})
-    script=ROOT/'backend/stockrl/finrl_trading/library/finrl_x/deploy.sh'
-    if script.is_file():items.append({'id':'FinRL-X:deploy','path':'FinRL-X/deploy.sh','framework':'FinRL-X',
-        'description':'공식 배포 스크립트의 데이터 준비 및 전략 실행 절차','functions':[],
-        'signatures':{},'imports':[],'calls':['data download','run_single_date','run_backtest']})
     return items
 
 
@@ -368,12 +360,10 @@ def catalog():
                 if not item.get('package'):parts=parts[:-1]
                 if level>1:parts=parts[:-(level-1)]
                 target=item['framework']+':'+'.'.join(part for part in [*parts,imported.lstrip('.')] if part)
-            elif imported.startswith('src.'):target='FinRL-X:'+imported[4:]
             elif imported.startswith('finrl.'):target='FinRL:'+imported[6:]
             elif imported.startswith('rea.'):target='REA:'+imported[4:]
             elif imported in ('web_api','menu_registry','api_context','api_transport'):target='Platform:'+imported
             elif imported.startswith('stockrl.'):target='stockrl:'+imported[8:]
-            elif item['framework']=='FinRL-X' and imported.startswith(('strategies.','data.','config.','trading.','backtest.')):target='FinRL-X:'+imported
             else:continue
             if target in by_id:deps.append(target)
         parts=item['id'].split(':',1)[1].split('.')
@@ -410,7 +400,7 @@ def catalog():
         item['last_error_function']=failure.get('function')
         item['dependencies']=edges[item['id']];item['actions']=[key for key,row in ACTIONS.items() if row[2]==item['id']]
         public=bool([name for name in item['functions'] if all(not part.startswith('_') for part in name.split('.'))])
-        native=public and item['framework'] in ('FinRL-X','FinRL') and not item['path'].startswith('FinRL-X/web/') and item['id'] not in REMOVED_BROKER_TOOLS
+        native=public and item['framework'] in ('FinRL',) and item['id'] not in REMOVED_BROKER_TOOLS
         item['referenced']=item['id'] in connected
         item['backend_connected']=item['referenced']
         item['frontend']=bool(item['actions']) or native
@@ -422,7 +412,7 @@ def catalog():
         item['native_operation']='framework/native_call' if native else None
         imported=system.states.get('import:'+item['id'])
         import_error=system.state_errors.get('import:'+item['id'])
-        namespace={'FinRL-X':'src','FinRL':'finrl','stockrl':'stockrl','REA':'rea','Platform':''}[item['framework']]
+        namespace={'FinRL':'finrl','stockrl':'stockrl','REA':'rea','Platform':''}[item['framework']]
         module_part=item['id'].split(':',1)[1]
         if module_part=='__init__':module_part=''
         module_name='.'.join(part for part in (namespace,module_part) if part)

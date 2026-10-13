@@ -19,8 +19,8 @@ function destination(hash:string,items=navigation){
 export function route(hash:string){const name=hash.replace(/^#/,'').split('?')[0];return name.startsWith('finance/')&&name.split('/').length>2?name:destination(hash).hash;}
 function errorSection(name:string){
  if(name==='rea'||name==='view:rea'||name.includes('rea.'))return {group:'REA 역공학',target:'rea/program_analysis'};
- if(name.includes('FinRL-X:')||name.includes('stockrl.finrl_trading.'))return {group:'금융',target:'finance/diagnostics_logs_code_apply'};
- if(name.includes('FinRL:')||name.includes('stockrl.finrl.')||['model','models_by_currency','checkpoints'].includes(name))return {group:'금융',target:'finance/modules_tools'};
+ if(name.includes('stockrl.finrl.price_data.')||name.includes('stockrl.finrl.provider_settings.'))return {group:'금융',target:'finance/diagnostics_logs_code_apply'};
+ if(name.includes('FinRL:')||name.includes('stockrl.finrl.')||['model','models_by_currency','checkpoints'].includes(name))return {group:'금융',target:'finance/all_backend_features'};
  if(['experts','library','models'].includes(name)||name.startsWith('champion:')||name==='view:champions'||name.includes('platform.expert_')||name.includes('platform.assets')||name.includes('platform.sac_champion'))return {group:'금융',target:'finance/moe'};
  if(name==='data')return {group:'금융',target:'finance/operation_control'};
  if(name==='operations'||name.includes('stockrl.trading.operation_control.'))return {group:'금융',target:'finance/operation_control'};

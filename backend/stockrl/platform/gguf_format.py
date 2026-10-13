@@ -68,7 +68,7 @@ def file_type(path):return describe(path)['file_type']
 def quantize_if_needed(settings,path,progress):
     kind=file_type(path)
     if kind not in (0,1,32):return path,kind
-    engine=ensure_engine(settings,progress);target=settings.resolve(settings.expert_checkpoint).parent/'expert-packages'/(path.stem+'-q4_k_m.gguf')
+    engine=ensure_engine(settings,progress);target=settings.resolve(settings.expert_checkpoint).parent/'market'/(path.stem+'-q4_k_m.gguf')
     if target.exists():
         existing=file_type(target)
         if existing in (0,1,32):raise ValueError('기존 변환 파일을 덮어쓰지 않습니다. 다른 출력 이름이 필요합니다.')

@@ -7,7 +7,7 @@
 | [backend/](backend/README.md) | 단일 API·전체 메뉴 총괄·금융 stockrl/·독립 rea/ |
 | [frontend/](frontend/README.md) | React; 금융 pages/finance/·REA pages/rea/ |
 | [development/](development/README.md) | scripts/·tests/·docs/ 개발 자료 통합 |
-| [공식 금융 소스](backend/stockrl/finrl_trading/library/README.md) | 백엔드 내부의 FinRL-X 원본 |
+| [금융 학습·데이터](backend/stockrl/finrl/README.md) | 공식 FinRL/SB3와 자체 가격 저장·공급원 연결 |
 | configs/ | 금융 설정·계약·인증 참조 |
 | data/ | 실제 저장 데이터 |
 | runtime/ | 실행 상태·작업·모델 도구 결과 |
@@ -22,3 +22,5 @@
 
 
 npm 의존성: 루트 package.json·package-lock.json·node_modules/에서 통합 관리합니다. frontend/와 backend/rea/는 package.json을 갖는 npm workspaces입니다. 설치는 루트 npm ci, 프론트 실행·빌드는 npm run dev/build --workspace frontend입니다.
+
+현재 가격 DB는 data/market_prices.sqlite3입니다. FinRL-X와 Streamlit은 설치·실행 연결에서 제거했습니다. Expert 원본·패키지는 바탕화면 모델/experts/market(시장·시계열) 및 action(행동·정책)에 분류합니다. 최신 검증·정리 결과는 development/docs/finrl_x_removal.md를 읽습니다.

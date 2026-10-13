@@ -14,7 +14,6 @@
 | 운영 제어 | #finance/operation_control · trading/operation_control/ |
 | 가상계좌 · 주문 | #finance/virtual_account_orders · trading/virtual_account_orders/ |
 | 정책 학습 | #finance/policy_learning · finrl/policy_learning/ |
-| 모듈 · 도구 | #finance/modules_tools · finrl/modules_tools/ |
 | MoE | #finance/moe · extensions/moe/ |
 | 연결 · 설정 | #finance/connection_settings · management/connection_settings/ |
 | 진단 · 로그 · 코드 적용 | #finance/diagnostics_logs_code_apply · management/diagnostics_logs_code_apply/ |

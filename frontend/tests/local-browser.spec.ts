@@ -14,7 +14,13 @@ test('all registered local screens render and continue receiving state', async (
     .map(element => ({href: element.getAttribute('href') || '', name: element.textContent || ''}))
     .filter(element => element.href.startsWith('#')));
   const unique = [...new Map(links.map(link => [link.href, link])).values()];
-  expect(unique.length).toBe(11);
+  const response=await page.request.post('/api',{data:{operation:'state',payload:{views:JSON.stringify(['menu_catalog'])}}});
+  expect(response.ok()).toBeTruthy();
+  const catalog=await response.json();
+  const nodes:unknown[]=[catalog.views.menu_catalog.data.groups],registered:string[]=[];
+  while(nodes.length){const node=nodes.pop();if(Array.isArray(node)){nodes.push(...node);continue;}if(node&&typeof node==='object'){const row=node as Record<string,unknown>;if(typeof row.id==='string'&&typeof row.frontend==='string'&&row.frontend)registered.push('#'+row.id);nodes.push(...Object.values(row));}}
+  expect(registered.length).toBeGreaterThan(0);
+  expect(unique.map(link=>link.href).sort()).toEqual([...new Set(registered)].sort());
   const removed = ['markets','finrl-trading','feature-adaptive_download','feature-adaptive_single','feature-adaptive_backtest','feature-calendar','feature-config_check','portfolio','finrl','stock-training','backtest','feature-finrl_workflow','feature-yahoo','feature-features','feature-data_split','feature-finrl_stats','feature-fundamentals','feature-news','feature-nasdaq100','feature-sp500','feature-process_prices','feature-process_fundamentals','feature-ml_dataset','feature-tsmom','feature-adaptive','feature-equal_weight','feature-ml','feature-sector_ml','feature-performance'];
   expect(unique.filter(link => removed.includes(link.href.slice(1))).map(link => link.href)).toEqual([]);
   for (const link of unique) {

@@ -270,7 +270,7 @@ def preflight(req, command):
                 errors.append(row["id"] + ": 활성 Expert 패키지가 없거나 크기가 다릅니다.")
     periods=None
     if symbols and not errors:
-        from stockrl.finrl_trading.price_data.operations import prices
+        from stockrl.finrl.price_data.operations import prices
         from stockrl.finrl.framework import validate_price_panel
         from pandas import Timedelta,to_datetime
         frame=prices(req.currency,symbols)

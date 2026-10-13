@@ -58,7 +58,9 @@ def convert(settings,catalog,payload,progress,*,package=None,targets=None):
     package=package if package is not None else load_package(model,item['package'],verify=True)
     if package.get('executor')=='llama_cpp':raise ValueError('GGUF는 원본의 검증된 저비트 파일을 사용합니다. PyTorch 정밀도 변환 대상이 아닙니다.')
     if package.get('quantization'):raise ValueError('재양자화 대신 원본 패키지에서 변환하세요.')
-    root=model.parent/'expert-packages';total=sum(v.numel()*v.element_size() for v in package['state_dict'].values())
+    root=(model.parent/item['package']['file']).parent;total=sum(v.numel()*v.element_size() for v in package['state_dict'].values())
+    target=root/(precision.upper()+'.pt')
+    if target.exists():raise ValueError('이 모델 폴더에 '+precision.upper()+'.pt가 이미 있습니다.')
     if shutil.disk_usage(root).free<total+settings.resources.disk_reserve_gib*2**30:raise ValueError('변환 후보를 저장할 디스크 여유 공간이 부족합니다.')
     if psutil.virtual_memory().available<total+settings.resources.ram_reserve_gib*2**30:raise MemoryError('현재 RAM이 부족합니다. 다른 Expert 실행이 끝난 뒤 변환하세요.')
     weights=package['state_dict'];quantization={};pool=None
@@ -115,13 +117,12 @@ def convert(settings,catalog,payload,progress,*,package=None,targets=None):
                 execution='packed weights / original Linear subclass forward' if any(spec.get('native_forward') for spec in quantization.values()) else 'bitsandbytes NF4 native kernel' if precision=='nf4' else 'packed weights / bounded floating-point Linear' if quantization else 'native autocast')}
         if quantization:candidate['quantization']=quantization
         progress(stage='conversion_save',detail='변환 후보 저장 · 원본 유지')
-        temporary=atomic_torch_save(candidate,root/(slot+'.pt'));checksum=digest(temporary)
-        target=root/(slot+'-'+checksum[:16]+'.pt')
+        temporary=atomic_torch_save(candidate,target);checksum=digest(temporary)
         if target.exists():
             if digest(target)!=checksum:raise ValueError('같은 이름의 후보 패키지가 손상됐습니다.')
             temporary.unlink()
         else:temporary.replace(target)
-        reference=dict(file=target.relative_to(root.parent).as_posix(),sha256=checksum,bytes=target.stat().st_size)
+        reference=dict(file=target.relative_to(model.parent).as_posix(),sha256=checksum,bytes=target.stat().st_size)
         return descriptor(slot,candidate,reference)
     finally:
         if pool:pool.close()

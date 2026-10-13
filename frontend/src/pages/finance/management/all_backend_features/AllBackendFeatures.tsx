@@ -2,8 +2,8 @@ import {useEffect,useState} from 'react';
 import {useOperations,useSystemState} from '../../../../data/Operations';
 import {apiUrl} from '../../../../data/api';
 import type {BackendMenuCatalog,JsonSchema} from '../../../../data/menu_types';
-import {NativeModuleRunner} from '../../finrl/modules_tools/NativeModuleRunner';
-import {ModuleCatalog} from '../../finrl/modules_tools/FrameworkWorkspace';
+import {NativeModuleRunner} from './NativeModuleRunner';
+import {ModuleCatalog} from './FrameworkWorkspace';
 import {Panel} from '../../../../ui/Panel';
 import {Button,ErrorMessage,Tabs,inputClass} from '../../../../ui/Primitives';
 
@@ -71,7 +71,7 @@ export function AllBackendFeatures(){
    if(!menus.length&&!actions.length)return null;
    return <Panel key={group.id} title={group.title} description={'기존 화면 '+group.menus.length+'개 · 등록된 추가 작업 '+(catalog.data?.actions.filter(item=>item.group===group.id).length??0)+'개'}>
     <div className="grid gap-2 sm:grid-cols-2">{menus.map(menu=><div className="rounded border border-slate-200 p-2 text-xs" key={menu.id}><a className="text-blue-700" href={'#'+menu.id}><b>{menu.title}</b></a><span className="mt-1 block text-slate-500">화면: {menu.frontend}</span><span className="block text-slate-500">매니저: {menu.manager}</span><button className="mt-2 text-blue-700" onClick={()=>{setGroupId(group.id);setMenuId(menu.id);setCommandKey('');setPaths({});setPayload({});setRaw('{}');setError('');setResult(undefined);setTab('commands')}}>소속 API · 입력값 보기</button></div>)}</div>
-    <div className="mt-3 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th>추가 기능 · 작은 메뉴</th><th>원본·함수</th><th>입력 항목</th><th>연결</th></tr></thead><tbody>{actions.map(item=><tr className="border-b border-slate-100" key={item.id}><td className="p-2">{item.name}<span className="block text-slate-500">{group.menus.find(menu=>menu.id===item.menu_id)?.title}</span></td><td className="p-2 break-all">{item.module}<br/>{item.function}</td><td className="p-2">{item.fields.join(', ')||'입력 없음'}</td><td className="p-2">{item.id==='native_call'?<><a className="block text-blue-700" href="#finance/modules_tools">FinRL 원본 함수</a><button className="block text-blue-700" onClick={()=>setTab('modules')}>원본 모듈 선택</button></>:<a className="text-blue-700" href={'#'+item.menu_id+'/'+item.id}>기능 열기</a>}</td></tr>)}</tbody></table></div>
+    <div className="mt-3 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th>추가 기능 · 작은 메뉴</th><th>원본·함수</th><th>입력 항목</th><th>연결</th></tr></thead><tbody>{actions.map(item=><tr className="border-b border-slate-100" key={item.id}><td className="p-2">{item.name}<span className="block text-slate-500">{group.menus.find(menu=>menu.id===item.menu_id)?.title}</span></td><td className="p-2 break-all">{item.module}<br/>{item.function}</td><td className="p-2">{item.fields.join(', ')||'입력 없음'}</td><td className="p-2">{item.id==='native_call'?<><a className="block text-blue-700" href="#finance/all_backend_features?tab=modules">FinRL 원본 함수</a><button className="block text-blue-700" onClick={()=>setTab('modules')}>원본 모듈 선택</button></>:<a className="text-blue-700" href={'#'+item.menu_id+'/'+item.id}>기능 열기</a>}</td></tr>)}</tbody></table></div>
    </Panel>;
   })}
   {tab==='commands'&&<Panel title="등록된 API · 전체 입력값" description="기존 단일 API를 사용합니다. 입력을 비우면 해당 API의 원본 기본값을 사용합니다.">

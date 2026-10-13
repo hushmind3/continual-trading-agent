@@ -282,8 +282,14 @@ def source_catalog():
             try:
                 with tokenize.open(path) as source:tree=ast.parse(source.read())
             except (UnicodeError,SyntaxError) as exc:
-                items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':str(exc),'functions':[],'imports':[],'calls':[]});continue
+                items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':str(exc),'source_error':str(exc),'functions':[],'imports':[],'calls':[],'credential_inputs':[]});continue
             functions=[];signatures={};parameters={};imports=[];calls=[];keyword_contracts={}
+            credential_names={'api_key','api_secret','access_token','auth_token','client_secret','password','private_key',
+                'FMP_API_KEY','APCA_API_KEY','APCA_API_SECRET','WRDS_USERNAME','WRDS_PASSWORD','TUSHARE_TOKEN'}
+            credential_inputs=sorted({value for node in ast.walk(tree)
+                if isinstance(node,(ast.Name,ast.Attribute,ast.Constant))
+                and isinstance(value:=node.id if isinstance(node,ast.Name) else node.attr if isinstance(node,ast.Attribute) else node.value,str)
+                and value in credential_names})
             def arguments(node,full_name=None):
                 keyword_contracts[full_name or node.name]={'variadic':node.args.kwarg is not None,
                     'positional_only':[arg.arg for arg in node.args.posonlyargs if arg.arg not in ('self','cls')],
@@ -314,7 +320,7 @@ def source_catalog():
                     for child in node.body:
                         if isinstance(child,(ast.FunctionDef,ast.AsyncFunctionDef)):
                             key=node.name+'.'+child.name;functions.append(key);signatures[key]=ast.unparse(child.args);parameters[key]=arguments(child,key)
-            items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':ast.get_docstring(tree),
+            items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':ast.get_docstring(tree),'credential_inputs':credential_inputs,
                           'package':path.name=='__init__.py','functions':functions,'signatures':signatures,'parameters':parameters,'keyword_contracts':keyword_contracts,'imports':sorted(set(imports)),'calls':sorted(set(calls))})
     script=ROOT/'backend/stockrl/finrl_trading/library/finrl_x/deploy.sh'
     if script.is_file():items.append({'id':'FinRL-X:deploy','path':'FinRL-X/deploy.sh','framework':'FinRL-X',
@@ -373,7 +379,8 @@ def catalog():
         item['referenced']=item['id'] in connected
         item['backend_connected']=item['referenced']
         item['frontend']=bool(item['actions']) or native
-        item['usage']='참조 있음' if item['referenced'] else '참조 없음'
+        item['referenced_by']=sorted(parent for parent,deps in edges.items() if parent in connected and item['id'] in deps)
+        item['entry_point']=item['id'] in roots
         item['native_api']='/api' if native else None
         item['native_operation']='framework/native_call' if native else None
         imported=system.states.get('import:'+item['id'])
@@ -385,15 +392,13 @@ def catalog():
         item['imported']=bool(imported and imported.get('imported')) or module_name in sys.modules
         item['import_error']=import_error
         item['verified_functions']=sorted(set(verified.get(item['id'],[])))
-        item['execution_status']='실행 확인' if item['verified_functions'] else '실행 미확인'
-        external=any(word in item['id'].lower() for word in ('alpaca','wrds','eodhd','joinquant','sinopac','shioaji','tushare','ibkr','fxmacro','quantconnect'))
-        if import_error:item.update(status='미연결',reason='백엔드 import 실패: '+import_error)
-        elif item['verified_functions']:item.update(status='연결·정상 작동',reason='표시된 함수의 실제 실행 결과가 있습니다. 다른 함수까지 검증한 것은 아닙니다.')
-        elif external:item.update(status='외부 인증 필요',reason='공식 공급원·계정 인증과 해당 입력 계약이 필요합니다. 다른 공급원으로 대체하지 않습니다.')
-        elif item['backend_connected']:item.update(status='연결·실행 미확인',reason='현재 서버·CLI·작업 실행 경로에서 참조하는 모듈입니다. import 여부와 실제 함수 실행 성공은 별도로 표시합니다.')
-        elif native:item.update(status='호출 가능·사용 미확인',reason='공통 원본 함수 API로 호출할 수 있지만 현재 운영 코드에서 사용한다는 참조는 확인되지 않았습니다.')
-        elif item['path'].startswith('FinRL-X/web/'):item.update(status='미연결',reason='사용자 지시로 Streamlit 화면은 이식·실행에서 제외합니다.')
-        elif not public:item.update(status='미연결',reason='현재 실행 진입점에서 참조되지 않는 패키지 초기화·상수 모듈 또는 소스 해석 오류입니다. 실행 미확인과 미사용 확정은 다릅니다.')
-        else:item.update(status='미연결',reason='원본 입력·의존성 및 공개 실행 경로를 확인해야 합니다.')
-        if item['imported']:item['reason']='백엔드 import 완료. '+item['reason']
-    return {'items':items,'actions':action_list(),'counts':{status:sum(item['status']==status for item in items if item['framework']!='stockrl') for status in ('연결·정상 작동','연결·실행 미확인','호출 가능·사용 미확인','미연결','외부 인증 필요')}}
+        item['import_status']='import 실패 기록 있음' if import_error else '현재 서버에 import됨' if item['imported'] else '현재 서버에 import되지 않음'
+        item['execution_status']='최근 실행 실패' if item['last_error'] else '실행 성공 기록 있음' if item['verified_functions'] else '실행 기록 없음'
+        item['authentication_status']='인증 입력 이름 탐지됨 · 인증 성공 미확인' if item.get('credential_inputs') else '인증 입력 이름 미탐지 · 인증 요구 여부 미확인'
+        if item.get('source_error'):item.update(status='소스 해석 실패',reason='소스를 해석하지 못해 참조·실행 계약을 판단할 수 없습니다: '+item['source_error'])
+        elif item['referenced']:item.update(status='운영 코드 참조',reason='서버·CLI·작업 진입점에서 import 경로가 이어집니다. 참조하는 모듈을 아래에 표시하며 함수 실행 여부는 별도입니다.')
+        elif native:item.update(status='수동 실행 전용',reason='운영 코드의 참조는 없지만 모듈 · 도구에서 사용자가 원본 함수를 직접 선택해 실행할 수 있습니다. 자동 운영에는 연결되지 않았습니다.')
+        else:item.update(status='참조 경로 없음',reason='운영 진입점에서 이어지는 import와 수동 실행 등록이 없습니다. 삭제 전 검사·설치 스크립트 및 동적 사용처를 추가 확인해야 합니다.')
+        item['usage']=item['status']
+    statuses=('운영 코드 참조','수동 실행 전용','참조 경로 없음','소스 해석 실패')
+    return {'items':items,'actions':action_list(),'counts':{status:sum(item['status']==status for item in items) for status in statuses}}

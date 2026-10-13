@@ -9,3 +9,5 @@
 사용자 검사: 루트에서 `.venv\Scripts\python.exe -m unittest discover -s tests`, frontend 폴더에서 `npm run typecheck`, `npm run test:api`, `npm run test:browser`. 요청 없는 자동 검사·백그라운드 검사는 실행하지 않습니다.
 
 npm은 루트 workspace 설치를 사용합니다. REA install()은 루트 npm ci로 프론트와 REA의 고정 버전을 함께 설치합니다. 검사 명령은 루트 npm run typecheck/test:api/test:browser로도 실행할 수 있습니다.
+
+모듈 참조 조사: .venv\Scripts\python.exe -B scripts\audit_module_usage.py. AST·import 경로만 읽어 운영 참조·검사 전용·참조 없음 후보를 출력합니다. 플랫폼 코드 import·함수 실행·삭제는 수행하지 않습니다.

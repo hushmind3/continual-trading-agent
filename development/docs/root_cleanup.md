@@ -1,5 +1,7 @@
 # 루트·모듈 정리
 
+> 과거 기록: 당시 루트 정리 기록입니다. 이후 기존 가격 DB는 휴지통으로 이동했고 현재 저장소는 data/market_prices.sqlite3입니다. 현재 로컬 구조는 [프로젝트 안내](../../README.md)와 [최신 변경 보고서](finrl_x_removal.md)를 기준으로 확인합니다.
+
 - scripts/·tests/·docs/는 development/ 아래로 통합했습니다. 서버켜기.cmd·설치.cmd·설치 명세·CI·적용 스크립트의 경로를 함께 수정했습니다.
 - .venv-kiwoom/은 .venv/kiwoom/으로 이동하고 Python 실행·활성화·콘솔 진입점·키움 worker 경로를 수정했습니다. 라이브러리 버전은 바꾸지 않았습니다. 주 환경과 키움 SDK는 각각 websockets<11 및 websockets>=15.0.1을 요구하므로 동일한 Python 패키지 공간으로 합치지 않았습니다.
 - 운영 참조·현재 적재·실행 기록·남길 모듈의 의존성이 없는 FinRL 소스 44개를 휴지통으로 옮겼습니다. 해당 바이트코드와 완료된 일회성 스크립트 8개를 포함해 96개 파일을 이동했습니다. 상세 경로는 local_cleanup_report.json에 있습니다.

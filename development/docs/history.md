@@ -1,5 +1,7 @@
 # Historical notes
 
+> 과거 기록: 이 문서는 과거 구조·경로·메뉴 이력입니다. 아래의 당시 경로와 메뉴 수를 현재 상태로 사용하지 않습니다. 현재 로컬 구조는 [프로젝트 안내](../../README.md)와 [최신 변경 보고서](finrl_x_removal.md)를 기준으로 확인합니다.
+
 이 문서는 이전 구현·실행 기록입니다. 현재 구조와 실행 안내는 [루트 README](../README.md)를 확인합니다.
 
 # FinRL · SB3 + React — FinRL-X 보조
@@ -129,7 +131,7 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 
 ## 외부 모델과 Frozen Expert 계약
 
-모델 기준 경로는 현재 사용자 `Desktop/모델`이며 저장소 안으로 강제 이전하지 않습니다. 실제 Expert 이름·역할·원본/양자화 구분·상대 파일명·SHA256·크기·종목·최소 이력·실행기는 [configs/experts.json](../configs/experts.json)에 있으므로 여기서 동일 목록을 복제하지 않습니다.
+모델 기준 경로는 현재 사용자 `Desktop/모델`이며 저장소 안으로 강제 이전하지 않습니다. 실제 Expert 이름·역할·원본/양자화 구분·상대 파일명·SHA256·크기·종목·최소 이력·실행기는 당시 configs/experts.json(현재 모델 폴더로 이전)에 있으므로 여기서 동일 목록을 복제하지 않습니다.
 
 - `expert-packages/*.pt`: `frozen_expert_package_v1`, `entry`, `state_dict`, `metadata`, `module_count`, `feature_size`. 구조 소스·원본 runner·입력 계약이 함께 있어야 합니다.
 - GGUF JSON 패키지: 같은 패키지 형식, `executor=llama_cpp`, `weight_asset`가 실제 `.gguf` 상대 파일·크기·checksum을 참조합니다. 예: `expert-packages/qwen35_08b_gguf.json` → `expert-packages/444406ddd926550c724ec18d.gguf`.

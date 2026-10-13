@@ -1,5 +1,7 @@
 # FinRL-X component inventory
 
+> 과거 기록: FinRL-X 원본이 존재하던 당시의 구성 기록입니다. 현재 원본·서브모듈·실행 의존성은 제거됐습니다. 현재 로컬 구조는 [프로젝트 안내](../../README.md)와 [최신 변경 보고서](finrl_x_removal.md)를 기준으로 확인합니다.
+
 현재 원본은 backend/stockrl/finrl_trading/library/finrl_x/src/ 아래 기능 영역별 폴더로 나뉘어 있습니다. 원본 import·설정·알고리즘·가격 데이터는 변경하지 않았습니다.
 
 ## 현재 플랫폼이 유지하는 직접 의존

@@ -75,3 +75,25 @@ test('REA has three input buttons and browses real saved source files without ag
   await expect(page.getByRole('button',{name:'저장 폴더 열기',exact:true})).toBeEnabled();
   expect(errors).toEqual([]);
 });
+
+test('MoE renders missing input metadata and ignores invalid saved UI state', async ({page}) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {
+    sessionStorage.setItem('finrl-x.champion.selection', '{broken');
+    sessionStorage.setItem('finrl-x.champion.result', JSON.stringify({policy_spaces: {}}));
+  });
+  await page.route('**/api', async route => {
+    const envelope = route.request().postDataJSON();
+    if (envelope?.operation !== 'state') { await route.continue(); return; }
+    const response = await route.fetch();
+    const state = await response.json();
+    for (const item of state.experts?.items ?? []) delete item.input;
+    await route.fulfill({response, json: state});
+  });
+  await page.goto('/#finance/moe', {waitUntil: 'networkidle'});
+  await expect(page.getByRole('heading', {name: 'Expert 슬롯 관리'})).toBeVisible();
+  await expect(page.getByRole('group', {name: 'Champion 조립용 모델 버전'}).first()).toBeVisible();
+  await expect(page.getByRole('button', {name: '금융 Expert 찾기', exact: true})).toBeVisible();
+  expect(errors).toEqual([]);
+});

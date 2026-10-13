@@ -21,9 +21,9 @@ export function ExpertLibraryPanel({initialSource=''}:{initialSource?:string}){
  const [tolerance,setTolerance]=useState(defaultTolerance),[device,setDevice]=useState('auto'),[goal,setGoal]=useState('memory'),[precision,setPrecision]=useState('int4');
  const [selectedAction,setSelectedAction]=useState('probe_all'),[actionMessage,setActionMessage]=useState('');
  const [skipChecked,setSkipChecked]=useState(true);
- const [selectedIds,setSelectedIds]=useState<string[]>(()=>{const saved=sessionStorage.getItem('finrl-x.champion.selection');return saved?JSON.parse(saved):state?.experts.active??[]});
+ const [selectedIds,setSelectedIds]=useState<string[]>(()=>{try{const saved=JSON.parse(sessionStorage.getItem('finrl-x.champion.selection')??'null');if(Array.isArray(saved)&&saved.every(id=>typeof id==='string'))return saved}catch{}return state?.experts.active??[]});
  const [selectedFailures,setSelectedFailures]=useState<{source_id:string;precision:string}[]>([]);
- const [creating,setCreating]=useState(false),[championResult,setChampionResult]=useState<Champion|null>(()=>{const saved=sessionStorage.getItem('finrl-x.champion.result');if(!saved)return null;const result=JSON.parse(saved);return result.policy_spaces&&result.identity.algorithm?result:null});
+ const [creating,setCreating]=useState(false),[championResult,setChampionResult]=useState<Champion|null>(()=>{try{const result=JSON.parse(sessionStorage.getItem('finrl-x.champion.result')??'null');return result?.policy_spaces&&typeof result?.identity?.algorithm==='string'?result:null}catch{return null}});
  useEffect(()=>{sessionStorage.setItem('finrl-x.champion.selection',JSON.stringify(selectedIds))},[selectedIds]);
  useEffect(()=>{if(championResult)sessionStorage.setItem('finrl-x.champion.result',JSON.stringify(championResult))},[championResult]);
  const catalog=lib?.catalog,job=lib?.job,busy=Boolean(job?.busy)||creating,items=state?.experts.items??[];
@@ -68,7 +68,7 @@ export function ExpertLibraryPanel({initialSource=''}:{initialSource?:string}){
    {shown.map((family,index)=>{const kind=expertCategory(family.base),selectedVersions=family.variants.filter(item=>selectedIds.includes(item.id)).map(item=>item.id),failures=selectedFailures.filter(row=>row.source_id===family.id);return <div key={family.id}>
     {(index===0||expertCategory(shown[index-1].base)!==kind)&&<h3 className="mb-3 mt-6 text-sm font-semibold text-slate-700">{categoryNames[kind]}</h3>}
     <div className="grid gap-4 rounded-xl bg-white px-4 py-4 xl:grid-cols-[minmax(200px,.7fr)_minmax(0,1.6fr)_auto] xl:items-center">
-     <div className="min-w-0"><b className="text-sm">{family.base.name}</b><p className="mt-1 text-xs text-slate-500">{family.base.executor==='repository_source'?'등록 원본 · 입력·실행기 미설정':`Frozen Expert · ${number(family.base.parameters,0)} parameters`}</p>{!!family.base.input.universe?.length&&<p className="mt-1 text-xs text-slate-400">원본 학습 종목 {family.base.input.universe.length}개</p>}</div>
+     <div className="min-w-0"><b className="text-sm">{family.base.name}</b><p className="mt-1 text-xs text-slate-500">{family.base.executor==='repository_source'?'등록 원본 · 입력·실행기 미설정':`Frozen Expert · ${number(family.base.parameters,0)} parameters`}</p>{!!family.base.input?.universe?.length&&<p className="mt-1 text-xs text-slate-400">원본 학습 종목 {family.base.input?.universe.length}개</p>}</div>
      <ExpertVariants variants={family.variants} quantization={catalog?.quantizations?.[family.id]} legacyFailures={catalog?.optimizations?.[family.id]} selectedIds={selectedIds} selectedFailurePrecisions={selectedFailures.filter(row=>row.source_id===family.id).map(row=>row.precision)} onToggleFailure={precision=>toggleFailure(family.id,precision)} onToggle={toggleManaged}/>
      <div className="flex flex-wrap gap-2"><Button disabled={busy||family.base.executor==='repository_source'} onClick={()=>void operation('quantize',{id:family.base.id,device,precision})}><WandSparkles size={14}/>양자화</Button><Button tone="danger" disabled={busy||!(selectedVersions.length+failures.length)} onClick={()=>void removeExpert(selectedVersions,failures)}><Trash2 size={14}/>선택 버전 삭제</Button></div>
     </div>
@@ -82,13 +82,13 @@ export function ExpertLibraryPanel({initialSource=''}:{initialSource?:string}){
     <Button busy={busy&&job?.kind==='inspect'} disabled={busy||!source} onClick={()=>void operation('inspect',{source})}>파일 구성 확인</Button>
     {job?.kind==='inspect'&&!!job?.result?.experts?.length&&<>
      <label className="block space-y-2 text-sm"><span>추가할 Expert / 검증된 입력 템플릿</span><select className={field} value={key} onChange={e=>{setKey(e.target.value);let next=e.target.value,index=2;while(catalog?.experts?.[next])next=e.target.value+'_v'+index++;setSlot(next)}}>
-      <option value="">Expert 선택</option>{job.result.experts.map((e:any)=><option key={e.id} value={e.id}>{e.name}{e.input.supported?'':' · 입력 생성기 없음'}</option>)}
+      <option value="">Expert 선택</option>{job.result.experts.map((e:any)=><option key={e.id} value={e.id}>{e.name}{e.input?.supported?'':' · 입력 생성기 없음'}</option>)}
      </select></label>
-     {candidate&&<p className={`rounded-xl px-3 py-3 text-sm ${candidate.input.supported?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-800'}`}>{candidate.input.requires?.join(' · ')??candidate.input.reason}</p>}
+     {candidate&&<p className={`rounded-xl px-3 py-3 text-sm ${candidate.input?.supported?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-800'}`}>{candidate.input?.requires?.join(' · ')??candidate.input?.reason}</p>}
      {candidate?.native_template&&<p className="text-xs leading-5 text-slate-500">원본 가중치는 선택한 모델의 구조·입력 규칙·학습 종목 범위를 사용합니다. 이 규칙이 달라진 모델은 원본 정의를 포함한 Expert 패키지가 필요합니다.</p>}
-     {!!candidate?.input.universe?.length&&<details className="text-xs text-slate-500"><summary className="cursor-pointer">입력 종목 {candidate.input.universe.length}개 확인</summary><p className="mt-2 leading-5">{candidate.input.universe.join(' · ')}</p></details>}
+     {!!candidate?.input?.universe?.length&&<details className="text-xs text-slate-500"><summary className="cursor-pointer">입력 종목 {candidate.input?.universe.length}개 확인</summary><p className="mt-2 leading-5">{candidate.input?.universe.join(' · ')}</p></details>}
      <label className="block space-y-2 text-sm"><span>슬롯 이름</span><input className={field} value={slot} onChange={e=>setSlot(e.target.value)}/></label>
-     <Button tone="primary" disabled={busy||!candidate?.input.supported||!slot} onClick={()=>void operation('import',{source:job?.result?.source??source,expert_id:key,slot,activate:true})}>가져오기 · 자동 등록</Button>
+     <Button tone="primary" disabled={busy||!candidate?.input?.supported||!slot} onClick={()=>void operation('import',{source:job?.result?.source??source,expert_id:key,slot,activate:true})}>가져오기 · 자동 등록</Button>
     </>}
     {busy&&<p className="text-sm text-blue-600" aria-live="polite">{job?.detail}</p>}
     {job?.error&&<ErrorMessage message={job.error}/>}

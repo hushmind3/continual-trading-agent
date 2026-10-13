@@ -1,5 +1,4 @@
 import {useState} from 'react';
-import {FrameworkTools} from './FrameworkTools';
 import {NativeModuleRunner} from './NativeModuleRunner';
 import {useSystemState} from '../../data/Operations';
 import {Panel,KeyValues} from '../../ui/Panel';
@@ -23,12 +22,9 @@ export function FrameworkWorkspace({framework}:{framework?:FrameworkScope}={}){
  const [selected,setSelected]=useState(()=>new URLSearchParams(location.hash.split('?')[1]??'').get('module')??'');
  return <div className="space-y-6">
   {framework==='FinRL'&&<p className="text-xs text-slate-600">FinRL · 기본 프레임워크 — SB3 알고리즘·공식 데이터 처리·학습·평가 기능</p>}
-  {framework==='FinRL-X'&&<p className="text-xs text-slate-600">FinRL-Trading (FinRL-X) · 보조 프레임워크 — 원형 Adaptive Rotation 실행·거래일·설정 검사와 공통 가격 연결. 알고리즘 선택·학습은 FinRL 구역에서 제공합니다.</p>}
   <ModuleCatalog scope={framework} onRun={setSelected}/>
-  {['workflows','markets','connection'].map(menu=><FrameworkTools key={menu} menu={menu} framework={framework}/>)}
   {framework==='stockrl'?<Panel title="프로젝트 실행 API" description="프로젝트 모듈은 소속 작은 메뉴의 등록 API로 실행합니다."><a className="text-xs text-blue-700" href="#backend-browser?tab=commands">큰 메뉴 · 작은 메뉴별 API와 입력값 열기</a></Panel>:<NativeModuleRunner framework={framework} selectedModule={selected} onSelect={setSelected}/>}
  </div>;
 }
 export function FinrlToolsWorkspace(){return <FrameworkWorkspace framework="FinRL"/>}
-export function FinrlTradingWorkspace(){return <FrameworkWorkspace framework="FinRL-X"/>}
 export function ProjectModulesWorkspace(){return <FrameworkWorkspace framework="stockrl"/>}

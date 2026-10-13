@@ -13,8 +13,8 @@ test('all registered local screens render and continue receiving state', async (
     .map(element => ({href: element.getAttribute('href') || '', name: element.textContent || ''}))
     .filter(element => element.href.startsWith('#')));
   const unique = [...new Map(links.map(link => [link.href, link])).values()];
-  expect(unique.length).toBeGreaterThanOrEqual(15);
-  const removed = ['portfolio','finrl','stock-training','backtest','feature-finrl_workflow','feature-yahoo','feature-features','feature-data_split','feature-finrl_stats','feature-fundamentals','feature-news','feature-nasdaq100','feature-sp500','feature-process_prices','feature-process_fundamentals','feature-ml_dataset','feature-tsmom','feature-adaptive','feature-equal_weight','feature-ml','feature-sector_ml','feature-performance'];
+  expect(unique.length).toBe(11);
+  const removed = ['finrl-trading','feature-adaptive_download','feature-adaptive_single','feature-adaptive_backtest','feature-calendar','feature-config_check','portfolio','finrl','stock-training','backtest','feature-finrl_workflow','feature-yahoo','feature-features','feature-data_split','feature-finrl_stats','feature-fundamentals','feature-news','feature-nasdaq100','feature-sp500','feature-process_prices','feature-process_fundamentals','feature-ml_dataset','feature-tsmom','feature-adaptive','feature-equal_weight','feature-ml','feature-sector_ml','feature-performance'];
   expect(unique.filter(link => removed.includes(link.href.slice(1))).map(link => link.href)).toEqual([]);
   for (const link of unique) {
     await page.locator(`aside a[href="${link.href}"]`).click();

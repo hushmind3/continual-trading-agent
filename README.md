@@ -2,7 +2,7 @@
 
 구조부터 확인: [백엔드 폴더 안내](backend/stockrl/README.md) · [프론트 폴더 안내](frontend/README.md). 각 기능 폴더의 README를 먼저 읽고 해당 진입점과 import/API 연결만 확인합니다.
 
-React의 접이식 메뉴는 FinRL 메인과 FinRL-Trading 보조 구역을 구분합니다. FinRL 메인에는 정책 학습과 모듈·도구가 있고, 거래 운영·프로젝트 확장·연결 관리 기능을 별도 구역에서 제공합니다.
+React의 접이식 메뉴는 거래 운영·FinRL 메인·REA·프로젝트 확장·연결 관리의 5개 구역으로 구성합니다. FinRL 메인에는 정책 학습과 모듈·도구가 있고, 거래 운영·프로젝트 확장·연결 관리 기능을 별도 구역에서 제공합니다.
 
 
 통합 소유자는 기존 `SystemOperations.system`입니다. 각 모듈의 JSON 결과 갱신을 보관하고 파일 버전이 바뀐 상태만 다시 계산합니다. `/api`의 `state` 요청는 현재 화면이 사용하는 조회 항목과 전체 운영·작업·모델·자원 상태를 함께 반환합니다. 조회 선택자는 공통 Context를 구독하며 개별 GET·별도 폴링을 하지 않습니다. 명령은 기존 POST API, 파일 전송은 결과 다운로드 경로를 사용합니다.
@@ -30,7 +30,7 @@ backend/stockrl/
   finrl/                      메인 FinRL·SB3 환경·학습·공식 데이터·평가
     framework.py              공식 환경·알고리즘·정책 경로
     operations.py             FinRL 실행 등록·주식거래 데이터/학습/평가
-  finrl_trading/              보조 FinRL-Trading 전용 호출
+  finrl_trading/              공통 FinRL-X 가격·공급원 연결
     data.py                   기존 DataStore 가격 조회
     operations.py             추가 데이터·전략·공급원 실행 등록
   job_worker.py               별도 SAC/백테스트/수집 작업과 저장 기록
@@ -223,7 +223,7 @@ React의 상태 조회·버튼 명령·파일 다운로드는 단일 `/api` 통�
 
 `#frameworks`는 Python 모듈을 브라우저에서 import하지 않습니다. React → `/api/framework/{action}` → 기존 `job_worker` → `platform/framework_operations.py` → `finrl_trading/operations.py` 또는 원본 native_call → 공식 Python 함수·클래스·CLI 순서입니다. Streamlit 화면은 이식·실행에서 제외합니다.
 
-FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합니다. 별도의 알고리즘 학습 도구는 두지 않습니다. FinRL에 없는 거래 달력·FMP 재무/뉴스·추가 데이터 처리·TSMOM·Adaptive Rotation·전략/백테스트 엔진은 FinRL-X 보조 기능으로 실행합니다. 원형 FinRL CLI와 FinRL-X deploy 데이터 준비·Rotation 실행도 연결합니다. FinRL·SB3는 백엔드 Python에서 import·실행하며 React는 API 설정·목록·상태·결과를 표시합니다.
+FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합니다. 별도의 알고리즘 학습 도구는 두지 않습니다. FinRL-Trading 보조 메뉴의 거래 달력·전략·재무/뉴스·CSV·ML·평가 및 deploy 실행 어댑터는 제거했습니다. FinRL-X의 공통 가격 저장·수집·공급원 인증과 공통 원본 함수 호출은 남은 기능에서 사용합니다. FinRL·SB3는 백엔드 Python에서 import·실행하며 React는 API 설정·목록·상태·결과를 표시합니다.
 
 나머지 공식 공개 callable은 백엔드의 `/api/framework/native_call`에서 실제 소스 선언·인자 계약에 따라 호출합니다. 동일 인스턴스의 메서드 연결, 원본 CLI 인자, 실제 DataFrame/Series/배열·설정 참조를 전달할 수 있습니다. 필요한 인자·객체·패키지·인증이 없으면 실제 오류를 반환하며 실행 성공으로 표시하지 않습니다. 모델 생성자 호출과 학습·추론 성공은 구분합니다.
 
@@ -278,7 +278,7 @@ Python 3.13에서 `python -m unittest discover -s tests`는 정합성 21개와 �
 
 FinRL 메인은 정책 학습과 FinRL 모듈·도구 2개 작은 메뉴를 제공합니다. 정책 평가·백테스트, 주식거래 데이터 준비·알고리즘 학습·백테스트, FinRL 원형 학습·평가·모의매매, Yahoo 수집, 기술지표·전처리, 기간 분할, 백테스트 성과의 9개 메뉴와 전용 화면·실행 어댑터·평가 API/CLI·결과 조회를 제거했습니다. 공통 FinRL/SB3 학습·정책 구조와 가상계좌·시세·Expert 경로는 유지합니다. 전체 기본 작은 메뉴는 11개입니다. 폐기 소스는 휴지통에 동일 상대 경로로 보존하며 저장 모델·가격·계좌·기존 산출물은 삭제하지 않습니다.
 
-FinRL-Trading 보조 메뉴는 Adaptive Rotation 원형 데이터 준비·단일 실행·전체 백테스트, 시장 거래일, 설정 유효성의 5개 추가 기능만 제공합니다. FMP 재무/뉴스, NASDAQ 100/S&P 500, CSV 전처리 2개, ML 데이터, TSMOM, Adaptive Rotation 개별 어댑터, 동일 비중, ML/산업별 ML 선택, 수익·성과의 13개 기능은 전용 등록·실행·화면 입력을 제거했습니다. 공통 가격 조회·가격 수집·공급원 인증과 공식 원본은 실제 남은 경로에 사용하므로 유지합니다.
+FinRL-Trading 큰 메뉴와 보조 화면 6개를 제거했습니다. 전용 메뉴 등록·화면·Adaptive Rotation 원형 실행 3개·거래일·설정 검사 어댑터와 기존 13개 추가 기능은 제공하지 않습니다. 공통 가격 조회·수집·인증과 공식 원본은 남은 기능의 의존성으로 유지합니다.
 
 ## REA 큰 메뉴
 

@@ -1,20 +1,15 @@
 """Import large-menu managers; expose their existing backend connections."""
 from .trading.trading_menu_manager import GROUP as TRADING
 from .finrl.finrl_menu_manager import GROUP as FINRL
-from .finrl_trading.finrl_trading_menu_manager import GROUP as FINRL_TRADING
 from .extensions.extensions_menu_manager import GROUP as EXTENSIONS
 from .management.management_menu_manager import GROUP as MANAGEMENT
 from .rea.rea_menu_manager import GROUP as REA
 
-GROUPS=(TRADING,FINRL,FINRL_TRADING,REA,EXTENSIONS,MANAGEMENT)
+GROUPS=(TRADING,FINRL,REA,EXTENSIONS,MANAGEMENT)
 _routes_by_menu={}
 
 def owner(operation):
     if operation=='framework/native_call':return 'management','backend-browser'
-    if operation.startswith('framework/') and operation.count('/')==1:
-        from .finrl_trading.operations import ACTIONS as trading_actions
-        action=operation.split('/',1)[1]
-        if action in trading_actions:return 'finrl_trading','finrl-trading'
     for group in GROUPS:
         for menu in group['menus']:
             if any(operation==pattern or pattern.endswith('/') and operation.startswith(pattern) for pattern in menu['operations']):
@@ -27,7 +22,7 @@ def bind(routes):
     for route in routes:
         if not hasattr(route,'endpoint') or not route.path.startswith('/api/'):continue
         operation=route.path.removeprefix('/api/')
-        menus=set(('frameworks','finrl-trading','project-modules','system','backend-browser') if operation=='framework/{action}' else (owner(operation)[1],))
+        menus=set(('frameworks','project-modules','system','backend-browser') if operation=='framework/{action}' else (owner(operation)[1],))
         for group in GROUPS:
             for menu in group['menus']:
                 if any(not pattern.endswith('/') and route.path_regex.fullmatch('/api/'+pattern) for pattern in menu['operations']):menus.add(menu['id'])
@@ -39,7 +34,7 @@ def dispatch(scope,parameters):
     menu=owner(operation)[1]
     if operation=='framework/native_call':
         module=str(parameters.get('module',''))
-        menu='finrl-trading' if module.startswith('FinRL-X:') else 'frameworks' if module.startswith('FinRL:') else 'project-modules'
+        menu='frameworks' if module.startswith('FinRL:') else 'backend-browser'
     for route in _routes_by_menu.get(menu,()):
         match,child=route.matches(scope)
         if match==Match.FULL:return route,{**scope,**child}

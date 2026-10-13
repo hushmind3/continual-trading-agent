@@ -182,12 +182,11 @@ class IntegrityTests(unittest.TestCase):
   self.assertEqual(actual.Close.tolist(),[100,200])
   with self.assertRaisesRegex(ValueError,'실제 과거 일봉'):
    complete_policy_day(history,['AAPL','META','T'])
- def test_only_remaining_trading_actions_are_registered(self):
-  from stockrl.finrl_trading.operations import ACTIONS
-  from stockrl.platform.framework_operations import ACTIONS as combined
-  expected={'adaptive_download','adaptive_single','adaptive_backtest','calendar','config_check'}
-  self.assertEqual(set(ACTIONS),expected)
-  self.assertEqual(set(combined),expected|{'native_call'})
+ def test_trading_menu_and_dedicated_actions_are_removed(self):
+  from stockrl.menu_registry import GROUPS
+  from stockrl.platform.framework_operations import ACTIONS
+  self.assertEqual(set(ACTIONS),{'native_call'})
+  self.assertNotIn('finrl_trading',{group['id'] for group in GROUPS})
  def test_rea_refuses_project_trash_inputs(self):
   from stockrl.rea.operations import validate_arguments
   with self.assertRaisesRegex(ValueError,'휴지통'):

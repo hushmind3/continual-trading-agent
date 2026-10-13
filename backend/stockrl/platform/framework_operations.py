@@ -16,10 +16,7 @@ from ..finrl_trading.data import prices
 from ..finrl_trading.operations import provider_environment
 from ..state_io import atomic_json,read_json
 
-# Shared registry; execution belongs to each framework folder.
-from ..finrl_trading.operations import ACTIONS as TRADING_ACTIONS
-
-ACTIONS={**TRADING_ACTIONS,"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'env_kwargs', 'steps', 'argv', 'symbols', 'source'])}
+ACTIONS={"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'env_kwargs', 'steps', 'argv', 'symbols', 'source'])}
 
 
 
@@ -138,8 +135,6 @@ def native_call(parameters,output):
             from finrl import config
             context[value]=config.INITIAL_AMOUNT
         elif value=='$config':context[value]=finrlx('config.settings').get_config()
-        elif value=='$rotation_config':
-            context[value]=finrlx('strategies.adaptive_rotation.config_loader').load_config(str(parameters.get('config_path',ROOT/'FinRL-X/src/strategies/AdaptiveRotationConf_v1.2.1.yaml')))
         elif value=='$indicators':
             from finrl import config
             context[value]=config.INDICATORS
@@ -224,8 +219,6 @@ def _execute(action,parameters,output):
     if action=='native_call':
         output=Path(output);output.mkdir(parents=True,exist_ok=True)
         return native_call({k:v for k,v in parameters.items() if v not in ('',None,[])},output)
-    from ..finrl_trading.operations import execute
-    return execute(action,parameters,output)
 
 def execute(action,parameters,output):
     """Record the actual official functions called by a successful task."""

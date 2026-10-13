@@ -4,7 +4,6 @@ menu_registry.ts는 큰 메뉴 연결 파일 5개만 import합니다. 각 파일
 
 - trading_menu_manager.ts: 거래 운영
 - finrl_menu_manager.ts: FinRL · 메인
-- finrl_trading_menu_manager.ts: FinRL-Trading · 보조
 - extensions_menu_manager.ts: 프로젝트 확장
 - management_menu_manager.ts: 연결 · 관리
 

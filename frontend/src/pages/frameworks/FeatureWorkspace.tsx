@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {useOperations,useSystemState} from '../../data/Operations';
 import {apiUrl} from '../../data/api';
 import type {BackendMenuCatalog,JsonSchema} from '../../data/menu_types';
-import {FrameworkTools} from './FrameworkTools';
+import {NativeModuleRunner} from './NativeModuleRunner';
 import {ModuleCatalog} from './FrameworkWorkspace';
 import {Panel} from '../../ui/Panel';
 import {Button,ErrorMessage,Tabs,inputClass} from '../../ui/Primitives';
@@ -35,7 +35,7 @@ export function FeatureWorkspace(){
  const catalog=useSystemState<BackendMenuCatalog>('menu_catalog'),{execute,pending}=useOperations();
  const selection=new URLSearchParams(location.hash.split('?')[1]??'');
  const [tab,setTab]=useState(selection.get('tab')??'features'),[groupId,setGroupId]=useState(selection.get('group')??''),[menuId,setMenuId]=useState(''),[query,setQuery]=useState(''),[commandKey,setCommandKey]=useState(''),[paths,setPaths]=useState<Record<string,unknown>>({}),[payload,setPayload]=useState<Record<string,unknown>>({}),[raw,setRaw]=useState('{}'),[error,setError]=useState(''),[result,setResult]=useState<unknown>();
- const actionId=location.hash.replace(/^#feature-/,'').split('?')[0],action=catalog.data?.actions.find(item=>item.id===actionId);
+ const [selectedModule,setSelectedModule]=useState('');
  const groups=catalog.data?.groups??[],menus=groups.filter(group=>!groupId||group.id===groupId).flatMap(group=>group.menus);
  const commands=(catalog.data?.commands??[]).filter(item=>(!groupId||item.group===groupId)&&(!menuId||item.menu===menuId)&&(!query||(item.operation+' '+item.function+' '+item.description).toLowerCase().includes(query.toLowerCase()))),command=commands.find(item=>item.operation+'|'+item.methods.join(',')===commandKey)??commands[0];
  const operation=command?.operation.replace(/\{([^}:]+)(?::[^}]+)?\}/g,(_,key:string)=>String(paths[key]??''));
@@ -58,9 +58,6 @@ export function FeatureWorkspace(){
    setResult(await execute(operation,args,command.methods.includes('POST')?'POST':'GET'));
   }catch(e){setError(e instanceof Error?e.message:'실행 실패')}
  };
- if(action)return <div className="space-y-3"><Panel title={action.name} description="백엔드에 실제 등록된 기능입니다. 등록 여부와 실제 실행 성공은 구분합니다.">
-  <p className="text-xs text-slate-600">소속: {catalog.data?.groups.find(group=>group.id===action.group)?.title} · 원본: {action.module} · 함수: {action.function}</p>
- </Panel><FrameworkTools key={action.id} menu={action.menu} framework={action.group==='finrl_trading'?'FinRL-X':action.group==='finrl'?'FinRL':undefined} actionId={action.id}/></div>;
  return <div className="space-y-3">
   <Panel title="백엔드 기능 전체" description="등록된 기능·API·원본 모듈을 확인하고 필요한 항목을 선택합니다. 목록에서 임의로 기능을 제거하지 않습니다.">
    <ErrorMessage message={catalog.error}/>
@@ -74,7 +71,7 @@ export function FeatureWorkspace(){
    if(!menus.length&&!actions.length)return null;
    return <Panel key={group.id} title={group.title} description={'기존 화면 '+group.menus.length+'개 · 등록된 추가 작업 '+(catalog.data?.actions.filter(item=>item.group===group.id).length??0)+'개'}>
     <div className="grid gap-2 sm:grid-cols-2">{menus.map(menu=><div className="rounded border border-slate-200 p-2 text-xs" key={menu.id}><a className="text-blue-700" href={'#'+menu.id}><b>{menu.title}</b></a><span className="mt-1 block text-slate-500">화면: {menu.frontend}</span><span className="block text-slate-500">매니저: {menu.manager}</span><button className="mt-2 text-blue-700" onClick={()=>{setGroupId(group.id);setMenuId(menu.id);setCommandKey('');setPaths({});setPayload({});setRaw('{}');setError('');setResult(undefined);setTab('commands')}}>소속 API · 입력값 보기</button></div>)}</div>
-    <div className="mt-3 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th>추가 기능 · 작은 메뉴</th><th>원본·함수</th><th>입력 항목</th><th>연결</th></tr></thead><tbody>{actions.map(item=><tr className="border-b border-slate-100" key={item.id}><td className="p-2">{item.name}<span className="block text-slate-500">{group.menus.find(menu=>menu.id===item.menu_id)?.title}</span></td><td className="p-2 break-all">{item.module}<br/>{item.function}</td><td className="p-2">{item.fields.join(', ')||'입력 없음'}</td><td className="p-2">{item.id==='native_call'?<><a className="block text-blue-700" href="#frameworks">FinRL 원본 함수</a><a className="block text-blue-700" href="#finrl-trading">보조 원본 함수</a></>:<a className="text-blue-700" href={'#feature-'+item.id}>기능 열기</a>}</td></tr>)}</tbody></table></div>
+    <div className="mt-3 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th>추가 기능 · 작은 메뉴</th><th>원본·함수</th><th>입력 항목</th><th>연결</th></tr></thead><tbody>{actions.map(item=><tr className="border-b border-slate-100" key={item.id}><td className="p-2">{item.name}<span className="block text-slate-500">{group.menus.find(menu=>menu.id===item.menu_id)?.title}</span></td><td className="p-2 break-all">{item.module}<br/>{item.function}</td><td className="p-2">{item.fields.join(', ')||'입력 없음'}</td><td className="p-2">{item.id==='native_call'?<><a className="block text-blue-700" href="#frameworks">FinRL 원본 함수</a><button className="block text-blue-700" onClick={()=>setTab('modules')}>원본 모듈 선택</button></>:<a className="text-blue-700" href={'#feature-'+item.id}>기능 열기</a>}</td></tr>)}</tbody></table></div>
    </Panel>;
   })}
   {tab==='commands'&&<Panel title="등록된 API · 전체 입력값" description="기존 단일 API를 사용합니다. 입력을 비우면 해당 API의 원본 기본값을 사용합니다.">
@@ -88,6 +85,6 @@ export function FeatureWorkspace(){
    {operation&&(operation.startsWith('download/')||operation.startsWith('framework/artifact/')||operation.startsWith('framework/result/')||operation==='checkpoint')?<a className="text-sm text-blue-700" href={apiUrl(operation,payload)} download>파일 다운로드</a>:<Button tone="primary" busy={!!operation&&pending.has(operation)} disabled={!command} onClick={()=>void run()}>{command?.methods.includes('POST')?'선택 API 실행':'선택 API 조회'}</Button>}
    <ErrorMessage message={error}/>{result!==undefined&&<pre className="mt-3 max-h-96 overflow-auto rounded bg-slate-50 p-3 text-xs">{JSON.stringify(result,null,2)}</pre>}
   </Panel>}
-  {tab==='modules'&&<ModuleCatalog onRun={module=>{location.hash=(module.startsWith('FinRL-X:')?'finrl-trading':module.startsWith('FinRL:')?'frameworks':'project-modules')+'?module='+encodeURIComponent(module)}}/>}
+  {tab==='modules'&&<><ModuleCatalog onRun={setSelectedModule}/><NativeModuleRunner selectedModule={selectedModule} onSelect={setSelectedModule}/></>}
  </div>;
 }

@@ -1034,10 +1034,16 @@ def rea_run(request:dict):
     except (OSError,ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
 
 @private_api.post('/api/rea/doctor')
-def rea_doctor():
+def rea_doctor(request:dict|None=None):
     from .rea.operations import doctor
-    try:return doctor()
+    try:return doctor((request or {}).get('provider'))
     except (OSError,ValueError,RuntimeError,subprocess.TimeoutExpired) as exc:raise HTTPException(400,str(exc)) from exc
+
+@private_api.post('/api/rea/settings')
+def rea_settings(request:dict):
+    from .rea.operations import save_engine_settings
+    try:return save_engine_settings(request)
+    except (OSError,ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc)) from exc
 
 @private_api.post('/api/rea/stop')
 def rea_stop():

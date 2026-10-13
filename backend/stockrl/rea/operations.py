@@ -1,5 +1,5 @@
 """Keep one original REA MCP session behind the existing project API."""
-import json,os,queue,re,shutil,subprocess,threading
+import json,os,queue,re,shutil,subprocess,threading,sys
 from functools import lru_cache
 from pathlib import Path
 import psutil
@@ -39,7 +39,7 @@ class REAConnection:
     def start(self):
         if self.process and self.process.poll() is None:return
         node,_=node_runtime();WORK.mkdir(parents=True,exist_ok=True);responses=queue.Queue();self.responses=responses
-        env=os.environ.copy();env.update(NO_COLOR='1',PYTHONUTF8='1')
+        env=runtime_environment()
         with (WORK/'mcp.stderr.log').open('ab') as errors:
             self.process=subprocess.Popen([node,str(BASE/'bridge.mjs')],cwd=WORK,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=errors,text=True,encoding='utf8',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         stream=self.process.stdout
@@ -90,9 +90,9 @@ def status():
     if not package.is_file():return {'installed':False,'source':SOURCE,'tools':[],'reason':'REA가 설치되지 않았습니다. 설치.cmd 또는 REA 폴더의 npm ci를 실행하세요.'}
     metadata=json.loads(package.read_text(encoding='utf8'))
     try:
-        node,version=node_runtime();tools=tool_catalog(metadata['version'])
+        node,version=node_runtime();tools=tool_catalog(metadata['version']);engines=engine_settings()
     except (OSError,RuntimeError,ValueError) as exc:return {'installed':False,'version':metadata['version'],'source':SOURCE,'tools':[],'reason':str(exc)}
-    return {'installed':True,'version':metadata['version'],'source':SOURCE,'node_version':version,'tools':tools,'tool_count':len(tools),'session_connected':bool(connection.process and connection.process.poll() is None)}
+    return {'installed':True,'version':metadata['version'],'source':SOURCE,'node_version':version,'tools':tools,'tool_count':len(tools),'session_connected':bool(connection.process and connection.process.poll() is None),'engines':engines}
 
 def call_tool(name,arguments):
     validate_arguments(arguments);available=status()
@@ -100,9 +100,12 @@ def call_tool(name,arguments):
     if name not in {tool['name'] for tool in available['tools']}:raise ValueError('원본 REA에 등록된 도구를 선택하세요.')
     return connection.request({'operation':'call','tool':name,'arguments':arguments})
 
-def doctor():
+def doctor(provider=None):
     node,_=node_runtime();WORK.mkdir(parents=True,exist_ok=True)
-    result=subprocess.run([node,str(BASE/'node_modules/rea-agents/scripts/rea.mjs'),'doctor','--format','json'],cwd=WORK,capture_output=True,text=True,encoding='utf8',timeout=60,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    if provider not in (None,'ghidra','hopper'):raise ValueError('지원하는 엔진을 선택하세요.')
+    args=[node,str(BASE/'node_modules/rea-agents/scripts/rea.mjs'),'doctor','--format','json']
+    if provider:args+=['--provider',provider]
+    result=subprocess.run(args,env=runtime_environment(),cwd=WORK,capture_output=True,text=True,encoding='utf8',timeout=60,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     try:data=json.loads(result.stdout)
     except ValueError:data={'output':result.stdout,'error':result.stderr}
     return {'exit_code':result.returncode,'result':data}
@@ -116,3 +119,67 @@ def install():
     env=os.environ.copy();env['PATH']=str(Path(node).parent)+os.pathsep+env.get('PATH','')
     if os.name=='nt':env['ComSpec']=str(Path(os.environ.get('SystemRoot','C:/Windows'))/'System32/cmd.exe')
     subprocess.run([node,str(npm_path),'ci','--no-audit','--no-fund'],cwd=BASE,env=env,check=True)
+
+# Project-scoped engine settings; never edit Codex/client/global environment.
+ENGINE_CONFIG=ROOT/'configs/local/rea.json'
+ENGINE_FIELDS=('GHIDRA_INSTALL_DIR','JAVA_HOME','HOPPER_LAUNCHER_PATH')
+
+def engine_environment():
+    if not ENGINE_CONFIG.is_file():return {}
+    value=json.loads(ENGINE_CONFIG.read_text(encoding='utf8'))
+    if not isinstance(value,dict) or set(value)-set(ENGINE_FIELDS):
+        raise ValueError('REA 엔진 설정 파일의 입력 이름을 확인하세요.')
+    if any(not isinstance(item,str) for item in value.values()):
+        raise ValueError('REA 엔진 경로는 문자열이어야 합니다.')
+    validate_arguments(value)
+    return {key:item for key,item in value.items() if item}
+
+def runtime_environment():
+    value=os.environ.copy();value.update(engine_environment())
+    value.update(NO_COLOR='1',PYTHONUTF8='1')
+    return value
+
+def engine_settings():
+    configured=engine_environment()
+    values={key:configured.get(key,os.environ.get(key,'')) for key in ENGINE_FIELDS}
+    suffix='.exe' if os.name=='nt' else ''
+    checks={
+        'ghidra':[('GHIDRA_INSTALL_DIR','support/analyzeHeadless.bat' if os.name=='nt' else 'support/analyzeHeadless'),
+                  ('JAVA_HOME','bin/java'+suffix),('JAVA_HOME','bin/javac'+suffix)],
+        'hopper':[('HOPPER_LAUNCHER_PATH',None)],
+    }
+    providers=[]
+    for name,required in checks.items():
+        missing=[]
+        for key,relative in required:
+            path=values[key]
+            if not path or not (Path(path)/relative if relative else Path(path)).is_file():
+                missing.append(key+('/'+relative if relative else ''))
+        supported=name!='hopper' or os.name!='nt'
+        providers.append({'id':name,'supported':supported,'missing':missing,
+            'state':'플랫폼 미지원' if not supported else '경로 설정 필요' if missing else '필수 파일 확인 · 엔진 실행 미확인'})
+    return {'values':values,'providers':providers,'platform':sys.platform}
+
+def save_engine_settings(values):
+    from ..state_io import atomic_json
+    if not isinstance(values,dict) or set(values)-set(ENGINE_FIELDS):
+        raise ValueError('Ghidra·JDK·Hopper의 원본 경로 설정만 저장할 수 있습니다.')
+    validate_arguments(values)
+    for key,value in values.items():
+        if not isinstance(value,str):raise ValueError(key+': 경로는 문자열이어야 합니다.')
+        if value and (not Path(value).is_absolute() or not Path(value).exists()):
+            raise ValueError(key+': 존재하는 전체 경로를 입력하세요.')
+        if key=='HOPPER_LAUNCHER_PATH' and value and os.name=='nt':
+            raise ValueError('Hopper는 이 Windows 실행 환경에서 지원하지 않습니다.')
+    if not connection.lock.acquire(blocking=False):
+        raise ValueError('분석이 끝난 후 엔진 경로를 저장하세요.')
+    try:
+        updated=engine_environment()
+        for key,value in values.items():
+            if value:updated[key]=value
+            else:updated.pop(key,None)
+        atomic_json(updated,ENGINE_CONFIG)
+        connection.close()
+        tool_catalog.cache_clear()
+        return engine_settings()
+    finally:connection.lock.release()

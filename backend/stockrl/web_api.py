@@ -88,7 +88,7 @@ async def local_writes(request: Request, call_next):
         allowed_stop=path in ('/api/stop','/api/system/stop','/api/system/prepare-restart','/api/library/stop') or path.startswith('/api/controls/') and parameters.get('enabled') is False
         if ((apply_running() and apply_state().get('target')!='frontend') or system.restarting) and not allowed_stop and path!='/api/system/apply':
             return JSONResponse({'detail':'변경 적용/서버 갱신 중입니다. 기존 작업은 보존합니다.'},status_code=409)
-        conflict=path in ('/api/train','/api/stop','/api/collect','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/framework/') or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
+        conflict=path in ('/api/train','/api/stop','/api/settings','/api/checkpoints/restore','/api/system/stop') or path.startswith(('/api/controls/','/api/experts/','/api/provider/')) and path!='/api/provider/test' or path.startswith('/api/framework/') or path.startswith('/api/library/') and path not in ('/api/library/search','/api/library/inspect')
         if conflict:
             system.cancel()
     response=await call_next(request)
@@ -119,12 +119,6 @@ class Selection(BaseModel):
 class Registration(BaseModel):
     path: str = Field(min_length=1)
     slot: str = Field(pattern=r"^[a-z][a-z0-9_]{0,79}$")
-
-
-class CollectionRequest(BaseModel):
-    symbols:list[str]=Field(min_length=1,max_length=100)
-    start_date:str=Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
-    end_date:str=Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 def now():
@@ -323,7 +317,6 @@ def capabilities():
     return {
         "learning":{"status":"supported","reason":"FinRL DRLAgent · SB3 알고리즘 선택·학습·중단·동일 정책 이어 학습 · 기본 SAC","source":"stockrl.finrl.framework.train"},
         "expert_selection":{"status":"supported","reason":"Frozen Expert 등록·선택·같은 모델 정밀도 교체·해제","source":"stockrl.expert_registry_native.ExpertRegistry"},
-        "collection":{"status":"supported","reason":"FinRL-X FMP 가격 수집 모듈. API 인증이 있어야 원격 수집 가능합니다.","source":"FinRL-X/src/data/data_fetcher.py::fetch_price_data"},
         "paper_accounts":{"status":"supported","reason":"원본 PaperAccount의 KRW/USD 독립 잔고·보유·체결·손익 기능이 연결되어 있습니다.","source":"stockrl.paper_account.PaperAccount"},
         "live_feed":{"status":"supported","reason":"복구한 LiveMarketCollector와 Kiwoom BrokerStreams의 완료 시세를 DataStore·가상계좌에 전달합니다.","source":"stockrl.live_feed"},
         "kiwoom":{"status":"supported","reason":"기존 보안 저장소·인증·실시간 수신 모듈 연결. 실제 수신에는 유효한 인증이 필요합니다. 실제 주문은 전송하지 않습니다.","source":"stockrl.provider_credentials / platform.kiwoom_data"},
@@ -445,10 +438,6 @@ def state_view(path):
         'champions':(champions,lambda:state_stamp(*MODEL_DIR.glob('*_champion_*.pt'))),
         'logs':(logs,lambda:state_stamp(*(official/name for name in ('api.stderr.log','api.stdout.log','server.stderr.log','training.log')))),
     }
-    if key=='prices':
-        symbol=query.get('symbol',[''])[0];limit=int(query.get('limit',['300'])[0])
-        if not symbol or not 1<=limit<=2000:raise ValueError('종목과 기존 가격 조회 범위를 확인하세요.')
-        providers[key]=(lambda:price_history(symbol,limit),state_stamp(DB,DB.with_name(DB.name+'-wal')))
     if key not in providers:raise ValueError('등록되지 않은 통합 상태 항목입니다: '+key)
     loader,signature=providers[key];name='view:'+path
     data=system.state_value(name,loader,signature)
@@ -528,15 +517,6 @@ def logs():
                 stream.seek(max(0,path.stat().st_size-12000))
                 result.append({"name":name,"file":file_info(path),"text":stream.read().decode("utf8",errors="replace")})
     return {"items":result}
-
-
-def price_history(symbol: str, limit: int = Query(300, ge=1, le=2000)):
-    if not DB.exists():
-        raise HTTPException(404, "가격 DB가 없습니다.")
-    with sqlite3.connect(DB.as_uri() + "?mode=ro", uri=True) as connection:
-        connection.row_factory = sqlite3.Row
-        rows = connection.execute("SELECT date,open,high,low,close,volume FROM price_data WHERE ticker=? ORDER BY date DESC LIMIT ?", (symbol, limit)).fetchall()
-    return {"symbol": symbol, "rows": [dict(row) for row in reversed(rows)]}
 
 
 @private_api.get("/api/download/{name}")
@@ -713,32 +693,6 @@ def train(req: RunRequest):
     return launch("train", req)
 
 
-
-
-@private_api.post("/api/collect")
-def collect(req:CollectionRequest):
-    try:
-        if datetime.fromisoformat(req.start_date)>datetime.fromisoformat(req.end_date):
-            raise ValueError("시작일이 종료일보다 늦습니다.")
-    except ValueError as exc:
-        raise HTTPException(400,str(exc))
-    allowed={r["symbol"] for r in database()["instruments"] if r["eligible"] and r["currency"]=="USD"}
-    if not set(req.symbols)<=allowed:
-        raise HTTPException(400,"현재 FMP 수집은 등록된 미국 주식·ETF만 선택할 수 있습니다.")
-    info=connections()
-    if info["data"]["status"]!="configured":
-        raise HTTPException(409,info["data"]["reason"])
-    with system.job_lock:
-        if system.job_state()["running"]:
-            raise HTTPException(409,"다른 작업을 마친 뒤 수집하세요.")
-        RUNTIME.mkdir(parents=True,exist_ok=True)
-        job_id=uuid.uuid4().hex
-        (RUNTIME/"jobs").mkdir(exist_ok=True)
-        job={"id":job_id,"command":"collect","status":"starting","started_at":now(),
-             "symbols":sorted(set(req.symbols)),"currency":"USD","resume":False,
-             "start_date":req.start_date,"end_date":req.end_date,"log":f"jobs/{job_id}.log"}
-        system.start_job(job)
-    return {"message":"FinRL-X 원본 가격 수집을 시작했습니다.","job":job}
 
 
 def champions():

@@ -5,6 +5,7 @@ import dataclasses
 import importlib.util
 import json
 import math
+import os
 import sys
 import tokenize
 from functools import lru_cache
@@ -268,7 +269,11 @@ def source_catalog():
     roots=[('stockrl',ROOT/'backend/stockrl'),('FinRL-X',ROOT/'FinRL-X/src'),('FinRL',finrl_root)]
     items=[]
     for framework,root in roots:
-        for path in sorted(root.rglob('*.py')):
+        sources=[]
+        for directory,folders,files in os.walk(root):
+            folders[:]=sorted(folder for folder in folders if folder not in ('node_modules','__pycache__','.git','dist','build'))
+            sources.extend(Path(directory)/name for name in files if name.endswith('.py'))
+        for path in sorted(sources):
             relative=path.relative_to(root).as_posix();module=relative.removesuffix('.py').replace('/','.').removesuffix('.__init__')
             name=framework+':'+module
             try:
@@ -290,7 +295,9 @@ def source_catalog():
                 return fields
             for node in ast.walk(tree):
                 if isinstance(node,ast.ImportFrom):
-                    imports.append('.'*node.level+(node.module or ''))
+                    base='.'*node.level+(node.module or '')
+                    imports.append(base)
+                    imports.extend(base+('' if base.endswith('.') else '.')+alias.name for alias in node.names if alias.name!='*')
                 elif isinstance(node,ast.Import):imports.extend(alias.name for alias in node.names)
                 elif isinstance(node,ast.Call):
                     calls.append(ast.unparse(node.func))
@@ -305,7 +312,7 @@ def source_catalog():
                         if isinstance(child,(ast.FunctionDef,ast.AsyncFunctionDef)):
                             key=node.name+'.'+child.name;functions.append(key);signatures[key]=ast.unparse(child.args);parameters[key]=arguments(child,key)
             items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':ast.get_docstring(tree),
-                          'functions':functions,'signatures':signatures,'parameters':parameters,'keyword_contracts':keyword_contracts,'imports':sorted(set(imports)),'calls':sorted(set(calls))})
+                          'package':path.name=='__init__.py','functions':functions,'signatures':signatures,'parameters':parameters,'keyword_contracts':keyword_contracts,'imports':sorted(set(imports)),'calls':sorted(set(calls))})
     script=ROOT/'FinRL-X/deploy.sh'
     if script.is_file():items.append({'id':'FinRL-X:deploy','path':'FinRL-X/deploy.sh','framework':'FinRL-X',
         'description':'공식 배포 스크립트의 데이터 준비 및 전략 실행 절차','functions':[],
@@ -317,22 +324,28 @@ def catalog():
     from .system_operations import system
     items=[dict(item) for item in source_catalog()];by_id={item['id']:item for item in items}
     roots={row[2]:[key] for key,row in ACTIONS.items() if row[2]}
-    for item in items:
-        if item['framework']=='stockrl':roots.setdefault(item['id'],[])
+    for module in ('web_api','__main__','official_cli','job_worker','platform.kiwoom_worker'):
+        roots['stockrl:'+module]=[]
     edges={}
     for item in items:
         deps=[]
         for imported in item['imports']:
             if imported.startswith('.'):
-                level=len(imported)-len(imported.lstrip('.'));parts=item['id'].split(':')[1].split('.')[:-level]
-                target=item['framework']+':'+'.'.join(parts+[imported.lstrip('.')])
+                level=len(imported)-len(imported.lstrip('.'));parts=item['id'].split(':')[1].split('.')
+                if not item.get('package'):parts=parts[:-1]
+                if level>1:parts=parts[:-(level-1)]
+                target=item['framework']+':'+'.'.join(part for part in [*parts,imported.lstrip('.')] if part)
             elif imported.startswith('src.'):target='FinRL-X:'+imported[4:]
             elif imported.startswith('finrl.'):target='FinRL:'+imported[6:]
             elif imported.startswith('stockrl.'):target='stockrl:'+imported[8:]
             elif item['framework']=='FinRL-X' and imported.startswith(('strategies.','data.','config.','trading.','backtest.')):target='FinRL-X:'+imported
             else:continue
             if target in by_id:deps.append(target)
-        edges[item['id']]=deps
+        parts=item['id'].split(':',1)[1].split('.')
+        parents=[item['framework']+':'+'.'.join(parts[:level]) for level in range(1,len(parts))]
+        if item['framework']=='stockrl':parents.append('stockrl:__init__')
+        deps.extend(parent for parent in parents if parent in by_id and by_id[parent].get('package'))
+        edges[item['id']]=sorted(set(deps))
     connected=set(roots);queue=list(roots)
     while queue:
         for target in edges.get(queue.pop(),[]):
@@ -351,22 +364,26 @@ def catalog():
         item['dependencies']=edges[item['id']];item['actions']=[key for key,row in ACTIONS.items() if row[2]==item['id']]
         public=bool([name for name in item['functions'] if all(not part.startswith('_') for part in name.split('.'))])
         native=public and item['framework'] in ('FinRL-X','FinRL') and not item['path'].startswith('FinRL-X/web/')
-        item['backend_connected']=item['id'] in connected or native
-        item['frontend']=bool(item['actions']) or native or item['id'] in connected
+        item['referenced']=item['id'] in connected
+        item['backend_connected']=item['referenced']
+        item['frontend']=bool(item['actions']) or native
+        item['usage']='참조 있음' if item['referenced'] else '참조 없음'
         item['native_api']='/api' if native else None
         item['native_operation']='framework/native_call' if native else None
         imported=system.states.get('import:'+item['id'])
         import_error=system.state_errors.get('import:'+item['id'])
-        item['imported']=bool(imported and imported.get('imported'))
+        item['imported']=bool(imported and imported.get('imported')) or (('src' if item['framework']=='FinRL-X' else 'finrl' if item['framework']=='FinRL' else 'stockrl')+'.'+item['id'].split(':',1)[1]) in sys.modules
         item['import_error']=import_error
         item['verified_functions']=sorted(set(verified.get(item['id'],[])))
+        item['execution_status']='실행 확인' if item['verified_functions'] else '실행 미확인'
         external=any(word in item['id'].lower() for word in ('alpaca','wrds','eodhd','joinquant','sinopac','shioaji','tushare','ibkr','fxmacro','quantconnect'))
         if import_error:item.update(status='미연결',reason='백엔드 import 실패: '+import_error)
         elif item['verified_functions']:item.update(status='연결·정상 작동',reason='표시된 함수의 실제 실행 결과가 있습니다. 다른 함수까지 검증한 것은 아닙니다.')
         elif external:item.update(status='외부 인증 필요',reason='공식 공급원·계정 인증과 해당 입력 계약이 필요합니다. 다른 공급원으로 대체하지 않습니다.')
-        elif item['backend_connected']:item.update(status='연결·실행 미확인',reason='원본 공개 callable 실행 API 또는 연결 모듈의 내부 의존성입니다. 필요한 원본 입력·객체·의존성을 갖춰 실행해야 합니다.')
+        elif item['backend_connected']:item.update(status='연결·실행 미확인',reason='현재 서버·CLI·작업 실행 경로에서 참조하는 모듈입니다. import 여부와 실제 함수 실행 성공은 별도로 표시합니다.')
+        elif native:item.update(status='호출 가능·사용 미확인',reason='공통 원본 함수 API로 호출할 수 있지만 현재 운영 코드에서 사용한다는 참조는 확인되지 않았습니다.')
         elif item['path'].startswith('FinRL-X/web/'):item.update(status='미연결',reason='사용자 지시로 Streamlit 화면은 이식·실행에서 제외합니다.')
-        elif not public:item.update(status='미연결',reason='독립 실행 함수가 없는 패키지 초기화·상수 모듈 또는 소스 해석 오류입니다. 상위 공식 모듈의 import 경로로 사용됩니다.')
+        elif not public:item.update(status='미연결',reason='현재 실행 진입점에서 참조되지 않는 패키지 초기화·상수 모듈 또는 소스 해석 오류입니다. 실행 미확인과 미사용 확정은 다릅니다.')
         else:item.update(status='미연결',reason='원본 입력·의존성 및 공개 실행 경로를 확인해야 합니다.')
         if item['imported']:item['reason']='백엔드 import 완료. '+item['reason']
-    return {'items':items,'actions':action_list(),'counts':{status:sum(item['status']==status for item in items if item['framework']!='stockrl') for status in ('연결·정상 작동','연결·실행 미확인','미연결','외부 인증 필요')}}
+    return {'items':items,'actions':action_list(),'counts':{status:sum(item['status']==status for item in items if item['framework']!='stockrl') for status in ('연결·정상 작동','연결·실행 미확인','호출 가능·사용 미확인','미연결','외부 인증 필요')}}

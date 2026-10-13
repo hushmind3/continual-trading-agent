@@ -28,12 +28,6 @@ def main():
             atomic_json(result,root/job['output']/'result.json')
             job['result']=preview(result)
             return
-        if job["command"]=="collect":
-            from .finrl_trading import finrlx
-            frame=finrlx("data.data_fetcher").fetch_price_data(
-                job["symbols"],job["start_date"],job["end_date"])
-            print("FinRL-X 가격 수집 완료:",len(frame),"행",flush=True)
-            return
         if job["command"] == "train" and not job.get('output'):
             backup = root / "archives" / job_id
             for name in (job.get('algorithm','sac')+'.zip', "replay.pkl", "dataset.json"):

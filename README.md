@@ -88,7 +88,6 @@ results/ / .venv/              공식 실행 산출물 / 설치 환경, Git 제�
 | --- | --- | --- |
 | 운영 `#control` | GET state, POST controls/{feed,paper,engine} | `web_api.state`, `OperationsRuntime.command` |
 | MoE `#moe` | GET state (모델·Library 통합 항목), POST experts/register, experts/select, library/{kind}, champions/create | `ExpertRegistry.register/select`, `model_files`, `LibraryOperations.start/_execute` |
-| 시장 `#markets` | GET state (데이터·가격·연결 통합 항목), POST collect, controls/feed | `price_history`, `job_worker.main` → FinRL-X `fetch_price_data`; `LiveMarketCollector.run` |
 | 연결 `#connection` | GET state (연결·인증·설정 통합 항목), POST provider/{connect,test,public}, settings | 기존 `connect_credentials/test_connection`, `operations_settings.update` |
 | 진단 `#system` | GET state (로그·자원·모듈 통합 항목) | `ResourceMonitor.snapshot`, 실제 저장 로그·소스 함수 목록 |
 

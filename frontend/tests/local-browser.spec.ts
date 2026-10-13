@@ -13,8 +13,8 @@ test('all registered local screens render and continue receiving state', async (
     .map(element => ({href: element.getAttribute('href') || '', name: element.textContent || ''}))
     .filter(element => element.href.startsWith('#')));
   const unique = [...new Map(links.map(link => [link.href, link])).values()];
-  expect(unique.length).toBe(12);
-  const removed = ['finrl-trading','feature-adaptive_download','feature-adaptive_single','feature-adaptive_backtest','feature-calendar','feature-config_check','portfolio','finrl','stock-training','backtest','feature-finrl_workflow','feature-yahoo','feature-features','feature-data_split','feature-finrl_stats','feature-fundamentals','feature-news','feature-nasdaq100','feature-sp500','feature-process_prices','feature-process_fundamentals','feature-ml_dataset','feature-tsmom','feature-adaptive','feature-equal_weight','feature-ml','feature-sector_ml','feature-performance'];
+  expect(unique.length).toBe(11);
+  const removed = ['markets','finrl-trading','feature-adaptive_download','feature-adaptive_single','feature-adaptive_backtest','feature-calendar','feature-config_check','portfolio','finrl','stock-training','backtest','feature-finrl_workflow','feature-yahoo','feature-features','feature-data_split','feature-finrl_stats','feature-fundamentals','feature-news','feature-nasdaq100','feature-sp500','feature-process_prices','feature-process_fundamentals','feature-ml_dataset','feature-tsmom','feature-adaptive','feature-equal_weight','feature-ml','feature-sector_ml','feature-performance'];
   expect(unique.filter(link => removed.includes(link.href.slice(1))).map(link => link.href)).toEqual([]);
   for (const link of unique) {
     await page.locator(`aside a[href="${link.href}"]`).click();
@@ -25,13 +25,6 @@ test('all registered local screens render and continue receiving state', async (
   }
   expect(errors).toEqual([]);
   expect(failures).toEqual([]);
-  await page.locator('aside a[href="#markets"]').click();
-  await expect(page.locator('main')).toContainText('시장 · 실제 가격 저장소');
-  const next = page.getByRole('button', {name: '다음', exact: true});
-  if (await next.isEnabled()) {
-    await next.click();
-    await expect(page.locator('main')).toContainText('2 /');
-  }
   console.log(`Verified ${unique.length} live local screens with screenshots, no JS crashes, no HTTP 500`);
 });
 
@@ -44,7 +37,7 @@ test('model errors remain visible in MoE and diagnostics without becoming a tran
     state.module_errors = {...state.module_errors, 'champion:validation-only': '검증용 모델 형식 오류'};
     await route.fulfill({response, json: state});
   });
-  await page.goto('/#markets', {waitUntil: 'networkidle'});
+  await page.goto('/#control', {waitUntil: 'networkidle'});
   await expect(page.locator('main')).toContainText('다른 기능 오류');
   await expect(page.locator('main')).not.toContainText('검증용 모델 형식 오류');
   await expect(page.locator('main')).not.toContainText('통합 API 연결:');

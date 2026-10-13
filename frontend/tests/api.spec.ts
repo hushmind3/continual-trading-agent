@@ -28,8 +28,8 @@ test('JSON command failures retain the backend reason', async () => {
 });
 
 test('GET payloads use the same API envelope without losing special characters', () => {
-  const url = new URL(apiUrl('state', {views: '["prices?symbol=^GSPC"]'}), 'http://127.0.0.1');
+  const url = new URL(apiUrl('state', {views: '["framework?symbol=^GSPC"]'}), 'http://127.0.0.1');
   expect(url.pathname).toBe('/api');
   expect(url.searchParams.get('operation')).toBe('state');
-  expect(JSON.parse(url.searchParams.get('payload')!)).toEqual({views: '["prices?symbol=^GSPC"]'});
+  expect(JSON.parse(url.searchParams.get('payload')!)).toEqual({views: '["framework?symbol=^GSPC"]'});
 });

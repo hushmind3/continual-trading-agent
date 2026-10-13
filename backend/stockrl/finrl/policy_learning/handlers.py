@@ -159,6 +159,21 @@ def saved_replay():
         return {"status":"unreadable","error":str(exc)}
 
 
+def checkpoint_identity(path):
+    """Require an existing current policy and its linked Champion, if any."""
+    path=Path(path).resolve()
+    if not path.is_relative_to(RUNTIME.resolve()) or path.suffix!='.zip' or path.stem not in MODELS or not path.is_file():
+        raise ValueError('저장된 정책 파일이 없습니다.')
+    identity=read_json(path.parent/'dataset.json')
+    if identity.get('environment')!=CASH_ENVIRONMENT or identity.get('algorithm')!=path.stem:
+        raise ValueError('현재 학습 환경의 정책이 아닙니다.')
+    champion_file=identity.get('champion_file')
+    if path.is_relative_to((RUNTIME/'champions').resolve()) or champion_file:
+        if not champion_file or not Path(champion_file).is_file():
+            raise ValueError('연결된 Champion 모델 파일이 없습니다.')
+    return identity
+
+
 def checkpoints(settings):
     from stockrl.management.diagnostics_logs_code_apply.handlers import file_info
     paths = list(RUNTIME.glob('*.zip')) + sorted((RUNTIME/"archives").glob("*/*.zip")) + sorted((RUNTIME/"policies").glob("*/*.zip")) + sorted((RUNTIME/"champions").glob("*/*.zip"))
@@ -166,10 +181,9 @@ def checkpoints(settings):
     for path in paths:
         if path.stem not in MODELS:continue
         try:
+            identity=checkpoint_identity(path)
             with zipfile.ZipFile(path) as archive:
                 data=json.loads(archive.read("data"))
-            identity=read_json(path.parent/"dataset.json")
-            identity.setdefault('algorithm',path.stem)
             compatible=identity.get("environment")==settings["environment"] and identity.get('algorithm','sac')==path.stem and identity.get("sac_example")==sac_example(path.stem)[1]
             items.append({"name":path.parent.name if path.parent!=RUNTIME else "현재 정책",
                           "path":path.relative_to(RUNTIME).as_posix(),"file":file_info(path),
@@ -312,8 +326,8 @@ def train(req: RunRequest):
 @router.get("/api/checkpoint")
 def checkpoint_download(path:str):
     target=(RUNTIME/path).resolve()
-    if not target.is_relative_to(RUNTIME.resolve()) or target.suffix!='.zip' or target.stem not in MODELS or not target.exists():
-        raise HTTPException(404,"정책 파일이 없습니다.")
+    try:checkpoint_identity(target)
+    except (OSError,ValueError) as exc:raise HTTPException(404,str(exc)) from exc
     return FileResponse(target,filename=target.parent.name+'-'+target.name)
 
 
@@ -322,9 +336,8 @@ def restore_checkpoint(request:dict):
     with system.job_lock:
         if system.job_state()["running"]:raise HTTPException(409,"현재 학습 작업 종료 후 복원하세요.")
         path=(RUNTIME/request.get("path","")).resolve()
-        if not path.is_relative_to(RUNTIME.resolve()) or path.suffix!='.zip' or path.stem not in MODELS or not path.is_file():
-            raise HTTPException(400,"저장된 FinRL 정책 버전을 선택하세요.")
-        identity=read_json(path.parent/"dataset.json")
+        try:identity=checkpoint_identity(path)
+        except (OSError,ValueError) as exc:raise HTTPException(400,str(exc)) from exc
         settings=source_settings()
         if identity.get("environment")!=settings["environment"] or identity.get('algorithm','sac')!=path.stem or identity.get("sac_example")!=sac_example(path.stem)[1]:
             raise HTTPException(400,"현재 FinRL 환경·알고리즘·설정과 호환되지 않는 정책입니다.")

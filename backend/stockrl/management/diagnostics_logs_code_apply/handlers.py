@@ -194,7 +194,12 @@ def state(views:str='[]',refresh_views:bool=False):
     models=system.state_value('models_by_currency',lambda:currency_models(settings),currency_signature)
     def checkpoint_signature():
         files=[*RUNTIME.glob('*.zip'),*(RUNTIME/'policies').glob('*/*.zip'),*(RUNTIME/'champions').glob('*/*.zip'),*(RUNTIME/'archives').glob('*/*.zip')]
-        return state_stamp(*files,*(file.parent/'dataset.json' for file in files))
+        champions=[]
+        for file in files:
+            try:champion=read_json(file.parent/'dataset.json').get('champion_file')
+            except (OSError,ValueError):continue
+            if champion:champions.append(Path(champion))
+        return state_stamp(*files,*(file.parent/'dataset.json' for file in files),*champions)
     revisions=system.state_value('checkpoints',lambda:checkpoints(settings),checkpoint_signature)
     operations_state=system.state_value('operations',runtime.snapshot)
     library=system.state_value('library',library_manager.snapshot)

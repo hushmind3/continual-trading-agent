@@ -250,4 +250,41 @@ class FrameworkFailureAttributionTests(unittest.TestCase):
    self.assertNotIn('FinRL:a',failed)
    self.assertEqual(len(unknown),1)
 
+class CheckpointAvailabilityTests(unittest.TestCase):
+ def test_deleted_champion_is_removed_from_list_and_download(self):
+  from stockrl.finrl.policy_learning import handlers
+  import zipfile
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);policy=root/'champions/example/sac.zip';policy.parent.mkdir(parents=True)
+   champion=root/'example.pt';champion.write_bytes(b'test-only artifact')
+   identity={'algorithm':'sac','environment':handlers.CASH_ENVIRONMENT,'champion_file':str(champion),'sac_example':{}}
+   (policy.parent/'dataset.json').write_text(json.dumps(identity),encoding='utf8')
+   with zipfile.ZipFile(policy,'w') as archive:archive.writestr('data',json.dumps({'num_timesteps':5000}))
+   with patch.object(handlers,'RUNTIME',root):
+    settings={'environment':handlers.CASH_ENVIRONMENT}
+    self.assertEqual(len(handlers.checkpoints(settings)),1)
+    champion.unlink()
+    self.assertEqual(handlers.checkpoints(settings),[])
+    with self.assertRaises(handlers.HTTPException) as error:handlers.checkpoint_download('champions/example/sac.zip')
+    self.assertEqual(error.exception.status_code,404)
+    self.assertTrue(policy.is_file())
+
+ def test_deleted_checkpoint_is_removed_and_old_environment_is_excluded(self):
+  from stockrl.finrl.policy_learning import handlers
+  import zipfile
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);policy=root/'policies/example/sac.zip';policy.parent.mkdir(parents=True)
+   identity={'algorithm':'sac','environment':handlers.CASH_ENVIRONMENT,'sac_example':{}}
+   metadata=policy.parent/'dataset.json';metadata.write_text(json.dumps(identity),encoding='utf8')
+   with zipfile.ZipFile(policy,'w') as archive:archive.writestr('data',json.dumps({'num_timesteps':5000}))
+   with patch.object(handlers,'RUNTIME',root):
+    settings={'environment':handlers.CASH_ENVIRONMENT}
+    self.assertEqual(len(handlers.checkpoints(settings)),1)
+    identity['environment']='finrl.meta.env_portfolio_allocation.env_portfolio.StockPortfolioEnv'
+    metadata.write_text(json.dumps(identity),encoding='utf8')
+    self.assertEqual(handlers.checkpoints(settings),[])
+    identity['environment']=handlers.CASH_ENVIRONMENT;metadata.write_text(json.dumps(identity),encoding='utf8')
+    policy.unlink()
+    self.assertEqual(handlers.checkpoints(settings),[])
+
 if __name__=='__main__':unittest.main()

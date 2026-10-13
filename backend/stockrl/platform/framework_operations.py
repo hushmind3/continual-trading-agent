@@ -45,8 +45,9 @@ def serialize(value):
 
 
 def validate_native_call(parameters):
-    if parameters in REMOVED_BROKER_TOOLS:raise ValueError('키움 외 브로커 매매 도구는 제거했습니다. 키움 연결·설정을 사용하세요.')
+    if not isinstance(parameters,dict):raise ValueError('원본 실행 요청은 JSON 객체여야 합니다.')
     target=parameters.get('module');name=parameters.get('callable','')
+    if isinstance(target,str) and target in REMOVED_BROKER_TOOLS:raise ValueError('키움 외 브로커 매매 도구는 제거했습니다. 키움 연결·설정을 사용하세요.')
     item=next((item for item in source_catalog() if item['id']==target),None)
     if not item or item['framework'] not in ('FinRL',):raise ValueError('공식 소스에 존재하는 모듈을 선택하세요.')
     if name not in item['functions'] or any(part.startswith('_') for part in name.split('.')):raise ValueError('공식 공개 함수·클래스·메서드를 선택하세요.')
@@ -67,6 +68,9 @@ def validate_native_call(parameters):
             positional=set(value)&set(contract['positional_only'])
             if positional:raise ValueError('위치 전용 인자는 JSON 키로 호출할 수 없습니다: '+', '.join(sorted(positional)))
         return value
+    argv=parameters.get('argv',[])
+    if isinstance(argv,str):argv=json.loads(argv or '[]')
+    if not isinstance(argv,list) or not all(isinstance(argument,str) for argument in argv):raise ValueError('원본 CLI 인자는 문자열 JSON 배열입니다.')
     steps=parameters.get('steps',[])
     if isinstance(steps,str):steps=json.loads(steps or '[]')
     if not isinstance(steps,list):raise ValueError('메서드 연결은 JSON 배열이어야 합니다.')
@@ -162,7 +166,9 @@ def native_call(parameters,output):
             for step in steps:
                 method=step['method']
                 if parts[0]+'.'+method not in item['functions'] or method.startswith('_'):raise ValueError('원본 클래스의 공개 메서드가 아닙니다: '+method)
-                function=getattr(instance,method);value=function(**resolve(step.get('kwargs',{})))
+                values=step.get('kwargs',{})
+                if isinstance(values,str):values=json.loads(values or '{}')
+                function=getattr(instance,method);value=function(**resolve(values))
                 if step.get('save_as'):context['$'+step['save_as']]=value
         elif len(parts)==1:
             inspect.signature(constructor).bind(**kwargs);value=constructor(**kwargs)

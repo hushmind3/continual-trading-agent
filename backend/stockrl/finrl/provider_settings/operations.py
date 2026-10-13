@@ -21,9 +21,11 @@ def save_provider(name,values):
     import os
     from stockrl.management.connection_settings.provider_credentials import _vault
     if name not in PROVIDER_FIELDS:raise ValueError('공식 공급원 설정을 선택하세요.')
+    if not isinstance(values,dict):raise ValueError('공급원 설정은 JSON 객체여야 합니다.')
+    for key in values:
+        if key not in PROVIDER_FIELDS[name]:raise ValueError('원본 공급원 환경변수 이름이 아닙니다: '+key)
     vault=_vault()
     for key,value in values.items():
-        if key not in PROVIDER_FIELDS[name]:raise ValueError('원본 공급원 환경변수 이름이 아닙니다: '+key)
         if value:vault.set_password('stockrl.official-framework',key,str(value))
     os.environ.update(provider_environment())
     return provider_status()

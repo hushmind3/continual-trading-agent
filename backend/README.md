@@ -2,8 +2,8 @@
 
 | 위치 | 역할 |
 | --- | --- |
-| [stockrl/](stockrl/README.md) | 금융 대메뉴: 기존 금융 화면 8개 |
-| [rea/](rea/README.md) | 독립 REA 프로젝트: analysis/, project_browser/ |
+| [stockrl/](stockrl/README.md) | 금융 대메뉴: 현재 금융 화면 7개 |
+| [rea/](rea/README.md) | 독립 REA 프로젝트: program_analysis/, project_explorer/ |
 | [menu_registry.py](menu_registry.py) | 금융·REA 두 대메뉴를 등록·취합하는 총괄 |
 | [web_api.py](web_api.py) | 단일 /api 진입점; 총괄만 통해 기능 등록 |
 | api_context.py, api_transport.py | 공유 HTTP 객체·요청 전달·React 제공 |

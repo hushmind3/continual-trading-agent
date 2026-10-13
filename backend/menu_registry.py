@@ -6,7 +6,6 @@ GROUPS=(FINANCE,REA)
 _routes_by_menu={}
 
 def owner(operation):
-    if operation=='framework/native_call':return 'finance','backend-browser'
     for group in GROUPS:
         for menu in group['menus']:
             if any(operation==pattern or pattern.endswith('/') and operation.startswith(pattern) for pattern in menu['operations']):
@@ -19,7 +18,7 @@ def bind(routes):
     for route in routes:
         if not hasattr(route,'endpoint') or not route.path.startswith('/api/'):continue
         operation=route.path.removeprefix('/api/')
-        menus=set(('frameworks','project-modules','system','backend-browser') if operation=='framework/{action}' else (owner(operation)[1],))
+        menus={owner(operation)[1]}
         for group in GROUPS:
             for menu in group['menus']:
                 if any(not pattern.endswith('/') and route.path_regex.fullmatch('/api/'+pattern) for pattern in menu['operations']):menus.add(menu['id'])
@@ -29,9 +28,6 @@ def dispatch(scope,parameters):
     from starlette.routing import Match
     operation=scope['path'].removeprefix('/api/')
     menu=owner(operation)[1]
-    if operation=='framework/native_call':
-        module=str(parameters.get('module',''))
-        menu='frameworks' if module.startswith('FinRL:') else 'backend-browser'
     for route in _routes_by_menu.get(menu,()):
         match,child=route.matches(scope)
         if match==Match.FULL:return route,{**scope,**child}

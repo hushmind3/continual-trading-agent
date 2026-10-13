@@ -25,7 +25,6 @@ def framework_providers():
 
 @router.post('/api/framework/providers/{provider}')
 def framework_provider_save(provider:str,values:dict):
-    from stockrl.management.connection_settings.handlers import provider
     from stockrl.finrl.provider_settings.operations import save_provider
     try:return save_provider(provider,values)
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))

@@ -7,6 +7,7 @@ export function NativeParameterFields({title,parameters,value,onChange}:{title:s
   const next={...values};
   if(!text.trim())delete next[parameter.name];
   else if(text.startsWith('$'))next[parameter.name]=text;
+  else if(parameter.annotation==='str')next[parameter.name]=text;
   else if(/bool/i.test(parameter.annotation??''))next[parameter.name]=text==='true';
   else if(/^(int|float)$/.test(parameter.annotation??'')||/^[-+]?\d+(\.\d+)?$/.test(parameter.default??''))next[parameter.name]=Number.isFinite(Number(text))?Number(text):text;
   else if(/^[\[{]/.test(text)){try{next[parameter.name]=JSON.parse(text)}catch{next[parameter.name]=text}}

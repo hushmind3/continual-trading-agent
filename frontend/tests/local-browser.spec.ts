@@ -153,3 +153,39 @@ test('paper order rejects fractional quantities before sending a request', async
   await page.getByRole('spinbutton',{name:'수량',exact:true}).fill('1');
   await expect(page.getByRole('button',{name:'가상 매수',exact:true})).toBeEnabled();
 });
+
+test('native runner preserves JSON-looking strings and rejects array argument objects', async ({page}) => {
+  const submitted:Record<string,unknown>[]=[];
+  await page.route('**/api',async route=>{
+    const envelope=route.request().postDataJSON();
+    if(envelope?.operation==='framework/native_call'){
+      submitted.push(envelope.payload);await route.fulfill({json:{message:'fixture accepted',job:{id:'fixture',running:false}}});return;
+    }
+    if(envelope?.operation==='state'){
+      const response=await route.fetch(),state=await response.json();
+      const catalog=state.views?.framework?.data;
+      if(catalog){
+        const original=catalog.items.find((item:{native_api?:string;framework:string})=>item.native_api&&item.framework==='FinRL');
+        if(original)catalog.items=[{...original,id:'FinRL:fixture',path:'fixture.py',functions:['combine'],signatures:{combine:'value: str'},parameters:{combine:[{name:'value',annotation:'str',required:true}]}}];
+      }
+      await route.fulfill({response,json:state});return;
+    }
+    await route.continue();
+  });
+  await page.goto('/#finance/all_backend_features',{waitUntil:'networkidle'});
+  await page.getByRole('tab',{name:'원본 모듈 · 함수',exact:true}).click();
+  await expect(page.getByRole('combobox',{name:'원형 모듈',exact:true})).toHaveValue('FinRL:fixture');
+  const raw=page.getByRole('textbox',{name:'원본 함수 인자',exact:true});
+  await expect(raw).toBeVisible();
+  await raw.fill('[]');
+  await page.getByRole('button',{name:'원본 함수 실행',exact:true}).click();
+  await expect(page.locator('main')).toContainText('함수·생성자 인자는 JSON 객체로 입력하세요.');
+  expect(submitted).toHaveLength(0);
+  await raw.fill('{}');
+  await page.getByLabel(/value.*필수/).fill('{"keep":"literal"}');
+  await page.getByRole('button',{name:'원본 함수 실행',exact:true}).click();
+  await expect.poll(()=>submitted.length).toBe(1);
+  expect(submitted[0].kwargs).toEqual({value:'{"keep":"literal"}'});
+  await expect(page.getByRole('button',{name:'원본 함수 실행',exact:true})).toBeEnabled();
+  await page.unrouteAll({behavior:'wait'});
+});

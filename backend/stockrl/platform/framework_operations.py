@@ -17,7 +17,7 @@ from ..finrl_trading.price_data.operations import prices
 from ..finrl_trading.provider_settings.operations import provider_environment
 from ..state_io import atomic_json,read_json
 
-REMOVED_BROKER_TOOLS={'FinRL:trade','FinRL:meta.env_stock_trading.env_stock_papertrading','FinRL-X:trading.alpaca_manager'}
+REMOVED_BROKER_TOOLS={'FinRL:trade','FinRL:meta.env_stock_trading.env_stock_papertrading','FinRL:meta.data_processors.processor_alpaca','FinRL-X:trading.alpaca_manager'}
 ACTIONS={"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'env_kwargs', 'steps', 'argv', 'symbols', 'source'])}
 
 
@@ -417,6 +417,9 @@ def catalog():
         item['execution_status']='최근 실행 실패' if item['last_error'] else '실행 성공 기록 있음' if item['verified_functions'] else '실행 기록 없음'
         item['authentication_status']='인증 입력 이름 탐지됨 · 인증 성공 미확인' if item.get('credential_inputs') else '인증 입력 이름 미탐지 · 인증 요구 여부 미확인'
         if item.get('source_error'):item.update(status='소스 해석 실패',reason='소스를 해석하지 못해 참조·실행 계약을 판단할 수 없습니다: '+item['source_error'])
+        elif item['id'] in REMOVED_BROKER_TOOLS:
+            item.update(status='라이브러리 내부 의존성',reason='키움 외 연결·시세 수집·매매 도구로 사용하지 않습니다. FinRL 원본 초기화가 자동 import하는 내부 의존성으로만 유지합니다. 직접 실행 등록은 제거했습니다.')
+            item['usage_menus']=[]
         elif item['referenced']:item.update(status='운영 기능의 의존성',reason='현재 플랫폼 기능이 이 파일을 직접 또는 내부 의존성으로 불러옵니다. 아래에 필요한 메뉴와 불러오는 파일을 표시합니다. 함수 실행 기록은 별도입니다.')
         elif native:
             item.update(status='직접 실행 도구',reason='사용자가 원본 함수 실행에서 선택하는 도구입니다. 자동 운영에서 실행하는 알고리즘이라는 뜻은 아닙니다.')

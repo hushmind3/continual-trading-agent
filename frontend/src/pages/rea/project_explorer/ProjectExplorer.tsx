@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {request} from '../../../data/api';
 import {Panel} from '../../../ui/Panel';
 import {Button,ErrorMessage,inputClass} from '../../../ui/Primitives';
@@ -6,11 +6,12 @@ interface Project {id:string;name:string;kind:string;artifact?:string;state:stri
 interface Entry {name:string;path:string;folder:boolean;bytes?:number}
 export function ProjectExplorer(){
  const [projects,setProjects]=useState<Project[]>([]),[id,setId]=useState(()=>new URLSearchParams(location.hash.split('?')[1]??'').get('id')??''),[path,setPath]=useState(''),[entries,setEntries]=useState<Entry[]>([]),[selected,setSelected]=useState(''),[content,setContent]=useState(''),[preview,setPreview]=useState(''),[error,setError]=useState(''),[query,setQuery]=useState(''),[page,setPage]=useState(0);
+ const fileRequest=useRef(0);
  const project=projects.find(item=>item.id===id);
  const refresh=async()=>{try{const data=await request<{items:Project[]}>('rea/projects',{},'GET');setProjects(data.items);if(!id&&data.items.length)setId(data.items[0].id);}catch(e){setError(e instanceof Error?e.message:'목록 조회 실패')}};
  useEffect(()=>{void refresh()},[]);
- useEffect(()=>{if(!id)return;let active=true;setEntries([]);setSelected('');setContent('');setPage(0);setError('');request<{items:Entry[]}>('rea/project/tree',{id,path},'GET').then(data=>{if(active)setEntries(data.items)}).catch(e=>{if(active)setError(String(e.message))});return()=>{active=false};},[id,path]);
- const read=async(entry:Entry)=>{if(entry.folder){setPath(entry.path);return;}setSelected(entry.path);setError('');try{const data=await request<{content:string;bytes:number;truncated?:boolean;preview_bytes?:number}>('rea/project/file',{id,path:entry.path},'GET');setContent(data.content);setPreview(data.truncated?'미리보기 '+data.preview_bytes+'바이트 / 저장 파일 '+data.bytes+'바이트':'저장 파일 '+data.bytes+'바이트');}catch(e){setError(e instanceof Error?e.message:'파일 조회 실패')}};
+ useEffect(()=>{fileRequest.current++;if(!id)return;let active=true;setEntries([]);setSelected('');setContent('');setPreview('');setPage(0);setError('');request<{items:Entry[]}>('rea/project/tree',{id,path},'GET').then(data=>{if(active)setEntries(data.items)}).catch(e=>{if(active)setError(String(e.message))});return()=>{active=false;fileRequest.current++};},[id,path]);
+ const read=async(entry:Entry)=>{if(entry.folder){setPath(entry.path);return;}const current=++fileRequest.current;setSelected(entry.path);setContent('');setPreview('');setError('');try{const data=await request<{content:string;bytes:number;truncated?:boolean;preview_bytes?:number}>('rea/project/file',{id,path:entry.path},'GET');if(current!==fileRequest.current)return;setContent(data.content);setPreview(data.truncated?'미리보기 '+data.preview_bytes+'바이트 / 저장 파일 '+data.bytes+'바이트':'저장 파일 '+data.bytes+'바이트');}catch(e){if(current===fileRequest.current)setError(e instanceof Error?e.message:'파일 조회 실패')}};
  const open=async()=>{try{await request('rea/project/open',{id});}catch(e){setError(e instanceof Error?e.message:'폴더 열기 실패')}};
  const visible=entries.filter(item=>item.name.toLowerCase().includes(query.toLowerCase())),pages=Math.max(1,Math.ceil(visible.length/100));
  return <div className="space-y-5"><Panel title="저장된 분석 프로젝트"><div className="flex flex-wrap gap-3"><select aria-label="저장 프로젝트 선택" className={inputClass+' max-w-xl'} value={id} onChange={e=>{setId(e.target.value);setPath('');setQuery('')}}><option value="">프로젝트 선택</option>{projects.map(item=><option key={item.id} value={item.id}>{item.name} · {item.state==='saved'?'저장 완료':item.state} · {item.created_at.slice(0,16)}</option>)}</select><Button onClick={()=>void refresh()}>목록 새로고침</Button><Button tone="primary" disabled={!project} onClick={()=>void open()}>저장 폴더 열기</Button></div>

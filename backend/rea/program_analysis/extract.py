@@ -109,7 +109,7 @@ def _copy_directory(target,destination):
     destination.mkdir(parents=True)
     for base,dirs,files in os.walk(target,followlinks=False):
         _check()
-        dirs[:]=[name for name in dirs if name!='.git' and not (Path(base)/name).is_symlink() and (Path(base)/name).resolve() not in {OUTPUT.resolve(),WORK.resolve(),destination.parent.parent.resolve()}]
+        dirs[:]=[name for name in dirs if name!='.git' and not (Path(base)/name).is_symlink() and (Path(base)/name).resolve() not in {OUTPUT.resolve(),WORK.resolve(),destination.parent.parent.resolve(),(ROOT/'휴지통').resolve()}]
         for name in files:
             _check();source=Path(base)/name;relative=source.relative_to(target)
             if source.is_symlink():unavailable.append({'path':str(relative),'reason':'symbolic link'});continue
@@ -178,18 +178,19 @@ def analyze(kind,target):
     if kind not in ('file','folder','web') or not isinstance(target,str) or not target.strip():
         raise ValueError('분석할 파일·폴더·웹사이트를 선택하세요.')
     if not _gate.acquire(blocking=False):raise RuntimeError('진행 중인 REA 분석이 있습니다.')
-    _cancel.clear();_processes.clear();identifier=uuid.uuid4().hex
-    display=urlparse(target).hostname if kind=='web' else Path(target).name
-    display=re.sub(r'[^A-Za-z0-9._-]+','_',display or '').strip(' ._')[:90] or {'file':'file_project','folder':'folder_project','web':'website_project'}[kind]
-    if display.upper().split('.')[0] in {'CON','PRN','AUX','NUL',*[f'COM{i}' for i in range(1,10)],*[f'LPT{i}' for i in range(1,10)]}:display='target_'+display
-    folder=OUTPUT/(display+'__'+datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f'))
-    folder.mkdir(parents=True)
-    for name in ('original','inferred','analysis'):(folder/name).mkdir()
-    metadata={'id':identifier,'name':urlparse(target).hostname if kind=='web' else Path(target).name,
-              'input':target,'kind':kind,'state':'analyzing','folder':str(folder),
-              'created_at':datetime.now(timezone.utc).isoformat()}
-    atomic_json(metadata,folder/'project.json')
+    folder=None;metadata={}
     try:
+        _cancel.clear();_processes.clear();identifier=uuid.uuid4().hex
+        display=urlparse(target).hostname if kind=='web' else Path(target).name
+        display=re.sub(r'[^A-Za-z0-9._-]+','_',display or '').strip(' ._')[:90] or {'file':'file_project','folder':'folder_project','web':'website_project'}[kind]
+        if display.upper().split('.')[0] in {'CON','PRN','AUX','NUL',*[f'COM{i}' for i in range(1,10)],*[f'LPT{i}' for i in range(1,10)]}:display='target_'+display
+        folder=OUTPUT/(display+'__'+datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f'))
+        folder.mkdir(parents=True)
+        for name in ('original','inferred','analysis'):(folder/name).mkdir()
+        metadata={'id':identifier,'name':urlparse(target).hostname if kind=='web' else Path(target).name,
+                  'input':target,'kind':kind,'state':'analyzing','folder':str(folder),
+                  'created_at':datetime.now(timezone.utc).isoformat()}
+        atomic_json(metadata,folder/'project.json')
         unavailable=[];limitations=[]
         if kind=='web':
             metadata['artifact']='웹사이트 프론트엔드';limitations=_web(target,folder)
@@ -244,5 +245,8 @@ def analyze(kind,target):
         atomic_json(metadata,folder/'project.json');return metadata
     except Exception as error:
         metadata.update(state='stopped' if _cancel.is_set() else 'failed',error=str(error))
-        atomic_json(metadata,folder/'project.json');raise
+        if metadata and folder is not None and folder.is_dir():
+            try:atomic_json(metadata,folder/'project.json')
+            except OSError:pass
+        raise
     finally:_processes.clear();_gate.release()

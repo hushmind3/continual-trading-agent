@@ -11,3 +11,5 @@ projects.py는 backend/rea/project_explorer/saved_projects/의 물리적 저장 
 - saved_projects/: 분석 대상별 실제 파일 저장 폴더 (Git 제외).
 - 프론트 연결: #rea/project_explorer → rea/projects·rea/project/tree,file,open → projects.py.
 - 분석 저장: analysis/extract.py가 projects.py의 OUTPUT을 공유합니다. 원본 파일과 추론 결과는 계속 분리합니다.
+
+2026-10-14: 잘못되거나 불완전한 project.json은 전체 목록을 중단시키지 않습니다. 임시 저장 실패·불완전 기록·원문 파일 탐색 회귀 검사 통과.

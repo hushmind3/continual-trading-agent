@@ -17,8 +17,11 @@ def catalog():
     OUTPUT.mkdir(parents=True,exist_ok=True)
     records=[]
     for file in OUTPUT.glob('*/project.json'):
-        try:records.append(json.loads(file.read_text(encoding='utf8')))
+        try:record=json.loads(file.read_text(encoding='utf8'))
         except (OSError,ValueError):continue
+        if not isinstance(record,dict) or not all(isinstance(record.get(key),str) for key in ('id','name','folder','created_at','state')):continue
+        if not re.fullmatch(r'[a-f0-9]{32}',record['id']):continue
+        records.append(record)
     return {'items':sorted(records,key=lambda item:item['created_at'],reverse=True)}
 
 def _inside(folder,relative):

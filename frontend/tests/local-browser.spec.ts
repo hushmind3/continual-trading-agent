@@ -97,3 +97,36 @@ test('MoE renders missing input metadata and ignores invalid saved UI state', as
   await expect(page.getByRole('button', {name: '금융 Expert 찾기', exact: true})).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('project explorer keeps the latest file when earlier responses arrive late', async ({page}) => {
+  const id='a'.repeat(32);
+  let releaseOld:()=>void=()=>{};
+  let finishOld:()=>void=()=>{};
+  const oldFinished=new Promise<void>(resolve=>{finishOld=resolve});
+  await page.route('**/api*', async route => {
+    const request=route.request(),url=new URL(request.url());
+    const envelope=request.method()==='GET'?{operation:url.searchParams.get('operation'),payload:JSON.parse(url.searchParams.get('payload')??'{}')}:request.postDataJSON();
+    if(envelope?.operation==='rea/projects'){
+      await route.fulfill({json:{items:[{id,name:'race fixture',folder:'temporary fixture',kind:'folder',state:'saved',created_at:'2026-10-14T00:00:00Z'}]}});return;
+    }
+    if(envelope?.operation==='rea/project/tree'){
+      await route.fulfill({json:{path:'',items:[{name:'old.js',path:'old.js',folder:false},{name:'new.js',path:'new.js',folder:false}]}});return;
+    }
+    if(envelope?.operation==='rea/project/file'){
+      const old=envelope.payload.path==='old.js';
+      if(old)await new Promise<void>(resolve=>{releaseOld=resolve});
+      await route.fulfill({json:{content:old?'OLD CONTENT':'LATEST CONTENT',bytes:14}});
+      if(old)finishOld();return;
+    }
+    await route.continue();
+  });
+  await page.goto('/#rea/project_explorer?id='+id,{waitUntil:'networkidle'});
+  await expect(page.getByRole('button',{name:'📄old.js',exact:true})).toBeVisible();
+  const oldRequest=page.waitForRequest(request=>request.url().includes('/api')&&JSON.parse(new URL(request.url()).searchParams.get('payload')??'{}').path==='old.js');
+  await page.getByRole('button',{name:'📄old.js',exact:true}).click();
+  await oldRequest;
+  await page.getByRole('button',{name:'📄new.js',exact:true}).click();
+  await expect(page.locator('main pre')).toHaveText('LATEST CONTENT');
+  releaseOld();await oldFinished;
+  await expect(page.locator('main pre')).toHaveText('LATEST CONTENT');
+});

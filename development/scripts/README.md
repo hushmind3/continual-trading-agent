@@ -11,3 +11,5 @@
 npm은 루트 workspace 설치를 사용합니다. REA install()은 루트 npm ci로 프론트와 REA의 고정 버전을 함께 설치합니다. 검사 명령은 루트 npm run typecheck/test:api/test:browser로도 실행할 수 있습니다.
 
 모듈 참조 조사: .venv\Scripts\python.exe -B development/scripts\audit_module_usage.py. AST·import 경로만 읽어 운영 참조·검사 전용·참조 없음 후보를 출력합니다. 플랫폼 코드 import·함수 실행·삭제는 수행하지 않습니다.
+
+서버켜기.cmd는 서버·현재 프론트만 적용하고 화면을 엽니다. 전체 시스템 시작(system/start), 시세·추론·학습·매매 및 자동 진단은 호출하지 않습니다. Git/Node는 이미 설치된 실행 파일을 사용하며 추가 설치하지 않습니다.

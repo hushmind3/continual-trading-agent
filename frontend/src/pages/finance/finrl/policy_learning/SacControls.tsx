@@ -5,7 +5,7 @@ import type {Currency,Preflight} from '../../../../data/types';
 import {Button,ErrorMessage,inputClass} from '../../../../ui/Primitives';
 import {Panel,KeyValues} from '../../../../ui/Panel';
 import {number} from '../../../../ui/format';
-interface ChampionOption {name:string;path:string;trained:boolean;parameters:Record<string,number>;identity:{currency:Currency;symbols:string[];algorithm:string}}
+interface ChampionOption {name:string;path:string;trained:boolean;parameters:Record<string,number>;identity:{currency:Currency;algorithm:string}}
 interface AlgorithmOption {name:string;parameters:Record<string,string|number|boolean>;steps_per_run:number;uses_replay:boolean}
 export function SacControls(){const {state:s,execute,pending,algorithm:algorithmChoice,selectAlgorithm:setAlgorithmChoice}=useOperations();
  const algorithms=useSystemState<{default:string;items:AlgorithmOption[]}>('algorithms');
@@ -16,8 +16,7 @@ export function SacControls(){const {state:s,execute,pending,algorithm:algorithm
  const championOptions=useSystemState<{items:ChampionOption[]}>('champions'),champions=championOptions.data?.items??[];const [champion,setChampion]=useState('');
  if(!s)return null;const algorithm=algorithmChoice||algorithms.data?.default||'',official=algorithms.data?.items.find(item=>item.name===algorithm);
  const model=s.models_by_currency?.[currency]??s.model;
- const symbols=champions.find(c=>c.path===champion)?.identity.symbols??(resume?model.identity.symbols:[])??[];
- const body={currency,symbols:[...symbols].sort(),resume,algorithm,...(timesteps?{total_timesteps:Number(timesteps)}:{}),...(champion?{champion_path:champion}:{})},signature=JSON.stringify(body);
+ const body={currency,resume,algorithm,...(timesteps?{total_timesteps:Number(timesteps)}:{}),...(champion?{champion_path:champion}:{})},signature=JSON.stringify(body);
  const valid=check?.signature===signature&&check.result.ok;
  const act=async(path:string)=>{setError('');setMessage('');try{if(path==='preflight/train'){const result=await execute<Preflight>(path,body);setCheck({signature,result})}else{const result=await execute<{message:string}>(path,body);setMessage(result.message);setCheck(null)}}catch(e){setError(e instanceof Error?e.message:'요청 실패')}};
  return <Panel title="FinRL · SB3 공식 학습" description="백엔드의 FinRL 알고리즘을 선택하고 공식 DRLAgent로 학습합니다.">

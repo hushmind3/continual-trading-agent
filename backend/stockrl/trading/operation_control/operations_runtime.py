@@ -192,7 +192,7 @@ class OperationsRuntime:
             currency=self.learning_pending.pop(0)
             try:
                 identity=read_json(policy_files(currency)/'dataset.json')
-                request=_policy_learning_api.RunRequest(currency=currency,symbols=identity['symbols'],algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
+                request=_policy_learning_api.RunRequest(currency=currency,algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
                 result=_policy_learning_api.launch('train',request,preserve_output=True)
                 self.learning_job=result['job']['id']
                 frame=prices(currency,identity['symbols'])

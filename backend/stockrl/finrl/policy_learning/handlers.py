@@ -33,7 +33,6 @@ router=APIRouter(default_response_class=FiniteJSONResponse)
 
 class RunRequest(BaseModel):
     currency: Literal["USD", "KRW"] = "USD"
-    symbols: list[str] = Field(default_factory=list, max_length=1000)
     resume: bool = False
     champion_path: str | None = None
     algorithm: str = 'sac'
@@ -202,23 +201,14 @@ def preflight(req, command):
         errors.append(db["error"])
     eligible = {row["symbol"]: row for row in db["instruments"]
                 if row["currency"] == req.currency and row["eligible"]}
-    symbols = sorted(set(req.symbols or [s for s, item in eligible.items() if item["stored"]]))
-    if not symbols:
-        errors.append("선택 시장에 저장된 종목이 없습니다.")
-    for symbol in symbols:
-        item = eligible.get(symbol)
-        if item is None:
-            errors.append(symbol + ": 선택 시장의 등록 주식·ETF가 아닙니다.")
-        elif not item["stored"]:
-            errors.append(symbol + ": 저장 가격이 없습니다.")
-        elif item["observations"] < 2:
-            errors.append(symbol + ": 공식 환경 실행에는 최소 2개 가격 관측이 필요합니다.")
+    symbols = sorted(symbol for symbol,item in eligible.items() if item["stored"])
     settings = source_settings()
     model={'identity':{}}
     if req.resume:
         try:
             selected=policy_files(req.currency)
             model=model_state(settings,selected)
+            symbols=list(model['identity'].get('symbols') or [])
         except (ValueError,OSError) as exc:
             errors.append(str(exc));model=model_state(settings)
     try:_,_,steps=sac_example(req.algorithm)
@@ -232,22 +222,33 @@ def preflight(req, command):
             if not source.is_relative_to(MODEL_DIR.resolve()) or source.suffix!='.pt':
                 raise ValueError('모델 폴더의 MoE Champion을 선택하세요.')
             champion=champion_info(source);identity=champion['identity']
+            symbols=list(identity.get('symbols') or [])
             if identity['algorithm']!=req.algorithm:raise ValueError('선택한 알고리즘과 Champion의 알고리즘이 다릅니다.')
             if identity.get('environment')!=CASH_ENVIRONMENT:
                 raise ValueError('현재 PortfolioOptimizationEnv와 다른 Champion입니다. MoE에서 현재 환경으로 생성하세요.')
             checkpoint=Path(champion['checkpoint'])
             if not checkpoint.is_absolute():checkpoint=RUNTIME/checkpoint
             if not checkpoint.is_file():raise ValueError('Champion의 SB3 학습 체크포인트가 없습니다.')
-            if identity.get('currency')!=req.currency or identity.get('symbols')!=symbols:
-                raise ValueError('선택한 Champion의 통화·종목 구성이 다릅니다.')
+            if identity.get('currency')!=req.currency:
+                raise ValueError('선택한 Champion의 통화가 다릅니다.')
         except (ValueError,OSError,KeyError,RuntimeError) as exc:
             errors.append('MoE Champion: '+str(exc))
     if req.resume and not req.champion_path:
         compatible=model["compatible"]
         if not compatible:
             errors.extend(model["reasons"])
-        if model["identity"].get("currency") != req.currency or model["identity"].get("symbols") != symbols:
-            errors.append("저장 정책의 통화·종목 구성과 다릅니다.")
+        if model["identity"].get("currency") != req.currency:
+            errors.append("저장 정책의 통화와 다릅니다.")
+    if not symbols:
+        errors.append("학습에 사용할 저장 종목이 없습니다.")
+    for symbol in symbols:
+        item = eligible.get(symbol)
+        if item is None:
+            errors.append(symbol + ": 선택 시장의 등록 주식·ETF가 아닙니다.")
+        elif not item["stored"]:
+            errors.append(symbol + ": 저장 가격이 없습니다.")
+        elif item["observations"] < 2:
+            errors.append(symbol + ": 공식 환경 실행에는 최소 2개 가격 관측이 필요합니다.")
     if not req.champion_path:
         experts = expert_state()
         for row in experts["items"]:

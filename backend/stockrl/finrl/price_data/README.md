@@ -8,3 +8,5 @@
 
 기존 가격 정리 규칙을 금융 백엔드에서 처리합니다. live_feed는 market_storage를 import하고 연결·설정은 collection_status를 호출합니다. Expert 입력은 price_store와 prices를 사용합니다. 다른 코드에 같은 저장 구현을 복제하지 않습니다.
 회귀 검사: PYTHONPATH=backend 설정 후 python -B -m unittest discover -s development/tests. 이번 작업에서 실제 실행했습니다.
+
+키움 원본 가격: collect_kiwoom_prices는 기존 격리 SDK의 ka10081로 등록된 국내 종목의 최근 완료 일봉을 조회합니다. normalize_kiwoom_daily가 날짜·가격·중복을 검증한 뒤 같은 PriceStore에 저장합니다. 정책 학습 화면의 키움 가격 수집은 start_kiwoom_collection을 호출하고 price/history 조회로 실제 완료·일부 실패를 표시합니다. 중앙 API 파일은 수정하지 않습니다. 미국 가격·분봉·추가 연속조회는 이 일봉 수집 작업의 범위에 포함되지 않습니다.

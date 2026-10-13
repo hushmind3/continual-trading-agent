@@ -235,3 +235,25 @@ test('REA resumes the visible analysis after navigation and stops polling when c
   expect(statusRequests).toBe(completed);
   await page.unrouteAll({behavior:'wait'});
 });
+
+
+test('Kiwoom history collection displays real completion state and stops polling',async({page})=>{
+ let started=false,queries=0,runningQueries=0;
+ await page.route('**/api*',async route=>{
+  const req=route.request(),url=new URL(req.url()),body=req.method()==='POST'?req.postDataJSON():{};
+  const operation=body?.operation??url.searchParams.get('operation');
+  if(operation!=='price/history'){await route.continue();return;}
+  if(req.method()==='POST')started=true;else queries++;
+  const running=started&&req.method()==='GET'&&runningQueries++===0;
+  const result={status:running||req.method()==='POST'?'running':'completed',rows:running?0:600,
+   symbols:running?[]:[{symbol:'005930.KS',rows:600,start:'2024-04-22',end:'2026-10-13'}],errors:[]};
+  await route.fulfill({json:result});
+ });
+ await page.goto('/#finance/policy_learning');
+ await page.getByRole('button',{name:'키움 가격 수집',exact:true}).click();
+ await expect.poll(()=>runningQueries).toBeGreaterThan(1);
+ await page.getByText('수집 완료 · 600행 · 1종목',{exact:true}).waitFor();
+ await page.getByText('실제 저장 범위',{exact:true}).click();
+ await expect(page.getByText('005930.KS · 2024-04-22 ~ 2026-10-13 · 600행',{exact:true})).toBeVisible();
+ const before=queries;await page.waitForTimeout(2400);expect(queries).toBe(before);
+});

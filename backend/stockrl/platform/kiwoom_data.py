@@ -18,6 +18,17 @@ from stockrl.management.connection_settings.provider_credentials import read_set
 from ..state_io import atomic_json,read_json
 
 
+def request_daily_history(client,symbol,base):
+    """Retry only broker throttling; other API failures retain their cause."""
+    for attempt in range(3):
+        try:
+            return client.request(api_id='ka10081',path='/api/dostk/chart',
+                body={'stk_cd':symbol.split('.')[0],'base_dt':base,'upd_stkpc_tp':'1'}).body
+        except Exception as error:
+            if getattr(error,'status_code',None)!=429 or attempt==2:raise
+            time.sleep(attempt+1)
+
+
 def quote_timestamp(day,clock,region):
     zone=ZoneInfo('America/New_York' if region=='us' else 'Asia/Seoul')
     day=str(day or datetime.now(zone).strftime('%Y%m%d')).strip()[:8]

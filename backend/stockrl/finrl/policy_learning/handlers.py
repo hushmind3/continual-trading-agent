@@ -31,6 +31,17 @@ from api_context import zipfile
 
 router=APIRouter(default_response_class=FiniteJSONResponse)
 
+@router.get('/api/price/history')
+def historical_price_status():
+    from stockrl.finrl.price_data.operations import kiwoom_collection_state
+    return kiwoom_collection_state()
+
+@router.post('/api/price/history')
+def prepare_historical_prices():
+    from stockrl.finrl.price_data.operations import start_kiwoom_collection
+    try:return start_kiwoom_collection()
+    except (ValueError,RuntimeError) as error:raise HTTPException(400,str(error))
+
 class RunRequest(BaseModel):
     currency: Literal["USD", "KRW"] = "USD"
     resume: bool = False

@@ -5,6 +5,5 @@ import type {BackendAction} from '../../../data/menu_types';
 const feature=lazy(()=>import('../management/all_backend_features/AllBackendFeatures').then(m=>({default:m.AllBackendFeatures})));
 export const menus:MenuItem[]=[
  {hash:'finance/moe',name:'MoE',group:'프로젝트 확장',icon:Boxes,component:lazy(()=>import('./moe/Moe').then(m=>({default:m.Moe}))),required:['experts','job','library']},
- {hash:'finance/project_modules',name:'프로젝트 모듈',group:'프로젝트 확장',icon:Workflow,component:lazy(()=>import('./project_modules/ProjectModules').then(m=>({default:m.ProjectModules}))),required:['job']},
 ];
 export function registeredMenus(actions:BackendAction[]){return [...menus,...actionMenus(actions,'extensions','프로젝트 확장',feature,Workflow)];}

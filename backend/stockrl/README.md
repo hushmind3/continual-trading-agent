@@ -4,7 +4,7 @@
 
 - [trading/](trading/README.md): 운영 제어·가상계좌.
 - [finrl/](finrl/README.md): 정책 학습·FinRL 도구.
-- [extensions/](extensions/README.md): MoE·모듈.
+- [extensions/](extensions/README.md): MoE.
 - [management/](management/README.md): 연결·설정·진단·기능 조회.
 
 이 네 폴더는 금융 내부 분류입니다. REA는 독립 ../rea/에 있으며 금융 대메뉴에 포함하지 않습니다.

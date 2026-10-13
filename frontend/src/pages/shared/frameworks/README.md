@@ -1,6 +1,6 @@
 # 공통 모듈·API 화면
 
-- FrameworkWorkspace/ModuleCatalog: FinRL 도구 및 프로젝트 모듈 목록.
+- FrameworkWorkspace/ModuleCatalog: 모듈 · 도구의 FinRL·프로젝트 통합 목록 및 백엔드 기능 전체의 공통 목록.
 - NativeModuleRunner/FrameworkResult: 원본 공개 함수의 입력·실행·결과.
 - FeatureWorkspace: 백엔드 등록 메뉴·API 조회와 공통 원본 모듈 실행.
 - FrameworkProviders: 연결 설정에서 사용하는 공급원 인증 UI.

@@ -1,25 +1,17 @@
 """Import large-menu managers; expose their existing backend connections."""
-from stockrl.trading.trading_menu_manager import GROUP as TRADING
-from stockrl.trading.trading_menu_manager import ROUTERS as TRADING_ROUTERS
-from stockrl.finrl.finrl_menu_manager import GROUP as FINRL
-from stockrl.finrl.finrl_menu_manager import ROUTERS as FINRL_ROUTERS
-from stockrl.extensions.extensions_menu_manager import GROUP as EXTENSIONS
-from stockrl.extensions.extensions_menu_manager import ROUTERS as EXTENSIONS_ROUTERS
-from stockrl.management.management_menu_manager import GROUP as MANAGEMENT
-from stockrl.management.management_menu_manager import ROUTERS as MANAGEMENT_ROUTERS
-from rea.rea_menu_manager import GROUP as REA
-from rea.rea_menu_manager import ROUTERS as REA_ROUTERS
+from stockrl.finance_menu_manager import GROUP as FINANCE,ROUTERS as FINANCE_ROUTERS
+from rea.rea_menu_manager import GROUP as REA,ROUTERS as REA_ROUTERS
 
-GROUPS=(TRADING,FINRL,REA,EXTENSIONS,MANAGEMENT)
+GROUPS=(FINANCE,REA)
 _routes_by_menu={}
 
 def owner(operation):
-    if operation=='framework/native_call':return 'management','backend-browser'
+    if operation=='framework/native_call':return 'finance','backend-browser'
     for group in GROUPS:
         for menu in group['menus']:
             if any(operation==pattern or pattern.endswith('/') and operation.startswith(pattern) for pattern in menu['operations']):
                 return group['id'],menu['id']
-    return 'management','system'
+    return 'finance','system'
 
 def bind(routes):
     """Bind existing handlers once without moving state/model ownership."""
@@ -95,8 +87,8 @@ def catalog(routes):
 
 
 def register_api(api,app):
-    """Collect small-menu routers through the five large-menu coordinators."""
-    for routers in (TRADING_ROUTERS,FINRL_ROUTERS,REA_ROUTERS,EXTENSIONS_ROUTERS,MANAGEMENT_ROUTERS):
+    """Collect small-menu routers through the finance and REA coordinators."""
+    for routers in (FINANCE_ROUTERS,REA_ROUTERS):
         for router in routers:
             api.include_router(router)
             app.router.on_startup.extend(router.on_startup)

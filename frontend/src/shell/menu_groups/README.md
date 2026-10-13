@@ -1,3 +1,3 @@
 # 전체 메뉴 총괄
 
-menu_registry.ts는 pages/의 대메뉴 취합 파일 5개만 import합니다. menu_types.ts는 공통 메뉴 계약입니다. 개별 화면은 대메뉴 아래 작은 메뉴 폴더에서 구현합니다.
+menu_registry.ts는 pages/finance/finance_menu_manager.ts와 pages/rea/rea_menu_manager.ts만 import합니다. menu_types.ts는 공통 계약입니다. 금융 화면 9개와 REA 화면 2개를 등록하며 개별 화면의 기존 해시·작업명은 유지합니다.

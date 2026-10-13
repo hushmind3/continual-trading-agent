@@ -186,7 +186,7 @@ class IntegrityTests(unittest.TestCase):
   from menu_registry import GROUPS
   from stockrl.platform.framework_operations import ACTIONS
   self.assertEqual(set(ACTIONS),{'native_call'})
-  self.assertNotIn('finrl_trading',{group['id'] for group in GROUPS})
+  self.assertEqual([group['id'] for group in GROUPS],['finance','rea'])
  def test_rea_refuses_project_trash_inputs(self):
   from rea.analysis.operations import validate_arguments
   with self.assertRaisesRegex(ValueError,'휴지통'):

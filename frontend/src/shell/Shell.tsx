@@ -21,13 +21,13 @@ function destination(hash:string,items=navigation){
 }
 export function route(hash:string){const name=hash.replace(/^#/,'').split('?')[0];return name.startsWith('feature-')||name==='backend-browser'?name:destination(hash).hash;}
 function errorSection(name:string){
- if(name==='rea'||name==='view:rea'||name.includes('rea.'))return {group:'REA',target:'rea'};
- if(name.includes('FinRL-X:')||name.includes('stockrl.finrl_trading.'))return {group:'연결·관리',target:'system'};
- if(name.includes('FinRL:')||name.includes('stockrl.finrl.')||['model','models_by_currency','checkpoints'].includes(name))return {group:'FinRL · 메인',target:'frameworks'};
- if(['experts','library','models'].includes(name)||name.startsWith('champion:')||name==='view:champions'||name.includes('platform.expert_')||name.includes('platform.assets')||name.includes('platform.sac_champion'))return {group:'프로젝트 확장',target:'moe'};
- if(name==='data')return {group:'거래 운영',target:'control'};
- if(name==='operations'||name.includes('stockrl.trading.control.'))return {group:'거래 운영',target:'control'};
- return {group:'연결 · 관리',target:'system'};
+ if(name==='rea'||name==='view:rea'||name.includes('rea.'))return {group:'REA 역공학',target:'rea'};
+ if(name.includes('FinRL-X:')||name.includes('stockrl.finrl_trading.'))return {group:'금융',target:'system'};
+ if(name.includes('FinRL:')||name.includes('stockrl.finrl.')||['model','models_by_currency','checkpoints'].includes(name))return {group:'금융',target:'frameworks'};
+ if(['experts','library','models'].includes(name)||name.startsWith('champion:')||name==='view:champions'||name.includes('platform.expert_')||name.includes('platform.assets')||name.includes('platform.sac_champion'))return {group:'금융',target:'moe'};
+ if(name==='data')return {group:'금융',target:'control'};
+ if(name==='operations'||name.includes('stockrl.trading.control.'))return {group:'금융',target:'control'};
+ return {group:'금융',target:'system'};
 }
 export function Page({active}:{active:string}){
  const {state}=useOperations(),items=useNavigation(),page=destination(location.hash,items),Component=page.component;
@@ -38,7 +38,7 @@ export function Shell({active,children}:{active:string;children:ReactNode}){
  const {state,error,refresh}=useOperations(),[alerts,setAlerts]=useState(false),[compact,setCompact]=useState(false),[closedGroups,setClosedGroups]=useState(new Set<string>()),close=useCallback(()=>setAlerts(false),[]);
  const issues=state?.experts?.items.filter(item=>item.active&&item.inference?.reason)||[],items=useNavigation(),page=items.find(item=>item.hash===active);
  const moduleErrors=Object.entries(state?.module_errors??{}),groupErrors=(group:string)=>moduleErrors.filter(([name])=>errorSection(name).group===group).length;
- const visibleErrors=active==='system'?moduleErrors:moduleErrors.filter(([name])=>errorSection(name).group===page?.group);
+ const visibleErrors=active==='system'?moduleErrors:moduleErrors.filter(([name])=>errorSection(name).target===active);
  return <div className="min-h-dvh bg-[#f4f6fa] text-slate-900">
  <header className="sticky top-0 z-30 border-b border-slate-200 bg-white"><div className="flex min-h-12 items-center justify-between gap-2 px-3 py-2"><div className="flex items-center gap-2"><button aria-label={compact?'메뉴 펼치기':'메뉴 접기'} aria-expanded={!compact} className="rounded p-1.5 text-slate-500" onClick={()=>setCompact(!compact)}>{compact?<Menu size={17}/>:<PanelLeftClose size={17}/>}</button><a href="#control" className="flex items-center gap-2 text-sm font-bold"><Activity size={17} className="text-blue-600"/>프로젝트 플랫폼</a></div><div className="flex items-center gap-2"><Status tone={error?'bad':state?'good':'idle'}>{error?'연결 오류':state?'서버 연결':'연결 중'}</Status>{state?.job?.running&&<a href="#system" className="text-xs text-blue-600">작업 실행 중</a>}<button aria-label="새로고침" onClick={()=>void refresh()} className="p-1.5 text-slate-500"><RefreshCw size={15}/></button><button aria-label={'알림 '+issues.length+'개'} onClick={()=>setAlerts(true)} className="p-1.5 text-slate-500"><Bell size={15}/></button></div></div></header>
  <div className={'workspace-layout '+(compact?'workspace-layout-compact':'')}>

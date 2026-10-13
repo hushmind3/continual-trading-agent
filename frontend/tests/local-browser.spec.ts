@@ -9,6 +9,7 @@ test('all registered local screens render and continue receiving state', async (
   await page.goto('/', {waitUntil: 'networkidle'});
   await expect(page.getByText('서버 연결', {exact: true})).toBeVisible();
   await expect(page.locator('aside a[href="#rea"]')).toBeVisible();
+  expect((await page.locator('aside details > summary').allTextContents()).map(text=>text.replace(/\s*오류\s*\d+\s*$/,'').trim())).toEqual(['금융','REA 역공학']);
   const links = await page.locator('aside a').evaluateAll(elements => elements
     .map(element => ({href: element.getAttribute('href') || '', name: element.textContent || ''}))
     .filter(element => element.href.startsWith('#')));

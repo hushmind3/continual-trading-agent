@@ -3,7 +3,6 @@ from .. import finrlx
 
 PROVIDER_FIELDS={
     'FMP':['FMP_API_KEY'],
-    'Alpaca':['APCA_API_KEY','APCA_API_SECRET','APCA_BASE_URL'],
     'WRDS':['WRDS_USERNAME','WRDS_PASSWORD'],
 }
 
@@ -16,7 +15,7 @@ def provider_environment():
 def provider_status():
     import os
     saved=provider_environment();config=finrlx('config.settings').get_config()
-    existing={'FMP':bool(config.fmp.api_key),'Alpaca':bool(config.alpaca.api_key and config.alpaca.api_secret),
+    existing={'FMP':bool(config.fmp.api_key),
               'WRDS':bool(config.wrds.username and config.wrds.password)}
     return {'items':[{'name':name,'fields':keys,'configured':existing[name] or all(saved.get(key) or os.environ.get(key) for key in keys if not key.endswith('BASE_URL')),
         'status':'설정 여부만 확인 · 실제 인증·수신 미확인'} for name,keys in PROVIDER_FIELDS.items()]}

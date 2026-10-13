@@ -1,8 +1,6 @@
-"""Reconnectable public-market-data poller for the global CSV paper agent.
+"""Public Yahoo market data with the existing Kiwoom broker stream.
 
-Yahoo's chart endpoint is an unofficial, best-effort 1m OHLCV source. Kraken's
-public OHLC endpoint supplies exchange candles without an API key. Providers
-are polled independently so one failing market never stops the others.
+Exchange connections other than Kiwoom are not registered.
 """
 from __future__ import annotations
 
@@ -90,12 +88,9 @@ class YahooChartAdapter(MarketDataProviderAdapter):
     def fetch(self,instrument): return self.collector._fetch_yahoo(instrument)
 
 
-class KrakenOHLCAdapter(MarketDataProviderAdapter):
-    def fetch(self,instrument): return self.collector._fetch_kraken(instrument)
 
 
 register_market_data_provider("yahoo",YahooChartAdapter)
-register_market_data_provider("kraken",KrakenOHLCAdapter)
 
 
 def _utc_stamp(epoch: int | float) -> str:
@@ -212,22 +207,6 @@ class LiveMarketCollector:
             raise RuntimeError("Yahoo chart contained no usable OHLCV bars")
         return rows
 
-    def _fetch_kraken(self, item: dict) -> list[dict]:
-        interval = int(item.get("interval", 1))
-        result = self._get("https://api.kraken.com/0/public/OHLC", {"pair": item["provider_symbol"], "interval": interval})
-        if result.get("error"):
-            raise RuntimeError("Kraken: " + "; ".join(result["error"]))
-        key = next((k for k in result.get("result", {}) if k != "last"), None)
-        if key is None:
-            raise RuntimeError("Kraken returned no candle series")
-        rows = []
-        bar_seconds=self._bar_seconds(interval); now=time.time()
-        for candle in result["result"][key]:
-            stamp, op, hi, lo, close, _vwap, volume, trades = candle[:8]
-            if float(stamp)+bar_seconds>now: continue
-            rows.append(self._row(item, stamp, float(op), float(hi), float(lo), float(close), float(volume),
-                                  trade_count=float(trades)))
-        return rows
 
     @staticmethod
     def _row(item, stamp, op, hi, lo, close, volume, **extras):
@@ -317,7 +296,7 @@ class LiveMarketCollector:
             if len(self.daily_futures)>=5:
                 break
             name=str(item["symbol"]);provider=str(item.get("provider","yahoo")).lower()
-            if name in self.daily_futures or provider not in ("yahoo","kraken") or now<self.daily_next_due.get(name,0.0):
+            if name in self.daily_futures or provider != "yahoo" or now<self.daily_next_due.get(name,0.0):
                 continue
             daily_item=dict(item)
             if provider=="yahoo":

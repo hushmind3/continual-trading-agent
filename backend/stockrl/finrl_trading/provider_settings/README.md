@@ -5,3 +5,5 @@
 - 필수 의존성: 상위 finrlx → 공식 config.settings; management/connection_settings/provider_credentials의 기존 인증 저장소.
 - 프론트: 기존 금융 연결·설정 화면을 사용하며 별도 메뉴를 만들지 않습니다.
 - 상태: import 경로 재배치 완료. 실제 공급원 인증·시세 수신 검사는 미실행입니다.
+
+거래소·브로커 인증은 키움만 등록합니다. Alpaca 연결 설정·직접 매매 도구와 Kraken 수집 코드를 제거했습니다. Yahoo·FMP·WRDS 시세·데이터 공급과 기존 인증 저장값·가격 자료는 유지합니다. FinRL 원본 초기화가 Alpaca SDK를 import하므로 내부 패키지 의존성과 키움 격리 환경은 유지합니다.

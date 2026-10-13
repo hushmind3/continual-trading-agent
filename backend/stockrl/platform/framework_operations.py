@@ -17,6 +17,7 @@ from ..finrl_trading.price_data.operations import prices
 from ..finrl_trading.provider_settings.operations import provider_environment
 from ..state_io import atomic_json,read_json
 
+REMOVED_BROKER_TOOLS={'FinRL:trade','FinRL:meta.env_stock_trading.env_stock_papertrading','FinRL-X:trading.alpaca_manager'}
 ACTIONS={"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'env_kwargs', 'steps', 'argv', 'symbols', 'source'])}
 
 
@@ -45,6 +46,7 @@ def serialize(value):
 
 
 def validate_native_call(parameters):
+    if parameters in REMOVED_BROKER_TOOLS:raise ValueError('키움 외 브로커 매매 도구는 제거했습니다. 키움 연결·설정을 사용하세요.')
     target=parameters.get('module');name=parameters.get('callable','')
     item=next((item for item in source_catalog() if item['id']==target),None)
     if not item or item['framework'] not in ('FinRL-X','FinRL'):raise ValueError('공식 소스에 존재하는 모듈을 선택하세요.')
@@ -392,7 +394,7 @@ def catalog():
         item['last_error']=failed.get(item['id'])
         item['dependencies']=edges[item['id']];item['actions']=[key for key,row in ACTIONS.items() if row[2]==item['id']]
         public=bool([name for name in item['functions'] if all(not part.startswith('_') for part in name.split('.'))])
-        native=public and item['framework'] in ('FinRL-X','FinRL') and not item['path'].startswith('FinRL-X/web/')
+        native=public and item['framework'] in ('FinRL-X','FinRL') and not item['path'].startswith('FinRL-X/web/') and item['id'] not in REMOVED_BROKER_TOOLS
         item['referenced']=item['id'] in connected
         item['backend_connected']=item['referenced']
         item['frontend']=bool(item['actions']) or native

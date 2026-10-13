@@ -98,7 +98,7 @@ GGUF 실행은 설치된 `llama-server`를 사용한다. 컨텍스트 길이, CP
 
 ## 실행 의존성
 
-운영/키움 요구와 재현 버전은 `scripts/requirements/operations.txt`, `operations.lock.txt`, `kiwoom.txt`, `kiwoom.lock.txt`가 관리합니다. `.venv`는 websockets 10.4, `.venv-kiwoom`은 SDK 1.0.2와 websockets 15.0.1을 사용합니다. 주 FinRL/NumPy/Pandas 버전을 SDK 요구에 맞춰 바꾸지 않습니다. `teachers`의 stockstats도 FinRL 요구와 같은 0.5.4입니다. Frozen FinCast의 실제 실행 의존성 beartype 0.22.9/einx 0.4.3/colt5-attention 0.11.2를 포함합니다.
+운영/키움 요구와 재현 버전은 `development/scripts/requirements/operations.txt`, `operations.lock.txt`, `kiwoom.txt`, `kiwoom.lock.txt`가 관리합니다. `.venv`는 websockets 10.4, `.venv/kiwoom`은 SDK 1.0.2와 websockets 15.0.1을 사용합니다. 주 FinRL/NumPy/Pandas 버전을 SDK 요구에 맞춰 바꾸지 않습니다. `teachers`의 stockstats도 FinRL 요구와 같은 0.5.4입니다. Frozen FinCast의 실제 실행 의존성 beartype 0.22.9/einx 0.4.3/colt5-attention 0.11.2를 포함합니다.
 
 원본 주식 Expert는 전체 학습 종목의 동일 과거 거래일 가격·원본 지표를 요구합니다. 일부 종목만 갱신된 최근 일봉 대신 관측 시점 이전의 가장 최근 완전한 공통 거래일을 사용합니다. 일봉을 만들거나 종목을 제외하지 않습니다.
 

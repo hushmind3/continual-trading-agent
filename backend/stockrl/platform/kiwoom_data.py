@@ -200,7 +200,7 @@ class BrokerStreams:
         elif kind=='symbols':self.collector.broker_symbols.update(value)
 
     def start(self):
-        python=ROOT/'.venv-kiwoom/Scripts/python.exe'
+        python=ROOT/'.venv/kiwoom/Scripts/python.exe'
         if not python.is_file():raise RuntimeError('키움 SDK 실행 환경이 없습니다. 설치.cmd로 준비하세요.')
         env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_KIWOOM_WORKER='1')
         log=self.collector.runtime_dir/'kiwoom-sdk.stderr.log';log.parent.mkdir(parents=True,exist_ok=True)

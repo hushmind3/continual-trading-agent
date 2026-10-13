@@ -1,0 +1,72 @@
+{
+  "api_responded": true,
+  "catalog_error": "",
+  "catalog_count": 189,
+  "still_present_removed_files": [],
+  "old_root_dirs": [],
+  "kiwoom_python_present": true,
+  "db_bytes": 84537344,
+  "sample_usage": [
+    {
+      "path": "stockrl/finrl_trading/price_data/operations.py",
+      "menus": [
+        "MoE",
+        "모듈 · 도구",
+        "백엔드 기능 전체",
+        "연결 · 설정",
+        "운영 제어",
+        "정책 학습",
+        "진단 · 로그 · 코드 적용"
+      ],
+      "files": [
+        "stockrl/finrl/policy_learning/handlers.py",
+        "stockrl/finrl/policy_learning/official_cli.py",
+        "stockrl/platform/expert_inference.py",
+        "stockrl/platform/framework_operations.py",
+        "stockrl/platform/library_operations.py",
+        "stockrl/trading/control/operations_runtime.py"
+      ]
+    },
+    {
+      "path": "FinRL/agents/stablebaselines3/models.py",
+      "menus": [
+        "MoE",
+        "모듈 · 도구",
+        "백엔드 기능 전체",
+        "연결 · 설정",
+        "운영 제어",
+        "정책 학습",
+        "진단 · 로그 · 코드 적용"
+      ],
+      "files": [
+        "stockrl/finrl/framework.py",
+        "stockrl/platform/sac_champion.py",
+        "stockrl/platform/system_operations.py",
+        "Platform/api_context.py",
+        "FinRL-X/strategies/fundamental_portfolio_drl.py",
+        "FinRL-X/strategies/rl_model.py",
+        "FinRL/test.py",
+        "FinRL/train.py"
+      ]
+    },
+    {
+      "path": "FinRL/meta/env_portfolio_optimization/env_portfolio_optimization.py",
+      "menus": [
+        "MoE",
+        "모듈 · 도구",
+        "백엔드 기능 전체",
+        "연결 · 설정",
+        "운영 제어",
+        "정책 학습",
+        "진단 · 로그 · 코드 적용"
+      ],
+      "files": [
+        "stockrl/finrl/framework.py",
+        "stockrl/finrl/policy_learning/handlers.py",
+        "stockrl/platform/framework_operations.py"
+      ]
+    }
+  ],
+  "module_errors": [],
+  "job_running": false
+}

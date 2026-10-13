@@ -362,6 +362,23 @@ def catalog():
     while queue:
         for target in edges.get(queue.pop(),[]):
             if target not in connected:connected.add(target);queue.append(target)
+    from stockrl.submenu_manager import MENUS
+    owner_seeds={menu['title']:{item['id'] for item in items
+        if item['id'].startswith('stockrl:'+menu['manager'].removeprefix('stockrl.').removesuffix('.menu')+'.')}
+        for menu in MENUS}
+    for menu in MENUS:
+        if 'framework' in menu.get('views',[]):owner_seeds[menu['title']].add('stockrl:platform.framework_operations')
+    owners={key:set() for key in by_id}
+    for title,seeds in owner_seeds.items():
+        seen=set(seeds);pending=list(seeds)
+        while pending:
+            current=pending.pop()
+            owners[current].add(title)
+            # api_context is shared transport infrastructure; its global imports
+            # do not establish that a particular menu calls every exported feature.
+            if current=='Platform:api_context':continue
+            for target in edges.get(current,[]):
+                if target not in seen:seen.add(target);pending.append(target)
     verified={};failed={}
     for result_file in sorted((ROOT/'runtime/official/framework-jobs').glob('*/result.json'),key=lambda path:path.stat().st_mtime_ns):
         record=read_json(result_file)
@@ -380,6 +397,8 @@ def catalog():
         item['backend_connected']=item['referenced']
         item['frontend']=bool(item['actions']) or native
         item['referenced_by']=sorted(parent for parent,deps in edges.items() if parent in connected and item['id'] in deps)
+        item['usage_menus']=sorted(owners[item['id']])
+        item['consumer_files']=[by_id[parent]['path'] for parent,deps in edges.items() if parent!=item['id'] and item['id'] in deps]
         item['entry_point']=item['id'] in roots
         item['native_api']='/api' if native else None
         item['native_operation']='framework/native_call' if native else None
@@ -396,9 +415,12 @@ def catalog():
         item['execution_status']='최근 실행 실패' if item['last_error'] else '실행 성공 기록 있음' if item['verified_functions'] else '실행 기록 없음'
         item['authentication_status']='인증 입력 이름 탐지됨 · 인증 성공 미확인' if item.get('credential_inputs') else '인증 입력 이름 미탐지 · 인증 요구 여부 미확인'
         if item.get('source_error'):item.update(status='소스 해석 실패',reason='소스를 해석하지 못해 참조·실행 계약을 판단할 수 없습니다: '+item['source_error'])
-        elif item['referenced']:item.update(status='운영 코드 참조',reason='서버·CLI·작업 진입점에서 import 경로가 이어집니다. 참조하는 모듈을 아래에 표시하며 함수 실행 여부는 별도입니다.')
-        elif native:item.update(status='수동 실행 전용',reason='운영 코드의 참조는 없지만 모듈 · 도구에서 사용자가 원본 함수를 직접 선택해 실행할 수 있습니다. 자동 운영에는 연결되지 않았습니다.')
-        else:item.update(status='참조 경로 없음',reason='운영 진입점에서 이어지는 import와 수동 실행 등록이 없습니다. 삭제 전 검사·설치 스크립트 및 동적 사용처를 추가 확인해야 합니다.')
+        elif item['referenced']:item.update(status='운영 기능의 의존성',reason='현재 플랫폼 기능이 이 파일을 직접 또는 내부 의존성으로 불러옵니다. 아래에 필요한 메뉴와 불러오는 파일을 표시합니다. 함수 실행 기록은 별도입니다.')
+        elif native:
+            item.update(status='직접 실행 도구',reason='사용자가 원본 함수 실행에서 선택하는 도구입니다. 자동 운영에서 실행하는 알고리즘이라는 뜻은 아닙니다.')
+            if not item['usage_menus']:item['usage_menus']=['모듈 · 도구' if item['framework']=='FinRL' else '백엔드 기능 전체']
+        elif item['consumer_files']:item.update(status='라이브러리 내부 의존성',reason='다른 설치 모듈이 불러오는 내부 파일입니다. 불러오는 파일 목록을 확인할 수 있습니다.')
+        else:item.update(status='사용처 없음',reason='플랫폼 운영 및 다른 목록 모듈에서 불러오는 경로가 없고 직접 실행 도구도 아닙니다.')
         item['usage']=item['status']
-    statuses=('운영 코드 참조','수동 실행 전용','참조 경로 없음','소스 해석 실패')
+    statuses=('운영 기능의 의존성','직접 실행 도구','라이브러리 내부 의존성','사용처 없음','소스 해석 실패')
     return {'items':items,'actions':action_list(),'counts':{status:sum(item['status']==status for item in items) for status in statuses}}

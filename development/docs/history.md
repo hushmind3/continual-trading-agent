@@ -68,8 +68,8 @@ configs/experts.json            Expert 이름·역할·파일 참조·입력 계
 configs/instruments.json        현재 종목·시장·통화·시세 공급원 목록
 configs/local/                 인증 공급원·운영 설정 (Git 제외)
 requirements/operations.txt     Python 의존성
-scripts/start_server.py         통합 서버 실행·소유권 확인
-scripts/install_windows.py      독립 주 환경·키움 SDK 환경 설치·정합성 검사
+development/scripts/start_server.py         통합 서버 실행·소유권 확인
+development/scripts/install_windows.py      독립 주 환경·키움 SDK 환경 설치·정합성 검사
 서버켜기.cmd                   8766 운영 진입점
 FinRL-X/                       공식 FinRL-Trading Git 서브모듈, 수정하지 않음
 data/                          실제 가격 DB, Git 제외
@@ -163,7 +163,7 @@ SAC 자동 판단은 `OperationsRuntime.sac_decision` → 현재 원본 환경/E
 - GitHub: `git clone --recurse-submodules https://github.com/hushmind3/continual-trading-agent.git`.
 - Python 의존성: [requirements/operations.txt](../scripts/requirements/operations.txt). 기존 설치 스크립트는 빠진 배포판만 설치하며 기존 패키지를 업그레이드하지 않습니다. FinRL·FinRL-Trading Git revision과 SB3·Torch 명세는 유지합니다.
 - React 의존성: `frontend/package-lock.json`. 새 환경은 `frontend`에서 `npm ci`로 준비합니다.
-- 운영: `서버켜기.cmd` → `scripts/start_server.py` → 8766 FastAPI 하나. 런처는 Git 추적 소스/미추적 소스의 내용 해시와 마지막 적용 기록을 비교합니다. 바뀐 React만 타입 검사·빌드하고, 백엔드 변경/서버 부재일 때만 소유권을 확인해 서버를 갱신합니다. 이후 CMD 기본 실행은 같은 전체 시작 API를 호출합니다.
+- 운영: `서버켜기.cmd` → `development/scripts/start_server.py` → 8766 FastAPI 하나. 런처는 Git 추적 소스/미추적 소스의 내용 해시와 마지막 적용 기록을 비교합니다. 바뀐 React만 타입 검사·빌드하고, 백엔드 변경/서버 부재일 때만 소유권을 확인해 서버를 갱신합니다. 이후 CMD 기본 실행은 같은 전체 시작 API를 호출합니다.
 - 개발: `frontend/start.cmd` 또는 `npm run dev` → 5173. 5173은 운영 런처에서 실행하지 않습니다.
 
 ```powershell
@@ -193,7 +193,7 @@ MoE 화면은 등록 모델의 실제 버전 선택과 SAC Champion 조립에 �
 
 | 동작 | API / 실제 실행 경로 |
 | --- | --- |
-| 프론트/백엔드 독립 적용 | POST `/api/system/apply` → `start_apply` → 별도 일회성 `scripts/start_server.py --apply-only` |
+| 프론트/백엔드 독립 적용 | POST `/api/system/apply` → `start_apply` → 별도 일회성 `development/scripts/start_server.py --apply-only` |
 | 진행 상태 | GET `/api`의 `state` 요청의 automation 항목 → `apply.json` + `SystemOperations.snapshot`; 재시작 전후 기록 유지 |
 | 전체 연결 점검 | GET `/api/system/check` → 기존 설정·정책 메타데이터·Registry·원장·공급원·프로세스 조회 |
 | 전체 시작 | POST `/api/system/start` → `SystemOperations.start/run`; CMD도 같은 API 호출 |
@@ -234,7 +234,7 @@ FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합
 
 연결 메뉴의 FMP·Alpaca·WRDS 값은 기존 OS keyring에 저장하고 공식 작업의 원본 환경변수로 전달합니다. 저장 여부와 인증·시세 성공은 구분합니다. 기타 공급원은 원본 생성자·외부 설정 계약을 요구합니다. Expert 최적화·변환·허용 기준은 기존 `library` API와 연결했고 모델 폴더 목록은 통합 상태의 models 항목을 사용합니다.
 
-이미 빌드한 화면을 적용하고 추가 검증을 생략하도록 기존 `scripts/start_server.py.main`에 `skip_build`, `skip_checks` 선택 인자를 추가했습니다. 기존 기본 실행 동작은 동일합니다.
+이미 빌드한 화면을 적용하고 추가 검증을 생략하도록 기존 `development/scripts/start_server.py.main`에 `skip_build`, `skip_checks` 선택 인자를 추가했습니다. 기존 기본 실행 동작은 동일합니다.
 
 
 ## 백엔드 배치와 소유권
@@ -253,7 +253,7 @@ FinRL 알고리즘 선택은 주 학습 화면과 기존 학습 API에 통합합
 
 학습 전 검사는 실제 학습·추론이 읽는 동일 가격 모듈로 rolling 구간의 종목별 가격 행렬을 확인합니다. 누락 가격을 만들거나 종목을 자동 제외하지 않습니다. 추론은 선택 종목의 최신 바가 모두 도착할 때까지 대기하고 통화별 처리 시각으로 중복 판단을 막습니다.
 
-프론트만 적용할 때는 기존 scripts/start_server.py --apply-only --frontend-only를 사용합니다. 단일 API의 system/apply 명령은 target이 frontend(기본값), backend, all 중 하나입니다. 프론트 적용 시 백엔드 변경이 남아 있어도 서버를 재시작하지 않으며, 통합 상태의 frontend_revision 변경을 브라우저가 반영합니다.
+프론트만 적용할 때는 기존 development/scripts/start_server.py --apply-only --frontend-only를 사용합니다. 단일 API의 system/apply 명령은 target이 frontend(기본값), backend, all 중 하나입니다. 프론트 적용 시 백엔드 변경이 남아 있어도 서버를 재시작하지 않으며, 통합 상태의 frontend_revision 변경을 브라우저가 반영합니다.
 
 ## 데이터·계좌 정합성과 CI 검사
 
@@ -271,9 +271,9 @@ CI 워크플로가 main에 설치되기 전에는 수신기가 waiting_for_main_
 
 ## 재현 환경과 자동검증
 
-주 `.venv`와 키움 `.venv-kiwoom`은 시스템 패키지를 공유하지 않습니다. 설치 스크립트는 운영/키움 명세와 lock 제약을 적용하고 양쪽 `pip check`를 실행합니다. 주 Torch 2.14.0+cu132·torchvision 0.29.1+cu132·SB3 2.9.0과 FinRL 고정 커밋을 유지합니다. 키움 SDK는 별도 프로세스의 JSON 이벤트로 수집기에 연결해 Alpaca/키움 websockets 버전 충돌을 해소합니다. FinCast 실행에 필요한 beartype/einx/colt5-attention도 명시합니다. 미사용 이전 환경은 사용자 지시에 따라 `휴지통/.venv-previous-20261012-232811/`로 이동했습니다. 휴지통은 실행 경로에 연결하지 않습니다.
+주 `.venv`와 키움 `.venv/kiwoom`은 시스템 패키지를 공유하지 않습니다. 설치 스크립트는 운영/키움 명세와 lock 제약을 적용하고 양쪽 `pip check`를 실행합니다. 주 Torch 2.14.0+cu132·torchvision 0.29.1+cu132·SB3 2.9.0과 FinRL 고정 커밋을 유지합니다. 키움 SDK는 별도 프로세스의 JSON 이벤트로 수집기에 연결해 Alpaca/키움 websockets 버전 충돌을 해소합니다. FinCast 실행에 필요한 beartype/einx/colt5-attention도 명시합니다. 미사용 이전 환경은 사용자 지시에 따라 `휴지통/.venv-previous-20261012-232811/`로 이동했습니다. 휴지통은 실행 경로에 연결하지 않습니다.
 
-Python 3.13에서 `python -m unittest discover -s tests`는 정합성 21개와 실제 FastAPI 전송 3개를 검사합니다. React 타입·빌드와 전송 테스트 4개는 CI에서도 실행합니다. 로컬 서버의 실제 현재 등록된 화면 검사는 `frontend`에서 `npm run test:browser`로 실행합니다. GPU 모델·외부 인증은 이 최소 CI의 범위에 포함하지 않습니다. 자세한 실행 근거와 제한은 기존 [검토 보고서](project_review.md)를 확인하세요.
+Python 3.13에서 `python -m unittest discover -s development/tests`는 정합성 21개와 실제 FastAPI 전송 3개를 검사합니다. React 타입·빌드와 전송 테스트 4개는 CI에서도 실행합니다. 로컬 서버의 실제 현재 등록된 화면 검사는 `frontend`에서 `npm run test:browser`로 실행합니다. GPU 모델·외부 인증은 이 최소 CI의 범위에 포함하지 않습니다. 자세한 실행 근거와 제한은 기존 [검토 보고서](project_review.md)를 확인하세요.
 
 2026-10-13 실행 검증: 신규 SAC의 11개 Expert 모두 CUDA 추론, 105단계 진단 학습·업데이트 5회, 평가 251개 거래일과 공식 가치·지표 저장을 완료했습니다. 현재 USD 선택은 추가 작업 전 `champions/sac_champion_003/sac.zip`으로 복원했으며 구형 모델·Replay와 이전 선택 경로는 보존합니다. 원본 BacktestEngine의 가중치 이력·거래 DataFrame은 비어 있으므로 해당 표를 체결 내역으로 취급하지 않습니다.
 

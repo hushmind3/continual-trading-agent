@@ -10,4 +10,6 @@
 
 실제 모듈 목록·원본 함수 입력·실행·결과 화면은 모두 이 작은 메뉴 폴더에 있습니다: FrameworkWorkspace.tsx, NativeModuleRunner.tsx, NativeParameterFields.tsx, FrameworkResult.tsx. 공급원 설정 화면은 management/connection_settings/FrameworkProviders.tsx입니다. 금융 밖 shared/frameworks/ 구현은 없습니다.
 
-분류: 운영 코드 참조 / 수동 실행 전용 / 참조 경로 없음 / 소스 해석 실패. import·함수 실행 기록·소스 인증 입력을 별도 표시하며, 참조하는 운영 모듈을 근거로 보여 줍니다. 실행 기록 없음·인증 입력 미탐지만으로 미사용·인증 불필요로 판단하지 않습니다. 사용 조사 결과는 docs/module_usage_audit.md, 사용자 조사 스크립트는 scripts/audit_module_usage.py입니다.
+분류: 운영 코드 참조 / 수동 실행 전용 / 참조 경로 없음 / 소스 해석 실패. import·함수 실행 기록·소스 인증 입력을 별도 표시하며, 참조하는 운영 모듈을 근거로 보여 줍니다. 실행 기록 없음·인증 입력 미탐지만으로 미사용·인증 불필요로 판단하지 않습니다. 사용 조사 결과는 development/docs/module_usage_audit.md, 사용자 조사 스크립트는 development/scripts/audit_module_usage.py입니다.
+
+현재 분류: 운영 기능의 의존성 / 직접 실행 도구 / 라이브러리 내부 의존성 / 사용처 없음 / 소스 해석 실패. 사용·의존 메뉴와 해당 파일을 불러오는 소스 파일을 화면에서 나열합니다. 미사용 FinRL 원본 44개와 완료된 일회성 스크립트 8개는 휴지통으로 이동했습니다. 상세 근거는 development/docs/root_cleanup.md입니다.

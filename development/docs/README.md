@@ -11,3 +11,5 @@
 [work_records/](work_records/README.md): 외부 Temp에서 옮긴 완료된 프로젝트 작업 기록. 플랫폼 실행에 연결하지 않습니다.
 
 [module_usage_audit.md](module_usage_audit.md): 모듈 사용·실행·인증 분류와 실제 정리 판단 근거.
+
+[root_cleanup.md](root_cleanup.md): 루트 통합·미사용 소스 44개 제거·환경 충돌·가격 DB 유지 근거.

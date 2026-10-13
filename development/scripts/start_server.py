@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.request import Request,urlopen
 from urllib.error import HTTPError
 import psutil
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 FRONTEND=ROOT/'frontend';RUNTIME=ROOT/'runtime/official';PORT=8766
 sys.path.insert(0,str(ROOT/'backend'))
 from stockrl.state_io import read_json,atomic_json
@@ -94,8 +94,8 @@ def sources():
             for target in ('frontend','backend'):groups[target][name]=hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
             continue
         if name.startswith('frontend/src/') or name in ('frontend/index.html','frontend/package.json','frontend/tsconfig.json','frontend/vite.config.ts'):group='frontend'
-        elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('backend/rea/project_explorer/saved_projects/') or name.startswith('scripts/requirements/'):group='backend'
-        elif name.startswith('scripts/') and name.endswith('.py') or name=='서버켜기.cmd':group='launcher'
+        elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('backend/rea/project_explorer/saved_projects/') or name.startswith('development/scripts/requirements/'):group='backend'
+        elif name.startswith('development/scripts/') and name.endswith('.py') or name=='서버켜기.cmd':group='launcher'
         elif name in ('configs/experts.json','configs/instruments.json'):group='configuration'
         else:continue
         path=ROOT/name

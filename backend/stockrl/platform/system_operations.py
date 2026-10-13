@@ -31,7 +31,7 @@ def start_apply(target='frontend'):
         env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1')
         RUNTIME.mkdir(parents=True,exist_ok=True)
         with (RUNTIME/'apply-launch.log').open('ab') as output:
-            args=[sys.executable,str(ROOT/'scripts/start_server.py'),'--apply-only','--skip-checks']
+            args=[sys.executable,str(ROOT/'development/scripts/start_server.py'),'--apply-only','--skip-checks']
             if target=='frontend':args.append('--frontend-only')
             elif target=='backend':args.append('--skip-build')
             child=subprocess.Popen(args,cwd=ROOT,env=env,

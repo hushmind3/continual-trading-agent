@@ -132,11 +132,11 @@ Date: 2026-10-13
 - backend/stockrl/__pycache__/submenu_manager.cpython-313.pyc — regenerated Python bytecode
 - backend/stockrl/__pycache__/__init__.cpython-313.pyc — regenerated Python bytecode
 - backend/stockrl/__pycache__/__main__.cpython-313.pyc — regenerated Python bytecode
-- scripts/__pycache__/codex_fix_receiver.cpython-313.pyc — bytecode left behind after source move
-- scripts/__pycache__/install_windows.cpython-313.pyc — regenerated Python bytecode
-- scripts/__pycache__/start_server.cpython-313.pyc — regenerated Python bytecode
-- tests/__pycache__/test_http_transport.cpython-313.pyc — regenerated Python bytecode
-- tests/__pycache__/test_state_integrity.cpython-313.pyc — regenerated Python bytecode
+- development/scripts/__pycache__/codex_fix_receiver.cpython-313.pyc — bytecode left behind after source move
+- development/scripts/__pycache__/install_windows.cpython-313.pyc — regenerated Python bytecode
+- development/scripts/__pycache__/start_server.cpython-313.pyc — regenerated Python bytecode
+- development/tests/__pycache__/test_http_transport.cpython-313.pyc — regenerated Python bytecode
+- development/tests/__pycache__/test_state_integrity.cpython-313.pyc — regenerated Python bytecode
 - frontend/dist/assets/Capability-CdXnDu2M.js — not referenced by current dist/index.html and its transitive assets
 - frontend/dist/assets/Capability-CtabMIsf.js — not referenced by current dist/index.html and its transitive assets
 - frontend/dist/assets/Capability-DasC6vY_.js — not referenced by current dist/index.html and its transitive assets

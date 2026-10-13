@@ -14,7 +14,7 @@
 
 | 영역 | 확인한 구현과 연결 |
 | --- | --- |
-| 진입점·실행 적용 | `서버켜기.cmd`, `scripts/start_server.py`, `scripts/install_windows.py`, `stockrl.__main__`, `official_cli`, `job_worker` |
+| 진입점·실행 적용 | `서버켜기.cmd`, `development/scripts/start_server.py`, `development/scripts/install_windows.py`, `stockrl.__main__`, `official_cli`, `job_worker` |
 | React 구조 | `App`, `Shell`, 큰 메뉴 관리자 5개, 화면·공통 UI·상태 Provider |
 | 단일 API | `web_api`, `menu_registry`, 메뉴별 백엔드 연결 파일, 입력 계약·응답 직렬화 |
 | 공통 관리 | `SystemOperations`의 상태·오류·파일 서명·작업·정책·Registry 캐시 |
@@ -105,7 +105,7 @@ Champion PT는 구성·정체성·체크포인트 참조를 가진 Spec이다. P
 
 ### F5. 설치 환경 요구 버전 불일치 — 수정·실행 확인
 
-기존 시스템 패키지 공유 환경의 충돌 15개를 확인하고 주 `.venv`와 키움 `.venv-kiwoom`을 독립 환경으로 분리했다. 주 FinRL의 Alpaca websockets<11과 키움 SDK websockets>=15/Pandas>=3 요구는 같은 프로세스 환경에서 양립하지 않는다. SDK를 별도 자식 프로세스로 실행해 기존 수집기에 JSON 이벤트로 연결했다. 인증은 OS keyring에서 읽으며 추가 HTTP 서버는 만들지 않았다.
+기존 시스템 패키지 공유 환경의 충돌 15개를 확인하고 주 `.venv`와 키움 `.venv/kiwoom`을 독립 환경으로 분리했다. 주 FinRL의 Alpaca websockets<11과 키움 SDK websockets>=15/Pandas>=3 요구는 같은 프로세스 환경에서 양립하지 않는다. SDK를 별도 자식 프로세스로 실행해 기존 수집기에 JSON 이벤트로 연결했다. 인증은 OS keyring에서 읽으며 추가 HTTP 서버는 만들지 않았다.
 
 주 Torch 2.14.0+cu132와 일치하는 torchvision 0.29.1+cu132를 사용하고 불필요한 시스템 torchaudio 의존을 제거했다. FinRL-Trading은 원래 고정된 submodule을 직접 사용하며 중복 설치 배포판을 제거했다. 공식 원본과 학습 기본값은 수정하지 않았다. FinCast 실제 추론에서 누락됐던 beartype/einx/colt5-attention과 원본 도구의 tzlocal을 명세에 반영했다.
 
@@ -163,7 +163,7 @@ PortfolioOptimizationEnv는 마지막 날짜에 도달한 다음 step에서 같�
 
 ## 7. 자동검증 재실행
 
-설치: `scripts/install_windows.py`. 백엔드: 주 환경 Python의 `-m unittest discover -s tests`, `-m compileall -q backend scripts`. 프론트: `npm run typecheck`, `npm run build`, `npm run test:api`. 실제 로컬 서버가 실행 중일 때 `npm run test:browser`를 사용한다. 브라우저 스크린샷·trace와 실행 모델/백테스트 산출물은 Git 제외 runtime·test-results·외부 모델 폴더에 보존한다.
+설치: `development/scripts/install_windows.py`. 백엔드: 주 환경 Python의 `-m unittest discover -s development/tests`, `-m compileall -q backend scripts`. 프론트: `npm run typecheck`, `npm run build`, `npm run test:api`. 실제 로컬 서버가 실행 중일 때 `npm run test:browser`를 사용한다. 브라우저 스크린샷·trace와 실행 모델/백테스트 산출물은 Git 제외 runtime·test-results·외부 모델 폴더에 보존한다.
 
 후속 GitHub 실행에서는 백엔드가 통과하고 Linux 프론트 빌드가 플랫폼별 Rollup 선택 의존성 누락으로 실패했습니다. 기존 패키지 버전을 유지하며 npm이 해석한 누락 플랫폼 패키지 기록을 lock에 반영하고 재검증했습니다.
 
@@ -205,7 +205,7 @@ REA 서버 적용 후 menu_catalog에 REA 큰 메뉴/분석·진단이 등록됐
 
 현재 5개 큰 메뉴·11개 화면이며 공통 실행 action은 native_call 하나다. 이전 절의 보조 5개 유지·17개 화면은 폐기 전 이력이다. operations.py에는 실제 가격 수집·연결 설정·공통 원본 호출에서 사용하는 공급원 인증 함수만 남겼다. data.py/finrlx 및 공식 FinRL-X 원본은 중앙 FinRL 가격·수집의 실제 의존성으로 유지한다. 모델·가격·계좌·인증·알고리즘 기본값은 변경하지 않았고 생성·학습·추론·전략 실행을 수행하지 않았다.
 
-REA는 Codex 종속이 아니다. 기존 연결은 원본 CLI를 독립 Node 자식 프로세스로 실행한 MCP/stdio 방식이다. Codex 설정이나 로그인 없이 사용하며 원본 CLI의 scripts/rea.mjs --help 실행도 정상 종료했다. CLI 연결 방식을 새로 구현하거나 원본 REA를 변경하지 않았다. 심층 바이너리 엔진 미설정은 이전 보고와 같다.
+REA는 Codex 종속이 아니다. 기존 연결은 원본 CLI를 독립 Node 자식 프로세스로 실행한 MCP/stdio 방식이다. Codex 설정이나 로그인 없이 사용하며 원본 CLI의 development/scripts/rea.mjs --help 실행도 정상 종료했다. CLI 연결 방식을 새로 구현하거나 원본 REA를 변경하지 않았다. 심층 바이너리 엔진 미설정은 이전 보고와 같다.
 
 실제 확인: 백엔드 24개·TypeScript·운영 빌드 통과. 서버 8766 적용 후 menu_catalog는 5개 구역·11개 화면·native_call 하나를 반환했고 module_errors는 비어 있었다. 삭제한 5개 실행 API는 모두 HTTP 404였다. API 전송 4개·실제 11개 화면 브라우저 2개 검사를 단일 프로세스로 순차 실행해 최종 6개 모두 통과했다. 최초 병렬 실행의 산출물 경로 충돌 및 재시작 중 연결 거부는 최종 순차 검증에서 해소했다. 실제 시세·학습·추론·가상체결·REA 심층 바이너리 분석의 성공을 이 결과로 주장하지 않는다.
 
@@ -213,7 +213,7 @@ REA는 Codex 종속이 아니다. 기존 연결은 원본 CLI를 독립 Node 자
 
 목적별 원본 도구 선택·바이너리 구조/세션/닫기·보관 Evidence 요약/페이지 조회 입력을 REA 메뉴에 연결했다. 엔진 경로는 단일 API와 configs/local/rea.json을 사용해 원본 자식 프로세스 환경에만 전달한다. 저장·진단·분석은 사용자 버튼 실행이며 자동 진단·자동 분석은 하지 않는다. 경로 존재·플랫폼 지원·원본 준비 확인·실제 분석 성공은 구분한다. Ghidra/JDK/Hopper 설치 자체와 실제 심층 분석 검증은 수행하지 않았다. 자동 검사는 사용자 직접 실행 대상으로 미실행이다. Windows 지원 근거: https://github.com/morluto/rea/blob/main/docs/windows-ghidra-p0.md .
 
-프론트 빌드·서버 적용은 기존 start_server.py --apply-only --skip-checks로 완료했다. 자동 검사·브라우저 검증·엔진 doctor·실제 분석은 실행하지 않았다. 사용자는 기존 tests/test_state_integrity.py, tests/test_http_transport.py 및 frontend/package.json의 test:api/test:browser 스크립트로 직접 검사할 수 있다.
+프론트 빌드·서버 적용은 기존 start_server.py --apply-only --skip-checks로 완료했다. 자동 검사·브라우저 검증·엔진 doctor·실제 분석은 실행하지 않았다. 사용자는 기존 development/tests/test_state_integrity.py, development/tests/test_http_transport.py 및 frontend/package.json의 test:api/test:browser 스크립트로 직접 검사할 수 있다.
 
 ## REA Ghidra 설치·연결 완료
 
@@ -246,10 +246,10 @@ REA 작은 메뉴를 파일 복원·디컴파일로 변경했다. 메인 화면�
 
 - 완료: 거래 운영의 `markets` 메뉴와 전용 프론트 폴더, 백엔드 `market_data_menu.py`, 해당 `.pyc`를 프로젝트 루트 `휴지통/`으로 상대 경로를 유지해 이동했습니다. 휴지통 내부는 열람하지 않았습니다.
 - 완료: 단일 `/api`의 `collect` 등록·요청 모델·수집 작업 분기 및 시장 화면 전용 `prices` 상태 조회·`price_history` 함수를 제거했습니다. 학습 사전 확인·중앙 운영에서 사용하는 `database()`·가격 저장소·공통 데이터 모듈은 참조가 있어 유지합니다. 데이터·모델·설정은 변경하지 않았습니다.
-- 코드 참조 조사: 웹 API·공식 CLI·작업 worker·키움 worker 진입점에서 이어지는 import와 프로세스 실행 경로를 확인했습니다. `expert_backends.py`는 `moe_native.py`, `expert_registry.py`는 `expert_backends.py`가 사용합니다. `scripts/`의 두 파일은 설치·서버 실행 CMD 및 서버 적용에서 사용됩니다. 남은 프로젝트 Python 비패키지 파일에서 추가 미참조 폐기 대상은 확인되지 않았습니다. 이는 코드 참조 조사이며 모든 기능 실행 검증을 의미하지 않습니다.
+- 코드 참조 조사: 웹 API·공식 CLI·작업 worker·키움 worker 진입점에서 이어지는 import와 프로세스 실행 경로를 확인했습니다. `expert_backends.py`는 `moe_native.py`, `expert_registry.py`는 `expert_backends.py`가 사용합니다. `development/scripts/`의 두 파일은 설치·서버 실행 CMD 및 서버 적용에서 사용됩니다. 남은 프로젝트 Python 비패키지 파일에서 추가 미참조 폐기 대상은 확인되지 않았습니다. 이는 코드 참조 조사이며 모든 기능 실행 검증을 의미하지 않습니다.
 - 완료: 프로젝트 모듈을 전부 연결됨으로 표시하던 처리를 제거했습니다. 실제 진입점에서 이어지는 소스 참조, import 완료, 함수 실행 성공 기록을 구분합니다. 공통 실행 API로 호출 가능하지만 운영 코드 참조가 없는 공식 함수는 `호출 가능·사용 미확인`으로 표시합니다. `node_modules`·캐시·빌드 파일은 프로젝트 소스 목록에서 제외합니다.
 - 완료: 상태·사유도 텍스트 검색에 포함하고 `실행 미확인`·`참조 없음` 필터를 추가했습니다. 실행 미확인만으로 미사용·폐기 대상으로 판정하지 않습니다.
-- 검사 미실행: AGENTS.md의 사용자 직접 검사 지침에 따라 이번 변경의 테스트·타입 검사·브라우저 검증은 실행하지 않았습니다. 기존 브라우저 스크립트는 메뉴 11개와 markets 폐기를 반영했습니다. 사용자가 실행할 명령: `.venv\Scripts\python.exe -m unittest discover -s tests`, 프론트 폴더에서 `npm run typecheck`, `npm run test:api`, `npm run test:browser`.
+- 검사 미실행: AGENTS.md의 사용자 직접 검사 지침에 따라 이번 변경의 테스트·타입 검사·브라우저 검증은 실행하지 않았습니다. 기존 브라우저 스크립트는 메뉴 11개와 markets 폐기를 반영했습니다. 사용자가 실행할 명령: `.venv\Scripts\python.exe -m unittest discover -s development/tests`, 프론트 폴더에서 `npm run typecheck`, `npm run test:api`, `npm run test:browser`.
 - 빌드·서버 적용 결과와 커밋 상태는 아래 완료 기록에 별도 기재합니다.
 
 - 완료 기록: 프로젝트 Python 소스 79개 참조 조사에서 미참조 비패키지 파일은 없었습니다. 전용 프론트 소스 3개, 백엔드 메뉴 1개, 해당 Python 캐시 1개, 기존 MarketScanner 빌드 파일 1개를 휴지통으로 이동했습니다. Vite 빌드 성공(3.98초). 기존 런처 `--apply-only --skip-build --skip-checks`로 React·백엔드 적용 완료. 실제 화면 동작·시장 수집·학습·추론·가상체결은 이번 변경에서 검사하지 않았습니다. 승인 범위 변경만 1회 커밋·push합니다.
@@ -262,7 +262,7 @@ REA 작은 메뉴를 파일 복원·디컴파일로 변경했다. 메인 화면�
 - 프론트 연결: pages/대메뉴/작은메뉴/컴포넌트 → 대메뉴 취합 파일 → shell/menu_groups/menu_registry.ts. 메뉴·해시·기능을 유지했고 공통 화면 부품은 pages/shared/frameworks/에 모았습니다. 화면 공통 이름은 프로젝트 플랫폼입니다.
 - REA 분석 구현은 rea/analysis/, 저장 프로젝트 탐색은 rea/project_browser/로 분리했습니다. 기존 원본 REA 설치 의존성과 CLI/MCP 연결을 사용합니다. 저장 결과 폴더 6개를 분석 대상 이름+생성 시각으로 실제 이동했습니다. 내부 ID는 유지했고 project.json의 물리적 경로와 분석 JSON의 경로 참조만 갱신했습니다. original/ 코드·바이너리 내용은 수정하지 않았습니다. 새 결과도 대상 이름+시각으로 저장합니다.
 - 여러 메뉴가 함께 사용하는 상태·모델 실행 기반과 저장 정책의 클래스 import 경로는 유지했습니다. 모델·설정·계좌·가격 데이터·공식 FinRL·SB3 소스·알고리즘 기본값은 바꾸지 않았습니다. 자동 에이전트 호출·정책 생성·학습·프로그램 재구현은 실행하지 않았습니다.
-- 기존 검사 스크립트의 import는 새 경로를 반영했습니다. 이번 작업의 테스트·타입 검사·브라우저 검증은 AGENTS.md에 따라 미실행입니다. 사용자 실행: `.venv\Scripts\python.exe -m unittest discover -s tests`, frontend에서 `npm run typecheck`, `npm run test:api`, `npm run test:browser`.
+- 기존 검사 스크립트의 import는 새 경로를 반영했습니다. 이번 작업의 테스트·타입 검사·브라우저 검증은 AGENTS.md에 따라 미실행입니다. 사용자 실행: `.venv\Scripts\python.exe -m unittest discover -s development/tests`, frontend에서 `npm run typecheck`, `npm run test:api`, `npm run test:browser`.
 - 실제 결과: Vite 빌드 성공(4.62초). 서버 적용 및 커밋 결과는 다음 완료 기록에 별도 기재합니다.
 
 - 사용자 추가 지침 반영: API→전체 메뉴 매니저→대메뉴별 소메뉴 매니저→기능의 계층을 AGENTS.md에 명시했습니다. 구조 경로는 영문 ASCII, 화면·README 설명은 한글을 허용합니다. REA 결과 폴더도 ASCII 대상명+시각으로 만들며 원본 이름은 메타데이터에 보존합니다. React·백엔드 적용 완료(검증 생략).
@@ -279,7 +279,7 @@ REA 작은 메뉴를 파일 복원·디컴파일로 변경했다. 메인 화면�
 - 실행 진입점은 web_api:app입니다. 서버 소유권 확인·설치 스크립트·메뉴 import·프론트 오류 구역·검사 스크립트의 경로를 함께 갱신했습니다. 기존 금융 정책·계좌·가격·설정·알고리즘 기본값은 변경하지 않았습니다.
 - 금융 운영에서 분리 이전 web_api의 요청 모델·함수를 찾던 참조는 실제 정책 학습/진단 모듈을 직접 import하도록 수정했습니다. REA 중지의 불필요한 금융 진단 import를 없애고 REA 종료 처리는 해당 프로젝트의 라우터 종료 콜백으로 이동했습니다. 정책 생성·학습·모델 실행은 수행하지 않았습니다.
 - 모듈 목록은 새 물리적 위치를 반영해 StockRL·REA·Platform 소스를 구분합니다. 연결·import·실행 미확인은 기존 의미를 유지합니다.
-- 사용자 직접 검사 지침에 따라 테스트·타입·브라우저 검증은 실행하지 않습니다. 실행할 기존 스크립트: .venv\Scripts\python.exe -m unittest discover -s tests; frontend에서 npm run typecheck, npm run test:api, npm run test:browser. 빌드·서버 적용 결과는 아래 완료 기록에 기재합니다.
+- 사용자 직접 검사 지침에 따라 테스트·타입·브라우저 검증은 실행하지 않습니다. 실행할 기존 스크립트: .venv\Scripts\python.exe -m unittest discover -s development/tests; frontend에서 npm run typecheck, npm run test:api, npm run test:browser. 빌드·서버 적용 결과는 아래 완료 기록에 기재합니다.
 
 - 완료 기록: REA 폴더 및 공통 파일 4개 물리적 이동 완료. 옛 StockRL 위치의 공통 파일 Python 캐시 4개는 상대 경로를 유지해 휴지통으로 이동했습니다. 프론트 빌드 성공(5.43초), 새 web_api:app으로 React·백엔드 적용 완료. 테스트·타입·브라우저 검사 미실행. 승인된 이동과 필수 참조 수정만 1회 커밋·push합니다.
 
@@ -289,15 +289,15 @@ REA 작은 메뉴를 파일 복원·디컴파일로 변경했다. 메인 화면�
 - 전체 대메뉴는 금융(finance)과 REA(rea) 두 개로 등록합니다. 기존 거래 운영·FinRL·프로젝트 확장·연결 관리의 금융 화면 9개는 금융 내부 소메뉴입니다. REA 화면 2개는 독립 대메뉴로 유지합니다.
 - 백엔드: stockrl/submenu_manager.py가 금융 내부 기능 분류의 소메뉴와 라우터를 취합하고 stockrl/finance_menu_manager.py가 금융 대메뉴를 등록합니다. backend/menu_registry.py는 금융과 REA 매니저만 import합니다. API 작업명·메뉴 해시·기능·모델·데이터·설정·알고리즘 기본값은 변경하지 않았습니다.
 - 프론트: trading·finrl·extensions·management 폴더를 pages/finance/로 실제 이동하고 import·백엔드 화면 경로·README를 갱신했습니다. 예전 독립 대메뉴 등록 파일 8개 및 해당 Python 캐시를 의존성 확인 후 휴지통으로 이동했습니다. 금융 대메뉴 내부 오류는 관련 화면별 표시를 유지합니다.
-- 기존 검사 스크립트는 대메뉴 두 개를 반영했습니다. 사용자 직접 검사 지침에 따라 테스트·타입·브라우저 검증은 미실행입니다. 사용자가 실행할 명령: .venv\Scripts\python.exe -m unittest discover -s tests; frontend에서 npm run typecheck, npm run test:api, npm run test:browser.
+- 기존 검사 스크립트는 대메뉴 두 개를 반영했습니다. 사용자 직접 검사 지침에 따라 테스트·타입·브라우저 검증은 미실행입니다. 사용자가 실행할 명령: .venv\Scripts\python.exe -m unittest discover -s development/tests; frontend에서 npm run typecheck, npm run test:api, npm run test:browser.
 
 - 완료 기록: 금융 폴더 4개 이동, 옛 대메뉴 등록 파일 8개·캐시 4개 휴지통 이동. Vite 빌드 성공(5.21초), React·백엔드 적용 완료. 이번 변경의 테스트·타입·브라우저 검증 미실행. AGENTS.md의 기존 로컬 변경은 유지하고 이번 코드 커밋에는 포함하지 않습니다.
 
 
 ### 2026-10-13 루트 폴더 정리
 
-- 긴 루트 문서는 docs/history.md, 설정 문서는 docs/settings.md, 검토 보고서는 docs/project_review.md로 실제 이동했습니다. 루트 README는 짧은 현재 구조 안내로 교체했고 문서 링크를 조정했습니다.
-- requirements/를 scripts/requirements/로 이동해 설치·CI 경로를 맞췄습니다. 설치 명세의 버전·내용은 바꾸지 않았습니다.
+- 긴 루트 문서는 development/docs/history.md, 설정 문서는 development/docs/settings.md, 검토 보고서는 development/docs/project_review.md로 실제 이동했습니다. 루트 README는 짧은 현재 구조 안내로 교체했고 문서 링크를 조정했습니다.
+- requirements/를 development/scripts/requirements/로 이동해 설치·CI 경로를 맞췄습니다. 설치 명세의 버전·내용은 바꾸지 않았습니다.
 - 공식 FinRL-X 서브모듈은 vendor/FinRL-X/로 Git 이동했습니다. 원본 소스·알고리즘·커밋은 유지하며 import·설치 경로만 변경했습니다.
 - src/·logs/·results/는 내용이 없는 폴더임을 확인하고 휴지통 이동을 시도했습니다. 경로 충돌이 있으면 해당 빈 폴더의 이동을 보류합니다.
 - configs/·data/·runtime/·기존 가상환경·금융 모델과 REA 저장 결과는 이동하거나 변경하지 않았습니다. 새 backend/ 루트 API 및 독립 REA Python 소스도 적용 대상에 포함하도록 기존 런처 소스 분류를 조정했습니다.
@@ -311,7 +311,7 @@ REA 작은 메뉴를 파일 복원·디컴파일로 변경했다. 메인 화면�
 - rea/는 독립 REA 기능 코드이며 rea_projects/는 프로젝트 탐색 화면에 연결된 저장 결과였습니다. 저장 결과는 backend/rea/project_browser/saved_projects/로 실제 이동해 REA 소메뉴 아래에 귀속했습니다. 저장·목록·파일 탐색·폴더 열기는 같은 OUTPUT을 사용합니다.
 - 기존 프로젝트 ID와 원본/추론 파일 내용은 유지하고 project.json의 물리적 폴더 및 분석 JSON의 생성 경로 참조만 갱신했습니다. 새 분석 결과도 같은 위치에 저장됩니다.
 - Git 제외·설치 패키지 제외·모듈 목록 제외·런처 소스 적용 제외를 새 위치로 맞춰 추출한 코드가 실행 모듈이나 대메뉴로 등록되지 않도록 했습니다. README 및 기존 경로 보호/재귀 복사 검사 스크립트도 새 경로를 반영했습니다.
-- 테스트·타입·브라우저 검사는 사용자 직접 실행 지침대로 미실행입니다. 사용자 실행 명령은 scripts/README.md에 있습니다. 새 정책·학습·코딩 에이전트·추출 프로그램 실행은 수행하지 않았습니다.
+- 테스트·타입·브라우저 검사는 사용자 직접 실행 지침대로 미실행입니다. 사용자 실행 명령은 development/scripts/README.md에 있습니다. 새 정책·학습·코딩 에이전트·추출 프로그램 실행은 수행하지 않았습니다.
 
 - 실제 결과: 저장 프로젝트 6개 이동 완료. 생성 분석 JSON의 경로 참조 3개 파일 및 필요한 경로 키를 갱신했습니다. 서버 적용 완료(검증 생략). 프론트 기능·해시·API 작업명은 유지하며 원본/추론 파일은 변경하지 않았습니다. 이번 작업의 테스트·타입·브라우저 검증은 미실행입니다.
 
@@ -335,5 +335,5 @@ Python 109개·프론트 65개 참조 조사 결과 추가 미참조 소스 파�
 - 루트 package.json·package-lock.json·node_modules/로 통합했습니다. frontend/·backend/rea/에는 각 package.json을 유지하고 npm workspaces로 등록했습니다. 기존 두 lockfile과 설치 트리는 휴지통으로 이동했습니다.
 - 기존 lock의 패키지 버전을 유지했습니다. Babel·Playwright 등의 서로 다른 버전은 루트 node_modules 내부의 전이 의존성으로 공존합니다. workspace 내부 node_modules 경로는 없습니다. npm ci --ignore-scripts --no-audit --no-fund 성공(234개 설치); 버전 변경 없음. 기존 루트 Node 24.21.0을 사용했으며 Node/라이브러리 업그레이드는 수행하지 않았습니다.
 - REA CLI·브리지·원본 추출·상태·설치는 루트 node_modules를 사용합니다. Vite·TypeScript 실행 경로·개발 CMD·CI lockfile·기존 런처의 소스 감지도 루트 통합 경로를 반영했습니다. Vite 개발 캐시는 루트 node_modules/.cache/vite/frontend에 둡니다.
-- 기존 workspace 로컬 설치 트리를 제거한 뒤 루트 의존성으로 프론트 빌드 성공(3.52초). 타입·단위·브라우저·REA 엔진 실제 검사는 사용자 직접 검사 지침에 따라 미실행입니다. 사용자 검사: 루트 npm run typecheck, npm run test:api, npm run test:browser; Python은 scripts/README.md 명령을 사용합니다. 정책 생성·학습·AI 에이전트·추출 프로그램 실행은 수행하지 않았습니다.
+- 기존 workspace 로컬 설치 트리를 제거한 뒤 루트 의존성으로 프론트 빌드 성공(3.52초). 타입·단위·브라우저·REA 엔진 실제 검사는 사용자 직접 검사 지침에 따라 미실행입니다. 사용자 검사: 루트 npm run typecheck, npm run test:api, npm run test:browser; Python은 development/scripts/README.md 명령을 사용합니다. 정책 생성·학습·AI 에이전트·추출 프로그램 실행은 수행하지 않았습니다.
 - FinRL-X 분리 단위의 확인은 이번 npm 구조 통합 뒤로 보류합니다. 관련 조사 초안은 현재 작업 커밋에 포함하지 않습니다.

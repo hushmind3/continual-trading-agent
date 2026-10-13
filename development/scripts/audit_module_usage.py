@@ -11,7 +11,7 @@ def audit(root):
         ['git', 'ls-files', '-co', '--exclude-standard', '-z'], cwd=root
     ).decode('utf-8').split('\0')
     paths = sorted({name for name in names if name.endswith('.py')
-                    and name.startswith(('backend/', 'scripts/', 'tests/'))
+                    and name.startswith(('backend/', 'development/scripts/', 'development/tests/'))
                     and (root / name).is_file()})
 
     def module(name):
@@ -51,7 +51,7 @@ def audit(root):
 
     entries = {'web_api', 'stockrl.__main__', 'stockrl.job_worker',
                'stockrl.finrl.policy_learning.official_cli', 'stockrl.platform.kiwoom_worker'}
-    checks = {module(name) for name in paths if name.startswith(('scripts/', 'tests/'))}
+    checks = {module(name) for name in paths if name.startswith(('development/scripts/', 'development/tests/'))}
 
     def reach(initial):
         seen, queue = set(initial), list(initial)
@@ -77,6 +77,6 @@ if __name__ == '__main__':
     import sys
     if not shutil.which('git'):
         raise SystemExit('Git executable must be on PATH.')
-    result = audit(Path(__file__).resolve().parents[1])
+    result = audit(Path(__file__).resolve().parents[2])
     print(json.dumps(result, ensure_ascii=False, indent=2))
     sys.exit(bool(result['source_errors']))

@@ -26,6 +26,6 @@ import는 현재 서버 적재와 import 실패 기록을 표시합니다. 함�
 
 ## 사용자가 다시 조사할 명령
 
-프로젝트 루트에서 `.venv\Scripts\python.exe -B scripts\audit_module_usage.py`를 실행합니다. 이 스크립트는 참조 조사 결과만 출력하며 파일 삭제·인증 검사·학습·추론·함수 실행을 하지 않습니다.
+프로젝트 루트에서 `.venv\Scripts\python.exe -B development/scripts\audit_module_usage.py`를 실행합니다. 이 스크립트는 참조 조사 결과만 출력하며 파일 삭제·인증 검사·학습·추론·함수 실행을 하지 않습니다.
 
 브라우저·타입·함수 실행·외부 인증 검사는 미실행입니다.

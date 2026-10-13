@@ -12,7 +12,6 @@ from api_context import ROOT
 from api_context import RUNTIME
 from api_context import champion_structure_environment
 from api_context import library_manager
-from api_context import lru_cache
 from api_context import os
 from api_context import re
 from api_context import read_json
@@ -37,40 +36,20 @@ class Registration(BaseModel):
     slot: str = Field(pattern=r"^[a-z][a-z0-9_]{0,79}$")
 
 
-@lru_cache(maxsize=256)
-def expert_descriptor(key,file,checksum,size,modified):
-    from stockrl.platform.expert_packages import load_package
-    from stockrl.platform.expert_contracts import descriptor
-    reference={"file":file,"sha256":checksum,"bytes":size}
-    return descriptor(key,load_package(MODEL_DIR/"expert_registry.json",reference),reference)
-
-
 def expert_state():
     from stockrl.management.diagnostics_logs_code_apply.handlers import file_info
+    from stockrl.trading.operation_control.operations_settings import settings
+    model_dir=settings().model_dir
     registry = read_json(ROOT / "configs/experts.json", {"active": [], "experts": {}})
     status = read_json(ROOT / "runtime/experts/status.json")
     rows = []
     for key, item in registry.get("experts", {}).items():
         reference = item.get("package", {})
-        path = (MODEL_DIR / reference.get("file", "")).resolve()
-        available = path.is_relative_to(MODEL_DIR.resolve()) and path.is_file()
+        path = (model_dir / reference.get("file", "")).resolve()
+        available = path.is_relative_to(model_dir.resolve()) and path.is_file()
         if available and reference.get("bytes") is not None:
             available = path.stat().st_size == reference["bytes"]
         detail=dict(item)
-        if available:
-            try:
-                actual=expert_descriptor(key,reference["file"],reference["sha256"],reference["bytes"],path.stat().st_mtime_ns)
-                detail={**item,**actual,"name":item.get("name",actual["name"]),
-                    "check":item.get("check",actual["check"]),"conversion":item.get("conversion",actual.get("conversion"))}
-                if actual.get("executor")=="llama_cpp":
-                    from stockrl.platform.gguf_format import stored_precision
-                    package=read_json(path);weight=(MODEL_DIR/package["weight_asset"]["file"]).resolve()
-                    if not weight.is_relative_to(MODEL_DIR.resolve()):raise ValueError("GGUF 경로가 모델 폴더 밖입니다.")
-                    info=weight.stat()
-                    detail["representation"]=stored_precision(str(weight),info.st_mtime_ns,info.st_size)
-                    detail["quantized"]=bool(re.search(r'(?:I?Q)\d+',detail["representation"]))
-            except (ValueError,OSError,KeyError,RuntimeError) as exc:
-                detail["metadata_error"]=str(exc)
         rows.append({**detail, "id": key, "active": key in registry.get("active", []),
                      "package_available": available, "package_path": str(path),
                      "inference": status.get("experts", {}).get(key),
@@ -160,18 +139,20 @@ def library_job(kind:str,payload:dict):
 
 
 def model_files():
-    registry=read_json(ROOT/'configs/experts.json');registered={item['package']['file']:key for key,item in registry.get('experts',{}).items()}
+    from stockrl.trading.operation_control.operations_settings import settings
+    model_dir=settings().model_dir
+    registry=read_json(ROOT/'configs/experts.json');registered={(model_dir/item['package']['file']).resolve():key for key,item in registry.get('experts',{}).items()}
     for key,item in registry.get('experts',{}).items():
         if item['package']['file'].endswith('.json'):
-            package=read_json(MODEL_DIR/item['package']['file'])
-            if package.get('weight_asset'):registered[package['weight_asset']['file']]=key
+            package=read_json(model_dir/item['package']['file'])
+            if package.get('weight_asset'):registered[(model_dir/package['weight_asset']['file']).resolve()]=key
     rows=[]
     if MODEL_DIR.exists():
         for path in MODEL_DIR.rglob("*"):
             if not path.is_file() or path.suffix.lower() not in (".pt",".pth",".gguf",".json",".safetensors",".zip"):continue
             relative=path.relative_to(MODEL_DIR).as_posix()
             rows.append({"path":str(path),"name":relative,"format":path.suffix.lower(),
-                "bytes":path.stat().st_size,"registered":registered.get(relative)})
+                "bytes":path.stat().st_size,"registered":registered.get(path.resolve())})
     return {"root":str(MODEL_DIR),"files":rows}
 
 

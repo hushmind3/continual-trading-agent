@@ -6,7 +6,7 @@ import type {Connections} from '../../../../data/types';
 import {Panel,KeyValues} from '../../../../ui/Panel';
 import {Button,ErrorMessage,Skeleton,Status,inputClass} from '../../../../ui/Primitives';
 import {Capability} from '../../../../ui/Capability';
-interface Provider {provider:string;environment:string;saved:boolean;vault_error?:string;last_test?:{ok:boolean;message:string}}
+interface Provider {provider:string;environment:string;saved:boolean;provider_name?:string;vault_error?:string;last_test?:{ok:boolean;message:string}}
 interface Settings {risk:{fee:number;slippage:number};data:{poll_seconds:number;timeout_seconds:number};symbols:string[];expert_devices:Record<string,string>}
 function ProviderForm(){
  const provider=useSystemState<Provider>('provider'),{execute,pending}=useOperations();
@@ -16,16 +16,16 @@ function ProviderForm(){
   setMessage(result.message||result.last_test?.message||'연결 설정을 반영했습니다.');
   if(action==='connect'){setAppKey('');setSecret('');setAccount('');}
  }catch(e){setError(e instanceof Error?e.message:String(e));}}
- return <Panel title="키움 인증·시세 연결" description="기존 OS 보안 저장소 사용 · 실제 주문 전송 기능은 연결하지 않습니다." actions={<Button busy={pending.has('provider/disconnect')} onClick={()=>void send('disconnect')}>시세 연결 해제</Button>}>
+ return <Panel title="키움 인증·시세 연결" description="키움 실시간 시세 → 로컬 가상매매 · 실제 주문은 전송하지 않습니다. 미국 시세는 실전 키 환경이 필요합니다." actions={<Button busy={pending.has('provider/disconnect')} onClick={()=>void send('disconnect')}>시세 연결 해제</Button>}>
 
-  <KeyValues items={[["공급원",provider.data?.provider],["저장 환경",provider.data?.environment],["인증 저장",provider.data?.saved?'저장됨':'미저장']]}/>
+  <KeyValues items={[["실시간 공급원",provider.data?.provider_name||"키움증권"],["저장 환경",provider.data?.environment],["인증 저장",provider.data?.saved?'저장됨':'미저장']]}/>
   <ErrorMessage message={error||provider.error||provider.data?.vault_error||''}/>
   {provider.data?.last_test&&<p className="my-3 text-xs text-slate-500">{provider.data.last_test.message}</p>}
   <div className="mt-4 space-y-3"><label className="block text-xs text-slate-500">키 발급 환경<select className={inputClass+' mt-2'} value={environment} onChange={e=>setEnvironment(e.target.value)}><option value="real">실전 시세</option><option value="paper">모의투자 시세</option></select></label>
   <input aria-label="App Key" type="password" autoComplete="off" className={inputClass} placeholder="App Key" value={appKey} onChange={e=>setAppKey(e.target.value)}/>
   <input aria-label="Secret Key" type="password" autoComplete="off" className={inputClass} placeholder="Secret Key" value={secret} onChange={e=>setSecret(e.target.value)}/>
   <input aria-label="계좌 정보" type="password" autoComplete="off" className={inputClass} placeholder="계좌 정보 (선택)" value={account} onChange={e=>setAccount(e.target.value)}/>
-  <div className="flex flex-wrap gap-2"><Button tone="primary" busy={pending.has('provider/connect')} onClick={()=>void send('connect')}>인증 후 저장·선택</Button><Button busy={pending.has('provider/test')} onClick={()=>void send('test')}>저장된 키 인증 확인</Button><Button busy={pending.has('provider/public')} onClick={()=>void send('public')}>공개 시세 선택</Button></div>{message&&<p className="text-xs text-slate-600">{message}</p>}</div>
+  <div className="flex flex-wrap gap-2"><Button tone="primary" busy={pending.has('provider/connect')} onClick={()=>void send('connect')}>인증 후 저장·선택</Button><Button busy={pending.has('provider/test')} onClick={()=>void send('test')}>저장된 키 인증 확인</Button></div>{message&&<p className="text-xs text-slate-600">{message}</p>}</div>
  </Panel>;
 }
 function OperationalSettings(){
@@ -41,6 +41,6 @@ function OperationalSettings(){
  </div>}</Panel>;
 }
 export function ConnectionSettings(){const {state:s}=useOperations();const connection=useSystemState<Connections>('connections');if(!s)return <Skeleton/>;
- return <div className="grid items-start gap-6 lg:grid-cols-2"><div className="space-y-6"><Panel title="연결 상태" description="현재 API·원격 데이터 공급원 · 인증 값은 응답에 포함하지 않습니다." actions={<Button busy={connection.loading} onClick={()=>void connection.refresh()}><RefreshCw size={14}/>연결 확인</Button>}><ErrorMessage message={connection.error}/><div className="flex items-center gap-2 text-sm font-bold"><Link2 size={17} className="text-blue-500"/>로컬 SAC API <Status tone={connection.data?'good':'idle'}>{connection.data?'응답 확인':'확인 중'}</Status></div><KeyValues items={[["API 주소",new URL('/api',location.origin).href],["현재 가격 DB",s.data.path],["원격 공급원",connection.data?.data.source||'미설정'],["원격 상태",connection.data?.data.status]]}/><p className="mt-4 text-xs text-slate-500">FMP는 기존 FinRL-X 설정 모듈에서 인증을 읽습니다.</p></Panel><ProviderForm/><FrameworkProviders/></div>
- <div className="space-y-6"><Panel title="증권사 연결" description="현재 실행 경로의 연결 상태"><div className="space-y-4"><Capability name="kiwoom" label="키움 시세 연결"/><Capability name="alpaca" label="Alpaca 주문 연결"/><Capability name="live_feed" label="실시간 입력"/></div></Panel><OperationalSettings/><Panel title="학습 설정 출처"><KeyValues items={[["학습 설정",s.settings.parameter_source],["환경 설정",s.settings.environment_source],["실행 단계",s.settings.steps_per_run]]}/></Panel></div></div>;
+ return <div className="grid items-start gap-6 lg:grid-cols-2"><div className="space-y-6"><Panel title="연결 상태" description="키움 실시간 시세·로컬 가상매매 연결 상태 · 실제 주문은 전송하지 않습니다." actions={<Button busy={connection.loading} onClick={()=>void connection.refresh()}><RefreshCw size={14}/>연결 확인</Button>}><ErrorMessage message={connection.error}/><div className="flex items-center gap-2 text-sm font-bold"><Link2 size={17} className="text-blue-500"/>로컬 통합 API <Status tone={connection.data?'good':'idle'}>{connection.data?'응답 확인':'확인 중'}</Status></div><KeyValues items={[["API 주소",new URL('/api',location.origin).href],["현재 가격 DB",s.data.path],["원격 공급원",connection.data?.data.source||'미설정'],["원격 상태",connection.data?.data.status]]}/><p className="mt-4 text-xs text-slate-500">실시간 가상매매 입력은 키움입니다. FMP·WRDS·Yahoo 과거 자료는 학습 데이터와 구분합니다.</p></Panel><ProviderForm/><FrameworkProviders/></div>
+ <div className="space-y-6"><Panel title="증권사 연결" description="현재 실행 경로의 연결 상태"><div className="space-y-4"><Capability name="kiwoom" label="키움 시세 연결"/><Capability name="live_feed" label="실시간 입력"/></div></Panel><OperationalSettings/><Panel title="학습 설정 출처"><KeyValues items={[["학습 설정",s.settings.parameter_source],["환경 설정",s.settings.environment_source],["실행 단계",s.settings.steps_per_run]]}/></Panel></div></div>;
 }

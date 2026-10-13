@@ -54,15 +54,17 @@ def _write_settings(runtime: Path, settings: dict) -> None:
 
 def read_settings(runtime: Path) -> dict:
     try:
-        return json.loads(_settings_path(runtime).read_text(encoding="utf-8"))
+        value=json.loads(_settings_path(runtime).read_text(encoding="utf-8"))
+        value["provider"]="kiwoom"
+        return value
     except (OSError, json.JSONDecodeError):
-        return {"provider": "yahoo", "environment": "paper"}
+        return {"provider": "kiwoom", "environment": "real"}
 
 
 def get_credentials(runtime: Path, environment: str | None = None) -> dict:
     """Read only the selected environment; retain legacy vault entries."""
     cfg = read_settings(runtime)
-    environment = environment or cfg.get("environment", "paper")
+    environment = environment or cfg.get("environment", "real")
     migrated = _migration_credentials(runtime, environment)
     if migrated["app_key"] and migrated["secret"]:
         return migrated
@@ -78,11 +80,11 @@ def get_credentials(runtime: Path, environment: str | None = None) -> dict:
 
 def public_status(runtime: Path) -> dict:
     cfg = read_settings(runtime)
-    provider = cfg.get("provider", "yahoo")
+    provider = cfg.get("provider", "kiwoom")
     state = {
         "provider": provider,
         "provider_name": PROVIDERS.get(provider, "\uacf5\uac1c \uc2dc\uc138 (Yahoo)"),
-        "environment": cfg.get("environment", "paper"),
+        "environment": cfg.get("environment", "real"),
         "saved": False,
         "has_app_key": False,
         "has_secret": False,
@@ -144,7 +146,7 @@ def test_connection(runtime: Path, provider_override: str | None = None,
     import requests
 
     settings = read_settings(runtime)
-    provider = provider_override or settings.get("provider", "yahoo")
+    provider = provider_override or settings.get("provider", "kiwoom")
     environment = environment_override or settings.get("environment", "paper")
     if provider != "kiwoom":
         raise ValueError("\ud0a4\uc6c0\uc99d\uad8c\uc744 \uc120\ud0dd\ud574 \uc8fc\uc138\uc694.")
@@ -219,6 +221,6 @@ def clear_credentials(runtime: Path, provider: str) -> dict:
                 pass
     settings = read_settings(runtime)
     if settings.get("provider") == "kiwoom":
-        settings.update({"provider": "yahoo", "environment": "paper", "last_test": None})
+        settings.update({"provider": "kiwoom", "environment": "real", "last_test": None})
         _write_settings(runtime, settings)
     return public_status(runtime)

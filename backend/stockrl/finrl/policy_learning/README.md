@@ -9,3 +9,5 @@
 소속 대메뉴：금융. 이 폴더는 금융 내부 기능 분류이며 독립 대메뉴로 등록하지 않습니다. 하위 기능 → 분류 submenu_manager → 금융 submenu_manager → finance_menu_manager → 전체 menu_registry → /api.
 
 프론트 메뉴 주소: `#finance/policy_learning`; 화면: `frontend/src/pages/finance/finrl/policy_learning/PolicyLearning.tsx`. 백엔드 실행 모듈·API 작업명은 유지합니다.
+
+프론트는 KRW·USD 각각 등록된 학습 대상 종목 전체를 명시적으로 전달합니다. algorithms는 실제 선택한 SB3 클래스 생성자의 기본값을 추가로 반환하며 학습 정책을 생성하지 않습니다. 공식 설정·학습기·환경 규칙은 유지합니다.

@@ -1,8 +1,2 @@
-import {useState} from 'react';
 import {PaperAccounts} from './PaperAccounts';
-import {Tabs} from '../../../../ui/Primitives';
-import type {Currency} from '../../../../data/types';
-export function VirtualAccountOrders(){
- const [currency,setCurrency]=useState<Currency>('USD');
- return <div className="space-y-3"><Tabs value={currency} onChange={value=>setCurrency(value as Currency)} items={[{id:'USD',label:'미국주식 · USD'},{id:'KRW',label:'국내주식 · KRW'}]}/><PaperAccounts key={currency} currency={currency}/></div>;
-}
+export function VirtualAccountOrders(){return <div className="grid items-start gap-4 xl:grid-cols-2"><PaperAccounts currency="KRW"/><PaperAccounts currency="USD"/></div>}

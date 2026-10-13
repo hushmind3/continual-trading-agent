@@ -1,5 +1,5 @@
 """Shared provider credentials used by collection and connection settings."""
-from . import finrlx
+from .. import finrlx
 
 PROVIDER_FIELDS={
     'FMP':['FMP_API_KEY'],

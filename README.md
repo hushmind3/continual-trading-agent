@@ -7,7 +7,7 @@
 | [backend/](backend/README.md) | 단일 API·전체 메뉴 총괄·금융 stockrl/·독립 rea/ |
 | [frontend/](frontend/README.md) | React; 금융 pages/finance/·REA pages/rea/ |
 | [scripts/](scripts/README.md) | 서버 실행·설치·requirements/ 설치 명세 |
-| [vendor/](vendor/README.md) | 수정하지 않는 공식 외부 소스 |
+| [공식 금융 소스](backend/stockrl/finrl_trading/library/README.md) | 백엔드 내부의 FinRL-X 원본 |
 | [docs/](docs/README.md) | 설정 안내·검토 보고서·이전 기록 |
 | tests/ | 사용자가 실행하는 기존 검사 스크립트 |
 | configs/ | 금융 설정·계약·인증 참조 |
@@ -22,6 +22,6 @@
 
 변경 작업은 관련 작은 메뉴 README부터 읽습니다. 검사 명령은 [scripts 안내](scripts/README.md)에 있습니다.
 
-정리 보류: 빈 src/는 휴지통의 같은 경로가 이미 있어 이동하지 않았습니다. 현재 실행 소스는 backend/·frontend/·vendor/에 있습니다.
+정리 보류: 빈 src/는 휴지통의 같은 경로가 이미 있어 이동하지 않았습니다. 현재 실행 소스는 backend/·frontend/에 있습니다.
 
 npm 의존성: 루트 package.json·package-lock.json·node_modules/에서 통합 관리합니다. frontend/와 backend/rea/는 package.json을 갖는 npm workspaces입니다. 설치는 루트 npm ci, 프론트 실행·빌드는 npm run dev/build --workspace frontend입니다.

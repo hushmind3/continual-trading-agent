@@ -165,7 +165,7 @@ class SystemOperations:
         with self.job_lock:
             RUNTIME.mkdir(parents=True,exist_ok=True);(RUNTIME/'jobs').mkdir(exist_ok=True)
             env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1')
-            from ..finrl_trading.operations import provider_environment
+            from ..finrl_trading.provider_settings.operations import provider_environment
             env.update(provider_environment())
             with (RUNTIME/job['log']).open('w',encoding='utf8') as output:
                 process=subprocess.Popen([sys.executable,'-m','stockrl.job_worker',job['id']],cwd=ROOT,env=env,

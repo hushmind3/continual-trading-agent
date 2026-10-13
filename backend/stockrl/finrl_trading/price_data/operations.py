@@ -1,6 +1,6 @@
 """Existing FinRL-Trading DataStore reader."""
-from .. import ROOT
-from . import finrlx
+from ... import ROOT
+from .. import finrlx
 
 def prices(currency='USD',symbols=None):
     import pandas as pd

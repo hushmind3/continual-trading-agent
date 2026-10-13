@@ -2,7 +2,7 @@
 import argparse
 from pathlib import Path
 from stockrl import ROOT
-from stockrl.finrl_trading.data import prices
+from stockrl.finrl_trading.price_data.operations import prices
 from stockrl.finrl.framework import train
 from stockrl.expert_registry_native import ExpertRegistry
 

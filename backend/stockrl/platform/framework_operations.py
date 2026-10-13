@@ -13,8 +13,8 @@ from pathlib import Path
 from .. import ROOT
 from ..finrl.framework import finrl_file
 from ..finrl_trading import finrlx
-from ..finrl_trading.data import prices
-from ..finrl_trading.operations import provider_environment
+from ..finrl_trading.price_data.operations import prices
+from ..finrl_trading.provider_settings.operations import provider_environment
 from ..state_io import atomic_json,read_json
 
 ACTIONS={"native_call":('공식 모듈 직접 실행', 'native', None, '선택한 원본 함수 호출', ['module', 'callable', 'kwargs', 'init_kwargs', 'env_kwargs', 'steps', 'argv', 'symbols', 'source'])}
@@ -225,7 +225,7 @@ def execute(action,parameters,output):
     """Record the actual official functions called by a successful task."""
     called={};previous=sys.getprofile();source_names={}
     finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    source_root=ROOT/'vendor/FinRL-X/src'
+    source_root=ROOT/'backend/stockrl/finrl_trading/library/finrl_x/src'
     def trace(frame,event,arg):
         if event!='call':return
         filename=frame.f_code.co_filename
@@ -266,12 +266,13 @@ def execute(action,parameters,output):
 def source_catalog():
     """Inventory every real Python source, without executing package import side effects."""
     finrl_root=Path(importlib.util.find_spec('finrl').origin).parent
-    roots=[('stockrl',ROOT/'backend/stockrl'),('REA',ROOT/'backend/rea'),('Platform',ROOT/'backend'),('FinRL-X',ROOT/'vendor/FinRL-X/src'),('FinRL',finrl_root)]
+    roots=[('stockrl',ROOT/'backend/stockrl'),('REA',ROOT/'backend/rea'),('Platform',ROOT/'backend'),('FinRL-X',ROOT/'backend/stockrl/finrl_trading/library/finrl_x/src'),('FinRL',finrl_root)]
     items=[]
     for framework,root in roots:
         sources=[]
         for directory,folders,files in os.walk(root):
             if framework=='Platform':folders[:]=[]
+            if framework=='stockrl':folders[:]=[folder for folder in folders if folder!='finrl_x']
             if framework=='REA':folders[:]=[folder for folder in folders if folder!='saved_projects']
             folders[:]=sorted(folder for folder in folders if folder not in ('node_modules','__pycache__','.git','dist','build'))
             sources.extend(Path(directory)/name for name in files if name.endswith('.py'))
@@ -315,7 +316,7 @@ def source_catalog():
                             key=node.name+'.'+child.name;functions.append(key);signatures[key]=ast.unparse(child.args);parameters[key]=arguments(child,key)
             items.append({'path':framework+'/'+relative,'id':name,'framework':framework,'description':ast.get_docstring(tree),
                           'package':path.name=='__init__.py','functions':functions,'signatures':signatures,'parameters':parameters,'keyword_contracts':keyword_contracts,'imports':sorted(set(imports)),'calls':sorted(set(calls))})
-    script=ROOT/'vendor/FinRL-X/deploy.sh'
+    script=ROOT/'backend/stockrl/finrl_trading/library/finrl_x/deploy.sh'
     if script.is_file():items.append({'id':'FinRL-X:deploy','path':'FinRL-X/deploy.sh','framework':'FinRL-X',
         'description':'공식 배포 스크립트의 데이터 준비 및 전략 실행 절차','functions':[],
         'signatures':{},'imports':[],'calls':['data download','run_single_date','run_backtest']})

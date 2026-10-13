@@ -15,7 +15,7 @@ FinRL과 FinRL-Trading의 실행 코드는 각 전용 폴더에 있습니다. �
 ## 연결
 
 - framework_operations의 등록표는 요청 중계용입니다. 알고리즘을 병합하거나 재구현하지 않습니다.
-- 정책 학습은 finrl.framework, 보조 등록 실행은 finrl_trading.operations로 전달합니다. 제거한 FinRL 전용 실행 등록은 중계하지 않습니다.
+- 정책 학습은 finrl.framework, 보조 등록 실행은 finrl_trading.provider_settings.operations로 전달합니다. 제거한 FinRL 전용 실행 등록은 중계하지 않습니다.
 - 상태 조회는 SystemOperations 한 곳에서 관리하며 이미 적재한 모델을 재사용합니다.
 - Champion 파일을 외부에서 삭제하면 다음 통합 상태·Champion 목록 조회에서 해당 파일의 상태·서명·오류·갱신 시각 캐시를 제거합니다. 존재하는 파일의 형식 오류와 다른 모듈 오류는 유지합니다.
 - Champion 목록의 파일 서명은 SAC만이 아니라 모든 알고리즘의 `*_champion_*.pt` 파일을 포함합니다.

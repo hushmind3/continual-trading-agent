@@ -230,7 +230,7 @@ class LibraryOperations:
             if not keys:raise ValueError('검사할 등록 Expert가 없습니다.' if kind=='probe_all' else '사용 중인 Expert가 없습니다.')
             shared_frame=shared_account=None
             if kind=='probe_all':
-                from ..finrl_trading.data import prices
+                from ..finrl_trading.price_data.operations import prices
                 shared_frame=prices('USD')
                 book=runtime.ledger().snapshot()['books']['USD']
                 shared_account={'currency':'USD','cash':book['cash'],'nav':book['equity'],

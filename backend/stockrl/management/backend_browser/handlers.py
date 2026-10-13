@@ -19,14 +19,14 @@ def framework_catalog():
 
 
 def framework_providers():
-    from stockrl.finrl_trading.operations import provider_status
+    from stockrl.finrl_trading.provider_settings.operations import provider_status
     return provider_status()
 
 
 @router.post('/api/framework/providers/{provider}')
 def framework_provider_save(provider:str,values:dict):
     from stockrl.management.connection_settings.handlers import provider
-    from stockrl.finrl_trading.operations import save_provider
+    from stockrl.finrl_trading.provider_settings.operations import save_provider
     try:return save_provider(provider,values)
     except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
 

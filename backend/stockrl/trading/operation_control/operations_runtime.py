@@ -14,6 +14,7 @@ from stockrl.finrl.price_data.operations import prices
 from stockrl.finrl.framework import training_environment
 from stockrl.state_io import read_json
 from stockrl.state_io import atomic_json
+from stockrl.state_io import update_json
 from stockrl.trading.virtual_account_orders.paper_account import PaperAccount
 from stockrl.trading.virtual_account_orders.paper_account import _moment
 from stockrl.trading.operation_control.operations_settings import settings
@@ -26,7 +27,7 @@ class OperationsRuntime:
     def __init__(self):
         self.lock=threading.RLock()
         self.controls={'feed':False,'paper':False,'engine':False,'learning':False}
-        self.learning_pending=[];self.learning_job=None;self.learning_versions={}
+        self.learning_pending=[];self.learning_job=None;self.learning_versions={};self.learning_context=None;self.learning_version_sources={};self.learning_scheduling=threading.Lock()
         self.collector=None;self.thread=None;self.policy_thread=None
         self.account=None;self.quotes={};self.decisions=[];self.last_policy_dates={}
         self.status={'status':'stopped','error':None}
@@ -46,6 +47,7 @@ class OperationsRuntime:
                 'decisions':self.decisions,'feed':dict(self.status),
                 'broker':dict(self.collector.broker_status) if self.collector else {},
                 'pool':system.expert_pool.catalog() if system.expert_pool else [],
+                'learning':{'current':dict(self.learning_context) if self.learning_context else None,'pending':list(self.learning_pending),'versions':dict(self.learning_versions),'status':self.status.get('learning_status','지속학습 대기'),'error':self.status.get('learning_error'),'last_completed':self.status.get('learning_completed'),'last_applied':self.status.get('learning_applied')},
                 'settings':read_json(ROOT/'configs/local/operations.json'),
                 'policies':{currency:{'path':path,'loaded':self.policy_models.get(currency,{}).get('path')==path and str((ROOT/'runtime/official'/path).resolve()) in resident,
                     **{key:value for key,value in self.policy_models.get(currency,{}).items() if key not in ('model','path','signature')}}
@@ -161,7 +163,10 @@ class OperationsRuntime:
 
     def process_updates(self):
         while self.controls['feed']:
-            self.feed_cycle.wait();self.feed_cycle.clear()
+            received=self.feed_cycle.wait(timeout=1 if self.learning_context else None);self.feed_cycle.clear()
+            if self.learning_context:
+                with self.lock,system.job_lock:self.finish_learning()
+            if not received:continue
             if not self.controls['feed']:break
             if self.controls['engine']:
                 try:self.sac_decision()
@@ -173,34 +178,90 @@ class OperationsRuntime:
                 except Exception as exc:
                     with self.lock:self.status.update(learning_status='학습 입력 오류',learning_error=str(exc))
 
+    def finish_learning(self):
+        context=self.learning_context
+        if not context:return
+        job=system.job_state()
+        if job.get('id')!=context['id']:
+            record=(ROOT/'runtime/official/jobs'/(context['id']+'.json')).resolve()
+            job=read_json(record) if record.is_relative_to((ROOT/'runtime/official/jobs').resolve()) else {}
+        if not job or job.get('status') in ('starting','running') or job.get('running'):return
+        self.learning_context=None;currency=context['currency']
+        if job.get('status')!='succeeded' or job.get('exit_code')!=0:
+            self.status.update(learning_status='지속학습 실패 · 같은 입력 재시도 가능',learning_error=job.get('error') or job.get('detail') or '학습 완료 기록을 확인하지 못했습니다.')
+            return
+        try:
+            from stockrl.finrl.policy_learning import handlers as learning
+            root=(ROOT/'runtime/official').resolve();folder=(root/context['output']).resolve()
+            if not folder.is_relative_to(root):raise ValueError('학습 결과 경로가 운영 폴더 밖입니다.')
+            identity=read_json(folder/'dataset.json')
+            for key in ('currency','algorithm','symbols','environment','champion_experts'):
+                if key in context['identity'] and identity.get(key)!=context['identity'][key]:raise ValueError('학습 결과의 '+key+' 계약이 기준 정책과 다릅니다.')
+            checked=learning.model_state(learning.source_settings(),folder)
+            if not checked['compatible']:raise ValueError('학습 결과를 운영에 반영할 수 없습니다: '+' · '.join(checked['reasons']))
+            checkpoint=policy_checkpoint(folder);relative=checkpoint.relative_to(root).as_posix()
+            self.learning_versions[currency]=identity.get('training_input',{}).get('fingerprint',context['version'])
+            self.status['learning_completed']={'id':context['id'],'currency':currency,'path':relative,'num_timesteps':checked.get('num_timesteps'),'updates':checked.get('updates'),'at':job.get('finished_at')}
+            applied=False
+            def select(current):
+                nonlocal applied
+                if not self.controls['learning'] or current.get(currency)!=context['source']:return None
+                source=root/context['source']
+                if context.get('source_signature') and (source.stat().st_mtime_ns,source.stat().st_size)!=tuple(context['source_signature']):return None
+                applied=True;return {**current,currency:relative}
+            update_json(ROOT/'runtime/operations/policies.json',select)
+            self.learning_version_sources[currency]=relative if applied else context['source']
+            self.status.update(learning_status='학습 완료 · 구조 확인된 새 버전 운영 반영' if applied else '학습 완료 · 기준 정책 변경/학습 중지로 반영 보류')
+            if applied:
+                self.status['learning_applied']=dict(self.status['learning_completed'])
+                self.policy_models.pop(currency,None)
+            self.status.pop('learning_error',None)
+        except (ValueError,OSError,KeyError) as error:
+            self.status.update(learning_status='학습 결과 검증 실패',learning_error=str(error))
+
     def queue_learning(self,symbols):
-        with system.job_lock,self.lock:
-            if not self.controls['learning']:return
-            from stockrl.finrl.policy_learning import handlers as _policy_learning_api
-            from stockrl.finrl.framework import policy_files
+        if not self.learning_scheduling.acquire(blocking=False):return
+        try:
+            with self.lock,system.job_lock:
+                self.finish_learning()
+                if not self.controls['learning'] or self.learning_context:return
+            from stockrl.finrl.policy_learning import handlers as learning
             policies=read_json(ROOT/'runtime/operations/policies.json')
             if not policies:
-                self.status['learning_error']='운영 모델을 선택·로드한 뒤 지속학습을 켜세요.';return
+                with self.lock:self.status['learning_error']='운영 모델을 선택·로드한 뒤 지속학습을 켜세요.'
+                return
+            candidates={}
             for currency,path in policies.items():
                 identity=read_json((ROOT/'runtime/official'/path).parent/'dataset.json')
                 if not set(identity.get('symbols',[]))&set(symbols):continue
                 frame=prices(currency,identity['symbols'])
                 if frame.empty:continue
                 version=sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest()
-                if self.learning_versions.get(currency)==version:continue
-                if currency not in self.learning_pending:self.learning_pending.append(currency)
-            if system.job_state()['running'] or not self.learning_pending:return
-            currency=self.learning_pending.pop(0)
-            try:
-                identity=read_json(policy_files(currency)/'dataset.json')
-                request=_policy_learning_api.RunRequest(currency=currency,algorithm=identity.get('algorithm','sac'),resume=not bool(identity.get('champion_file')),champion_path=identity.get('champion_file'))
-                result=_policy_learning_api.launch('train',request,preserve_output=True)
-                self.learning_job=result['job']['id']
-                frame=prices(currency,identity['symbols'])
-                self.learning_versions[currency]=sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest()
-                self.status.update(learning_status=identity.get('algorithm','sac').upper()+' 이어 학습 실행',learning_job=self.learning_job)
-                self.status.pop('learning_error',None)
-            except Exception as exc:self.status.update(learning_status='학습 요청 실패',learning_error=str(exc))
+                candidates[currency]=(path,identity,version,{'observations':len(frame),'end':str(frame.date.max()),'timeframe':frame.attrs.get('timeframe','미지정')})
+            with self.lock,system.job_lock:
+                if not self.controls['learning'] or self.learning_context:return
+                current=read_json(ROOT/'runtime/operations/policies.json')
+                for currency,(path,identity,version,data) in candidates.items():
+                    if current.get(currency)!=path:continue
+                    if self.learning_versions.get(currency)==version and self.learning_version_sources.get(currency)==path:continue
+                    if currency not in self.learning_pending:self.learning_pending.append(currency)
+                if system.job_state().get('running') or not self.learning_pending:return
+                currency=self.learning_pending.pop(0)
+                if currency not in candidates:return
+                source,identity,version,data=candidates[currency]
+                if current.get(currency)!=source:return
+                try:
+                    checkpoint=(ROOT/'runtime/official'/source).resolve()
+                    if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('기준 정책 경로가 운영 폴더 밖입니다.')
+                    stat=checkpoint.stat()
+                    request=learning.RunRequest(currency=currency,algorithm=identity.get('algorithm','sac'),resume=True,champion_path=identity.get('champion_file'),checkpoint=str(checkpoint))
+                    result=learning.launch('train',request,preserve_output=True,continuous=True);job=result['job']
+                    self.learning_job=job['id']
+                    self.learning_context={'id':job['id'],'currency':currency,'source':source,'source_signature':[stat.st_mtime_ns,stat.st_size],'version':version,'identity':dict(identity),'input':data,'output':job['output']}
+                    self.status.update(learning_status=identity.get('algorithm','sac').upper()+' 이어 학습 실행',learning_job=self.learning_job)
+                    self.status.pop('learning_error',None)
+                except Exception as error:self.status.update(learning_status='학습 요청 실패',learning_error=str(error))
+        finally:self.learning_scheduling.release()
 
     def manual_order(self,symbol,currency,action,quantity):
         from stockrl.trading.virtual_account_orders.paper_account import _currency

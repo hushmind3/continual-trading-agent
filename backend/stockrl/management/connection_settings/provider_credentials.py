@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from stockrl import ROOT
 from stockrl.paths import ensure_project_path
 
 SERVICE = "stockrl.market-data"
@@ -25,8 +26,7 @@ def _vault():
 
 
 def _settings_path(runtime: Path | None = None) -> Path:
-    project_root = Path(__file__).resolve().parents[2]
-    local = project_root / "configs" / "local"
+    local = ROOT / "configs" / "local"
     configured = Path(os.environ.get("STOCKRL_LOCAL_CONFIG_DIR", local)).expanduser()
     settings_dir = ensure_project_path(configured, "provider settings")
     return ensure_project_path(settings_dir / "provider_settings.json", "provider settings")

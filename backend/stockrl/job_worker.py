@@ -55,13 +55,14 @@ def main():
         if job["resume"]:
             args.append("--resume")
         if job.get('output'):args.extend(['--output',str(root/job['output'])])
+        if job.get('source_checkpoint'):args.extend(['--checkpoint',job['source_checkpoint']])
         if job.get('champion_path'):args.extend(['--champion-path',job['champion_path']])
         if job.get('champion_output'):args.extend(['--champion-output',job['champion_output']])
         sys.argv = args
         from stockrl.finrl.policy_learning.official_cli import main as official_main
         official_main()
         if job["command"]=="train":
-            print('학습 결과 저장 완료. 운영 반영은 모델 선택 화면에서 직접 승인하세요.',flush=True)
+            print('지속학습 결과 저장 완료. 기준 정책과 결과 구조 확인 후 운영 반영합니다.' if job.get('continuous') else '학습 결과 저장 완료. 운영 반영은 모델 선택 화면에서 직접 승인하세요.',flush=True)
     except BaseException:
         exit_code = 1;failure=str(sys.exc_info()[1])
         traceback.print_exc()
@@ -79,6 +80,7 @@ def main():
             current.update(status="succeeded" if exit_code == 0 else "failed", exit_code=exit_code,
                            finished_at=datetime.now(timezone.utc).isoformat())
             return current
+        update_json(root/'jobs'/(job_id+'.json'),finished)
         update_json(root/'job.json',finished)
     raise SystemExit(exit_code)
 

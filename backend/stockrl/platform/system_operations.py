@@ -173,6 +173,7 @@ class SystemOperations:
                     stdout=output,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
             job.update(pid=process.pid,process_created=psutil.Process(process.pid).create_time())
             self.job_process=process
+            atomic_json(job,RUNTIME/'jobs'/(job['id']+'.json'))
             update_json(RUNTIME/'job.json',lambda current:dict(job) if current.get('id')!=job['id'] else {**job,**current,'pid':job['pid'],'process_created':job['process_created']})
             (RUNTIME/'training.pid').write_text(str(process.pid))
             return job
@@ -199,6 +200,7 @@ class SystemOperations:
                     pass
             job.update(status="stopped", finished_at=datetime.now(timezone.utc).isoformat(), detail="사용자가 중단했습니다. 정상 종료 전 새 가중치는 저장되지 않습니다.")
             update_json(RUNTIME/'job.json',lambda current:{**current,'status':job['status'],'finished_at':job['finished_at'],'detail':job['detail']} if current.get('id')==job['id'] else None)
+            update_json(RUNTIME/'jobs'/(job['id']+'.json'),lambda current:{**current,'status':job['status'],'finished_at':job['finished_at'],'detail':job['detail']} if current.get('id')==job['id'] else None)
             return {"message": job["detail"]}
     def module_update(self,path,value):
         path=Path(path).resolve()

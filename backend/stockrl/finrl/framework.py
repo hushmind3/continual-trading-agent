@@ -86,7 +86,7 @@ def champion_structure_environment(currency,symbols,registry,champion_ids):
     return wrapped
 
 
-def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None,algorithm='sac',total_timesteps=None,champion=None):
+def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None,algorithm='sac',total_timesteps=None,champion=None,source_checkpoint=None):
     from finrl.agents.stablebaselines3.models import DRLAgent
     from ..platform.system_operations import system
     example,parameters,steps=sac_example(algorithm)
@@ -99,13 +99,15 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     from ..state_io import read_json,atomic_json
     currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in frame.symbol.unique()) else 'USD'
     if champion and champion['identity']['environment']!=CASH_ENVIRONMENT:raise ValueError('PortfolioOptimizationEnv Champion으로 새로 생성하세요.')
-    if resume and read_json(policy_files(currency)/'dataset.json').get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경의 정책은 실행하지 않습니다. 현금 정책을 새로 학습하세요.')
+    saved=policy_files(currency,source_checkpoint)
+    if resume and read_json(saved/'dataset.json').get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경의 정책은 실행하지 않습니다. 현금 정책을 새로 학습하세요.')
+    if resume and champion_ids is None:champion_ids=read_json(saved/'dataset.json').get('champion_experts')
     champion_ids=list(registry.catalog().get('active',[])) if champion_ids is None else champion_ids
     env=training_environment(frame,registry,champion_ids=champion_ids)
     root=Path(output) if output is not None else ROOT/'runtime/official'
     if not root.resolve().is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('정책 출력은 기존 runtime/official 내부에 저장합니다.')
     root.mkdir(parents=True,exist_ok=True)
-    saved=policy_files(env.currency)
+    saved=policy_files(env.currency,source_checkpoint)
     identity={'currency':env.currency,'symbols':env.symbols,'algorithm':algorithm,'sac_example':parameters,'environment':CASH_ENVIRONMENT,'rolling_days':[1095,365]}
     from ..platform.sac_champion import _candidate_identity,_policy_kwargs,_original_report
     base_dim=int(__import__('numpy').prod(env.unwrapped.observation_space.shape))
@@ -117,19 +119,25 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     try:
         if resume:
             previous=read_json(saved/'dataset.json');previous.setdefault('algorithm','sac')
-            if previous!=identity:raise ValueError('저장된 정책과 알고리즘·통화·종목·Expert 구성이 다릅니다. 새 학습으로 시작하세요.')
+            if any(previous.get(key)!=value for key,value in identity.items() if key!='champion_file'):raise ValueError('저장된 정책과 알고리즘·통화·종목·Expert 구성이 다릅니다. 새 학습으로 시작하세요.')
+            identity={**previous,**identity}
+        from hashlib import sha256
+        import pandas as pd
+        identity['training_input']={'fingerprint':sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest(),'observations':len(frame),'end':str(frame.date.max()),'timeframe':frame.attrs.get('timeframe','미지정')}
         agent=DRLAgent(env=env)
         print('FinRL DRLAgent ·',algorithm.upper(),parameters,'단계:',steps,flush=True)
         if champion:
-            checkpoint=Path(champion['checkpoint'])
+            checkpoint=Path(source_checkpoint) if resume and source_checkpoint else Path(champion['checkpoint'])
             if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/official'/checkpoint
             model=system.model(checkpoint,algorithm,env)
             if hasattr(model,'load_replay_buffer') and (checkpoint.parent/'replay.pkl').is_file():model.load_replay_buffer(checkpoint.parent/'replay.pkl')
-            model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
+            from finrl.agents.stablebaselines3.models import TensorboardCallback
+            model=model.learn(total_timesteps=steps,tb_log_name=algorithm,callback=TensorboardCallback(),reset_num_timesteps=False)
         elif resume:
             model=system.model(policy_checkpoint(saved),algorithm,env)
             if hasattr(model,'load_replay_buffer'):model.load_replay_buffer(saved/'replay.pkl')
-            model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
+            from finrl.agents.stablebaselines3.models import TensorboardCallback
+            model=model.learn(total_timesteps=steps,tb_log_name=algorithm,callback=TensorboardCallback(),reset_num_timesteps=False)
         else:
             roles={key:registry.catalog()['experts'][key]['role'] for key in champion_ids}
             kwargs={'policy_kwargs':_policy_kwargs(identity,roles,_original_report())} if algorithm=='sac' else {}
@@ -150,10 +158,17 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
 
 
 
-def policy_files(currency=None):
+def policy_files(currency=None,checkpoint=None):
     """Select an existing native SB3 revision without modifying its weights."""
     from ..state_io import read_json
     root=ROOT/'runtime/official'
+    if checkpoint is not None:
+        path=Path(checkpoint).expanduser();path=(path if path.is_absolute() else root/path).resolve()
+        if not path.is_relative_to(root.resolve()) or path.suffix!='.zip' or not path.is_file():raise ValueError('운영 폴더의 실제 정책 ZIP을 선택하세요.')
+        identity=read_json(path.parent/'dataset.json')
+        if currency and identity.get('currency')!=currency:raise ValueError('이어 학습 정책의 통화가 다릅니다.')
+        if policy_checkpoint(path.parent)!=path:raise ValueError('이어 학습 정책 경로와 알고리즘이 다릅니다.')
+        return path.parent
     selected=read_json(ROOT/'runtime/operations/policies.json').get(currency) if currency else None
     selection={'path':selected} if selected else read_json(root/'active-checkpoint.json')
     if not selection:return root

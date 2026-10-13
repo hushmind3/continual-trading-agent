@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--algorithm',default='sac',help='설치된 FinRL MODELS의 알고리즘')
     parser.add_argument('--total-timesteps',type=int)
     parser.add_argument('--output',type=Path,help='기존 정책과 분리할 신규 SAC 결과 경로')
+    parser.add_argument('--checkpoint',type=Path,help='이어 학습할 기존 정책 ZIP 경로')
     parser.add_argument('--champion-path',type=Path,help='통합 SAC Champion PT')
     parser.add_argument('--champion-output',type=Path,help='학습 결과로 발행할 새 Champion PT')
     args=parser.parse_args();registry=ExpertRegistry();champion=None
@@ -23,7 +24,7 @@ def main():
         if args.champion_path and args.command=='train':
             from stockrl.platform.sac_champion import load_spec
             champion=load_spec(args.champion_path)
-            registry=ExpertRegistry(champion=champion)
+            registry=ExpertRegistry(champion=champion,source_checkpoint=args.checkpoint)
         if args.command=='experts':
             for key,item in registry.catalog()['experts'].items():print(key,item['name'],'active' if key in registry.catalog()['active'] else 'stored')
             return

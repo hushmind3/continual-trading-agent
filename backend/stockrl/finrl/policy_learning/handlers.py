@@ -35,6 +35,7 @@ class RunRequest(BaseModel):
     currency: Literal["USD", "KRW"] = "USD"
     resume: bool = False
     champion_path: str | None = None
+    checkpoint: str | None = None
     algorithm: str = 'sac'
     total_timesteps: int | None = Field(default=None,ge=1)
 
@@ -220,7 +221,7 @@ def preflight(req, command):
     model={'identity':{}}
     if req.resume:
         try:
-            selected=policy_files(req.currency)
+            selected=policy_files(req.currency,req.checkpoint)
             model=model_state(settings,selected)
             symbols=list(model['identity'].get('symbols') or [])
         except (ValueError,OSError) as exc:
@@ -294,7 +295,7 @@ def check(req: RunRequest):
     return preflight(req, "train")
 
 
-def launch(command, req,preserve_output=False):
+def launch(command, req,preserve_output=False,continuous=False):
     from stockrl.management.diagnostics_logs_code_apply.handlers import now
     with system.job_lock:
         if system.job_state()["running"]:
@@ -307,7 +308,8 @@ def launch(command, req,preserve_output=False):
         job = {"id": job_id, "status": "starting", "command": command, "currency": req.currency,
                "symbols": checked["symbols"], "resume": req.resume, "started_at": now(),
                "log": f"jobs/{job_id}.log", "finished_at": None, "exit_code": None}
-        job.update(algorithm=req.algorithm,total_timesteps=req.total_timesteps)
+        job.update(algorithm=req.algorithm,total_timesteps=req.total_timesteps,continuous=continuous)
+        if req.resume:job['source_checkpoint']=str(policy_checkpoint(policy_files(req.currency,req.checkpoint)))
         if req.champion_path:
             from stockrl.platform.sac_champion import _next_version
             _,target=_next_version(req.algorithm)

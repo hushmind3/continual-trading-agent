@@ -1,0 +1,25 @@
+import {useOperations} from '../../../../data/Operations';
+import {Panel,KeyValues} from '../../../../ui/Panel';
+import {ErrorMessage} from '../../../../ui/Primitives';
+import {money,number,date} from '../../../../ui/format';
+
+export function LearningProgress(){
+ const {state}=useOperations(),operation=state?.operations,learning=operation?.learning;
+ if(!operation)return null;
+ const current=learning?.current,completed=learning?.last_completed,applied=learning?.last_applied;
+ return <Panel title="실시간 경험 · 정책 업데이트" description="수신 시세, 실제 학습 완료, 운영 반영, 가상계좌 성과를 각각 확인합니다.">
+  <KeyValues items={[
+   ['시세 수신',operation.feed.last_as_of?date(operation.feed.last_as_of):'수신 기록 없음'],
+   ['지속학습',operation.controls.learning?learning?.status??operation.feed.learning_status??'입력 대기':'꺼짐'],
+   ['학습 입력',current?.input?`${current.input.timeframe} · ${number(current.input.observations,0)}행 · ${current.input.end}`:'새 입력 대기'],
+   ['완료된 학습',completed?`${completed.currency} · ${number(completed.num_timesteps,0)}단계 · 업데이트 ${number(completed.updates,0)}`:'완료 기록 없음'],
+   ['운영 반영',applied?`${applied.currency} · ${applied.path}`:'반영 기록 없음'],
+  ]}/>
+  <ErrorMessage message={learning?.error??operation.feed.learning_error??''}/>
+  <div className="mt-4 grid gap-3 sm:grid-cols-2">{(['USD','KRW'] as const).map(currency=>{
+   const book=operation.account.books[currency],rate=book.initial_cash>0?(book.equity/book.initial_cash-1)*100:null;
+   return <div key={currency} className="rounded-xl bg-slate-50 p-3"><h3 className="mb-2 text-xs font-semibold">{currency} 가상운영 성과</h3><p className="text-sm font-semibold">초기자금 대비 {rate==null?'미측정':number(rate,2)+'%'}</p><p className="mt-2 text-xs text-slate-600">순손익 {money(book.net_pnl,currency)} · 수수료 {money(book.fees,currency)} · 체결 {number(book.trade_count,0)}건</p></div>;
+  })}</div>
+  <p className="mt-3 text-xs text-slate-500">학습 단계·업데이트 횟수는 수익 개선의 증거가 아닙니다. 위 수익률은 기록된 가상계좌 평가액이며 실제 증권사 주문을 전송하지 않습니다.</p>
+ </Panel>;
+}

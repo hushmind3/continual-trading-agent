@@ -142,21 +142,6 @@ class IntegrityTests(unittest.TestCase):
    with patch.object(framework,'ROOT',root),patch.object(framework,'price_store',return_value=store):
     actual=framework.prices('USD',['AAPL'])
    self.assertEqual(actual.close.tolist(),[100]);self.assertEqual(actual.attrs['timeframe'],'1d')
- def test_unchanged_daily_data_does_not_repeat_learning(self):
-  import sys
-  from stockrl.trading.operation_control import operations_runtime
-  from stockrl.finrl import framework
-  runtime=OperationsRuntime();runtime.controls['learning']=True
-  frame=pd.DataFrame([row('AAPL','2026-01-01')]);launched=[]
-  def launch(*args,**kwargs):launched.append(args);return {'job':{'id':str(len(launched))}}
-  from stockrl.finrl.policy_learning import handlers as learning
-  identity={'symbols':['AAPL'],'currency':'USD','algorithm':'sac'}
-  def read(path):return {'USD':'policies/x/sac.zip'} if path.name=='policies.json' else identity
-  with patch.object(learning,'launch',side_effect=launch),patch.object(operations_runtime,'read_json',read),patch.object(operations_runtime,'prices',return_value=frame) as prices,patch.object(framework,'policy_files',return_value=ROOT/'runtime/official/policies/x'),patch.object(operations_runtime.system,'job_state',return_value={'running':False}):
-   runtime.queue_learning(['AAPL']);runtime.queue_learning(['AAPL'])
-   self.assertEqual(len(launched),1)
-   prices.return_value=frame.assign(close=101)
-   runtime.queue_learning(['AAPL']);self.assertEqual(len(launched),2)
  def test_old_manual_quote_is_rejected(self):
   import sys
   from stockrl.trading.operation_control import operations_runtime

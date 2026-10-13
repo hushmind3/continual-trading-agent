@@ -59,6 +59,7 @@ export interface Snapshot {
 export interface Preflight {ok:boolean;errors:string[];symbols:string[];currency:Currency;mode:string;steps_per_run:number;periods:{training_observations:number;train_start:string;train_end_exclusive:string}|null}
 export interface Connections {api:{status:string};data:{status:string;source:string|null;available_sources:string[];reason?:string};brokers:{name:string;status:string;reason:string}[]}
 export interface OperationsState {
+  learning?:{status:string;error?:string;current?:{id:string;currency:Currency;source:string;input:{observations:number;end:string;timeframe:string}}|null;pending:string[];versions:Record<string,string>;last_completed?:{id:string;currency:Currency;path:string;num_timesteps?:number;updates?:number;at?:string};last_applied?:{id:string;currency:Currency;path:string;num_timesteps?:number;updates?:number;at?:string}};
   policies?:Partial<Record<Currency,{path:string;loaded:boolean;device?:string;observation_shape?:number[];action_shape?:number[];num_timesteps?:number;updates?:number}>>;
   controls:{feed:boolean;paper:boolean;engine:boolean;learning:boolean};
   account:{books:Record<Currency,{initial_cash:number;cash:number;equity:number;net_pnl:number;

@@ -3,8 +3,8 @@ import threading
 import time
 from pathlib import Path
 from ..state_io import atomic_json,read_json
-from stockrl.trading.control.operations_settings import settings
-from stockrl.trading.control.operations_runtime import runtime
+from stockrl.trading.operation_control.operations_settings import settings
+from stockrl.trading.operation_control.operations_runtime import runtime
 from .system_operations import system
 from .observations import InputUnavailable
 

@@ -13,9 +13,9 @@ from stockrl.finrl_trading.price_data.operations import prices
 from stockrl.finrl.framework import training_environment
 from stockrl.state_io import read_json
 from stockrl.state_io import atomic_json
-from stockrl.trading.paper_account.paper_account import PaperAccount
-from stockrl.trading.paper_account.paper_account import _moment
-from stockrl.trading.control.operations_settings import settings
+from stockrl.trading.virtual_account_orders.paper_account import PaperAccount
+from stockrl.trading.virtual_account_orders.paper_account import _moment
+from stockrl.trading.operation_control.operations_settings import settings
 from stockrl.platform.system_operations import system
 from stockrl.finrl.framework import policy_checkpoint
 from stockrl.finrl.framework import CASH_ENVIRONMENT
@@ -202,7 +202,7 @@ class OperationsRuntime:
             except Exception as exc:self.status.update(learning_status='학습 요청 실패',learning_error=str(exc))
 
     def manual_order(self,symbol,currency,action,quantity):
-        from stockrl.trading.paper_account.paper_account import _currency
+        from stockrl.trading.virtual_account_orders.paper_account import _currency
         items=read_json(ROOT/'configs/instruments.json').get('instruments',[])
         item=next((i for i in items if i['symbol']==symbol),None)
         if not item or _currency(item['market'],item['asset_class'])!=currency:raise ValueError('계좌 통화에 맞는 등록 종목을 선택하세요.')

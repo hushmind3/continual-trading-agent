@@ -331,6 +331,27 @@ def source_catalog():
     return items
 
 
+def execution_records(directory,known_modules):
+    """Separate targeted failures from unattributable historical records."""
+    verified={};failed={};unattributed=[]
+    for result_file in sorted(Path(directory).glob('*/result.json'),key=lambda path:path.stat().st_mtime_ns):
+        record=read_json(result_file)
+        target=record.get('request_target') or record
+        module=target.get('module');function=target.get('function')
+        if record.get('error'):
+            failure={'module':module,'function':function,'error':record['error'],'result':result_file.parent.name}
+            if isinstance(module,str) and module in known_modules:failed[module]=failure
+            else:unattributed.append(failure)
+            continue
+        if isinstance(module,str) and module in known_modules:
+            failed.pop(module,None)
+            if isinstance(function,str) and function:verified.setdefault(module,[]).append(function)
+        for called_module,names in record.get('executed_functions',{}).items():
+            if called_module in known_modules and isinstance(names,list):
+                verified.setdefault(called_module,[]).extend(name for name in names if isinstance(name,str) and name)
+    return verified,failed,unattributed
+
+
 def catalog():
     from .system_operations import system
     items=[dict(item) for item in source_catalog()];by_id={item['id']:item for item in items}
@@ -381,17 +402,12 @@ def catalog():
             if current=='Platform:api_context':continue
             for target in edges.get(current,[]):
                 if target not in seen:seen.add(target);pending.append(target)
-    verified={};failed={}
-    for result_file in sorted((ROOT/'runtime/official/framework-jobs').glob('*/result.json'),key=lambda path:path.stat().st_mtime_ns):
-        record=read_json(result_file)
-        if record.get('error'):
-            failed[record.get('module')]=record['error'];continue
-        failed.pop(record.get('module'),None)
-        for module,names in record.get('executed_functions',{}).items():verified.setdefault(module,[]).extend(names)
-        if record.get('module'):verified.setdefault(record['module'],[]).append(record.get('function'))
+    verified,failed,unattributed=execution_records(ROOT/'runtime/official/framework-jobs',by_id)
     for item in items:
         item.setdefault('signatures',{})
-        item['last_error']=failed.get(item['id'])
+        failure=failed.get(item['id'],{})
+        item['last_error']=failure.get('error')
+        item['last_error_function']=failure.get('function')
         item['dependencies']=edges[item['id']];item['actions']=[key for key,row in ACTIONS.items() if row[2]==item['id']]
         public=bool([name for name in item['functions'] if all(not part.startswith('_') for part in name.split('.'))])
         native=public and item['framework'] in ('FinRL-X','FinRL') and not item['path'].startswith('FinRL-X/web/') and item['id'] not in REMOVED_BROKER_TOOLS
@@ -414,7 +430,7 @@ def catalog():
         item['import_error']=import_error
         item['verified_functions']=sorted(set(verified.get(item['id'],[])))
         item['import_status']='import 실패 기록 있음' if import_error else '현재 서버에 import됨' if item['imported'] else '현재 서버에 import되지 않음'
-        item['execution_status']='최근 실행 실패' if item['last_error'] else '실행 성공 기록 있음' if item['verified_functions'] else '실행 기록 없음'
+        item['execution_status']='최근 실행 실패' if item['last_error'] else '성공한 작업의 호출 기록 있음' if item['verified_functions'] else '실행 기록 없음'
         item['authentication_status']='인증 입력 이름 탐지됨 · 인증 성공 미확인' if item.get('credential_inputs') else '인증 입력 이름 미탐지 · 인증 요구 여부 미확인'
         if item.get('source_error'):item.update(status='소스 해석 실패',reason='소스를 해석하지 못해 참조·실행 계약을 판단할 수 없습니다: '+item['source_error'])
         elif item['id'] in REMOVED_BROKER_TOOLS:
@@ -425,7 +441,7 @@ def catalog():
             item.update(status='직접 실행 도구',reason='사용자가 원본 함수 실행에서 선택하는 도구입니다. 자동 운영에서 실행하는 알고리즘이라는 뜻은 아닙니다.')
             if not item['usage_menus']:item['usage_menus']=['모듈 · 도구' if item['framework']=='FinRL' else '백엔드 기능 전체']
         elif item['consumer_files']:item.update(status='라이브러리 내부 의존성',reason='다른 설치 모듈이 불러오는 내부 파일입니다. 불러오는 파일 목록을 확인할 수 있습니다.')
-        else:item.update(status='사용처 없음',reason='플랫폼 운영 및 다른 목록 모듈에서 불러오는 경로가 없고 직접 실행 도구도 아닙니다.')
+        else:item.update(status='정적 참조 미탐지 · 미사용 미확인',reason='분석한 소스에서 import 경로·직접 실행 등록을 찾지 못했습니다. 동적 호출 가능성이 있으므로 실행 여부와 미사용 여부는 미확인이며 삭제 근거로 단정하지 않습니다.')
         item['usage']=item['status']
-    statuses=('운영 기능의 의존성','직접 실행 도구','라이브러리 내부 의존성','사용처 없음','소스 해석 실패')
-    return {'items':items,'actions':action_list(),'counts':{status:sum(item['status']==status for item in items) for status in statuses}}
+    statuses=('운영 기능의 의존성','직접 실행 도구','라이브러리 내부 의존성','정적 참조 미탐지 · 미사용 미확인','소스 해석 실패')
+    return {'items':items,'actions':action_list(),'counts':{status:sum(item['status']==status for item in items) for status in statuses},'unattributed_failures':unattributed}

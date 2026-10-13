@@ -87,14 +87,14 @@ def capabilities():
     return {
         "learning":{"status":"supported","reason":"FinRL DRLAgent · SB3 알고리즘 선택·학습·중단·동일 정책 이어 학습 · 기본 SAC","source":"stockrl.finrl.framework.train"},
         "expert_selection":{"status":"supported","reason":"Frozen Expert 등록·선택·같은 모델 정밀도 교체·해제","source":"stockrl.expert_registry_native.ExpertRegistry"},
-        "paper_accounts":{"status":"supported","reason":"원본 PaperAccount의 KRW/USD 독립 잔고·보유·체결·손익 기능이 연결되어 있습니다.","source":"stockrl.trading.paper_account.paper_account.PaperAccount"},
+        "paper_accounts":{"status":"supported","reason":"원본 PaperAccount의 KRW/USD 독립 잔고·보유·체결·손익 기능이 연결되어 있습니다.","source":"stockrl.trading.virtual_account_orders.paper_account.PaperAccount"},
         "live_feed":{"status":"supported","reason":"복구한 LiveMarketCollector와 Kiwoom BrokerStreams의 완료 시세를 DataStore·가상계좌에 전달합니다.","source":"stockrl.live_feed"},
         "kiwoom":{"status":"supported","reason":"기존 보안 저장소·인증·실시간 수신 모듈 연결. 실제 수신에는 유효한 인증이 필요합니다. 실제 주문은 전송하지 않습니다.","source":"stockrl.management.connection_settings.provider_credentials / platform.kiwoom_data"},
         "alpaca":{"status":"not_connected","reason":"공식 서브모듈에는 Alpaca 모듈이 있지만 현재 SAC 작업에 연결되지 않았습니다.","source":"FinRL-X/src/trading/alpaca_manager.py"},
         "conversion":{"status":"supported","reason":"기존 정밀도 변환과 품질 비교·후보 선택 함수를 연결합니다. 변환은 새 파일로 저장됩니다.","source":"stockrl.platform.expert_conversion / expert_optimizer"},
         "discovery":{"status":"supported","reason":"기존 HF/GitHub 검색·가중치 호환 확인·다운로드·자동 등록 함수가 연결되어 있습니다.","source":"stockrl.platform.expert_discovery / expert_acquisition"},
         "checkpoint_restore":{"status":"supported","reason":"기존 SB3 파일을 변경하지 않고 선택하여 복원·이어 학습에 사용합니다. 이전 자체 정책 형식은 호환되지 않습니다.","source":"stockrl.finrl.framework.policy_files"},
-        "settings_edit":{"status":"supported","reason":"시세·가상계좌·Expert 장치의 기존 운영 설정을 편집합니다. SAC 학습값은 변경하지 않습니다.","source":"stockrl.trading.control.operations_settings"},
+        "settings_edit":{"status":"supported","reason":"시세·가상계좌·Expert 장치의 기존 운영 설정을 편집합니다. SAC 학습값은 변경하지 않습니다.","source":"stockrl.trading.operation_control.operations_settings"},
     }
 
 
@@ -128,8 +128,8 @@ def state_view(path):
     from stockrl.finrl.policy_learning.handlers import algorithms
     from stockrl.extensions.moe.handlers import champions
     from stockrl.management.connection_settings.handlers import connections
-    from stockrl.management.backend_browser.handlers import framework_catalog
-    from stockrl.management.backend_browser.handlers import framework_providers
+    from stockrl.management.all_backend_features.handlers import framework_catalog
+    from stockrl.management.all_backend_features.handlers import framework_providers
     from stockrl.extensions.moe.handlers import model_files
     from stockrl.management.connection_settings.handlers import operational_settings
     from stockrl.management.connection_settings.handlers import provider

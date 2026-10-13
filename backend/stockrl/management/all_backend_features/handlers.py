@@ -33,7 +33,7 @@ def framework_provider_save(provider:str,values:dict):
 
 @router.post('/api/framework/{action}')
 def framework_task(action:str,parameters:dict):
-    from stockrl.management.diagnostics.handlers import now
+    from stockrl.management.diagnostics_logs_code_apply.handlers import now
     from stockrl.platform.framework_operations import ACTIONS
     from stockrl.platform.framework_operations import validate_native_call
     if action not in ACTIONS:raise HTTPException(404,'등록된 공식 실행 기능이 아닙니다.')

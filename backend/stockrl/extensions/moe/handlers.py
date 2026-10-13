@@ -46,7 +46,7 @@ def expert_descriptor(key,file,checksum,size,modified):
 
 
 def expert_state():
-    from stockrl.management.diagnostics.handlers import file_info
+    from stockrl.management.diagnostics_logs_code_apply.handlers import file_info
     registry = read_json(ROOT / "configs/experts.json", {"active": [], "experts": {}})
     status = read_json(ROOT / "runtime/experts/status.json")
     rows = []
@@ -88,9 +88,9 @@ def champions():
 
 @router.post("/api/champions/create")
 def champion_create(request:ChampionRequest):
-    from stockrl.management.diagnostics.handlers import database
+    from stockrl.management.diagnostics_logs_code_apply.handlers import database
     if system.job_state()["running"]:raise HTTPException(409,"현재 학습·수집이 끝난 뒤 생성하세요.")
-    from stockrl.trading.control.operations_settings import settings
+    from stockrl.trading.operation_control.operations_settings import settings
     recent=read_json(RUNTIME/"job.json")
     if recent.get('command')!='train':recent={}
     request.currency=request.currency or recent.get("currency") or "USD"

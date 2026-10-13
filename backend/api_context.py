@@ -42,7 +42,7 @@ from stockrl.platform.system_operations import apply_running
 from stockrl.platform.system_operations import start_apply
 from stockrl.platform.system_operations import busy
 from stockrl.platform.system_operations import check_system
-from stockrl.trading.control.operations_runtime import runtime
+from stockrl.trading.operation_control.operations_runtime import runtime
 from stockrl.platform.library_operations import library as library_manager
 from stockrl.expert_registry_native import ExpertRegistry
 from finrl.agents.stablebaselines3.models import MODELS

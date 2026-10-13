@@ -82,8 +82,8 @@ def source_settings():
 
 
 def model_state(settings,selected=None):
-    from stockrl.management.diagnostics.handlers import file_info
-    from stockrl.management.diagnostics.handlers import state
+    from stockrl.management.diagnostics_logs_code_apply.handlers import file_info
+    from stockrl.management.diagnostics_logs_code_apply.handlers import state
     selected=Path(selected) if selected is not None else policy_files()
     path = policy_checkpoint(selected)
     replay = selected / "replay.pkl"
@@ -161,7 +161,7 @@ def saved_replay():
 
 
 def checkpoints(settings):
-    from stockrl.management.diagnostics.handlers import file_info
+    from stockrl.management.diagnostics_logs_code_apply.handlers import file_info
     paths = list(RUNTIME.glob('*.zip')) + sorted((RUNTIME/"archives").glob("*/*.zip")) + sorted((RUNTIME/"policies").glob("*/*.zip")) + sorted((RUNTIME/"champions").glob("*/*.zip"))
     items=[]
     for path in paths:
@@ -194,7 +194,7 @@ def download(name: Literal["sac.zip", "dataset.json"],currency:Literal['KRW','US
 
 
 def preflight(req, command):
-    from stockrl.management.diagnostics.handlers import database
+    from stockrl.management.diagnostics_logs_code_apply.handlers import database
     from stockrl.extensions.moe.handlers import expert_state
     db = database()
     errors = []
@@ -280,7 +280,7 @@ def check(req: RunRequest):
 
 
 def launch(command, req,preserve_output=False):
-    from stockrl.management.diagnostics.handlers import now
+    from stockrl.management.diagnostics_logs_code_apply.handlers import now
     with system.job_lock:
         if system.job_state()["running"]:
             raise HTTPException(409, "학습 작업이 실행 중입니다.")

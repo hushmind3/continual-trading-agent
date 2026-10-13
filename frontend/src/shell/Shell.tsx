@@ -23,7 +23,7 @@ function errorSection(name:string){
  if(name.includes('FinRL:')||name.includes('stockrl.finrl.')||['model','models_by_currency','checkpoints'].includes(name))return {group:'금융',target:'finance/modules_tools'};
  if(['experts','library','models'].includes(name)||name.startsWith('champion:')||name==='view:champions'||name.includes('platform.expert_')||name.includes('platform.assets')||name.includes('platform.sac_champion'))return {group:'금융',target:'finance/moe'};
  if(name==='data')return {group:'금융',target:'finance/operation_control'};
- if(name==='operations'||name.includes('stockrl.trading.control.'))return {group:'금융',target:'finance/operation_control'};
+ if(name==='operations'||name.includes('stockrl.trading.operation_control.'))return {group:'금융',target:'finance/operation_control'};
  return {group:'금융',target:'finance/diagnostics_logs_code_apply'};
 }
 export function Page({active}:{active:string}){

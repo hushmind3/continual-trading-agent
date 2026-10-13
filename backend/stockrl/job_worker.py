@@ -8,6 +8,20 @@ from . import ROOT
 from .state_io import read_json, atomic_json, update_json
 
 
+def framework_failure_record(job,error,previous=None):
+    """Attribute a failed request to its selected module and callable."""
+    from .platform.framework_operations import ACTIONS
+    action=job.get('action');row=ACTIONS.get(action)
+    parameters=job.get('parameters') or {}
+    module=parameters.get('module') if action=='native_call' else row[2] if row else None
+    function=parameters.get('callable') if action=='native_call' else row[3] if row else None
+    module=module if isinstance(module,str) else None
+    function=function if isinstance(function,str) else None
+    return {**(previous or {}),'job_id':job.get('id'),'action':action,
+        'module':module,'function':function,'status':'failed','error':str(error),
+        'request_target':{'module':module,'function':function}}
+
+
 def main():
     root = ROOT / "runtime/official"
     job_id = sys.argv[1]
@@ -52,10 +66,8 @@ def main():
         exit_code = 1;failure=str(sys.exc_info()[1])
         traceback.print_exc()
         if job['command']=='framework':
-            from .platform.framework_operations import ACTIONS
-            row=ACTIONS[job['action']]
             result_path=root/job['output']/'result.json';failed=read_json(result_path)
-            failed.update(action=job['action'],module=row[2],function=row[3],status='failed',error=str(sys.exc_info()[1]))
+            failed=framework_failure_record(job,sys.exc_info()[1],failed)
             atomic_json(failed,result_path)
     finally:
         def finished(current):

@@ -9,10 +9,10 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 from stockrl import ROOT
-from stockrl.trading.paper_account.paper_account import PaperAccount
+from stockrl.trading.virtual_account_orders.paper_account import PaperAccount
 from stockrl.expert_observation import ExpertObservation
-from stockrl.trading.control.operations_runtime import OperationsRuntime
-from stockrl.trading.control import operations_settings
+from stockrl.trading.operation_control.operations_runtime import OperationsRuntime
+from stockrl.trading.operation_control import operations_settings
 from stockrl.market_storage import AppendOnlyMarketCSV
 def panel(symbol,date,price=100):
  return SimpleNamespace(dates=[date],symbols=[symbol],groups={symbol:('US','equity')},observed=np.ones((1,1),bool),closes=np.array([[price]]),features=np.zeros((1,1,8)))
@@ -144,7 +144,7 @@ class IntegrityTests(unittest.TestCase):
    self.assertEqual(actual.close.tolist(),[100]);self.assertEqual(actual.attrs['timeframe'],'1d')
  def test_unchanged_daily_data_does_not_repeat_learning(self):
   import sys
-  from stockrl.trading.control import operations_runtime
+  from stockrl.trading.operation_control import operations_runtime
   from stockrl.finrl import framework
   runtime=OperationsRuntime();runtime.controls['learning']=True
   frame=pd.DataFrame([row('AAPL','2026-01-01')]);launched=[]
@@ -159,7 +159,7 @@ class IntegrityTests(unittest.TestCase):
    runtime.queue_learning(['AAPL']);self.assertEqual(len(launched),2)
  def test_old_manual_quote_is_rejected(self):
   import sys
-  from stockrl.trading.control import operations_runtime
+  from stockrl.trading.operation_control import operations_runtime
   runtime=OperationsRuntime();runtime.account=PaperAccount.in_memory(0,0);runtime.quotes['AAPL']=row('AAPL','2000-01-01')
   with patch.dict(sys.modules,{'stockrl.live_feed':SimpleNamespace(LIVE_QUOTE_MAX_AGE_SECONDS=300)}),patch.object(operations_runtime,'read_json',return_value={'instruments':[{'symbol':'AAPL','market':'US','asset_class':'equity'}]}):
    with self.assertRaisesRegex(ValueError,'최신 시세'):runtime.manual_order('AAPL','USD','BUY',1)
@@ -213,9 +213,41 @@ class REAProjectStorageTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as temporary:
    source=Path(temporary);(source/'app.js').write_text('export const value=7;',encoding='utf8')
    output=source/'backend/rea/project_explorer/saved_projects';destination=output/'test/original/source'
-   with patch.object(projects,'OUTPUT',output):
-    projects._copy_directory(source,destination)
+   with patch.object(extract,'OUTPUT',output):
+    extract._copy_directory(source,destination)
    self.assertEqual((destination/'app.js').read_text(encoding='utf8'),'export const value=7;')
    self.assertFalse((destination/'backend/rea/project_explorer/saved_projects').exists())
+
+class FrameworkFailureAttributionTests(unittest.TestCase):
+ def test_failed_native_call_uses_requested_module_and_function(self):
+  from stockrl.job_worker import framework_failure_record
+  job={'id':'requested','action':'native_call','parameters':{'module':'FinRL:a','callable':'load'}}
+  record=framework_failure_record(job,ValueError('failed'),{'module':'FinRL:b','function':'other'})
+  self.assertEqual(record['request_target'],{'module':'FinRL:a','function':'load'})
+  self.assertEqual(record['module'],'FinRL:a')
+  self.assertEqual(record['function'],'load')
+  self.assertEqual(record['status'],'failed')
+
+ def test_success_for_another_module_does_not_clear_failure(self):
+  from stockrl.platform.framework_operations import execution_records
+  import os
+  with tempfile.TemporaryDirectory() as temporary:
+   directory=Path(temporary)
+   records=[{'error':'unattributed','module':None},
+            {'error':'target failed','request_target':{'module':'FinRL:a','function':'load'}},
+            {'module':'FinRL:b','function':'run','executed_functions':{'FinRL:b':[None,'run']}}]
+   for index,record in enumerate(records):
+    path=directory/str(index)/'result.json';path.parent.mkdir()
+    path.write_text(json.dumps(record),encoding='utf8');os.utime(path,(index+1,index+1))
+   verified,failed,unknown=execution_records(directory,{'FinRL:a','FinRL:b'})
+   self.assertEqual(failed['FinRL:a']['function'],'load')
+   self.assertNotIn(None,failed)
+   self.assertEqual(verified,{'FinRL:b':['run','run']})
+   self.assertEqual(len(unknown),1)
+   path=directory/'success'/'result.json';path.parent.mkdir()
+   path.write_text(json.dumps({'module':'FinRL:a','function':'load'}),encoding='utf8')
+   _,failed,unknown=execution_records(directory,{'FinRL:a','FinRL:b'})
+   self.assertNotIn('FinRL:a',failed)
+   self.assertEqual(len(unknown),1)
 
 if __name__=='__main__':unittest.main()

@@ -64,12 +64,13 @@ def audit(root):
 
     operating = reach(entries)
     retained = reach(entries | checks)
-    return {'python_files': len(paths),
+    return {'analysis_kind': 'static_reference_graph', 'execution_verified': False,
+            'nonuse_verdict': 'unconfirmed', 'python_files': len(paths),
             'production_referenced': sorted(path for name, path in modules.items() if name in operating),
             'inspection_only': sorted(path for name, path in modules.items() if name in retained - operating),
             'unreferenced_candidates': sorted(path for name, path in modules.items() if name not in retained and not path.endswith('/__init__.py')),
             'source_errors': errors, 'dynamic_imports_for_review': dynamic,
-            'note': 'Static references only. No project imports, function execution, authentication checks or deletion.'}
+            'note': 'Static references only; candidates are not proven unused. Dynamic imports, conditional imports and string references require review. No project imports, function execution, authentication checks or deletion.'}
 
 
 if __name__ == '__main__':

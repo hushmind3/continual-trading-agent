@@ -8,4 +8,4 @@
 
 소속 대메뉴：금융. 이 폴더는 금융 내부 기능 분류이며 독립 대메뉴로 등록하지 않습니다. 하위 기능 → 분류 submenu_manager → 금융 submenu_manager → finance_menu_manager → 전체 menu_registry → /api.
 
-프론트 메뉴 주소: `#finance/all_backend_features`; 화면: `frontend/src/pages/finance/management/all_backend_features/AllBackendFeatures.tsx`. 백엔드 실행 모듈·API 작업명은 유지합니다.
+프론트 메뉴 주소: `#finance/all_backend_features`; 화면: `frontend/src/pages/finance/management/all_backend_features/AllBackendFeatures.tsx`. 백엔드 폴더·import 이름은 프론트 소메뉴 폴더와 일치합니다. API 작업명은 유지합니다.

@@ -42,6 +42,14 @@ class REAConnection:
         env=runtime_environment()
         with (WORK/'mcp.stderr.log').open('ab') as errors:
             self.process=subprocess.Popen([node,str(BASE/'bridge.mjs')],cwd=WORK,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=errors,text=True,encoding='utf8',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        if os.name=='nt':
+            try:
+                owner=psutil.Process(self.process.pid)
+                for process in [owner,*owner.children(recursive=True)]:
+                    process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+                    process.cpu_affinity(process.cpu_affinity()[:2])
+            except psutil.Error as exc:
+                self.close();raise RuntimeError('REA CPU 사용 제한 적용 실패: '+str(exc)) from exc
         stream=self.process.stdout
         def receive():
             try:
@@ -105,10 +113,15 @@ def doctor(provider=None):
     if provider not in (None,'ghidra','hopper'):raise ValueError('지원하는 엔진을 선택하세요.')
     args=[node,str(BASE/'node_modules/rea-agents/scripts/rea.mjs'),'doctor','--format','json']
     if provider:args+=['--provider',provider]
-    result=subprocess.run(args,env=runtime_environment(),cwd=WORK,capture_output=True,text=True,encoding='utf8',timeout=60,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    env=runtime_environment()
+    result=subprocess.run(args,env=env,cwd=WORK,capture_output=True,text=True,encoding='utf8',timeout=60,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     try:data=json.loads(result.stdout)
     except ValueError:data={'output':result.stdout,'error':result.stderr}
-    return {'exit_code':result.returncode,'result':data}
+    report={'exit_code':result.returncode,'result':data}
+    if provider:
+        from ..state_io import atomic_json
+        atomic_json({**report,'settings':{key:env.get(key,'') for key in ENGINE_FIELDS}},WORK/(provider+'-readiness.json'))
+    return report
 
 def install():
     node,_=node_runtime();npm=shutil.which('npm')
@@ -156,8 +169,11 @@ def engine_settings():
             if not path or not (Path(path)/relative if relative else Path(path)).is_file():
                 missing.append(key+('/'+relative if relative else ''))
         supported=name!='hopper' or os.name!='nt'
+        from ..state_io import read_json
+        readiness=read_json(WORK/(name+'-readiness.json'))
+        verified=not missing and readiness.get('settings')==values and readiness.get('exit_code')==0
         providers.append({'id':name,'supported':supported,'missing':missing,
-            'state':'플랫폼 미지원' if not supported else '경로 설정 필요' if missing else '필수 파일 확인 · 엔진 실행 미확인'})
+            'state':'플랫폼 미지원' if not supported else '경로 설정 필요' if missing else '원본 엔진 준비 확인 통과' if verified else '필수 파일 확인 · 엔진 실행 미확인'})
     return {'values':values,'providers':providers,'platform':sys.platform}
 
 def save_engine_settings(values):

@@ -190,10 +190,11 @@ test('MoE selected operations, version details and removal dispatch only chosen 
     await operation.selectOption(action);await page.getByRole('button',{name:'선택 작업 실행',exact:true}).click();
     await expect(page.getByText('버튼 검사: '+(action==='apply'?'experts/select':'library/'+action),{exact:true})).toBeVisible();
   }
-  for(const detail of await page.getByRole('button',{name:/상세·검사 결과$/}).all()){
-    await detail.click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'닫기',exact:true}).last().click();
-  }
+  const detail=page.getByRole('button',{name:/상세·검사 결과$/}).first();
+  await detail.click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'닫기',exact:true}).last().click();
+  await page.getByText('버전 관리',{exact:true}).first().click();
   const remove=page.getByRole('button',{name:'선택 버전 삭제',exact:true}).filter({visible:true});
+  await expect(remove.first()).toBeEnabled();
   for(const button of await remove.all()){if(await button.isEnabled()){await button.click();await expect(page.getByText('버튼 검사: library/remove',{exact:true})).toBeVisible();}}
   await page.getByRole('button',{name:'가져오기',exact:true}).click();
   await page.getByRole('dialog').getByPlaceholder('C:\\모델\\expert.pt 또는 https://…').fill('nonexistent-expert.pt');

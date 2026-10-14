@@ -4,13 +4,13 @@
 - 핵심 파일: CheckpointPanel.tsx, PolicyArchitecture.tsx, SacControls.tsx, PolicyLearning.tsx
 - 상위 연결: ../submenu_manager.ts → finance_menu_manager.ts → 전체 menu_registry → 단일 /api.
 - 필수 의존성: 소스의 명시적 import와 공통 상태·API 전송 모듈.
-- 상태: 등록 경로 이식 완료. 이번 구조 변경 후 함수 실행·브라우저 검사 미실행. 기존 기록만 실행 확인으로 표시합니다.
+- 상태: 저장 모델·비교 평가 표시 수정 후 TypeScript·Vite 빌드 및 로컬 서버 적용 완료. 실제 화면에서 004 선택, 002와의 수익률·낙폭 비교 표시를 확인했습니다. 화면 확인 중 학습 실행·운영 정책 변경은 하지 않았습니다. 자동 학습 예약 변경의 실제 학습 검증은 미실행입니다.
 
 소속 대메뉴：금융. 이 폴더는 금융 내부 기능 분류이며 독립 대메뉴로 등록하지 않습니다. 하위 기능 → 분류 submenu_manager → 금융 submenu_manager → finance_menu_manager → 전체 menu_registry → /api.
 
 - 주소: `#finance/policy_learning`. 메뉴 등록 ID와 프론트 폴더 이름을 일치시킵니다.
 
-- 저장 모델 선택·로드 패널은 정책 학습 화면 맨 위에 표시합니다. 목록의 실제 파일 존재 여부와 Champion 연결은 백엔드가 확인합니다.
+- 저장 모델 선택·로드 패널은 정책 학습 화면 맨 위에 표시합니다. 최근 저장 모델의 학습 단계·업데이트, 실제 소비 봉과 입력 최신 봉, 저장된 같은 구간의 비교 평가를 바로 표시합니다. 후보 탐색은 운영 모델을 변경하지 않으며 모델 로드는 별도 버튼입니다. 목록의 실제 파일 존재 여부와 Champion 연결은 백엔드가 확인합니다.
 
 - 종목 선택 표·검색·선택 버튼과 선택 상태·종목 요청값을 제거했습니다. RunRequest에 수동 종목 입력 필드가 없습니다. 새 정책은 해당 통화의 등록 종목을 백엔드에서 결정하며, 이어 학습·Champion 학습은 저장된 정책의 종목 구성을 백엔드가 읽습니다. 과거 training_symbols 선택값은 읽지 않습니다.
 

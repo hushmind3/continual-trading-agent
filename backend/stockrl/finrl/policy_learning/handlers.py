@@ -185,6 +185,24 @@ def checkpoint_identity(path):
     return identity
 
 
+def checkpoint_evaluation(path,identity):
+    """Expose saved paired results only for the corresponding unchanged checkpoint."""
+    champion=identity.get('champion_file')
+    if not champion:return None
+    champion=Path(champion).resolve()
+    if not champion.is_relative_to(MODEL_DIR.resolve()):return None
+    report=champion.with_suffix('.evaluation.json')
+    if not report.is_file() or report.stat().st_mtime_ns<path.stat().st_mtime_ns:return None
+    try:
+        data=read_json(report);candidate=data.get('candidate',{});baseline=data.get('baseline',{})
+        if data.get('kind')!='chronological_paper_comparison' or Path(candidate.get('checkpoint','')).resolve()!=path.resolve():return None
+        fields=('checkpoint','start','end','return_pct','max_drawdown_pct','fees','fills','steps','device')
+        return {'currency':data.get('currency'),'source':data.get('source'),'timeframe':data.get('timeframe'),
+                'baseline':{key:baseline.get(key) for key in fields},'candidate':{key:candidate.get(key) for key in fields},
+                'return_difference_percentage_points':data.get('return_difference_percentage_points')}
+    except (OSError,ValueError,TypeError):return None
+
+
 def checkpoints(settings):
     from stockrl.management.diagnostics_logs_code_apply.handlers import file_info
     paths = list(RUNTIME.glob('*.zip')) + sorted((RUNTIME/"archives").glob("*/*.zip")) + sorted((RUNTIME/"policies").glob("*/*.zip")) + sorted((RUNTIME/"champions").glob("*/*.zip"))
@@ -199,7 +217,7 @@ def checkpoints(settings):
             items.append({"name":path.parent.name if path.parent!=RUNTIME else "현재 정책",
                           "path":path.relative_to(RUNTIME).as_posix(),"file":file_info(path),
                           "num_timesteps":data.get("num_timesteps"),"updates":data.get("_n_updates"),
-                          "identity":identity,"compatible":compatible})
+                          "identity":identity,"compatible":compatible,"evaluation":checkpoint_evaluation(path,identity)})
         except (OSError,ValueError,KeyError,zipfile.BadZipFile):
             continue
     return items

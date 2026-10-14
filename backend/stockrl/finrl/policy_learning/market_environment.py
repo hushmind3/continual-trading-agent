@@ -10,7 +10,7 @@ from stockrl.trading.operation_control.operations_settings import settings
 class MarketLearningEnv(gym.Env):
     metadata={'render_modes':[]}
     WARMUP_BARS=32
-    def __init__(self,frame,symbols,currency,fee=None,slippage=None,start_index=None):
+    def __init__(self,frame,symbols,currency,fee=None,slippage=None,start_index=None,continuous=False):
         self.symbols=list(symbols);self.currency=currency
         self._df=frame.copy();self._df['date']=pd.to_datetime(self._df.date)
         if self._df.duplicated(['date','symbol']).any():raise ValueError('같은 시각·종목의 가격이 중복돼 있습니다.')
@@ -23,7 +23,7 @@ class MarketLearningEnv(gym.Env):
         if len(self._sorted_times)<2:raise ValueError('학습에 서로 다른 시각의 시세가 2개 이상 필요합니다.')
         self._start_index=min(self.WARMUP_BARS-1,len(self._sorted_times)-2) if start_index is None else int(start_index)
         if not 0<=self._start_index<len(self._sorted_times)-1:raise ValueError('이어 학습 시작 시각이 가격 범위 밖입니다.')
-        self.consumed_until=None;self.transition_count=0
+        self.consumed_until=None;self.transition_count=0;self.continuous=bool(continuous)
         self.fields={name:self._df.pivot(index='date',columns='symbol',values=name).reindex(index=self._sorted_times,columns=self.symbols).to_numpy(dtype=float) for name in columns}
         observed=np.isfinite(self.fields['close'])
         groups={symbol:('KRX' if currency=='KRW' else 'US','equity') for symbol in self.symbols}
@@ -76,7 +76,8 @@ class MarketLearningEnv(gym.Env):
         self._final_weights.append(weights)
         reward=float(np.log(max(nav,1e-9)/max(previous,1e-9)))
         info={**self._info,'portfolio_value':nav,'fills':fills,'reward_basis':'net_equity_log_return'}
-        return self._state.copy(),reward,self._time_index==len(self._sorted_times)-1,False,info
+        end=self._time_index==len(self._sorted_times)-1
+        return self._state.copy(),reward,end and not self.continuous,end and self.continuous,info
 
     def normalized_action(self,action):
         values=np.asarray(action,dtype=float)

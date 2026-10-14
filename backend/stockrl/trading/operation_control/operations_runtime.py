@@ -24,6 +24,28 @@ from stockrl.finrl.framework import CASH_ENVIRONMENT
 from stockrl.finrl.framework import policy_timeframe
 from stockrl.finrl.framework import champion_structure_environment
 
+
+def learning_budget(identity,pending_observations,poll_seconds):
+    """Schedule work; preserve official algorithm parameters and rollout units."""
+    import math
+    from stockrl.finrl.framework import sac_example
+    _,parameters,limit=sac_example(identity.get('algorithm','sac'))
+    limit=max(1,int(limit));minimum=min(limit,max(1,int(parameters.get('n_steps',1))))
+    target=float(poll_seconds)
+    if not math.isfinite(target) or target<=0:raise ValueError('학습 작업 시간 기준이 유효하지 않습니다.')
+    desired=min(limit,max(minimum,int(pending_observations)))
+    previous=identity.get('training_input',{});elapsed=previous.get('elapsed_seconds');transitions=previous.get('transitions')
+    rate=None;capacity=None
+    if elapsed is not None and transitions is not None:
+        elapsed=float(elapsed);transitions=int(transitions)
+        if not math.isfinite(elapsed) or elapsed<=0 or transitions<1:raise ValueError('저장된 학습 속도 기록이 유효하지 않습니다.')
+        rate=transitions/elapsed;capacity=max(1,int(target*rate))
+        desired=min(desired,max(minimum,capacity))
+    return {'requested_timesteps':desired,'target_seconds':target,
+        'estimated_seconds':desired/rate if rate else None,'rollout_minimum':minimum,
+        'rollout_exceeds_target':capacity is not None and minimum>capacity}
+
+
 class OperationsRuntime:
     def __init__(self):
         self.lock=threading.RLock()
@@ -259,8 +281,7 @@ class OperationsRuntime:
                 current=read_json(ROOT/'runtime/operations/policies.json')
                 for currency,(path,identity,version,data) in candidates.items():
                     if current.get(currency)!=path:continue
-                    recorded=identity.get('training_input',{}).get('fingerprint')
-                    if not data['pending_observations'] and (recorded==version or (self.learning_versions.get(currency)==version and self.learning_version_sources.get(currency)==path)):
+                    if not data['pending_observations']:
                         self.learning_pending=[item for item in self.learning_pending if item!=currency]
                         continue
                     if currency not in self.learning_pending:self.learning_pending.append(currency)
@@ -273,7 +294,8 @@ class OperationsRuntime:
                     checkpoint=(ROOT/'runtime/official'/source).resolve()
                     if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('기준 정책 경로가 운영 폴더 밖입니다.')
                     stat=checkpoint.stat()
-                    request=learning.RunRequest(currency=currency,algorithm=identity.get('algorithm','sac'),resume=True,champion_path=identity.get('champion_file'),checkpoint=str(checkpoint),timeframe=policy_timeframe(identity))
+                    data.update(learning_budget(identity,data['pending_observations'],settings().data.poll_seconds))
+                    request=learning.RunRequest(currency=currency,algorithm=identity.get('algorithm','sac'),resume=True,champion_path=identity.get('champion_file'),checkpoint=str(checkpoint),timeframe=policy_timeframe(identity),total_timesteps=data['requested_timesteps'])
                     result=learning.launch('train',request,preserve_output=True,continuous=True);job=result['job']
                     self.learning_job=job['id']
                     self.learning_context={'id':job['id'],'currency':currency,'source':source,'source_signature':[stat.st_mtime_ns,stat.st_size],'version':version,'identity':dict(identity),'input':data,'output':job['output']}

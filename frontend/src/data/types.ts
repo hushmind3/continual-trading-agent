@@ -26,7 +26,12 @@ export interface Job {
   exit_code?:number;log_text:string;detail?:string;currency?:Currency;symbols?:string[];
   measurements:Record<string,number>;
 }
-export interface Checkpoint {name:string;path:string;file:FileState;num_timesteps:number|null;updates:number|null;identity:Record<string,unknown>;compatible:boolean}
+export interface PolicyEvaluation {
+  currency:string;source:string;timeframe:string;return_difference_percentage_points:number;
+  baseline:{checkpoint:string;start:string;end:string;return_pct:number;max_drawdown_pct:number};
+  candidate:{checkpoint:string;start:string;end:string;return_pct:number;max_drawdown_pct:number};
+}
+export interface Checkpoint {name:string;path:string;file:FileState;num_timesteps:number|null;updates:number|null;identity:Record<string,unknown>;compatible:boolean;evaluation?:PolicyEvaluation|null}
 export interface Snapshot {
   architecture:"finrl-unified-v3";updated_at:string;frontend_revision?:string|null;commands?:{operation:string;methods:string[];module:string;function:string}[];
   views?:Record<string,{data:unknown;error:string;updated_at:number|null}>;
@@ -59,7 +64,7 @@ export interface Snapshot {
 export interface Preflight {ok:boolean;errors:string[];symbols:string[];currency:Currency;mode:string;steps_per_run:number;periods:{training_observations:number;train_start:string;train_end_exclusive:string}|null}
 export interface Connections {api:{status:string};data:{status:string;source:string|null;available_sources:string[];reason?:string};brokers:{name:string;status:string;reason:string}[]}
 export interface OperationsState {
-  learning?:{status:string;error?:string;current?:{id:string;currency:Currency;source:string;input:{observations:number;end:string;timeframe:string;consumed_end?:string|null;pending_observations?:number}}|null;pending:string[];versions:Record<string,string>;last_completed?:{id:string;currency:Currency;path:string;num_timesteps?:number;updates?:number;at?:string;consumed_end?:string;transitions?:number};last_applied?:{id:string;currency:Currency;path:string;num_timesteps?:number;updates?:number;at?:string;consumed_end?:string;transitions?:number}};
+  learning?:{status:string;error?:string;current?:{id:string;currency:Currency;source:string;input:{observations:number;end:string;timeframe:string;consumed_end?:string|null;pending_observations?:number;requested_timesteps?:number;target_seconds?:number;estimated_seconds?:number|null;rollout_exceeds_target?:boolean}}|null;pending:string[];versions:Record<string,string>;last_completed?:{id:string;currency:Currency;path:string;num_timesteps?:number;updates?:number;at?:string;consumed_end?:string;transitions?:number};last_applied?:{id:string;currency:Currency;path:string;num_timesteps?:number;updates?:number;at?:string;consumed_end?:string;transitions?:number}};
   policies?:Partial<Record<Currency,{path:string;loaded:boolean;device?:string;observation_shape?:number[];action_shape?:number[];num_timesteps?:number;updates?:number}>>;
   controls:{feed:boolean;paper:boolean;engine:boolean;learning:boolean};
   account:{books:Record<Currency,{initial_cash:number;cash:number;equity:number;net_pnl:number;

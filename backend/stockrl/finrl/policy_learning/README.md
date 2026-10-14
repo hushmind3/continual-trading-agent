@@ -18,6 +18,8 @@
 
 비교 평가 진입점은 official_cli.py의 evaluate 명령입니다. 결과 JSON은 후보 Champion의 모델 폴더에 저장합니다. 과거 가상원장 결과는 실제 거래나 미래 수익의 증명이 아닙니다.
 
+저장 모델 목록은 해당 체크포인트와 일치하며 체크포인트보다 오래되지 않은 평가 JSON에서 요약 지표만 전달합니다. 화면 조회는 모델 생성·학습·평가를 실행하지 않습니다. 지속학습은 실제 소비 봉 이후 입력이 있을 때만 예약하며, 직전 실행 시간과 처리량으로 다음 작업량을 제한합니다. 이어 학습의 입력 끝은 시간 제한으로 처리하고 유한한 비교 평가의 종료와 구분합니다. 이번 수정 과정에서 새 학습 작업은 실행하지 않았습니다.
+
 저장 모델 목록·로드·다운로드는 실제 ZIP, 현재 환경의 dataset.json, 연결된 Champion PT 파일의 존재를 확인합니다. 삭제된 Champion의 남은 ZIP과 구형 환경 기록은 선택 모델로 등록하지 않습니다. PT 삭제·생성·변경도 목록 캐시 서명에 반영합니다. 모델 파일·선택 설정은 정리 과정에서 삭제하거나 변경하지 않습니다.
 
 사용자 회귀 검사(미실행): PowerShell에서 `$env:PYTHONPATH='backend;development/tests'` 설정 후 `.\.venv\Scripts\python.exe -B -m unittest test_state_integrity.CheckpointAvailabilityTests`를 실행합니다. 임시 테스트 파일에서 PT/ZIP 삭제 및 구형 환경 제외를 확인하며 실제 모델 파일은 변경하지 않습니다.

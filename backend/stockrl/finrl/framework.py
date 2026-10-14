@@ -14,7 +14,7 @@ def cash_environment(frame,registry,symbols,champion_ids=None,structure_only=Fal
     from .policy_learning.market_environment import MarketLearningEnv
     from ..expert_observation import ExpertObservation
     currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in symbols) else 'USD'
-    raw=MarketLearningEnv(frame,symbols,currency,start_index=frame.attrs.get('initial_time_index'))
+    raw=MarketLearningEnv(frame,symbols,currency,start_index=frame.attrs.get('initial_time_index'),continuous=frame.attrs.get('continuous',False))
     wrapped=ExpertObservation(raw,registry,frame,symbols,champion_ids=champion_ids,structure_only=structure_only)
     wrapped.source_environment=CASH_ENVIRONMENT;wrapped.currency=currency
     return wrapped
@@ -82,6 +82,7 @@ def learning_frame(frame,training=True,include_latest=False,since=None):
         initial_index=max(0,next_index-context_index-1)
     prepared=frame[(dates>=start)&(dates<end)].sort_values(['date','symbol']).reset_index(drop=True)
     prepared.attrs.update(frame.attrs)
+    prepared.attrs['continuous']=bool(training and include_latest)
     if initial_index is not None:prepared.attrs['initial_time_index']=initial_index
     if prepared.date.nunique()<2:raise ValueError('학습·평가 구간에 서로 다른 시각의 실제 가격이 부족합니다.')
     return prepared
@@ -112,6 +113,8 @@ def champion_structure_environment(currency,symbols,registry,champion_ids):
 
 
 def train(frame,registry,resume=False,output=None,champion_path=None,champion_output=None,algorithm='sac',total_timesteps=None,champion=None,source_checkpoint=None):
+    from time import perf_counter
+    started=perf_counter()
     from finrl.agents.stablebaselines3.models import DRLAgent
     from ..platform.system_operations import system
     example,parameters,steps=sac_example(algorithm)
@@ -179,6 +182,8 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
             transitions=int(native.transition_count))
         model.save(root/algorithm)
         if hasattr(model,'save_replay_buffer'):model.save_replay_buffer(root/'replay.pkl')
+        identity['training_input']['elapsed_seconds']=perf_counter()-started
+        identity['training_input']['requested_timesteps']=steps
         atomic_json(identity,root/'dataset.json')
         if champion and champion_output:
             from ..platform.sac_champion import save_trained_champion

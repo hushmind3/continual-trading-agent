@@ -221,7 +221,7 @@ test('MoE waits for request acceptance before enabling another operation',async(
   await page.route('**/api',async route=>{
     if(envelope(route.request())?.operation==='library/probe_all'){
       calls++;await new Promise<void>(resolve=>{release=resolve});
-      await route.fulfill({status:400,json:{error:{message:'controlled rejection'}}});return;
+      await route.fulfill({status:400,json:{detail:'controlled rejection'}});return;
     }
     await route.continue();
   });

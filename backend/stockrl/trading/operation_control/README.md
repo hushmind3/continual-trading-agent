@@ -13,3 +13,5 @@
 Expert 모델 설정 경로는 operations_settings.settings().model_dir 및 registry_file에서 제공합니다. 실제 등록·선택 정보는 바탕화면 모델/experts/expert_registry.json과 각 모델 폴더의 expert.json에 있습니다. 프로젝트 configs/experts.json을 읽지 않습니다.
 
 2026-10-14: 가상주문에서 NaT/누락 시각, 0·누락·NaN·무한 가격, 잘못된 호가를 원장 변경 전에 거부합니다. 통화 목록과 종목·장치 설정 자료형을 저장/실행 전에 확인합니다. 임시 계좌·설정 및 가짜 실행기로 검사했으며 알고리즘·수수료·슬리피지 기본값은 변경하지 않았습니다.
+
+주기 연결: 운영 판단과 지속학습은 dataset.json의 timeframe(구형 현재 환경 기록은 training_input.timeframe, 누락 시 기존 1d)을 따릅니다. 1m 정책은 완료된 분봉이 저장될 때 입력이 바뀌며, 요청 작업과 결과도 같은 주기를 유지해야 운영에 반영합니다. 기존 일봉 정책을 자동으로 분봉 정책으로 바꾸지 않습니다. 최신 수정 후 실제 시세·판단·학습·가상체결 검사는 미실행입니다.

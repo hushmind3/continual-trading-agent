@@ -51,6 +51,7 @@ def main():
             print("학습 저장 전: 이전 정책·Replay는 archives에 보관합니다.", flush=True)
         args = ["stockrl", job["command"], "--currency", job["currency"], "--symbols", *job["symbols"]]
         args.extend(['--algorithm',job.get('algorithm','sac')])
+        args.extend(['--timeframe',job.get('timeframe','1d')])
         if job.get('total_timesteps') is not None:args.extend(['--total-timesteps',str(job['total_timesteps'])])
         if job["resume"]:
             args.append("--resume")

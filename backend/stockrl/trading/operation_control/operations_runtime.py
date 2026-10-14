@@ -21,6 +21,7 @@ from stockrl.trading.operation_control.operations_settings import settings
 from stockrl.platform.system_operations import system
 from stockrl.finrl.framework import policy_checkpoint
 from stockrl.finrl.framework import CASH_ENVIRONMENT
+from stockrl.finrl.framework import policy_timeframe
 from stockrl.finrl.framework import champion_structure_environment
 
 class OperationsRuntime:
@@ -195,6 +196,7 @@ class OperationsRuntime:
             root=(ROOT/'runtime/official').resolve();folder=(root/context['output']).resolve()
             if not folder.is_relative_to(root):raise ValueError('학습 결과 경로가 운영 폴더 밖입니다.')
             identity=read_json(folder/'dataset.json')
+            if policy_timeframe(identity)!=policy_timeframe(context['identity']):raise ValueError('학습 결과의 가격 주기가 기준 정책과 다릅니다.')
             for key in ('currency','algorithm','symbols','environment','champion_experts'):
                 if key in context['identity'] and identity.get(key)!=context['identity'][key]:raise ValueError('학습 결과의 '+key+' 계약이 기준 정책과 다릅니다.')
             checked=learning.model_state(learning.source_settings(),folder)
@@ -234,7 +236,7 @@ class OperationsRuntime:
             for currency,path in policies.items():
                 identity=read_json((ROOT/'runtime/official'/path).parent/'dataset.json')
                 if not set(identity.get('symbols',[]))&set(symbols):continue
-                frame=prices(currency,identity['symbols'])
+                frame=prices(currency,identity['symbols'],timeframe=policy_timeframe(identity))
                 if frame.empty:continue
                 version=sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest()
                 candidates[currency]=(path,identity,version,{'observations':len(frame),'end':str(frame.date.max()),'timeframe':frame.attrs.get('timeframe','미지정')})
@@ -254,7 +256,7 @@ class OperationsRuntime:
                     checkpoint=(ROOT/'runtime/official'/source).resolve()
                     if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('기준 정책 경로가 운영 폴더 밖입니다.')
                     stat=checkpoint.stat()
-                    request=learning.RunRequest(currency=currency,algorithm=identity.get('algorithm','sac'),resume=True,champion_path=identity.get('champion_file'),checkpoint=str(checkpoint))
+                    request=learning.RunRequest(currency=currency,algorithm=identity.get('algorithm','sac'),resume=True,champion_path=identity.get('champion_file'),checkpoint=str(checkpoint),timeframe=policy_timeframe(identity))
                     result=learning.launch('train',request,preserve_output=True,continuous=True);job=result['job']
                     self.learning_job=job['id']
                     self.learning_context={'id':job['id'],'currency':currency,'source':source,'source_signature':[stat.st_mtime_ns,stat.st_size],'version':version,'identity':dict(identity),'input':data,'output':job['output']}
@@ -402,7 +404,7 @@ class OperationsRuntime:
         cash_enabled=identity.get('environment')==CASH_ENVIRONMENT
         if identity.get('environment')!=CASH_ENVIRONMENT:
             raise ValueError('현재 저장 SAC는 기존 환경의 파일입니다. 현재 원본 환경으로 학습한 정책이 필요합니다.')
-        symbols=identity['symbols'];currency=identity['currency'];frame=prices(currency,symbols)
+        symbols=identity['symbols'];currency=identity['currency'];frame=prices(currency,symbols,timeframe=policy_timeframe(identity))
         if frame.empty:
             self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'실제 저장 가격이 없습니다.'}
             return

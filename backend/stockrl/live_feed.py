@@ -213,7 +213,8 @@ class LiveMarketCollector:
         epoch = int(stamp) if isinstance(stamp, (int, float)) else int(pd.Timestamp(stamp).timestamp())
         row = {"date": _utc_stamp(epoch), "symbol": item["symbol"], "market": item["market"],
                "asset_class": item["asset_class"], "open": op, "high": hi, "low": lo, "close": close,
-               "volume": volume}
+               "volume": volume,"source":str(item.get('provider','yahoo')).lower(),
+               "timeframe":str(item.get('interval','1m'))}
         row.update(extras)
         return row
 

@@ -6,7 +6,7 @@ from stockrl.state_io import read_json,atomic_json
 
 
 def evaluate_pair(checkpoint,baseline_checkpoint):
-    from stockrl.finrl.framework import policy_files,training_environment,CASH_ENVIRONMENT
+    from stockrl.finrl.framework import policy_files,training_environment,CASH_ENVIRONMENT,policy_timeframe
     from stockrl.finrl.price_data.operations import prices
     from stockrl.expert_registry_native import ExpertRegistry
     from stockrl.platform.sac_champion import load_spec
@@ -20,7 +20,8 @@ def evaluate_pair(checkpoint,baseline_checkpoint):
     for key in ('currency','symbols','environment'):
         if identities[0].get(key)!=identities[1].get(key):raise ValueError('비교 정책의 '+key+' 구성이 다릅니다.')
     if identities[1]['environment']!=CASH_ENVIRONMENT:raise ValueError('현재 원장 환경의 정책을 선택하세요.')
-    frame=prices(identities[1]['currency'],identities[1]['symbols'])
+    if policy_timeframe(identities[0])!=policy_timeframe(identities[1]):raise ValueError('비교 정책의 가격 주기가 다릅니다.')
+    frame=prices(identities[1]['currency'],identities[1]['symbols'],timeframe=policy_timeframe(identities[1]))
     reports=[]
     try:
         for path,identity in zip(paths,identities):

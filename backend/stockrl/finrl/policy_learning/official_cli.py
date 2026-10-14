@@ -15,6 +15,7 @@ def main():
     parser.add_argument('--resume',action='store_true',help='이번 공식 SAC 실행에서 생성한 정책과 Replay만 복원')
     parser.add_argument('--algorithm',default='sac',help='설치된 FinRL MODELS의 알고리즘')
     parser.add_argument('--total-timesteps',type=int)
+    parser.add_argument('--timeframe',choices=['1d','1m'])
     parser.add_argument('--output',type=Path,help='기존 정책과 분리할 신규 SAC 결과 경로')
     parser.add_argument('--checkpoint',type=Path,help='이어 학습할 기존 정책 ZIP 경로')
     parser.add_argument('--baseline-checkpoint',type=Path,help='동일 조건에서 비교할 기준 정책 ZIP')
@@ -37,7 +38,14 @@ def main():
             for key,item in registry.catalog()['experts'].items():print(key,item['name'],'active' if key in registry.catalog()['active'] else 'stored')
             return
         (ROOT/'runtime/official').mkdir(parents=True,exist_ok=True)
-        frame=prices(args.currency,args.symbols)
+        timeframe=args.timeframe or '1d'
+        if args.resume:
+            from stockrl.finrl.framework import policy_files,policy_timeframe
+            from stockrl.state_io import read_json
+            stored_timeframe=policy_timeframe(read_json(policy_files(args.currency,args.checkpoint)/'dataset.json'))
+            if args.timeframe and args.timeframe!=stored_timeframe:raise ValueError('이어 학습 가격 주기가 저장 정책과 다릅니다.')
+            timeframe=stored_timeframe
+        frame=prices(args.currency,args.symbols,timeframe=timeframe)
         if frame.empty:raise ValueError('공식 DataStore에 해당 시장의 실제 가격 데이터가 없습니다.')
         model=train(frame,registry,args.resume,args.output,args.champion_path,args.champion_output,args.algorithm,args.total_timesteps,champion=champion,source_checkpoint=args.checkpoint)
         print('Saved FinRL policy:',(args.output or ROOT/'runtime/official')/(args.algorithm+'.zip'))

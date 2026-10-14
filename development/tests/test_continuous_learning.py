@@ -122,9 +122,25 @@ class ContinuousLearningTests(unittest.TestCase):
         self.runtime.finish_learning()
         self.assertEqual(read_json(self.selection)['USD'], 'policies/result1/sac.zip')
 
+    def test_minute_policy_keeps_its_timeframe_through_continuous_learning(self):
+        self.identity['timeframe']='1m'
+        self.write_policy('policies/source',self.identity)
+        self.runtime.queue_learning(['AAPL'])
+        self.prices.assert_called_once_with('USD',['AAPL'],timeframe='1m')
+        self.assertEqual(self.requests[0][0].timeframe,'1m')
+
+    def test_timeframe_changed_in_result_is_not_applied_to_operation(self):
+        self.identity['timeframe']='1m'
+        self.write_policy('policies/source',self.identity)
+        self.runtime.queue_learning(['AAPL'])
+        self.succeed({**self.identity,'timeframe':'1d'})
+        self.runtime.finish_learning()
+        self.assertEqual(read_json(self.selection)['USD'],self.source)
+        self.assertIn('가격 주기',self.runtime.status['learning_error'])
+
     def test_price_query_does_not_hold_runtime_quote_lock(self):
         started, release = threading.Event(), threading.Event()
-        def slow(*args):
+        def slow(*args,**kwargs):
             started.set()
             if not release.wait(3): raise TimeoutError('query timed out')
             return self.frame

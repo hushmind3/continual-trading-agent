@@ -49,6 +49,7 @@ class RunRequest(BaseModel):
     checkpoint: str | None = None
     algorithm: str = 'sac'
     total_timesteps: int | None = Field(default=None,ge=1)
+    timeframe: Literal['1d','1m'] | None = None
 
 
 def algorithms():
@@ -86,7 +87,7 @@ def source_settings():
         "save_policy":"정상 종료 시 동일 SAC 정책·Replay·Champion 새 버전 저장",
         "observation":"관측된 가격·가용 여부 + Expert별 실제 출력 64D + 계좌 16D → ChampionExtractor",
         "notes":["학습과 가상운영이 같은 정수 수량 원장을 사용합니다. 보상은 비용 반영 순자산의 로그 증가율입니다.",
-            "SAC 행동은 현금(첫 항목)과 종목별 비중입니다. 가상원장 전달 시 현금을 마지막 항목으로 옮깁니다.",
+            "SAC 행동은 현금(첫 항목)과 종목별 비중이며 같은 순서로 가상원장에 전달합니다.",
             "Frozen Expert와 결합부·Actor·Twin Critic은 단일 SAC 정책에 연결됩니다."]}
 
 
@@ -217,6 +218,7 @@ def download(name: Literal["sac.zip", "dataset.json"],currency:Literal['KRW','US
 
 
 def preflight(req, command):
+    from stockrl.finrl.framework import policy_timeframe
     from stockrl.management.diagnostics_logs_code_apply.handlers import database
     from stockrl.extensions.moe.handlers import expert_state
     db = database()
@@ -228,11 +230,15 @@ def preflight(req, command):
     symbols = sorted(symbol for symbol,item in eligible.items() if item["stored"])
     settings = source_settings()
     model={'identity':{}}
+    timeframe=req.timeframe or '1d'
     if req.resume:
         try:
             selected=policy_files(req.currency,req.checkpoint)
             model=model_state(settings,selected)
             symbols=list(model['identity'].get('symbols') or [])
+            stored_timeframe=policy_timeframe(model['identity'])
+            if req.timeframe and req.timeframe!=stored_timeframe:errors.append('이어 학습 가격 주기가 저장 정책과 다릅니다.')
+            timeframe=stored_timeframe
         except (ValueError,OSError) as exc:
             errors.append(str(exc));model=model_state(settings)
     try:_,_,steps=sac_example(req.algorithm)
@@ -249,10 +255,13 @@ def preflight(req, command):
             symbols=list(identity.get('symbols') or [])
             if identity['algorithm']!=req.algorithm:raise ValueError('선택한 알고리즘과 Champion의 알고리즘이 다릅니다.')
             if identity.get('environment')!=CASH_ENVIRONMENT:
-                raise ValueError('현재 PortfolioOptimizationEnv와 다른 Champion입니다. MoE에서 현재 환경으로 생성하세요.')
+                raise ValueError('현재 학습 환경과 다른 Champion입니다. MoE에서 현재 환경으로 생성하세요.')
             checkpoint=Path(champion['checkpoint'])
             if not checkpoint.is_absolute():checkpoint=RUNTIME/checkpoint
             if not checkpoint.is_file():raise ValueError('Champion의 SB3 학습 체크포인트가 없습니다.')
+            checkpoint_identity=read_json(checkpoint.parent/'dataset.json')
+            if champion.get('trained') and policy_timeframe(checkpoint_identity)!=timeframe:
+                raise ValueError('학습된 Champion의 가격 주기가 다릅니다. 해당 주기의 새 정책을 선택하세요.')
             if identity.get('currency')!=req.currency:
                 raise ValueError('선택한 Champion의 통화가 다릅니다.')
         except (ValueError,OSError,KeyError,RuntimeError) as exc:
@@ -284,7 +293,7 @@ def preflight(req, command):
         from stockrl.finrl.framework import learning_frame
         from stockrl.finrl.policy_learning.market_environment import MarketLearningEnv
         from pandas import Timedelta,to_datetime
-        frame=prices(req.currency,symbols)
+        frame=prices(req.currency,symbols,timeframe=timeframe)
         if frame.empty:errors.append('학습·추론 모듈이 사용하는 실제 저장 가격이 없습니다.')
         else:
             try:
@@ -293,7 +302,7 @@ def preflight(req, command):
                 periods={'training_observations':int(prepared.date.nunique()),'trade_date':str(frame.date.max()),
                     'train_start':str(prepared.date.min()),'train_end':str(prepared.date.max()),'includes_latest_completed':req.resume}
             except ValueError as exc:errors.append('학습: '+str(exc))
-    return {"ok": not errors, "errors": errors, "symbols": symbols, "currency": req.currency, "periods": periods,
+    return {"ok": not errors, "errors": errors, "symbols": symbols, "currency": req.currency, "timeframe":timeframe,"periods": periods,
             "mode": "이어 학습" if req.resume else "새 학습",
             "steps_per_run": req.total_timesteps or steps}
 
@@ -316,7 +325,7 @@ def launch(command, req,preserve_output=False,continuous=False):
         job = {"id": job_id, "status": "starting", "command": command, "currency": req.currency,
                "symbols": checked["symbols"], "resume": req.resume, "started_at": now(),
                "log": f"jobs/{job_id}.log", "finished_at": None, "exit_code": None}
-        job.update(algorithm=req.algorithm,total_timesteps=req.total_timesteps,continuous=continuous)
+        job.update(algorithm=req.algorithm,total_timesteps=req.total_timesteps,continuous=continuous,timeframe=checked['timeframe'])
         if req.resume:job['source_checkpoint']=str(policy_checkpoint(policy_files(req.currency,req.checkpoint)))
         if req.champion_path:
             from stockrl.platform.sac_champion import _next_version

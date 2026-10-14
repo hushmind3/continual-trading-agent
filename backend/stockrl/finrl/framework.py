@@ -82,6 +82,12 @@ def training_environment(frame,registry,training=True,champion_ids=None,include_
     return wrapped
 
 
+def policy_timeframe(identity):
+    value=identity.get('timeframe') or identity.get('training_input',{}).get('timeframe') or '1d'
+    if value not in ('1d','1m'):raise ValueError('저장 정책의 학습 가격 주기를 확인할 수 없습니다.')
+    return value
+
+
 def champion_structure_environment(currency,symbols,registry,champion_ids):
     """Inspect the selected cash-enabled spaces without market or Expert inference."""
     import pandas as pd
@@ -122,19 +128,23 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     if champion:
         identity.update(champion['identity'])
         if champion_output:identity['champion_file']=str(Path(champion_output))
+    identity['timeframe']=frame.attrs.get('timeframe','1d')
     try:
         if resume:
             previous=read_json(saved/'dataset.json');previous.setdefault('algorithm','sac')
+            previous.setdefault('timeframe',policy_timeframe(previous))
             if any(previous.get(key)!=value for key,value in identity.items() if key!='champion_file'):raise ValueError('저장된 정책과 알고리즘·통화·종목·Expert 구성이 다릅니다. 새 학습으로 시작하세요.')
             identity={**previous,**identity}
         from hashlib import sha256
         import pandas as pd
-        identity['training_input']={'fingerprint':sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest(),'observations':len(frame),'end':str(frame.date.max()),'timeframe':frame.attrs.get('timeframe','미지정')}
+        identity['training_input']={'fingerprint':sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest(),'observations':len(frame),'end':str(frame.date.max()),'timeframe':identity['timeframe'],'source':frame.attrs.get('source','unknown')}
         agent=DRLAgent(env=env)
         print('FinRL DRLAgent ·',algorithm.upper(),parameters,'단계:',steps,flush=True)
         if champion:
             checkpoint=Path(source_checkpoint) if resume and source_checkpoint else Path(champion['checkpoint'])
             if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/official'/checkpoint
+            if (checkpoint.parent/'replay.pkl').is_file() and policy_timeframe(read_json(checkpoint.parent/'dataset.json'))!=identity['timeframe']:
+                raise ValueError('저장된 Replay와 입력 가격 주기가 다릅니다. 해당 주기의 새 정책을 생성하세요.')
             model=system.model(checkpoint,algorithm,env)
             if hasattr(model,'load_replay_buffer') and (checkpoint.parent/'replay.pkl').is_file():model.load_replay_buffer(checkpoint.parent/'replay.pkl')
             from finrl.agents.stablebaselines3.models import TensorboardCallback
@@ -154,7 +164,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
         atomic_json(identity,root/'dataset.json')
         if champion and champion_output:
             from ..platform.sac_champion import save_trained_champion
-            save_trained_champion(champion_path,model,Path(champion_output),root,spec=champion)
+            save_trained_champion(champion_path,model,Path(champion_output),root,spec={**champion,'identity':dict(identity)})
         print('학습 완료:',model.num_timesteps,'관측,',getattr(model,'_n_updates',None),'업데이트',flush=True)
     finally:env.close()
     return model

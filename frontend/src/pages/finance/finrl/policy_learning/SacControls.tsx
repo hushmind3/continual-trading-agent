@@ -10,13 +10,15 @@ interface AlgorithmOption {name:string;parameters:Record<string,string|number|bo
 export function SacControls(){const {state:s,execute,pending,algorithm:algorithmChoice,selectAlgorithm:setAlgorithmChoice}=useOperations();
  const algorithms=useSystemState<{default:string;items:AlgorithmOption[]}>('algorithms');
  const [timesteps,setTimesteps]=useState('');
+ const [timeframe,setTimeframe]=useState<'1d'|'1m'>('1d');
  const [currency,setCurrency]=useState<Currency>(()=>sessionStorage.getItem('training_currency')==='KRW'?'KRW':'USD');
  useEffect(()=>{sessionStorage.setItem('training_currency',currency)},[currency]);
  const [resume,setResume]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[check,setCheck]=useState<{signature:string;result:Preflight}|null>(null);
  const championOptions=useSystemState<{items:ChampionOption[]}>('champions'),champions=championOptions.data?.items??[];const [champion,setChampion]=useState('');
  if(!s)return null;const algorithm=algorithmChoice||algorithms.data?.default||'',official=algorithms.data?.items.find(item=>item.name===algorithm);
  const model=s.models_by_currency?.[currency]??s.model;
- const body={currency,resume,algorithm,...(timesteps?{total_timesteps:Number(timesteps)}:{}),...(champion?{champion_path:champion}:{})},signature=JSON.stringify(body);
+ const identity=model.identity as {timeframe?:string;training_input?:{timeframe?:string}},savedTimeframe=identity.timeframe??identity.training_input?.timeframe??'1d';
+ const body={currency,resume,algorithm,timeframe:resume?savedTimeframe:timeframe,...(timesteps?{total_timesteps:Number(timesteps)}:{}),...(champion?{champion_path:champion}:{})},signature=JSON.stringify(body);
  const valid=check?.signature===signature&&check.result.ok;
  const act=async(path:string)=>{setError('');setMessage('');try{if(path==='preflight/train'){const result=await execute<Preflight>(path,body);setCheck({signature,result})}else{const result=await execute<{message:string}>(path,body);setMessage(result.message);setCheck(null)}}catch(e){setError(e instanceof Error?e.message:'요청 실패')}};
  return <Panel title="FinRL · SB3 공식 학습" description="백엔드의 FinRL 알고리즘을 선택하고 공식 DRLAgent로 학습합니다.">
@@ -27,6 +29,8 @@ export function SacControls(){const {state:s,execute,pending,algorithm:algorithm
  <label className="text-xs text-slate-500">학습 단계<input aria-label="학습 단계" type="number" min={1} className={inputClass+' mt-2'} value={timesteps||official?.steps_per_run||''} disabled={s.job.running} onChange={e=>{setTimesteps(e.target.value);setCheck(null)}}/></label>
  <label className="text-xs text-slate-500">학습 방식<select aria-label="학습 방식" className={inputClass+' mt-2'} value={resume?'resume':'new'} disabled={s.job.running||!!champion} onChange={e=>{setResume(e.target.value==='resume');setCheck(null)}}><option value="new">새 학습</option><option value="resume" disabled={!model.compatible||model.identity.algorithm!==algorithm}>저장 정책 이어 학습</option></select></label>
  </div>
+ <label className="mt-4 block text-xs text-slate-500">학습 가격 주기<select aria-label="학습 가격 주기" className={inputClass+' mt-2'} value={resume?savedTimeframe:timeframe} disabled={s.job.running||resume} onChange={e=>{setTimeframe(e.target.value as '1d'|'1m');setCheck(null)}}><option value="1d">일봉 · 저장 역사 가격</option><option value="1m">1분봉 · 수신 완료 시세</option></select></label>
+ <p className="mt-2 text-xs leading-6 text-slate-500">1분봉은 시세 수신으로 저장된 완료 봉을 사용합니다. 데이터가 부족하면 실행 전 검사에서 차단합니다. 이어 학습은 저장 정책의 주기를 유지합니다.</p>
  <label className="mt-4 block text-xs text-slate-500">{algorithm.toUpperCase()} MoE Champion 선택<select aria-label="MoE Champion 선택" className={inputClass+' mt-2'} value={champion} disabled={s.job.running} onChange={e=>{const path=e.target.value;setChampion(path);setResume(false);const chosen=champions.find(c=>c.path===path);if(chosen){setCurrency(chosen.identity.currency)}setCheck(null)}}><option value="">FinRL {algorithm.toUpperCase()} 새 정책</option>{champions.filter(c=>c.identity.algorithm===algorithm).map(c=><option key={c.path} value={c.path}>{c.name} · {c.trained?'학습된 상태':'미학습'} · {number(c.parameters?.total_logical_parameters,0)} params</option>)}</select></label>
  {official&&<details className="my-4 rounded-xl bg-slate-50 p-4"><summary className="cursor-pointer text-xs text-blue-600">{algorithm.toUpperCase()} · FinRL 공식 기본 설정</summary><KeyValues items={Object.entries(official.parameters).map(([key,value])=>[key,String(value)])}/></details>}
  {!model.compatible&&<p className="my-4 rounded-xl bg-amber-50 p-4 text-xs leading-6 text-amber-800">현재 저장본은 최신 학습 환경과 호환되지 않아 이어 학습이 차단되어 있습니다. 아래 호환 사유를 확인하세요.</p>}

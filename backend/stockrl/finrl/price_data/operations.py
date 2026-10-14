@@ -109,7 +109,8 @@ def collection_status():
         'available_sources':sources,'reason':None if sources else 'FMP 인증이 없어 원격 가격 수집을 실행할 수 없습니다.'}
 
 
-def prices(currency='USD',symbols=None):
+def prices(currency='USD',symbols=None,timeframe='1d'):
+    if timeframe not in ('1d','1m'):raise ValueError('학습 가격 주기는 1d 또는 1m이어야 합니다.')
     import pandas as pd
     store=price_store()
     import sqlite3
@@ -123,14 +124,18 @@ def prices(currency='USD',symbols=None):
     names=symbols or [s for s in available if s in allowed]
     if start is None:return pd.DataFrame()
     from stockrl.management.connection_settings.provider_credentials import read_settings
-    kiwoom=currency=='KRW' and read_settings(ROOT/'runtime/operations').get('provider')=='kiwoom'
-    data=store.get_price_data(names,start,end,source='kiwoom',timeframe='1d') if kiwoom else store.get_price_data(names,start,end)
+    provider=read_settings(ROOT/'runtime/operations').get('provider')
+    kiwoom=currency=='KRW' and provider=='kiwoom'
+    if timeframe=='1m':
+        data=store.get_price_data(names,start,end,source=provider or 'unknown',timeframe='1m')
+    else:data=store.get_price_data(names,start,end,source='kiwoom',timeframe='1d') if kiwoom else store.get_price_data(names,start,end)
+    if timeframe=='1d' and not data.empty:data=data.loc[data.timeframe.isin(['1d','unknown'])].copy()
     if data.empty:return pd.DataFrame()
     data=data.rename(columns={'tic':'symbol','datadate':'date','prcod':'open','prchd':'high','prcld':'low','prccd':'close','cshtrd':'volume'})
     dates=pd.to_datetime(data.date,utc=True,format='mixed')
-    if kiwoom:
+    if kiwoom or timeframe=='1m':
         data['date']=dates.dt.tz_localize(None)
-        data=data.sort_values(['date','symbol']).reset_index(drop=True);data.attrs.update(timeframe='1d',source='kiwoom')
+        data=data.sort_values(['date','symbol']).reset_index(drop=True);data.attrs.update(timeframe=timeframe,source=provider or 'unknown')
         return data
     feed=ROOT/'runtime/operations/live/timeframes.sqlite3'
     if feed.is_file():

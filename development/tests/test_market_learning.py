@@ -11,6 +11,12 @@ def row(symbol,date,close=100):
 
 
 class MarketLearningTests(unittest.TestCase):
+    def test_policy_timeframe_uses_saved_metadata_and_rejects_unknown_units(self):
+        from stockrl.finrl.framework import policy_timeframe
+        self.assertEqual(policy_timeframe({}),'1d')
+        self.assertEqual(policy_timeframe({'training_input':{'timeframe':'1m'}}),'1m')
+        self.assertEqual(policy_timeframe({'timeframe':'1d','training_input':{'timeframe':'1m'}}),'1d')
+        with self.assertRaisesRegex(ValueError,'가격 주기'):policy_timeframe({'timeframe':'unknown'})
     def test_continuation_includes_latest_completed_data_while_initial_keeps_holdout(self):
         from stockrl.finrl.framework import learning_frame
         frame=pd.DataFrame([row('A',date) for date in pd.date_range('2024-01-01',periods=600)])

@@ -11,6 +11,25 @@ from stockrl.finrl.price_data.storage import PriceStore
 
 
 class KiwoomHistoryTests(unittest.TestCase):
+    def test_minute_learning_query_never_mixes_daily_or_other_source(self):
+        import pandas as pd
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'configs').mkdir()
+            (root/'configs/instruments.json').write_text(json.dumps({'instruments':[{'symbol':'005930.KS','market':'KRX','asset_class':'equity'}]}))
+            store=PriceStore(root/'data')
+            frame=pd.DataFrame({'ticker':['005930.KS'],'date':[pd.Timestamp('2026-10-13T09:00:00+09:00')],
+                'open':[100],'high':[100],'low':[100],'close':[100],'volume':[1]})
+            for source,timeframe,price in [('kiwoom','1m',100),('kiwoom','1d',200),('another','1m',300)]:
+                frame.attrs.update(source=source,timeframe=timeframe)
+                for name in ('open','high','low','close'):frame[name]=price
+                store.save_price_data(frame)
+            with patch.object(operations,'ROOT',root),patch.object(operations,'price_store',return_value=store), \
+                    patch('stockrl.management.connection_settings.provider_credentials.read_settings',return_value={'provider':'kiwoom'}):
+                minute=operations.prices('KRW',timeframe='1m');daily=operations.prices('KRW')
+            self.assertEqual(minute.close.tolist(),[100]);self.assertEqual(daily.close.tolist(),[200])
+            self.assertEqual(minute.attrs,{'timeframe':'1m','source':'kiwoom'})
+            self.assertEqual(minute.date.iloc[0],pd.Timestamp('2026-10-13T00:00:00'))
+
     def test_intraday_timestamps_and_origins_do_not_overwrite_each_other(self):
         import pandas as pd
         import sqlite3

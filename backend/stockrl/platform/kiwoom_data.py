@@ -74,6 +74,7 @@ class USQuotes(DomesticQuotes):
             if old is None:
                 self.bars[symbol]={'_bucket':bucket,'date':bucket.isoformat(),'symbol':symbol,
                     'market':instrument.get('market','US'),'asset_class':instrument.get('asset_class','equity'),
+                    'source':'kiwoom','timeframe':'1m',
                     'open':price,'high':price,'low':price,'close':price,'volume':volume,
                     'bid':_number(values.get('28'),absolute=True),'ask':_number(values.get('27'),absolute=True),'trade_count':1}
             else:

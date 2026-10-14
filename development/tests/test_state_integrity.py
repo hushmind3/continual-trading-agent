@@ -67,10 +67,39 @@ class IntegrityTests(unittest.TestCase):
    writer.path=Path(directory)/'market.csv';writer.raw_path=Path(directory)/'timeframes.sqlite3'
    import sqlite3
    with closing(sqlite3.connect(writer.raw_path)) as db,db:db.execute('CREATE TABLE received_bars(symbol TEXT,stamp_ns INTEGER,PRIMARY KEY(symbol,stamp_ns))')
-   writer._save_prices=lambda frame:self.fail('Raw bars must not enter daily data')
+   from stockrl.finrl.price_data.storage import PriceStore
+   writer.store=PriceStore(directory)
    self.assertEqual(writer.append([row('AAPL','2026-01-01')]),1)
    self.assertEqual(writer.append([row('AAPL','2026-01-01'),row('MSFT','2026-01-01')]),1)
    self.assertEqual([item['symbol'] for item in writer.last_added_rows],['MSFT'])
+   self.assertEqual(len(writer.store.get_price_data(['AAPL','MSFT'],'2020','2030',timeframe='1m')),2)
+   self.assertTrue(writer.store.get_price_data(['AAPL','MSFT'],'2020','2030',timeframe='1d').empty)
+
+ def test_existing_live_csv_header_stays_compatible_while_prices_keep_metadata(self):
+  from stockrl.finrl.price_data.storage import PriceStore
+  from stockrl.finrl.price_data.market_storage import FEED_COLUMNS
+  import csv,sqlite3
+  with tempfile.TemporaryDirectory(dir=ROOT/'runtime') as directory:
+   writer=AppendOnlyMarketCSV.__new__(AppendOnlyMarketCSV)
+   writer.path=Path(directory)/'market.csv';writer.raw_path=Path(directory)/'timeframes.sqlite3';writer.store=PriceStore(directory)
+   columns=[name for name in FEED_COLUMNS if name not in ('source','timeframe')]
+   with writer.path.open('w',newline='',encoding='utf8') as stream:csv.DictWriter(stream,fieldnames=columns).writeheader()
+   with closing(sqlite3.connect(writer.raw_path)) as db,db:db.execute('CREATE TABLE received_bars(symbol TEXT,stamp_ns INTEGER,PRIMARY KEY(symbol,stamp_ns))')
+   self.assertEqual(writer.append([{**row('AAPL','2026-01-01T09:01:00Z'),'source':'kiwoom','timeframe':'1m'}]),1)
+   with writer.path.open(newline='',encoding='utf8') as stream:stored=list(csv.DictReader(stream))
+   self.assertEqual(len(stored),1);self.assertNotIn(None,stored[0])
+   self.assertEqual(len(writer.store.get_price_data(['AAPL'],'2020','2030',source='kiwoom',timeframe='1m')),1)
+
+ def test_price_save_failure_does_not_acknowledge_the_live_bar(self):
+  import sqlite3
+  with tempfile.TemporaryDirectory(dir=ROOT/'runtime') as directory:
+   writer=AppendOnlyMarketCSV.__new__(AppendOnlyMarketCSV)
+   writer.path=Path(directory)/'market.csv';writer.raw_path=Path(directory)/'timeframes.sqlite3'
+   with closing(sqlite3.connect(writer.raw_path)) as db,db:db.execute('CREATE TABLE received_bars(symbol TEXT,stamp_ns INTEGER,PRIMARY KEY(symbol,stamp_ns))')
+   writer._save_prices=lambda frame:0
+   with self.assertRaisesRegex(ValueError,'저장 개수'):writer.append([row('AAPL','2026-01-01')])
+   with closing(sqlite3.connect(writer.raw_path)) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM received_bars').fetchone(),(0,))
+   self.assertFalse(writer.path.exists())
  def test_slow_or_failed_policy_does_not_block_accept(self):
   runtime=OperationsRuntime();runtime.account=PaperAccount.in_memory(0,0);runtime.controls.update(feed=True,engine=True)
   entered=threading.Event();release=threading.Event()

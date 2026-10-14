@@ -13,7 +13,7 @@ export function Moe(){
  return <div className="expert-workspace space-y-6">
   <header className="expert-workspace-heading">
    <div><div className="expert-workspace-eyebrow"><Layers3 size={16}/>모델 구성</div>
-    <h2>내 모델 <span className="expert-total-count">{state.experts.items.length}</span></h2>
+    <h2>내 모델 <span className="expert-total-count">{state.experts.items.length}개 버전</span></h2>
     
 
    </div>

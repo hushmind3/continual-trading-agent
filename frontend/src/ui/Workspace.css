@@ -126,10 +126,10 @@
 .expert-search {display:flex;align-items:center;gap:8px;width:220px;padding:9px 12px;border:1px solid #dedee5;border-radius:11px;background:#fff;color:#71717c}
 .expert-search input {min-width:0;width:100%;font-size:12px;color:#45454e;outline:none}
 .expert-search:focus-within {border-color:#0071e3;box-shadow:0 0 0 3px #0071e30e}
-.expert-family-card {display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr) auto;align-items:center;gap:24px;padding:22px 24px;border:1px solid #e7eaf0;border-radius:17px;background:#fff;transition:border-color .18s,box-shadow .18s}
+.expert-family-card {display:flex;flex:1;flex-direction:column;align-items:stretch;gap:18px;padding:22px 24px;border:1px solid #e7eaf0;border-radius:17px;background:#fff;transition:border-color .18s,box-shadow .18s}
 .expert-family-identity>b {display:block;font-size:15px;font-weight:600;line-height:1.5;letter-spacing:-.25px;overflow-wrap:anywhere}
 .expert-family-identity p {font-size:11px;line-height:1.7}
-.expert-family-management {align-self:start;padding-top:5px;max-width:145px}
+.expert-family-management {align-self:flex-end;padding-top:0;max-width:145px;margin-top:auto}
 .expert-family-management>summary {font-size:11px;color:#71717c;cursor:pointer;white-space:nowrap}
 .expert-family-management>div {margin-top:10px}
 .expert-family-management .ui-button {width:100%;font-size:11px;min-height:34px;padding:6px 10px}
@@ -396,3 +396,20 @@
 .workspace-app .operations-device-content .ui-panel {padding:0;border:0;box-shadow:none}
 @media(min-width:1100px) {.operations-market-card .operations-connection-metrics {grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.operations-market-card .operations-stat-value {font-size:28px}.operations-market-card .operations-stat-value-small {font-size:16px}}
 @media(max-width:760px) {.workspace-app .operations-hero {padding:22px}.operations-command-actions .ui-button {padding:11px 12px;font-size:12px}.operations-command-actions .ui-button-primary {min-width:0}.operations-flow-step {padding:20px 16px;gap:10px}.operations-flow-icon {width:30px;height:30px;border-radius:9px}.operations-flow-step h3 {font-size:12px}.operations-region-row {margin-top:18px;padding-top:14px}}
+
+/* Actual viewport review: shorter model browsing and quiet historical details. */
+.expert-family-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.expert-family-grid>div {display:flex;min-width:0}
+.expert-family-grid .expert-family-management {align-self:flex-end}
+.expert-family-grid .expert-family-identity {padding-right:0}
+.learning-current-summary {margin-top:16px}
+.learning-measurements {margin-top:14px;padding-top:14px;border-top:1px solid #e9edf3;font-size:11px;color:#7a8698}
+.learning-measurements>summary {cursor:pointer}
+.learning-measurements>dl {margin-top:16px}
+.policy-job-history {padding:16px 20px;border:1px solid #e6eaf1;border-radius:13px;background:#fff;font-size:12px;color:#7c899b}
+.policy-job-history>summary {cursor:pointer}
+.workspace-app .policy-job-history .ui-panel {padding:0;border:0;box-shadow:none}
+@media(max-width:1000px) {.expert-family-grid {grid-template-columns:minmax(0,1fr)}}
+
+.operations-currency-select {width:130px}
+@media(max-width:760px) {.operations-command-actions .operations-currency-select {width:100%;flex-basis:100%}.operations-flow-step .ui-status {white-space:normal;align-items:flex-start;max-width:100%;line-height:1.65;font-size:10px}.operations-flow-step .ui-status>* {min-width:0;overflow-wrap:anywhere}.operations-flow-step .ui-status::before {flex-shrink:0}}

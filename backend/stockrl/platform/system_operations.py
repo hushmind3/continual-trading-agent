@@ -368,6 +368,17 @@ class SystemOperations:
             if not cfg.model_dir.is_dir():raise ValueError('모델 폴더 없음: '+str(cfg.model_dir))
             catalog=read_catalog(cfg.registry_file)
             selected_policies=read_json(ROOT/'runtime/operations/policies.json')
+            identities=[read_json((RUNTIME/selected_policies.get(currency,'')).parent/'dataset.json') for currency in self.value['currencies']]
+            expert_ids={expert for identity in identities for expert in identity.get('champion_experts',[])} or set(catalog.get('active',[]))
+            required={symbol for expert in expert_ids for symbol in ((catalog['experts'].get(expert,{}).get('input') or {}).get('universe') or [])}
+            if required:
+                from ..finrl.price_data.operations import prices,collect_kiwoom_prices
+                history=prices('USD',sorted(required))
+                missing=sorted(required-(set(history.symbol) if not history.empty else set()))
+                if missing:
+                    self.phase(key,title,detail='원본 Expert의 키움 미국 일봉 수집: '+', '.join(missing))
+                    collected=collect_kiwoom_prices(missing,currency='USD')
+                    if collected['errors']:raise ValueError('Expert 원본 입력 수집 실패: '+str(collected['errors']))
             embedded_models=all(read_json((RUNTIME/selected_policies.get(currency,'')).parent/'dataset.json').get('champion_file') for currency in self.value['currencies'])
             preload=[] if embedded_models else catalog.get('active',[])
             for expert in preload:

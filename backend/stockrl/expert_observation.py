@@ -43,6 +43,12 @@ class ExpertObservation(gym.ObservationWrapper):
             account['drawdown']=1-nav/max(initial_amount,*values)
             account['volatility']=float(np.std(np.diff(np.log(np.maximum(values,1e-9))))) if len(values)>1 else 0.
             if hasattr(base,'observation_for_account'):value=base.observation_for_account(value,account)
+        contexts=getattr(self,'expert_accounts',None)
+        if contexts is None and getattr(base,'account',None):
+            contexts={currency:{'currency':currency,'nav':book['equity'],'cash':book['cash'],'initial_cash':book['initial_cash'],
+                'positions':{symbol:position['quantity'] for symbol,position in book['positions'].items()},'marks':dict(book['marks'])}
+                for currency,book in base.account.snapshot()['books'].items()}
+        if contexts:account['expert_accounts']=contexts
         signals=self.registry.outputs(history,account,champion_ids=self.champion_ids)
         fractions=np.asarray(weights,dtype=np.float32)
         quantiles=np.quantile(fractions,[0,.25,.5,.75,1]).astype(np.float32) if len(fractions) else np.zeros(5,dtype=np.float32)

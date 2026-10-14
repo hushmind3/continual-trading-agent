@@ -50,14 +50,25 @@ def main():
         runtime=Path(request['runtime_dir']);cfg=read_settings(runtime);keys=get_credentials(runtime)
         client=KiwoomClient(KiwoomAuth('real' if cfg['environment']=='real' else 'demo',
             StaticSecretProvider(keys['app_key'],keys['secret']),MemoryTokenStore(),timeout_seconds=10),timeout_seconds=15)
-        base=(datetime.now(ZoneInfo('Asia/Seoul'))-timedelta(days=1)).strftime('%Y%m%d')
+        zone='America/New_York' if request.get('currency')=='USD' else 'Asia/Seoul'
+        base=(datetime.now(ZoneInfo(zone))-timedelta(days=1)).strftime('%Y%m%d')
         results=[];next_request=0
         try:
             for symbol in request['symbols']:
                 try:
                     time.sleep(max(0,next_request-time.monotonic()))
                     next_request=time.monotonic()+.3
-                    response=request_daily_history(client,symbol,base)
+                    if request.get('currency')=='USD':
+                        exchange=client.request(api_id='usa10098',path='/api/us/stkinfo',body={'stk_cd':symbol}).body
+                        item=next((row for row in exchange.get('list',[]) if row.get('stex_tp') in ('ND','NY','NA')),None)
+                        if item is None:raise ValueError(f'{symbol}: 키움 미국 거래소 정보가 없습니다.')
+                        chart=client.request(api_id='usa06012',path='/api/us/chart',body={
+                            'stex_tp':item['stex_tp'],'stk_cd':item.get('stk_cd',symbol),
+                            'strt_dt':base,'upd_stkpc_tp':'1','exrt_appl_tp':'0'}).body
+                        rows=[{**row,'trde_qty':row['acc_trde_qty']} for row in chart.get('result_list',[]) if row.get('dt','')<=base]
+                        response={'return_code':chart.get('return_code'),'return_msg':chart.get('return_msg'),
+                            'stk_dt_pole_chart_qry':rows}
+                    else:response=request_daily_history(client,symbol,base)
                     results.append({'symbol':symbol,'base_date':base,'response':response})
                 except Exception as error:
                     detail=str(error)

@@ -65,7 +65,7 @@ def normalize_kiwoom_daily(result):
     return frame.sort_values('date').reset_index(drop=True)
 
 
-def collect_kiwoom_prices(symbols=None):
+def collect_kiwoom_prices(symbols=None,*,currency='KRW'):
     """Use the existing isolated official SDK, never broker order endpoints."""
     import json
     import os
@@ -77,11 +77,15 @@ def collect_kiwoom_prices(symbols=None):
     instruments=json.loads((ROOT/'configs/instruments.json').read_text(encoding='utf-8'))['instruments']
     allowed={i['symbol'] for i in instruments if i.get('market') in ('KRX','KOSDAQ') and i.get('asset_class') in ('equity','etf')}
     names=sorted(allowed) if symbols is None else list(dict.fromkeys(symbols))
-    if not names or any(name not in allowed for name in names):raise ValueError('등록된 국내 주식·ETF의 종목 코드를 선택하세요.')
+    if currency=='USD':
+        from stockrl.expert_registry import read_catalog
+        required={symbol for entry in read_catalog()['experts'].values() for symbol in ((entry.get('input') or {}).get('universe') or [])}
+        if not names or any(name not in required for name in names):raise ValueError('등록 Expert의 원본 미국 종목만 조회할 수 있습니다.')
+    elif currency!='KRW' or not names or any(name not in allowed for name in names):raise ValueError('등록된 국내 주식·ETF의 종목 코드를 선택하세요.')
     python=ROOT/'.venv/kiwoom/Scripts/python.exe'
     if not python.is_file():raise RuntimeError('기존 키움 SDK 실행 환경을 확인하세요.')
     env={**os.environ,'PYTHONPATH':str(ROOT/'backend'),'PYTHONUTF8':'1'}
-    request={'operation':'daily_history','runtime_dir':str(ROOT/'runtime/operations'),'symbols':names}
+    request={'operation':'daily_history','runtime_dir':str(ROOT/'runtime/operations'),'symbols':names,'currency':currency}
     process=subprocess.run([str(python),'-B','-m','stockrl.platform.kiwoom_worker'],input=json.dumps(request)+'\n',
         text=True,encoding='utf-8',capture_output=True,env=env,cwd=ROOT,timeout=max(30,20*len(names)),
         creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
@@ -89,7 +93,7 @@ def collect_kiwoom_prices(symbols=None):
     events=[json.loads(line) for line in process.stdout.splitlines() if line.startswith('{')]
     results=next((event['value'] for event in events if event.get('kind')=='history'),None)
     if results is None:raise RuntimeError('키움 SDK의 가격 조회 결과가 없습니다.')
-    summary={'source':'kiwoom','api_id':'ka10081','timeframe':'1d','adjusted':True,'symbols':[],'errors':[],'rows':0}
+    summary={'source':'kiwoom','api_id':'usa06012' if currency=='USD' else 'ka10081','timeframe':'1d','adjusted':True,'symbols':[],'errors':[],'rows':0}
     store=price_store()
     for result in results:
         try:

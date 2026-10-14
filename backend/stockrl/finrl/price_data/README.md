@@ -1,5 +1,7 @@
 # 저장 가격 조회
 
+Expert 원본 미국 입력: collect_kiwoom_prices(symbols,currency='USD')는 기존 키움 격리 SDK의 usa10098 거래소 조회·usa06012 일 차트를 사용합니다. 등록 Expert의 원본 universe에 있는 종목만 조회하여 같은 PriceStore에 source=kiwoom/timeframe=1d로 저장합니다. 자동 시작은 누락 종목 이력을 수집합니다. 실제 CRWD·META·T 각 100개 최근 완료 일봉 수집·저장 완료. 주문 API·개별 Expert 추론 검사는 실행하지 않았습니다.
+
 - 핵심 파일·진입점: operations.py의 prices(currency, symbols), price_store, collection_status; storage.py의 PriceStore·clean_price_data; market_storage.py의 AppendOnlyMarketCSV.
 - 사용처: 금융 policy_learning, trading/operation_control 및 platform의 공식 함수 실행·Expert 추론.
 - 필수 의존성: pandas, Python 표준 SQLite, stockrl.ROOT. FinRL-X import는 없습니다.

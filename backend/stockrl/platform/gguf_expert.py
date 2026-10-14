@@ -42,7 +42,9 @@ class GGUFExpert(nn.Module):
         while True:
             if getattr(self,'cancelled',lambda:False)():self.close();raise InterruptedError('MoE 정지 요청')
             if self.child.poll() is not None:
-                self.log.seek(0);detail=self.log.read().decode('utf8',errors='replace')[-1500:];self.close();raise ValueError('GGUF 원본 실행 실패: '+detail)
+                code=self.child.returncode;self.log.seek(0);detail=self.log.read().decode('utf8',errors='replace')
+                if self.log_path.exists():detail+='\n'+self.log_path.read_text(encoding='utf8',errors='replace')
+                self.close();raise ValueError(f'GGUF 원본 실행 실패 (exit {code}): '+detail[-1500:])
             try:
                 if requests.get(self.url+'/health').ok:break
             except requests.RequestException:pass

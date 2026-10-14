@@ -14,10 +14,12 @@ def prepare_inputs(entry, frame, account, context_frames=None):
     daily=frame[frame.date<pd.Timestamp(stamp).normalize()]
     policy=bool(entry.get('stock_policy'))
     if policy and account.get('currency','USD')!='USD':
-        raise InputUnavailable('이 Expert의 원본 계약은 USD 계좌입니다.')
+        account=account.get('expert_accounts',{}).get('USD')
+        if not account or account.get('currency')!='USD':raise InputUnavailable('이 Expert의 원본 계약은 USD 계좌입니다.')
     snapshot={'symbols':sorted(frame.symbol.unique()),'as_of':stamp,'policy_account':account}
     if policy:
         spec=entry['stock_policy']
+        snapshot['symbols']=list(spec['universe'])
         if spec['kind'] in ('a2c','ppo','sac'):
             from .. import ROOT
             from ..finrl.price_data.operations import prices,price_store
@@ -42,6 +44,10 @@ def prepare_inputs(entry, frame, account, context_frames=None):
             daily=complete_policy_day(history,spec['universe'])
             snapshot['stock_policy_history']=daily.assign(Date=daily.Date.astype(str)).to_dict('records')
         else:
+            from ..finrl.price_data.operations import prices
+            source=prices('USD',list(spec['universe']))
+            daily=source[source.date<pd.Timestamp(stamp).normalize()] if not source.empty else source
+            if daily.empty:raise InputUnavailable('해당 시점 이전의 USD Expert 원본 종목 가격이 없습니다.')
             snapshot['stock_policy_history']=daily.assign(date=daily.date.astype(str)).to_dict('records')
     batches=[None] if policy else native_input(entry['backend'],frame,daily,stamp)
     if not batches:

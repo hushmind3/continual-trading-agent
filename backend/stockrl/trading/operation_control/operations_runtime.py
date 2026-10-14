@@ -56,6 +56,7 @@ class OperationsRuntime:
         self.status={'status':'stopped','error':None}
         self.policy_models={}
         self.feed_cycle=threading.Event();self.cancel_inference=threading.Event();self.inference_active=0
+        self.decision_lock=threading.Lock()
 
     def ledger(self):
         cfg=settings()
@@ -403,17 +404,20 @@ class OperationsRuntime:
 
     def sac_decision(self):
         from stockrl.finrl.framework import policy_files
+        while not self.decision_lock.acquire(timeout=.2):
+            if self.cancel_inference.is_set() or not self.controls['engine']:return
         self.inference_active+=1
         try:
             selected=read_json(ROOT/'runtime/operations/policies.json')
             if not selected:raise ValueError('운영 정책 미승인: 모델 선택 화면에서 직접 승인하세요.')
             files=[(ROOT/'runtime/official'/path).resolve().parent for path in selected.values()]
-            with self.lock:self.decisions=[]
             for folder in files:
                 if not folder.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('운영 정책 경로가 runtime/official 밖에 있습니다.')
                 if self.cancel_inference.is_set() or not self.controls['engine']:break
                 self._sac_decision(folder)
-        finally:self.inference_active-=1
+        finally:
+            self.inference_active-=1
+            self.decision_lock.release()
 
     def check_policy(self,files,*,load=False):
         self.inference_active+=1
@@ -463,7 +467,10 @@ class OperationsRuntime:
                 'device':str(model.device),'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
                 'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
             with self.lock:
-                ledger=self.ledger();book=ledger.snapshot()['books'][currency]
+                ledger=self.ledger();books=ledger.snapshot()['books'];book=books[currency]
+                wrapped.expert_accounts={code:{'currency':code,'nav':value['equity'],'cash':value['cash'],'initial_cash':value['initial_cash'],
+                    'positions':{symbol:position['quantity'] for symbol,position in value['positions'].items()},'marks':dict(value['marks'])}
+                    for code,value in books.items()}
                 history=ledger.state['books'][currency].setdefault('equity_history',[])
                 if history and history[-1]['date']==input_stamp:history[-1]['nav']=book['equity']
                 else:history.append({'date':input_stamp,'nav':book['equity']})
@@ -489,6 +496,7 @@ class OperationsRuntime:
                 panel.dates=[pd.Timestamp.now(tz='UTC').isoformat()]
                 if self.controls['paper']:self.ledger().queue_allocations(panel,0,allocation,currency)
                 self.ledger().save()
+                self.decisions=[row for row in self.decisions if row['currency']!=currency]
                 self.decisions.extend({'symbol':s,'currency':currency,'target_weight':float(weight),'as_of':stamp} for s,weight in zip(symbols,weights))
                 self.decisions.append({'symbol':'CASH','currency':currency,'target_weight':cash_weight,'as_of':stamp,'cash_action':cash_enabled})
                 self.last_policy_dates[currency]=input_stamp

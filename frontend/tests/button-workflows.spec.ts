@@ -41,7 +41,7 @@ test('trained Champion selection pins resume checkpoint and currency changes rev
 
 test('operation buttons dispatch their own control and recover from rejected requests',async({page})=>{
   const seen:string[]=[];await rejectWrites(page,seen);await page.goto('/#finance/operation_control');
-  const actions=[['자동 운영 시작','system/start'],['운영 중지','system/stop'],['시세 수신 시작','controls/feed'],['가상매매 켜기','controls/paper'],['SAC 자동 판단 켜기','controls/engine'],['실시간 SAC 지속학습 켜기','controls/learning']];
+  const actions=[['자동 운영 시작','system/start'],['운영 중지','system/stop'],['시세 수신 시작','controls/feed'],['가상매매 켜기','controls/paper'],['정책 자동 판단 켜기','controls/engine'],['실시간 지속학습 켜기','controls/learning']];
   for(const [label,operation] of actions){const button=page.getByRole('button',{name:label,exact:true});await expect(button).toBeEnabled();await button.click();await expect(page.getByText('버튼 검사: '+operation,{exact:true})).toBeVisible();await expect(button).toBeEnabled();}
   expect(seen).toEqual(actions.map(row=>row[1]));
 });

@@ -102,6 +102,8 @@ class _SDKBrokerStreams:
                 'last_message_utc':max((s.get('last_message_utc') or '' for s in self.states.values()),default='') or None}
         for region,item in self.states.items():
             merged[f'{region}_connected']=bool(item.get('connected'))
+        domestic=self.states.get('kr',{})
+        merged.update({key:value for key,value in domestic.items() if key not in ('connected','last_error','last_message_utc','source')})
         self.collector.broker_status.update(merged)
 
     def resolve_us(self):
@@ -207,8 +209,16 @@ class BrokerStreams:
     def _event(self,event):
         kind=event.get('kind');value=event.get('value')
         if kind=='bar':self.collector.broker_rows.put(value)
-        elif kind=='status':self.collector.broker_status.update(value)
-        elif kind=='quote':self.collector.latest_quotes[value['symbol']]=value['quote']
+        elif kind=='status':
+            value=dict(value)
+            if value.get('connected') is False and not any(key in value for key in ('kr_connected','us_connected')):
+                value.update(kr_connected=False,us_connected=False)
+            if value.get('connected'):value.update(transport_status='connected',reconnect_in_seconds=0)
+            self.collector.broker_status.update(value)
+        elif kind=='quote':
+            self.collector.latest_quotes[value['symbol']]=value['quote']
+            self.collector.broker_status.update(last_quote_utc=value['quote'].get('date'),
+                quote_events=self.collector.broker_status.get('quote_events',0)+1)
         elif kind=='symbols':self.collector.broker_symbols.update(value)
 
     def start(self):
@@ -216,22 +226,46 @@ class BrokerStreams:
         if not python.is_file():raise RuntimeError('키움 SDK 실행 환경이 없습니다. 설치.cmd로 준비하세요.')
         env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_KIWOOM_WORKER='1')
         log=self.collector.runtime_dir/'kiwoom-sdk.stderr.log';log.parent.mkdir(parents=True,exist_ok=True)
-        with log.open('ab') as errors:
-            self.process=subprocess.Popen([str(python),'-m','stockrl.platform.kiwoom_worker'],
-                cwd=ROOT,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=errors,
-                text=True,encoding='utf-8',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         payload={'runtime_dir':str(self.collector.runtime_dir),'instruments':self.collector.instruments,
                  'broker_instruments':self.collector.broker_instruments,'broker_symbols':sorted(self.collector.broker_symbols)}
-        self.process.stdin.write(json.dumps(payload,ensure_ascii=False)+'\n');self.process.stdin.flush()
         def receive():
-            try:
-                for line in self.process.stdout:
-                    try:event=json.loads(line)
-                    except ValueError:continue
-                    if isinstance(event,dict) and event.get('protocol')=='stockrl-kiwoom-v1':self._event(event)
-                code=self.process.wait()
-                if code and not self.stop.is_set():self.collector.broker_status.update(connected=False,last_error=f'키움 SDK 작업 종료 ({code}); {log}')
-            finally:self.collector.broker_status.update(connected=False)
+            delay=2
+            while not self.stop.is_set():
+                process=None
+                self._event({'kind':'status','value':{'connected':False,'transport_status':'connecting','reconnect_in_seconds':0}})
+                try:
+                    with log.open('ab') as errors:
+                        process=subprocess.Popen([str(python),'-m','stockrl.platform.kiwoom_worker'],
+                            cwd=ROOT,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=errors,
+                            text=True,encoding='utf-8',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+                    self.process=process
+                    if self.stop.is_set():break
+                    process.stdin.write(json.dumps(payload,ensure_ascii=False)+'\n');process.stdin.flush()
+                    for line in process.stdout:
+                        try:event=json.loads(line)
+                        except ValueError:continue
+                        if isinstance(event,dict) and event.get('protocol')=='stockrl-kiwoom-v1':
+                            self._event(event)
+                            if event.get('kind')=='quote':delay=2
+                    code=process.wait()
+                    if not self.stop.is_set():
+                        previous=self.collector.broker_status.get('last_error')
+                        self._event({'kind':'status','value':{'connected':False,
+                            'last_error':previous or f'키움 SDK 작업 종료 ({code}); {log}'}})
+                except Exception as exc:
+                    if not self.stop.is_set():self._event({'kind':'status','value':{'connected':False,'last_error':f'{type(exc).__name__}: {exc}'}})
+                finally:
+                    if process:
+                        if process.poll() is None:
+                            process.terminate();process.wait(timeout=5)
+                        for stream in (process.stdin,process.stdout):
+                            if stream:stream.close()
+                    self._event({'kind':'status','value':{'connected':False,'transport_status':'stopped' if self.stop.is_set() else 'reconnecting'}})
+                if self.stop.is_set():break
+                self.collector.broker_status.update(reconnect_in_seconds=delay)
+                if self.stop.wait(delay):break
+                delay=min(60,delay*2)
+            self._event({'kind':'status','value':{'connected':False,'transport_status':'stopped','reconnect_in_seconds':0}})
         self.thread=threading.Thread(target=receive,name='kiwoom-sdk-events',daemon=True);self.thread.start()
 
     def close(self):

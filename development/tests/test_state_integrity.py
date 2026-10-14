@@ -326,3 +326,44 @@ class IndependentPriceStoreTests(unittest.TestCase):
    self.assertTrue(store.get_price_data(['AAPL'],'2000-01-01','2100-01-01').empty)
 
 if __name__=='__main__':unittest.main()
+
+
+class BrokerLifecycleTests(unittest.TestCase):
+ def test_broker_region_metrics_and_transport_disconnect(self):
+  from stockrl.platform.kiwoom_data import BrokerStreams,_SDKBrokerStreams
+  collector=SimpleNamespace(broker_stop=threading.Event(),broker_status={},latest_quotes={})
+  sdk=_SDKBrokerStreams.__new__(_SDKBrokerStreams);sdk.collector=collector;sdk.states={}
+  sdk.status('kr',{'connected':True,'subscription_count':105,'nxt_ticks':7,'krx_ticks':9})
+  sdk.status('us',{'connected':False,'last_error':'US unavailable'})
+  self.assertTrue(collector.broker_status['connected'])
+  self.assertEqual(collector.broker_status['subscription_count'],105)
+  self.assertEqual(collector.broker_status['nxt_ticks'],7)
+  worker=BrokerStreams(collector)
+  worker._event({'kind':'quote','value':{'symbol':'TEST','quote':{'price':100,'date':'2026-10-14T03:00:00Z'}}})
+  self.assertEqual(collector.broker_status['quote_events'],1)
+  worker._event({'kind':'status','value':{'connected':False,'last_error':'worker exit'}})
+  self.assertFalse(collector.broker_status['kr_connected'])
+  self.assertFalse(collector.broker_status['us_connected'])
+  self.assertEqual(collector.broker_status['last_quote_utc'],'2026-10-14T03:00:00Z')
+
+ def test_broker_restarts_after_unexpected_worker_exit_and_stop_cancels_retry(self):
+  import io
+  from unittest.mock import MagicMock
+  from stockrl.platform import kiwoom_data
+  with tempfile.TemporaryDirectory() as directory:
+   root=Path(directory);python=root/'.venv/kiwoom/Scripts/python.exe';python.parent.mkdir(parents=True);python.touch()
+   stop=threading.Event()
+   collector=SimpleNamespace(broker_stop=stop,broker_status={},runtime_dir=root/'runtime',instruments=[],broker_instruments=[],broker_symbols=set(),latest_quotes={})
+   processes=[]
+   for index in range(2):
+    process=MagicMock();process.stdin=io.StringIO();process.stdout=io.StringIO(json.dumps({'protocol':'stockrl-kiwoom-v1','kind':'status','value':{'connected':True,'kr_connected':True}})+'\n');process.poll.return_value=0
+    process.wait.side_effect=(lambda: (stop.set(),0)[1]) if index else lambda:0
+    processes.append(process)
+   streams=kiwoom_data.BrokerStreams(collector)
+   with patch.object(kiwoom_data,'ROOT',root),patch.object(kiwoom_data.subprocess,'Popen',side_effect=processes) as launch,patch.object(stop,'wait',return_value=False) as retry:
+    streams.start();streams.thread.join(timeout=5)
+    self.assertFalse(streams.thread.is_alive())
+    self.assertEqual(launch.call_count,2);retry.assert_called_once_with(2)
+    self.assertEqual(collector.broker_status['transport_status'],'stopped')
+    self.assertFalse(collector.broker_status['connected']);self.assertFalse(collector.broker_status['kr_connected'])
+    streams.close()

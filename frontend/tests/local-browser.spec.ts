@@ -303,3 +303,40 @@ test('MoE excludes stale selections and labels incomplete registrations honestly
   await expect(page.getByRole('button',{name:'양자화',exact:true}).last()).toBeDisabled();
   expect(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('finrl-x.champion.selection')!))).toEqual(['chronos_bolt_tiny']);
 });
+
+
+test('operation screen separates feed execution from broker and quote reception', async ({page}) => {
+  await page.route('**/api',async route=>{
+    if(route.request().postDataJSON()?.operation==='state'){
+      const response=await route.fetch(),state=await response.json();
+      state.operations.controls.feed=true;
+      state.operations.broker={connected:false,kr_connected:false,us_connected:false,transport_status:'reconnecting',reconnect_in_seconds:2,quote_events:0};
+      await route.fulfill({response,json:state});return;
+    }
+    await route.continue();
+  });
+  await page.goto('/#finance/operation_control',{waitUntil:'networkidle'});
+  const connection=page.getByRole('region',{name:'실제 시세 연결 상태'});
+  await expect(connection).toContainText('연결 끊김 · 재연결 대기');
+  await expect(connection).toContainText('국내 미연결');
+  await expect(connection).toContainText('미국 미연결');
+  await expect(connection).toContainText('실제 시세 수신 0건');
+  await expect(connection).toContainText('2초 후 연결 재시도');
+});
+
+
+test('restored local Expert files appear in the real MoE list and detail drawer', async ({page,request}) => {
+  const response=await request.post('/api',{data:{operation:'state',payload:{}}});
+  const state=await response.json();
+  for(const id of ['fincast','exaone','kronos','chronos','timesfm','timemoe','toto','stock_finrl_sac','qwen35_08b_gguf']){
+    const item=state.experts.items.find((row:{id:string})=>row.id===id);
+    expect(item?.package_available,id).toBe(true);
+  }
+  expect(state.experts.items.some((row:{id:string})=>row.id==='q')).toBe(false);
+  await page.goto('/#finance/moe',{waitUntil:'networkidle'});
+  await expect(page.getByText('등록 모델 '+state.experts.items.length+'개',{exact:true})).toBeVisible();
+  await expect(page.getByText('FinCast 1.0B',{exact:true})).toBeVisible();
+  await expect(page.getByText('unsloth/Qwen3.5-0.8B-GGUF',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:/^FinCast 1\.0B .*상세·검사 결과$/}).first().click();
+  await expect(page.getByText(/market[\\/]FinCast[\\/]ORIGINAL\.pt/)).toBeVisible();
+});

@@ -73,7 +73,7 @@ export interface OperationsState {
     fills:Record<string,unknown>[];pending:Record<string,unknown>};
   quotes:Record<string,Record<string,unknown>>;decisions:Record<string,unknown>[];
   feed:{status:string;error?:string;policy_error?:string;learning_status?:string;learning_error?:string;last_as_of?:string};
-  broker?:{connected?:boolean;last_error?:string;last_message_utc?:string};
+  broker?:{connected?:boolean;kr_connected?:boolean;us_connected?:boolean;last_error?:string;last_message_utc?:string;last_quote_utc?:string;quote_events?:number;transport_status?:string;reconnect_in_seconds?:number};
   pool:{id:string;loaded?:boolean;device?:string;resident_bytes?:number;peak_ram_increment?:number}[];
 }
 export interface DiscoveryModel {id:string;repository:string;compatible:boolean;same_weights?:boolean;

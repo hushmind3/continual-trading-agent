@@ -186,7 +186,7 @@ class LibraryOperations:
             results=[]
             for index,key in enumerate(keys):
                 progress(stage='quantize_all',completed=index,total=len(keys),detail=f'{index+1}/{len(keys)} · {key} 양자화')
-                try:result=self._execute('quantize',{'id':key,'device':payload.get('device','auto'),'precision':payload.get('precision','int4')},progress)
+                try:result=self._execute('quantize',{'id':key,'device':payload.get('device','auto'),'precision':payload.get('precision','int4'),'compare_after':payload.get('compare_after',True)},progress)
                 except InterruptedError:raise
                 except Exception as exc:result={'items':[{'id':key,'status':'failed','detail':str(exc)}]}
                 results.extend(result['items'])
@@ -271,7 +271,8 @@ class LibraryOperations:
                             'package_bytes':candidate['package']['bytes'],'seconds':time.perf_counter()-started,'conversion':candidate.get('conversion',{}),
                             'detail':'양자화 완료' if status=='created' else '기존 양자화 버전이 있습니다.'}
                         latest=read_catalog(cfg.registry_file);latest['experts'][candidate['id']]=candidate;write_catalog(latest,cfg.registry_file)
-                        row.update(self._compare_quantized(key,candidate,progress,comparison_cache))
+                        if payload.get('compare_after',True):row.update(self._compare_quantized(key,candidate,progress,comparison_cache))
+                        else:row.update(comparison_status='not_requested',comparison_detail='원본 출력 비교 미요청')
                         row['conversion']=candidate.get('conversion',{})
                         latest=read_catalog(cfg.registry_file);latest['experts'][candidate['id']]=candidate
                         record['attempts'][precision]={'status':'complete','detail':row['detail']}
@@ -282,7 +283,7 @@ class LibraryOperations:
                         record['failures'].append({'precision':precision,'detail':str(exc)})
                         latest=read_catalog(cfg.registry_file)
                     record['reports'].append(row);latest.setdefault('quantizations',{})[key]=record;write_catalog(latest,cfg.registry_file)
-                record.update(stage='partial' if record['failures'] or any(row.get('comparison_status')!='measured' for row in record['reports']) else 'complete',finished=time.time())
+                record.update(stage='partial' if record['failures'] or any(row.get('comparison_status') not in ('measured','not_requested') for row in record['reports']) else 'complete',finished=time.time())
                 latest=read_catalog(cfg.registry_file);latest.setdefault('quantizations',{})[key]=record;write_catalog(latest,cfg.registry_file)
             finally:
                 if pool:pool.close()

@@ -367,3 +367,20 @@ class BrokerLifecycleTests(unittest.TestCase):
     self.assertEqual(collector.broker_status['transport_status'],'stopped')
     self.assertFalse(collector.broker_status['connected']);self.assertFalse(collector.broker_status['kr_connected'])
     streams.close()
+
+
+class CollectorQuoteStateTests(unittest.TestCase):
+ def test_live_collector_initializes_quote_store_before_broker_events(self):
+  from stockrl.live_feed import LiveMarketCollector
+  from stockrl.platform.kiwoom_data import BrokerStreams
+  with tempfile.TemporaryDirectory(dir=ROOT/'runtime') as directory:
+   root=Path(directory);config=root/'symbols.json';config.write_text(json.dumps({'instruments':[]}),encoding='utf-8')
+   collector=LiveMarketCollector(config,root/'live/market.csv')
+   try:
+    self.assertEqual(collector.latest_quotes,{})
+    streams=BrokerStreams(collector)
+    streams._event({'kind':'quote','value':{'symbol':'TEST','quote':{'price':100,'date':'2026-10-14T03:00:00Z'}}})
+    self.assertEqual(collector.latest_quotes['TEST']['price'],100)
+    self.assertEqual(collector.broker_status['quote_events'],1)
+   finally:
+    collector.daily_pool.shutdown(wait=True);collector.daily_store.db.close();collector.http.close()

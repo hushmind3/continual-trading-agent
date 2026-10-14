@@ -62,13 +62,14 @@ test('MoE assembly ignores removed stock picker state and protected actions surf
   const request=page.waitForRequest(r=>envelope(r)?.operation==='champions/create');await create.click();
   expect((await request).postDataJSON().payload).not.toHaveProperty('symbols');
   await expect(page.getByText('버튼 검사: champions/create',{exact:true})).toBeVisible();
+  await page.getByText('검사 · 양자화 · 관리',{exact:true}).click();
   for(const [label,operation] of [['모델 폴더','model/open-directory'],['전체 Expert 실행 검사','library/probe_all'],['전체 양자화','library/quantize_all']]){
     await page.getByRole('button',{name:label,exact:true}).click();await expect(page.getByText('버튼 검사: '+operation,{exact:true})).toBeVisible();
   }
-  await page.getByRole('button',{name:'금융 Expert 찾기',exact:true}).click();
+  await page.getByRole('button',{name:'Expert 찾기',exact:true}).click();
   await page.getByRole('button',{name:'금융 Expert 자동 검색',exact:true}).click();await expect(page.getByText('버튼 검사: library/search',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'닫기',exact:true}).last().click();
-  await page.getByRole('button',{name:'패키지 가져오기',exact:true}).click();
+  await page.getByRole('button',{name:'가져오기',exact:true}).click();
   await expect(page.getByRole('button',{name:'파일 구성 확인',exact:true})).toBeDisabled();
 });
 
@@ -181,6 +182,7 @@ test('REA native chooser can be cancelled from the frontend and immediately used
 
 test('MoE selected operations, version details and removal dispatch only chosen items',async({page})=>{
   const seen:string[]=[];await rejectWrites(page,seen);await page.goto('/#finance/moe');
+  await page.getByText('검사 · 양자화 · 관리',{exact:true}).click();
   await page.getByRole('button',{name:'선택 해제',exact:true}).click();
   await page.getByRole('group',{name:'Champion 조립용 모델 버전',exact:true}).getByRole('checkbox').first().check();
   const operation=page.getByRole('combobox',{name:'선택 Expert 실행 작업',exact:true});
@@ -193,7 +195,7 @@ test('MoE selected operations, version details and removal dispatch only chosen 
   }
   const remove=page.getByRole('button',{name:'선택 버전 삭제',exact:true}).filter({visible:true});
   for(const button of await remove.all()){if(await button.isEnabled()){await button.click();await expect(page.getByText('버튼 검사: library/remove',{exact:true})).toBeVisible();}}
-  await page.getByRole('button',{name:'패키지 가져오기',exact:true}).click();
+  await page.getByRole('button',{name:'가져오기',exact:true}).click();
   await page.getByRole('dialog').getByPlaceholder('C:\\모델\\expert.pt 또는 https://…').fill('nonexistent-expert.pt');
   await page.getByRole('button',{name:'파일 구성 확인',exact:true}).click();
   await expect(page.getByRole('dialog').getByText('버튼 검사: library/inspect',{exact:true})).toBeVisible();

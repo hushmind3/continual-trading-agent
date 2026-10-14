@@ -151,6 +151,7 @@ class LiveMarketCollector:
         self.broker_rows: queue.Queue = queue.Queue()
         self.broker_stop = threading.Event()
         self.broker_thread = None
+        self.latest_quotes = {}
         self.broker_status = {"source": self.broker_provider, "connected": False,
                               "symbols": len(self.broker_instruments), "last_message_utc": None,
                               "last_error": ""}

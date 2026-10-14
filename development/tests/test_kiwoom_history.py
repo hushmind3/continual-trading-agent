@@ -11,6 +11,68 @@ from stockrl.finrl.price_data.storage import PriceStore
 
 
 class KiwoomHistoryTests(unittest.TestCase):
+    def test_intraday_timestamps_and_origins_do_not_overwrite_each_other(self):
+        import pandas as pd
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as directory:
+            store=PriceStore(directory)
+            frame=pd.DataFrame({'ticker':['A','A'],'date':pd.to_datetime(['2026-10-13 09:00:00.000000001+09:00','2026-10-13 09:01:00+09:00'],format='mixed'),
+                'open':[100,101],'high':[100,101],'low':[100,101],'close':[100,101],'volume':[1,2]})
+            frame.attrs.update(source='kiwoom',timeframe='1m')
+            self.assertEqual(store.save_price_data(frame),2)
+            original=store.get_price_data(['A'],'2026-10-13','2026-10-13',source='kiwoom',timeframe='1m')
+            self.assertEqual(len(original),2)
+            self.assertEqual(pd.to_datetime(original.datadate,utc=True,format='mixed').astype('int64').tolist(),[pd.Timestamp(value).value for value in frame.date])
+            frame.attrs['timeframe']='5m';store.save_price_data(frame.iloc[:1])
+            frame.attrs.update(source='another',timeframe='1m');store.save_price_data(frame.iloc[:1])
+            self.assertEqual(len(store.get_price_data(['A'],'2026-10-13','2026-10-13')),4)
+            with closing(sqlite3.connect(store.db_path)) as db:
+                identity=db.execute("SELECT id,created_at FROM price_data WHERE source='kiwoom' AND timeframe='1m' ORDER BY date").fetchall()
+            frame.attrs.update(source='kiwoom',timeframe='1m');frame.loc[0,'close']=99;store.save_price_data(frame.iloc[:1])
+            self.assertEqual(len(store.get_price_data(['A'],'2026-10-13','2026-10-13')),4)
+            self.assertEqual(store.get_price_data(['A'],'2026-10-13','2026-10-13',source='kiwoom',timeframe='1m').prccd.tolist(),[99,101])
+            with closing(sqlite3.connect(store.db_path)) as db:
+                self.assertEqual(db.execute("SELECT id,created_at FROM price_data WHERE source='kiwoom' AND timeframe='1m' ORDER BY date").fetchall(),identity)
+
+    def test_legacy_schema_migration_preserves_rows_and_custom_index(self):
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'market_prices.sqlite3'
+            with closing(sqlite3.connect(path)) as db,db:
+                db.execute('''CREATE TABLE price_data (id INTEGER PRIMARY KEY AUTOINCREMENT,ticker TEXT NOT NULL,date TEXT NOT NULL,
+                    open REAL,high REAL,low REAL,close REAL,adj_close REAL,volume REAL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE(ticker,date))''')
+                db.execute("INSERT INTO price_data(ticker,date,close) VALUES('A','2026-10-13',100)")
+                db.execute('CREATE INDEX prices_by_close ON price_data(close)')
+                db.execute("UPDATE sqlite_sequence SET seq=42 WHERE name='price_data'")
+                before=db.execute('SELECT id,ticker,date,close,created_at FROM price_data').fetchall()
+            store=PriceStore(directory)
+            with closing(sqlite3.connect(path)) as db:
+                self.assertEqual(db.execute('SELECT id,ticker,date,close,created_at FROM price_data').fetchall(),before)
+                self.assertEqual(db.execute('SELECT source,timeframe FROM price_data').fetchone(),('unknown','unknown'))
+                self.assertIn('prices_by_close',[index[1] for index in db.execute('PRAGMA index_list(price_data)')])
+                self.assertEqual(db.execute("SELECT seq FROM sqlite_sequence WHERE name='price_data'").fetchone(),(42,))
+            self.assertEqual(len(store.get_price_data(['A'],'2020','2030')),1)
+            PriceStore(directory)
+
+    def test_unsupported_legacy_columns_roll_back_migration(self):
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'market_prices.sqlite3'
+            with closing(sqlite3.connect(path)) as db,db:
+                db.execute('''CREATE TABLE price_data (id INTEGER PRIMARY KEY AUTOINCREMENT,ticker TEXT NOT NULL,date TEXT NOT NULL,
+                    open REAL,high REAL,low REAL,close REAL,adj_close REAL,volume REAL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    user_note TEXT,UNIQUE(ticker,date))''')
+                db.execute("INSERT INTO price_data(ticker,date,user_note) VALUES('A','2026-10-13','keep')")
+                before=db.execute('SELECT * FROM price_data').fetchall()
+                columns=[row[1] for row in db.execute('PRAGMA table_info(price_data)')]
+            with self.assertRaisesRegex(RuntimeError,'알 수 없는 열'):PriceStore(directory)
+            with closing(sqlite3.connect(path)) as db:
+                self.assertEqual(db.execute('SELECT * FROM price_data').fetchall(),before)
+                self.assertEqual([row[1] for row in db.execute('PRAGMA table_info(price_data)')],columns)
+
     def test_throttling_is_retried_but_other_api_errors_are_not(self):
         from stockrl.platform import kiwoom_data
         from unittest.mock import Mock

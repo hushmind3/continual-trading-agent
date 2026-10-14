@@ -280,3 +280,26 @@ test('price timeframe reaches preflight and changing it invalidates training app
  await expect(start).toBeDisabled();
  expect(trainCalls).toBe(0);
 });
+
+
+test('MoE excludes stale selections and labels incomplete registrations honestly', async ({page}) => {
+  await page.addInitScript(()=>sessionStorage.setItem('finrl-x.champion.selection',JSON.stringify(['removed_a','removed_b','chronos_bolt_tiny'])));
+  await page.route('**/api',async route=>{
+    if(route.request().postDataJSON()?.operation==='state'){
+      const response=await route.fetch(),state=await response.json();
+      const valid=state.experts.items.find((item:{id:string})=>item.id==='chronos_bolt_tiny');
+      state.experts.items=[valid,{id:'q',representation:'INT4',package:{file:'source.bin',bytes:1,sha256:'known'},package_available:false,loaded:false,resources:{}}];
+      await route.fulfill({response,json:state});return;
+    }
+    await route.continue();
+  });
+  await page.goto('/#finance/moe',{waitUntil:'networkidle'});
+  await expect(page.getByRole('button',{name:'SAC MoE 생성 · 1개',exact:true})).toBeVisible();
+  await expect(page.getByText('1개 모델 · 실패 기록 0개 선택',{exact:true})).toBeVisible();
+  await expect(page.getByRole('tab',{name:'분류 미지정 1',exact:true})).toBeVisible();
+  await expect(page.getByText('q',{exact:true})).toBeVisible();
+  await expect(page.getByText('파일 없음 · 크기 미확인',{exact:true})).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('등록 JSON');
+  await expect(page.getByRole('button',{name:'양자화',exact:true}).last()).toBeDisabled();
+  expect(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('finrl-x.champion.selection')!))).toEqual(['chronos_bolt_tiny']);
+});

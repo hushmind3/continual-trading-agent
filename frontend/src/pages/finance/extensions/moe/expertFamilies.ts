@@ -1,6 +1,6 @@
 import type {LibraryExpert} from '../../../../data/library';
-export const categoryNames={forecast:'시계열 예측',trading:'매매 판단',interpretation:'시장 해석'};
-export function expertCategory(item:LibraryExpert){return item.category??(item.role==='action'?'trading':item.executor==='llama_cpp'||item.backend==='gguf_market'?'interpretation':'forecast')}
+export const categoryNames={forecast:'시계열 예측',trading:'매매 판단',interpretation:'시장 해석',unclassified:'분류 미지정'};
+export function expertCategory(item:LibraryExpert){return item.category??(item.role==='action'?'trading':item.executor==='llama_cpp'||item.backend==='gguf_market'?'interpretation':item.role==='market'?'forecast':'unclassified')}
 export function expertFamilies(items:LibraryExpert[]){
  const ids=new Set(items.map(item=>item.id));
  const rootOf=(item:LibraryExpert)=>{

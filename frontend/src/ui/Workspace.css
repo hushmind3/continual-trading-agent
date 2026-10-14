@@ -425,3 +425,14 @@
 .expert-toolbar-tools {display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
 .expert-family-grid :where(button,input,summary) {scroll-margin-top:205px}
 @media(max-width:760px) {.expert-toolbar {top:76px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;padding:14px;box-shadow:0 5px 18px #233e5a0b}.expert-toolbar>label {width:auto;min-width:0;margin:0}.expert-toolbar>.ui-button-primary {width:100%;padding:10px 8px;gap:5px;white-space:nowrap}.expert-toolbar>.ui-button-primary>svg {display:none}.expert-toolbar-tools {grid-column:1 / -1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;margin:0}.expert-toolbar-tools .ui-button {width:100%;padding:8px 5px;font-size:11px;white-space:nowrap;justify-content:center}.expert-toolbar-tools .ui-button>svg {display:none}.expert-toolbar-tools .ui-button-danger {grid-column:1 / -1}.expert-family-grid :where(button,input,summary) {scroll-margin-top:235px}}
+
+/* Source provenance remains visible without changing saved names or paths. */
+.rea-folder-label {display:block;font-size:12px;font-weight:500;color:#55647c}
+.rea-folder-name {display:block;margin-top:3px;font-size:9px;color:#96a0af}
+.rea-file-entry[data-provenance] {min-height:58px}
+.rea-file-entry[data-provenance="original"]>svg {color:#4e8dcd}
+.rea-file-entry[data-provenance="inferred"]>svg {color:#bc8b43}
+.rea-file-entry[data-provenance="analysis"]>svg {color:#8980b2}
+.rea-code-provenance-original {border-color:#d6e8fa;background:#eff7ff;color:#437caa}
+.rea-code-provenance-inferred {border-color:#efdfc5;background:#fff8ec;color:#a0783c}
+.rea-code-provenance-analysis {border-color:#e3dcf2;background:#f6f3fc;color:#81709f}

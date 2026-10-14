@@ -113,10 +113,10 @@
 /* Expert library: names first, selectable versions second, tools on demand. */
 .expert-workspace-heading {display:flex;align-items:center;justify-content:space-between;gap:24px;padding:4px 0 8px}
 .expert-workspace-eyebrow {display:flex;align-items:center;gap:7px;margin-bottom:8px;font-size:11px;color:#71717c}
-.expert-workspace-heading h2 {font-size:23px;line-height:1.3;font-weight:600;letter-spacing:-.6px}
+.expert-workspace-heading h2 {display:flex;align-items:center;gap:10px;font-size:22px;line-height:1.3;font-weight:600;letter-spacing:-.6px}
 .expert-workspace-heading p {margin-top:7px;font-size:12px;line-height:1.7;color:#71717c}
 .expert-help>summary {color:#7c7c86;font-size:12px}
-.expert-toolbar {display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding:20px;border:1px solid #e5e5eb;border-radius:16px;background:#fff}
+.expert-toolbar {display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding:20px 22px;border:1px solid #e5e9f0;border-radius:18px;background:linear-gradient(110deg,#fff,#f8faff);box-shadow:0 3px 12px #233e5a03}
 .expert-toolbar>label {display:flex;flex-direction:column;gap:5px;min-width:110px;margin-right:8px;font-size:11px;color:#71717c}
 .expert-toolbar .ui-button {min-height:42px}
 .workspace-app .workspace-disclosure {border:1px solid #e7e7eb;border-radius:14px;background:#fff;padding:16px 20px}
@@ -126,15 +126,15 @@
 .expert-search {display:flex;align-items:center;gap:8px;width:220px;padding:9px 12px;border:1px solid #dedee5;border-radius:11px;background:#fff;color:#71717c}
 .expert-search input {min-width:0;width:100%;font-size:12px;color:#45454e;outline:none}
 .expert-search:focus-within {border-color:#0071e3;box-shadow:0 0 0 3px #0071e30e}
-.expert-family-card {display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr) auto;align-items:center;gap:24px;padding:22px;border:1px solid #e7e7eb;border-radius:16px;background:#fff}
-.expert-family-identity>b {font-size:14px;font-weight:600;letter-spacing:-.2px;overflow-wrap:anywhere}
+.expert-family-card {display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr) auto;align-items:center;gap:24px;padding:22px 24px;border:1px solid #e7eaf0;border-radius:17px;background:#fff;transition:border-color .18s,box-shadow .18s}
+.expert-family-identity>b {display:block;font-size:15px;font-weight:600;line-height:1.5;letter-spacing:-.25px;overflow-wrap:anywhere}
 .expert-family-identity p {font-size:11px;line-height:1.7}
 .expert-family-management {align-self:start;padding-top:5px;max-width:145px}
 .expert-family-management>summary {font-size:11px;color:#71717c;cursor:pointer;white-space:nowrap}
 .expert-family-management>div {margin-top:10px}
 .expert-family-management .ui-button {width:100%;font-size:11px;min-height:34px;padding:6px 10px}
-.expert-version {flex:0 1 175px;min-width:135px;max-width:210px;padding:12px 13px;border:1px solid #ededf1;border-radius:11px;background:#f8f8fa;transition:border-color .18s,background .18s}
-.expert-version-selected {border-color:#b1d4f8;background:#f0f7ff}
+.expert-version {flex:0 1 160px;min-width:135px;max-width:190px;padding:13px 14px;border:1px solid #e8ebf1;border-radius:12px;background:#f7f9fb;transition:border-color .18s,background .18s}
+.expert-version-selected {border-color:#78aceb;background:#edf5ff;box-shadow:0 0 0 1px #78aceb18}
 .expert-version-warning {border-color:#f4e3c3;background:#fffaf1}
 .expert-version-selection {display:flex;align-items:center;gap:7px;margin-bottom:7px;font-size:11px;font-weight:600;color:#55555f;cursor:pointer}
 .workspace-app input[type="checkbox"],.workspace-app input[type="radio"] {accent-color:#0071e3;cursor:pointer}
@@ -348,3 +348,23 @@
 .workspace-error-record>summary a {margin-left:auto;font-size:11px;text-decoration:underline;text-underline-offset:3px}
 .workspace-error-record .ui-error {margin-top:12px}
 @media(max-width:760px) {.workspace-app .account-overview {padding:24px}.workspace-app .account-records {padding:20px}.account-balance strong {font-size:34px}.account-balance-eyebrow {font-size:9px}.account-wallet {width:46px;height:46px;border-radius:15px}.account-records .data-table-scroll td {padding-top:13px;padding-bottom:13px}}
+
+/* Model selection: concise cards, with tools and evidence in dedicated drawers. */
+.expert-total-count {display:inline-grid;place-items:center;min-width:30px;height:26px;padding:0 8px;border-radius:8px;background:#e9edf4;color:#59677e;font-size:12px;font-weight:500;letter-spacing:0}
+.expert-action-count {padding:2px 7px;border-radius:6px;background:#ffffff25;font-size:11px;font-variant-numeric:tabular-nums}
+.expert-selection-summary {display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap;padding:0 4px;font-size:11px;color:#798291}
+.expert-selection-summary b {color:#354866;font-weight:600}
+.expert-family-category {display:block;margin-bottom:6px;font-size:10px;letter-spacing:.25px;color:#8a94a4}
+.expert-family-selected {color:#2870c7}
+.expert-family-card:hover {border-color:#cdd8e8;box-shadow:0 3px 15px #1a345008}
+.expert-version-selection input {accent-color:#2375d2}
+.expert-registration-notice {padding:10px 14px;border:1px solid #ecdcc0;border-radius:11px;background:#fffbf4;font-size:11px;color:#866333}
+.expert-registration-notice summary {display:flex;align-items:center;gap:7px;cursor:pointer;list-style:none}
+.expert-registration-notice p {margin-top:10px;line-height:1.8}
+.expert-failure-records {margin-top:10px;font-size:11px;color:#946c36}
+.expert-failure-records summary {cursor:pointer}
+.expert-management>div>div {padding-bottom:18px;border-bottom:1px solid #eceef3}
+.expert-management>div>div:last-child {border-bottom:0;padding-bottom:0}
+@media(max-width:760px) {.expert-toolbar {padding:16px}.expert-toolbar>.ui-button {flex:1;justify-content:center;font-size:12px}.expert-toolbar>.ui-button-primary {flex-basis:100%}.expert-selection-summary {gap:8px 14px}.expert-family-card {padding:18px}.expert-family-category {margin-bottom:4px}}
+
+.expert-management-progress {margin:14px 0;padding:12px 14px;border-radius:11px;background:#edf5ff;font-size:12px;line-height:1.7;color:#326393}

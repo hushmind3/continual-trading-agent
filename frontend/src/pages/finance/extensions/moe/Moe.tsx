@@ -13,8 +13,8 @@ export function Moe(){
  return <div className="expert-workspace space-y-6">
   <header className="expert-workspace-heading">
    <div><div className="expert-workspace-eyebrow"><Layers3 size={16}/>모델 구성</div>
-    <h2>Expert 라이브러리</h2>
-    <p>등록 항목 {state.experts.items.length}개 · 원본과 정밀도 버전을 함께 관리합니다.</p>
+    <h2>내 모델 <span className="expert-total-count">{state.experts.items.length}</span></h2>
+    
 
    </div>
    <div className="flex flex-wrap gap-2">

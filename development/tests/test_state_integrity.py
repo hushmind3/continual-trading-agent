@@ -167,6 +167,7 @@ class IntegrityTests(unittest.TestCase):
     db.execute('CREATE TABLE daily_bars(symbol TEXT,stamp_ns INTEGER,open REAL,high REAL,low REAL,close REAL,volume REAL)')
     db.execute('INSERT INTO daily_bars VALUES (?,?,?,?,?,?,?)',('AAPL',pd.Timestamp('2026-01-01T00:00:00Z').value,100,100,100,100,1))
    frame=pd.DataFrame([{'tic':'AAPL','datadate':'2026-01-01','prcod':100,'prchd':100,'prcld':100,'prccd':100,'cshtrd':1},{'tic':'AAPL','datadate':'2026-01-01T10:00:00','prcod':900,'prchd':900,'prcld':900,'prccd':900,'cshtrd':1}])
+   frame['source']='unknown';frame['timeframe']='unknown'
    store=SimpleNamespace(db_path=dbpath,get_price_data=lambda *args:frame.copy())
    with patch.object(framework,'ROOT',root),patch.object(framework,'price_store',return_value=store):
     actual=framework.prices('USD',['AAPL'])

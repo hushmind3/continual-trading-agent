@@ -4,7 +4,7 @@
 - 핵심 파일: handlers.py(API), menu.py(등록), official_cli.py(작업 실행), market_environment.py(가상원장 학습 환경), evaluation.py(과거 구간 비교).
 - 상위 연결: ../submenu_manager.py → finance_menu_manager.py → 전체 menu_registry → 단일 /api.
 - 필수 의존성: 소스의 명시적 import와 공통 상태·API 전송 모듈.
-- 상태: 새 지침 이전 CUDA SAC 학습 1,024단계·924회 업데이트와 가상원장 과거 구간 비교 완료. 최신 데이터 분할 수정 및 회귀 검사는 미실행입니다.
+- 상태: 사용자가 이번 변경 묶음의 검사 실행을 별도로 허용한 뒤 백엔드 전체 102개 검사 통과. 실제 이어 학습 32단계와 1단계가 각각 종료돼 누적 1,057단계·957회 업데이트를 확인했습니다. CUDA 추론과 다음 봉의 가상원장 체결도 확인했습니다. 운영 정책은 자동 변경하지 않았습니다.
 
 소속 대메뉴：금융. 이 폴더는 금융 내부 기능 분류이며 독립 대메뉴로 등록하지 않습니다. 하위 기능 → 분류 submenu_manager → 금융 submenu_manager → finance_menu_manager → 전체 menu_registry → /api.
 
@@ -22,8 +22,8 @@
 
 사용자 회귀 검사(미실행): PowerShell에서 `$env:PYTHONPATH='backend;development/tests'` 설정 후 `.\.venv\Scripts\python.exe -B -m unittest test_state_integrity.CheckpointAvailabilityTests`를 실행합니다. 임시 테스트 파일에서 PT/ZIP 삭제 및 구형 환경 제외를 확인하며 실제 모델 파일은 변경하지 않습니다.
 
-학습 환경·분할·체결 회귀 검사(최신 수정 후 미실행): 위 PYTHONPATH 설정 후 `.\.venv\Scripts\python.exe -B -m unittest test_market_learning test_expert_lazy_loading test_training_cli`를 사용합니다. 실제 모델 생성·학습을 실행하는 명령과 구분합니다.
+학습 환경·분할·체결 회귀 검사: 위 PYTHONPATH 설정 후 `.\.venv\Scripts\python.exe -B -m unittest test_market_learning test_expert_lazy_loading test_training_cli`를 사용합니다. 이번 변경 묶음은 전체 102개 검사에 포함해 통과했습니다. 실제 모델 생성·학습을 실행하는 명령과 구분합니다.
 
-가격 주기: RunRequest.timeframe과 CLI --timeframe은 1d/1m을 지원합니다. 새 학습의 기본값은 기존 일봉이며, 이어 학습은 저장 정책의 주기를 상속합니다. 다른 주기의 이어 학습·Replay 혼합·비교 평가는 거부합니다. dataset.json·새 Champion의 identity에 주기를 기록하고 training_input에는 실제 출처·주기를 남깁니다. 분봉 입력은 수신 완료된 봉만 사용합니다. 이 연결을 적용한 이후 실제 학습·검사는 미실행입니다.
+가격 주기: RunRequest.timeframe과 CLI --timeframe은 1d/1m을 지원합니다. 새 학습의 기본값은 기존 일봉이며, 이어 학습은 저장 정책의 주기를 상속합니다. 다른 주기의 이어 학습·Replay 혼합·비교 평가는 거부합니다. dataset.json·새 Champion의 identity에 주기를 기록하고 training_input에는 실제 출처·주기를 남깁니다. 분봉 입력은 수신 완료된 봉만 사용합니다. 단위 검사와 브라우저 주기 전달 검사는 통과했습니다. 실제 일봉 이어 학습은 확인했고, 새로운 실시간 분봉 수신부터 학습까지의 실행은 아직 확인하지 않았습니다.
 
-소비 범위: training_input.end는 읽은 입력의 최신 시각입니다. consumed_end는 환경 step이 실제로 소비한 마지막 시각이며 transitions는 이번 작업에서 실행한 전이 수입니다. 에피소드 reset으로 이 누적 기록을 지우지 않습니다. 이어 학습은 consumed_end 다음 봉부터 진행하도록 과거 관측 문맥을 남겨 시작 위치를 정합니다. 과거 기록에 consumed_end가 없으면 end를 실제 학습 증거로 사용하지 않으며 첫 실행에서 새 소비 기록을 만듭니다. 기존 모델·JSON을 소급 변경하지 않습니다. 같은 주기의 SAC Replay 복원과 공식 학습 기본값은 유지합니다. 최신 소비 범위 회귀 검사·학습 실행은 미실행입니다.
+소비 범위: training_input.end는 읽은 입력의 최신 시각입니다. consumed_end는 환경 step이 실제로 소비한 마지막 시각이며 transitions는 이번 작업에서 실행한 전이 수입니다. 에피소드 reset으로 이 누적 기록을 지우지 않습니다. 이어 학습은 consumed_end 다음 봉부터 진행하도록 과거 관측 문맥을 남겨 시작 위치를 정합니다. 과거 기록에 consumed_end가 없으면 end를 실제 학습 증거로 사용하지 않으며 첫 실행에서 새 소비 기록을 만듭니다. 기존 모델·JSON을 소급 변경하지 않습니다. 같은 주기의 SAC Replay 복원과 공식 학습 기본값은 유지합니다. 실제 sac_champion_003에서 소비 시각 2024-07-24를 저장했고, 다음 sac_champion_004의 1단계 학습은 2024-07-25를 소비했습니다. 입력 최신 시각은 2026-10-13으로, 남은 입력을 전부 학습했다고 주장하지 않습니다.

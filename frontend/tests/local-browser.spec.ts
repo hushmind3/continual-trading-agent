@@ -257,3 +257,26 @@ test('Kiwoom history collection displays real completion state and stops polling
  await expect(page.getByText('005930.KS · 2024-04-22 ~ 2026-10-13 · 600행',{exact:true})).toBeVisible();
  const before=queries;await page.waitForTimeout(2400);expect(queries).toBe(before);
 });
+
+test('price timeframe reaches preflight and changing it invalidates training approval',async({page})=>{
+ const requests:Array<{currency:string;timeframe:string}>=[];let trainCalls=0;
+ await page.route('**/api*',async route=>{
+  const req=route.request(),url=new URL(req.url()),body=req.method()==='POST'?req.postDataJSON():{};
+  const operation=body?.operation??url.searchParams.get('operation');
+  if(operation==='train'){trainCalls++;await route.fulfill({json:{message:'unexpected training request'}});return;}
+  if(operation!=='preflight/train'){await route.continue();return;}
+  requests.push(body.payload);
+  await route.fulfill({json:{ok:true,errors:[],symbols:['005930.KS'],currency:'KRW',timeframe:body.payload.timeframe,mode:'새 학습',steps_per_run:1024}});
+ });
+ await page.goto('/#finance/policy_learning');
+ await page.getByRole('combobox',{name:'학습 통화',exact:true}).selectOption('KRW');
+ await page.getByRole('combobox',{name:'학습 가격 주기',exact:true}).selectOption('1m');
+ await page.getByRole('button',{name:'실행 전 검사',exact:true}).click();
+ await expect.poll(()=>requests.at(-1)?.timeframe).toBe('1m');
+ expect(requests.at(-1)?.currency).toBe('KRW');
+ const start=page.getByRole('button',{name:/새 학습 시작/});
+ await expect(start).toBeEnabled();
+ await page.getByRole('combobox',{name:'학습 가격 주기',exact:true}).selectOption('1d');
+ await expect(start).toBeDisabled();
+ expect(trainCalls).toBe(0);
+});

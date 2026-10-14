@@ -3,10 +3,12 @@
 - Panel.tsx: 접이식 패널·키/값 표시.
 - Primitives.tsx: 버튼·상태·탭·Drawer·오류·빈 상태 등 재사용 요소.
 - DataTable.tsx: 검색·정렬·선택·페이지 이동.
-- SystemControls.tsx, OperationsControls.tsx: 기존 운영 명령 연결.
+- SystemControls.tsx: 기존 자동 운영 시작·중지 명령과 실제 실행 단계 표시.
 - JobLog.tsx, ServiceProgress.tsx: 실제 작업 로그·단계 표시.
-- Workspace.css: 메뉴와 공통 화면 밀도.
+- Workspace.css: 전체 메뉴·화면의 색상·타이포그래피·여백·버튼·입력·패널·반응형 디자인.
 
 공통 컴포넌트를 재사용합니다. 기능 실행 버튼을 여러 화면에 복제하지 않으며 등록·선택·적재·검사·학습 상태를 구분합니다.
 
 ChampionSpec은 선택 알고리즘과 실제 정책·Critic 또는 가치 출력 구조를 표시합니다.
+
+공통 디자인: 밝은 중성 배경·흰 카드·한 가지 파란 실행 강조색을 사용합니다. ui-button/input/status/tabs/drawer 스타일은 기존 컴포넌트의 동작과 분리합니다. 760px 이하에서는 전체 메뉴를 Drawer로 열고, 1100px 이하의 운영 개요는 한 열로 배치합니다. 키보드 본문 이동·포커스 표시·모션 감소 설정을 제공합니다. 운영 명령·API·모델 설정을 변경하지 않습니다.

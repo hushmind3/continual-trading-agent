@@ -16,7 +16,7 @@ export function Button({
       type="button"
       {...props}
       disabled={props.disabled || busy}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-150 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-45 ${tone === "primary" ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20" : tone === "danger" ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "bg-slate-100 text-slate-700 hover:bg-slate-200"} ${className}`}
+      className={`ui-button ui-button-${tone} inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-150 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-45 ${tone === "primary" ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20" : tone === "danger" ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "bg-slate-100 text-slate-700 hover:bg-slate-200"} ${className}`}
     >
       {busy && <LoaderCircle size={15} className="animate-spin" />}
       {children}
@@ -34,7 +34,7 @@ export function Status({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${tone === "good" ? inverted ? "text-emerald-300" : "text-emerald-700" : tone === "bad" ? inverted ? "text-rose-300" : "text-rose-600" : tone === "warn" ? inverted ? "text-amber-300" : "text-amber-700" : "text-slate-400"}`}
+      className={`ui-status inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${tone === "good" ? inverted ? "text-emerald-300" : "text-emerald-700" : tone === "bad" ? inverted ? "text-rose-300" : "text-rose-600" : tone === "warn" ? inverted ? "text-amber-300" : "text-amber-700" : "text-slate-400"}`}
     >
       <i
         className={`h-1.5 w-1.5 rounded-full ${tone === "good" ? "bg-emerald-500" : tone === "bad" ? "bg-rose-500" : tone === "warn" ? "bg-amber-500" : "bg-slate-300"}`}
@@ -71,7 +71,7 @@ export function ErrorMessage({ message }: { message: string }) {
   return message ? (
     <div
       role="alert"
-      className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
+      className="ui-error rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
     >
       {message}
     </div>
@@ -127,26 +127,28 @@ export function Drawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const previous=useRef<HTMLElement|null>(null),wasOpen=useRef(false),panel=useRef<HTMLElement|null>(null);
+  const previous=useRef<HTMLElement|null>(null),wasOpen=useRef(false),panel=useRef<HTMLElement|null>(null),closeHandler=useRef(onClose);
+  closeHandler.current=onClose;
   if(open&&!wasOpen.current)previous.current=document.activeElement as HTMLElement|null;
   wasOpen.current=open;
   useEffect(() => {
     if (!open) return;
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") closeHandler.current();
       if(e.key==='Tab'){
         const controls=panel.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),summary,a[href],[tabindex="0"]');
         if(controls?.length){const first=controls[0],last=controls[controls.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
       }
     };
     window.addEventListener("keydown", key);
+    const originalOverflow=document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", key);
-      document.body.style.overflow = "";
+      document.body.style.overflow = originalOverflow;
       previous.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div
@@ -157,10 +159,10 @@ export function Drawer({
     >
       <button
         aria-label="닫기"
-        className="absolute inset-0 z-0 bg-slate-950/30 backdrop-blur-sm"
+        className="ui-drawer-backdrop absolute inset-0 z-0 bg-slate-950/30 backdrop-blur-sm"
         onClick={onClose}
       />
-      <section ref={panel} className="relative z-10 max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl animate-[reveal_.2s_ease-out] sm:max-h-none sm:max-w-lg sm:rounded-none">
+      <section ref={panel} className="ui-drawer-panel relative z-10 max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl animate-[reveal_.2s_ease-out] sm:max-h-none sm:max-w-lg sm:rounded-none">
         <div className="mb-6 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold">{title}</h2>
           <Button
@@ -187,7 +189,7 @@ export function Tabs({
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist">
+    <div className="ui-tabs inline-flex rounded-xl bg-slate-100 p-1" role="tablist">
       {items.map((item) => (
         <button
           key={item.id}
@@ -249,4 +251,4 @@ export function Sparkline({
   );
 }
 export const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:ring-3 focus:ring-blue-100";
+  "ui-input w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:ring-3 focus:ring-blue-100";

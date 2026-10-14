@@ -10,20 +10,20 @@ import {ModelGuide} from './ModelGuide';
 export function Moe(){
  const {state}=useOperations();const [error,setError]=useState(''),[source,setSource]=useState({path:'',selection:0});
  if(!state)return <Skeleton/>;
- return <div className="space-y-6">
-  <header className="flex flex-wrap items-start justify-between gap-4 rounded-xl bg-[#202e4a] px-4 py-3 text-white">
-   <div><div className="mb-2 flex items-center gap-2 text-xs text-blue-200"><Layers3 size={15}/>지속학습 MoE</div>
-    <h2 className="text-lg font-bold">Expert 슬롯 관리</h2>
-    <p className="mt-1 text-xs text-slate-300">등록 모델 {state.experts.items.length}개</p>
+ return <div className="expert-workspace space-y-6">
+  <header className="expert-workspace-heading">
+   <div><div className="expert-workspace-eyebrow"><Layers3 size={16}/>모델 구성</div>
+    <h2>Expert 라이브러리</h2>
+    <p>등록 항목 {state.experts.items.length}개 · 원본과 정밀도 버전을 함께 관리합니다.</p>
 
    </div>
    <div className="flex flex-wrap gap-2">
     <Button onClick={()=>void request('model/open-directory',{}).catch(e=>setError(e.message))}><FolderOpen size={15}/>모델 폴더</Button>
    </div>
   </header>
-  <details className="text-xs text-slate-500"><summary className="cursor-pointer">사용 안내</summary><div className="mt-2"><ModelGuide/></div></details>
+  <details className="expert-help text-xs text-slate-500"><summary className="cursor-pointer">사용 안내</summary><div className="mt-2"><ModelGuide/></div></details>
   {error&&<ErrorMessage message={error}/>}
-  <ExpertLibraryPanel initialSource={source.path} sourceSelection={source.selection}/><details className="rounded-xl border border-slate-200 bg-white px-4 py-3"><summary className="cursor-pointer text-sm font-semibold text-slate-600">모델 폴더 파일</summary><div className="mt-3"><ModelFiles onPick={path=>setSource(current=>({path,selection:current.selection+1}))}/></div></details>
+  <ExpertLibraryPanel initialSource={source.path} sourceSelection={source.selection}/><details className="workspace-disclosure rounded-xl border border-slate-200 bg-white px-4 py-3"><summary className="cursor-pointer text-sm font-semibold text-slate-600">모델 폴더 파일</summary><div className="mt-3"><ModelFiles onPick={path=>setSource(current=>({path,selection:current.selection+1}))}/></div></details>
   <a href="#finance/policy_learning" className="text-xs font-semibold text-blue-600">FinRL 정책 학습 →</a>
  </div>;
 }

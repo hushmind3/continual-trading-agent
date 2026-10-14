@@ -88,9 +88,27 @@ root=tk.Tk();root.withdraw();root.attributes('-topmost',True)
 value=filedialog.askdirectory(title='분석할 폴더 선택',parent=root) if sys.argv[1]=='folder' else filedialog.askopenfilename(title='분석할 파일 선택',parent=root)
 root.destroy();print(json.dumps({'path':value},ensure_ascii=False))
 """
-    result=subprocess.run([sys.executable,'-c',script,kind],capture_output=True,text=True,encoding='utf8',env=runtime_environment(),creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-    if result.returncode:raise RuntimeError('파일 선택창을 열지 못했습니다: '+result.stderr[-1000:])
-    return json.loads(result.stdout)
+    if not _gate.acquire(blocking=False):raise RuntimeError('다른 REA 선택·분석 작업이 진행 중입니다.')
+    process=None
+    try:
+        _cancel.clear();_processes.clear();_publish('picking','파일·폴더 선택창에서 대상을 선택하세요.')
+        process=subprocess.Popen([sys.executable,'-c',script,kind],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf8',env=runtime_environment(),creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        _processes.append(process)
+        if _cancel.is_set() and process.poll() is None:process.terminate()
+        stdout,stderr=process.communicate()
+        if _cancel.is_set():return {'path':''}
+        if process.returncode:raise RuntimeError('파일 선택창을 열지 못했습니다: '+stderr[-1000:])
+        return json.loads(stdout)
+    except RuntimeError:
+        if _cancel.is_set():return {'path':''}
+        raise
+    finally:
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:process.wait(timeout=3)
+            except subprocess.TimeoutExpired:process.kill();process.wait()
+        _processes.clear();_publish('idle','선택을 취소했습니다.' if _cancel.is_set() else '')
+        _gate.release()
 
 
 

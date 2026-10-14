@@ -8,6 +8,6 @@ export default defineConfig({
   use: {baseURL: process.env.FINRL_BASE_URL || 'http://127.0.0.1:8766', headless: true, trace: 'retain-on-failure', screenshot: 'only-on-failure'},
   projects: [
     {name: 'api', testMatch: /api\.spec\.ts/},
-    {name: 'local-browser', testMatch: /local-browser\.spec\.ts/},
+    {name: 'local-browser', testMatch: /(local-browser|button-workflows)\.spec\.ts/},
   ],
 });

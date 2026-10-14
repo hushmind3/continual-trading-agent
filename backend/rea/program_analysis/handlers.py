@@ -36,5 +36,5 @@ def rea_stop():
 
 @router.on_event("shutdown")
 def close_analysis():
-    from rea.program_analysis.operations import connection
-    connection.close()
+    from rea.program_analysis.extract import stop
+    stop()

@@ -20,9 +20,9 @@ export function CheckpointPanel(){
  const load=async()=>{if(!chosen)return;setError('');setMessage('');try{await execute('checkpoints/restore',{path:chosen.path});setMessage('모델을 메모리에 로드했습니다.')}catch(e){setError(e instanceof Error?e.message:'모델 로딩 실패')}};
  return <Panel title="저장 모델 · 실제 학습 결과" description="저장된 결과를 먼저 확인하세요. 모델 로드를 눌러야 운영에 사용하는 정책이 바뀝니다.">
  <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{recent.slice(0,4).map(item=>{
- const used=Object.values(s.operations?.policies??{}).some(policy=>policy.path===item.path);
+ const uses=Object.entries(s.operations?.policies??{}).filter(([,policy])=>policy.path===item.path),used=uses.length>0,mismatch=uses.some(([currency])=>currency!==item.identity.currency);
  return <button key={item.path} type="button" aria-pressed={chosen?.path===item.path} onClick={()=>{setPath(item.path);setMessage('');setError('')}} className={'rounded-xl border p-4 text-left '+(chosen?.path===item.path?'border-blue-500 bg-blue-50':'border-slate-200 bg-white')}>
- <p className="text-xs text-slate-500">{String(item.identity.currency??'통화 미기록')} · {String(item.identity.timeframe??'주기 미기록')} · {used?'운영 선택됨':'저장된 후보'}</p>
+ <p className="text-xs text-slate-500">{String(item.identity.currency??'통화 미기록')} · {String(item.identity.timeframe??'주기 미기록')} · {mismatch?'운영 통화 불일치':used?'운영 선택됨':'저장된 후보'}</p>
  <p className="mt-1 break-all text-sm font-semibold">{item.name}</p>
  <p className="mt-2 text-sm">{number(item.num_timesteps,0)} 학습 단계 · {number(item.updates,0)} 업데이트</p>
  <p className="mt-1 text-xs text-slate-500">{item.evaluation?'가상원장 비교 평가 있음':'비교 평가 기록 없음'}</p>

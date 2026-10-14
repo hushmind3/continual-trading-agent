@@ -29,15 +29,15 @@ function ProviderForm(){
  </Panel>;
 }
 function OperationalSettings(){
- const endpoint=useSystemState<Settings>('settings'),{execute,pending}=useOperations();const [draft,setDraft]=useState<Settings|null>(null),[error,setError]=useState(''),[message,setMessage]=useState('');
+ const endpoint=useSystemState<Settings>('settings'),{execute,pending}=useOperations();const [draft,setDraft]=useState<Settings|null>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[deviceJsonError,setDeviceJsonError]=useState('');
  const value=draft||endpoint.data;
- async function save(){if(!value)return;setError('');try{const {risk,data,symbols,expert_devices}=value;await execute('settings',{risk,data,symbols,expert_devices});setMessage('운영 설정을 저장했습니다.');setDraft(null);}catch(e){setError(e instanceof Error?e.message:String(e));}}
- return <Panel title="운영 설정" description="기존 시세·가상계좌·Expert 장치 설정 · SAC 원본 학습값은 읽기 전용입니다."><ErrorMessage message={error||endpoint.error}/>{value&&<div className="space-y-4">
+ async function save(){if(!value||deviceJsonError)return;setError('');setMessage('');try{const {risk,data,symbols,expert_devices}=value;await execute('settings',{risk,data,symbols,expert_devices});setMessage('운영 설정을 저장했습니다.');setDraft(null);}catch(e){setError(e instanceof Error?e.message:String(e));}}
+ return <Panel title="운영 설정" description="기존 시세·가상계좌·Expert 장치 설정 · SAC 원본 학습값은 읽기 전용입니다."><ErrorMessage message={deviceJsonError||error||endpoint.error}/>{value&&<div className="space-y-4">
   {(['fee','slippage'] as const).map(key=><label key={key} className="block text-xs text-slate-500">{key==='fee'?'가상매매 수수료율':'가상매매 슬리피지율'}<input type="number" step="any" className={inputClass+' mt-2'} value={value.risk[key]} onChange={e=>setDraft({...value,risk:{...value.risk,[key]:Number(e.target.value)}})}/></label>)}
   {(['poll_seconds','timeout_seconds'] as const).map(key=><label key={key} className="block text-xs text-slate-500">{key==='poll_seconds'?'시세 폴링 주기(초)':'시세 요청 대기(초)'}<input type="number" step="any" className={inputClass+' mt-2'} value={value.data[key]} onChange={e=>setDraft({...value,data:{...value.data,[key]:Number(e.target.value)}})}/></label>)}
   <label className="block text-xs text-slate-500">수신 종목 (쉼표 구분 · 비우면 기존 전체 목록)<input className={inputClass+' mt-2'} value={value.symbols.join(', ')} onChange={e=>setDraft({...value,symbols:e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})}/></label>
-  <label className="block text-xs text-slate-500">Expert별 장치 (JSON)<textarea className={inputClass+' mt-2'} defaultValue={JSON.stringify(value.expert_devices,null,2)} onBlur={e=>{try{setDraft({...value,expert_devices:JSON.parse(e.target.value)});setError('');}catch{setError('장치 설정 JSON을 확인하세요.');}}}/></label>
-  <Button tone="primary" disabled={!!error} busy={pending.has('settings')} onClick={()=>void save()}>운영 설정 저장</Button>{message&&<p className="text-xs text-slate-500">{message}</p>}
+  <label className="block text-xs text-slate-500">Expert별 장치 (JSON)<textarea className={inputClass+' mt-2'} defaultValue={JSON.stringify(value.expert_devices,null,2)} onChange={e=>{try{setDraft({...value,expert_devices:JSON.parse(e.target.value)});setDeviceJsonError('');}catch{setDeviceJsonError('장치 설정 JSON을 확인하세요.');}}}/></label>
+  <Button tone="primary" disabled={!!deviceJsonError} busy={pending.has('settings')} onClick={()=>void save()}>운영 설정 저장</Button>{message&&<p className="text-xs text-slate-500">{message}</p>}
  </div>}</Panel>;
 }
 export function ConnectionSettings(){const {state:s}=useOperations();const connection=useSystemState<Connections>('connections');if(!s)return <Skeleton/>;

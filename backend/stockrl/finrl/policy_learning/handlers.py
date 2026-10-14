@@ -278,13 +278,15 @@ def preflight(req, command):
             if not checkpoint.is_absolute():checkpoint=RUNTIME/checkpoint
             if not checkpoint.is_file():raise ValueError('Champion의 SB3 학습 체크포인트가 없습니다.')
             checkpoint_identity=read_json(checkpoint.parent/'dataset.json')
+            if req.resume and policy_checkpoint(policy_files(req.currency,req.checkpoint)).resolve()!=checkpoint.resolve():
+                raise ValueError('이어 학습 체크포인트가 선택한 Champion과 다릅니다.')
             if champion.get('trained') and policy_timeframe(checkpoint_identity)!=timeframe:
                 raise ValueError('학습된 Champion의 가격 주기가 다릅니다. 해당 주기의 새 정책을 선택하세요.')
             if identity.get('currency')!=req.currency:
                 raise ValueError('선택한 Champion의 통화가 다릅니다.')
         except (ValueError,OSError,KeyError,RuntimeError) as exc:
             errors.append('MoE Champion: '+str(exc))
-    if req.resume and not req.champion_path:
+    if req.resume:
         compatible=model["compatible"]
         if not compatible:
             errors.extend(model["reasons"])
@@ -384,7 +386,8 @@ def restore_checkpoint(request:dict):
             except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
             atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
             selection_path=ROOT/'runtime/operations/policies.json'
-            update_json(selection_path,lambda selected:{**selected,identity['currency']:path.relative_to(RUNTIME).as_posix()})
+            relative=path.relative_to(RUNTIME).as_posix()
+            update_json(selection_path,lambda selected:{**{currency:value for currency,value in selected.items() if value!=relative or currency==identity['currency']},identity['currency']:relative})
             system.release_models(keep=system.selected_models())
         return {"message":"해당 FinRL 정책을 선택하고 중앙 정책을 실제 로드했습니다. 학습·시세·매매는 시작하지 않았습니다.","policy":loaded}
 

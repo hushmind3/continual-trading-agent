@@ -8,6 +8,13 @@ export function LearningProgress(){
  if(!operation)return null;
  const current=learning?.current,completed=learning?.last_completed,applied=learning?.last_applied;
  return <Panel title="실시간 경험 · 정책 업데이트" description="수신 시세, 실제 학습 완료, 운영 반영, 가상계좌 성과를 각각 확인합니다.">
+  <div className="mb-4 grid gap-3 sm:grid-cols-2">{(['KRW','USD'] as const).map(currency=>{
+   const policy=operation.policies?.[currency],saved=state?.checkpoints.find(item=>item.path===policy?.path);
+   const input=saved?.identity.training_input as {consumed_end?:string;end?:string}|undefined;
+   return <section key={currency} className="rounded-xl border border-slate-200 p-3"><h3 className="text-xs font-semibold">{currency} 운영 모델</h3>
+    {policy?<><p className="mt-2 break-all text-sm font-semibold">{saved?.name??policy.path}</p><p className="mt-1 text-xs text-slate-500">{policy.loaded?'메모리 로드됨 · '+policy.device:'선택됨 · 메모리 미로드'} · {number(saved?.num_timesteps,0)} 학습 단계 · {number(saved?.updates,0)} 업데이트</p><p className="mt-2 text-xs text-slate-500">실제 학습 마지막 봉: {input?.consumed_end??'기록 없음'}</p><p className="mt-1 text-xs text-slate-500">입력 최신 봉: {input?.end??'기록 없음'}</p></>:<p className="mt-2 text-xs text-amber-700">승인한 모델이 없습니다. 정책 학습 화면에서 이 통화의 저장 모델을 로드하세요.</p>}
+   </section>;
+  })}</div>
   <KeyValues items={[
    ['시세 수신',operation.feed.last_as_of?date(operation.feed.last_as_of):'수신 기록 없음'],
    ['지속학습',operation.controls.learning?learning?.status??operation.feed.learning_status??'입력 대기':'꺼짐'],

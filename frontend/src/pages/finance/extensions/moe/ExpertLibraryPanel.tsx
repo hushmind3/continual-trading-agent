@@ -36,7 +36,7 @@ export function ExpertLibraryPanel({initialSource=''}:{initialSource?:string}){
  useEffect(()=>{if(initialSource){setSource(initialSource);setOpen(true);void operation('inspect',{source:initialSource})}},[initialSource]);
  const toggleManaged=(id:string)=>setSelectedIds(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
  const toggleFailure=(source_id:string,precision:string)=>setSelectedFailures(current=>current.some(row=>row.source_id===source_id&&row.precision===precision)?current.filter(row=>row.source_id!==source_id||row.precision!==precision):[...current,{source_id,precision}]);
- const createChampion=async()=>{setError('');setCreating(true);try{const symbols=JSON.parse(sessionStorage.getItem('training_symbols')||'[]');setChampionResult(await request<Champion>('champions/create',{algorithm,experts:[...chosenExperts],...(sessionStorage.getItem('training_currency')?{currency:sessionStorage.getItem('training_currency')}:{}),...(symbols.length?{symbols}:{})}));await refresh()}catch(e){setError(e instanceof Error?e.message:'MoE Champion 생성 실패')}finally{setCreating(false)}};
+ const createChampion=async()=>{setError('');setCreating(true);try{setChampionResult(await request<Champion>('champions/create',{algorithm,experts:[...chosenExperts],...(sessionStorage.getItem('training_currency')?{currency:sessionStorage.getItem('training_currency')}:{} )}));await refresh()}catch(e){setError(e instanceof Error?e.message:'MoE Champion 생성 실패')}finally{setCreating(false)}};
  const removeExpert=async(ids:string[],failures:{source_id:string;precision:string}[]=[])=>{if(!(ids.length+failures.length))return;if(await operation('remove',{ids,failures})){setSelectedIds(current=>current.filter(id=>!ids.includes(id)));setSelectedFailures(current=>current.filter(row=>!failures.some(removed=>removed.source_id===row.source_id&&removed.precision===row.precision)))}};
 
  const runSelected=async()=>{setError('');setActionMessage('');const quality={device,goal,max_relative_rmse:tolerance.error/100,min_action_agreement:tolerance.agreement/100};
@@ -77,6 +77,7 @@ export function ExpertLibraryPanel({initialSource=''}:{initialSource?:string}){
   {discoveryOpen&&<ExpertDiscovery onClose={()=>setDiscoveryOpen(false)}/>}
   <Drawer title="Frozen Expert 가져오기" open={open} onClose={()=>setOpen(false)}>
    <div className="space-y-4">
+    <ErrorMessage message={error}/>
     <p className="text-sm leading-6 text-slate-500">Expert 패키지 또는 호환 MoE 파일의 로컬 경로·다운로드 주소를 입력하세요. 입력 생성기가 없는 모델은 구성에 넣기 전에 거릅니다.</p>
     <label className="block space-y-2 text-sm"><span>파일 경로 / 다운로드 주소</span><input className={field} value={source} onChange={e=>setSource(e.target.value)} placeholder="C:\모델\expert.pt 또는 https://…"/></label>
     <Button busy={busy&&job?.kind==='inspect'} disabled={busy||!source} onClick={()=>void operation('inspect',{source})}>파일 구성 확인</Button>

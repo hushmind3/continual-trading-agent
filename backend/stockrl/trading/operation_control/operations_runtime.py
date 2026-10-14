@@ -87,7 +87,8 @@ class OperationsRuntime:
                     checkpoint=(ROOT/'runtime/official'/path).resolve()
                     if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('승인 정책 경로가 운영 폴더 밖입니다.')
                     identity=read_json(checkpoint.parent/'dataset.json')
-                    if identity.get('currency')!=currency or policy_checkpoint(checkpoint.parent)!=checkpoint:raise ValueError('승인 정책 경로·통화 정보가 다릅니다.')
+                    if identity.get('currency')!=currency:raise ValueError(f"{currency} 운영에 {identity.get('currency','통화 미기록')} 모델이 선택되어 있습니다. 정책 학습 화면에서 해당 모델을 다시 로드하세요.")
+                    if policy_checkpoint(checkpoint.parent)!=checkpoint:raise ValueError('승인 정책 경로가 저장된 알고리즘과 다릅니다.')
                     self._check_policy(checkpoint.parent,load=True)
             if name=='feed':
                 if enabled and not self.controls['feed']:

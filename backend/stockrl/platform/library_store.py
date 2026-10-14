@@ -77,7 +77,7 @@ def import_package(settings,path,key,slot,progress,template=None):
         from .gguf_registration import register_gguf
         return register_gguf(settings,path,slot,progress)
     from .native_upgrade import read_native,upgrade_from_template
-    saved=read_native(path)
+    saved=read_catalog(path) if path.suffix.lower()=='.json' else read_native(path)
     if saved.get('format')==PACKAGE_FORMAT:
         package=saved;key=saved['id']
     elif saved.get('format')==HEADER_FORMAT:
@@ -97,14 +97,20 @@ def import_package(settings,path,key,slot,progress,template=None):
                 native_runner_source=saved['metadata']['native_runner_source'],construction_input=saved['metadata']['construction_inputs'].get(key)))
     elif template:package=upgrade_from_template(settings,path,template)
     else:raise ValueError('지원하지 않는 패키지 형식')
-    return register_package(settings,package,slot,progress)
+    return register_package(settings,package,slot,progress,source=path if path.suffix.lower()=='.json' else None)
 
 
-def register_package(settings,package,slot,progress):
+def register_package(settings,package,slot,progress,*,source=None):
     contract=input_contract(package['entry'])
     if not contract['supported']:raise ValueError(contract['reason'])
     if not 3<package['feature_size']<=32768:raise ValueError('출력 크기가 지원 범위를 벗어났습니다.')
     package={**package,'id':slot,'entry':{**package['entry'],'id':slot}}
+    if source is not None:
+        source=Path(source).resolve()
+        if not source.is_relative_to(settings.model_dir.resolve()):raise ValueError('JSON 패키지를 모델 폴더에 둔 뒤 등록하세요.')
+        reference=dict(file=source.relative_to(settings.model_dir.resolve()).as_posix(),sha256=digest(source),bytes=source.stat().st_size)
+        progress(stage='importing',detail='JSON 패키지 등록 · 가중치 파일 유지')
+        return descriptor(slot,package,reference)
     root=settings.resolve(settings.expert_checkpoint).parent/('action' if package['entry'].get('stock_policy') else 'market');root.mkdir(parents=True,exist_ok=True)
     progress(stage='importing',detail='Frozen 패키지를 등록하는 중')
     temporary=atomic_torch_save(package,root/(slot+'.pt'))

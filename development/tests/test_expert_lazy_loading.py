@@ -56,3 +56,18 @@ class ExpertRegistryIntegrityTests(unittest.TestCase):
                     write_catalog({'experts':{}},index,removed_ids=['saved'])
                 self.assertEqual(index.read_bytes(),before)
                 if content is not None:self.assertEqual(manifest.read_text(encoding='utf-8'),content)
+
+
+class JsonExpertImportTests(unittest.TestCase):
+    def test_json_package_import_keeps_native_files_without_loading_or_creating_pt(self):
+        import json
+        from stockrl.platform import library_store
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=root/'market/model/MODEL.json';source.parent.mkdir(parents=True)
+            package={'format':library_store.PACKAGE_FORMAT,'id':'existing','executor':'llama_cpp','feature_size':6,'module_count':1,'state_dict':{},'weight_asset':{'file':'market/model/GGUF.gguf','bytes':100,'sha256':'stored'},'entry':{'name':'Existing GGUF','backend':'gguf_market'}}
+            source.write_text(json.dumps(package),encoding='utf-8');before=source.read_bytes()
+            with patch.object(library_store.torch,'load',side_effect=AssertionError('must not load weights')),patch.object(library_store,'atomic_torch_save',side_effect=AssertionError('must not create PT')):
+                item=library_store.import_package(SimpleNamespace(model_dir=root),source,'existing','chosen',lambda **values:None)
+            self.assertEqual(item['id'],'chosen');self.assertEqual(item['package']['file'],'market/model/MODEL.json')
+            self.assertTrue(item['input']['supported']);self.assertEqual(source.read_bytes(),before)
+            self.assertEqual(list(root.rglob('*.pt')),[])

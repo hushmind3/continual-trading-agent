@@ -149,11 +149,11 @@
 
 /* Policy workspace: inspect a saved model, then configure and run training. */
 .policy-model-grid {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
-.policy-model-card {min-width:0;padding:17px;border:1px solid #e7e7ec;border-radius:12px;background:#fafafb;text-align:left;transition:border-color .18s,background .18s;cursor:pointer}
-.policy-model-card:hover {background:#f5f5f8;border-color:#cfcfd8}
-.policy-model-card-selected {background:#f4f9ff;border-color:#a2c9f1}
+.policy-model-card {position:relative;min-width:0;padding:18px;border:1px solid #e5eaf1;border-radius:14px;background:#f8fafc;text-align:left;transition:border-color .18s,background .18s,box-shadow .18s;cursor:pointer}
+.policy-model-card:hover {background:#f5f8fd;border-color:#bdd0e9;box-shadow:0 3px 12px #203d6307}
+.policy-model-card-selected {background:#edf5ff;border-color:#78aceb;box-shadow:0 0 0 1px #78aceb18}
 .policy-model-card>p:first-child {font-size:10px;line-height:1.7}
-.policy-model-card>p:nth-child(2) {font-size:13px;letter-spacing:-.15px;color:#33333b}
+.policy-model-card>p:nth-child(2) {font-size:14px;line-height:1.6;letter-spacing:-.2px;color:#243a59}
 .policy-model-card>p:nth-child(3) {font-size:11px;line-height:1.7}
 .policy-model-card>p:last-child {font-size:10px}
 .policy-selected-details {margin-top:20px;padding-top:18px;border-top:1px solid #eeeef2}
@@ -163,7 +163,7 @@
 .policy-result-metrics strong.policy-result-time {font-size:13px;line-height:1.75;letter-spacing:0}
 .policy-storage-details {padding-top:16px;border-top:1px solid #eeeef2;font-size:12px;color:#7e7e89}
 .policy-storage-details>summary {color:#0071e3;font-size:11px;cursor:pointer}
-.policy-training-summary {padding:24px;border:1px solid #e7e7eb;border-radius:20px;background:#fff}
+.policy-training-summary {padding:24px;border:1px solid #e5eaf1;border-radius:18px;background:linear-gradient(120deg,#fff,#f8faff)}
 .policy-summary-heading {display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
 .policy-summary-heading>div>p {display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:11px;color:#71717c}
 .policy-summary-heading h2 {font-size:17px;font-weight:600;letter-spacing:-.35px}
@@ -368,3 +368,16 @@
 @media(max-width:760px) {.expert-toolbar {padding:16px}.expert-toolbar>.ui-button {flex:1;justify-content:center;font-size:12px}.expert-toolbar>.ui-button-primary {flex-basis:100%}.expert-selection-summary {gap:8px 14px}.expert-family-card {padding:18px}.expert-family-category {margin-bottom:4px}}
 
 .expert-management-progress {margin:14px 0;padding:12px 14px;border-radius:11px;background:#edf5ff;font-size:12px;line-height:1.7;color:#326393}
+
+/* Policy actions form a visible sequence; explanatory details stay out of the way. */
+.policy-model-actions {display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.policy-model-actions select {flex:1;min-width:180px}
+.policy-model-actions .ui-button {min-height:42px;white-space:nowrap}
+.policy-download {display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;font-size:12px;line-height:1.5;border:1px solid #e3e8ef;border-radius:10px;color:#62738a;background:#fff;text-decoration:none}
+.policy-inline-help {margin-top:12px;font-size:11px;color:#7b8595}
+.policy-inline-help summary {cursor:pointer}
+.policy-inline-help>p {max-width:75ch;line-height:1.8}
+.policy-action-step {display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:10px;background:#edf1f6;color:#5e708a;font-variant-numeric:tabular-nums}
+.ui-button-primary .policy-action-step {background:#ffffff25;color:#fff}
+.policy-evaluation-empty {margin-top:14px;padding-top:14px;border-top:1px dashed #e8edf3;font-size:11px;color:#8a94a4}
+@media(max-width:760px) {.policy-model-actions {gap:8px}.policy-model-actions select {width:100%;flex-basis:100%}.policy-model-actions .ui-button {flex:1}.policy-training-actions .ui-button {gap:7px;font-size:12px}.policy-training-actions .ui-button>svg {display:none}}

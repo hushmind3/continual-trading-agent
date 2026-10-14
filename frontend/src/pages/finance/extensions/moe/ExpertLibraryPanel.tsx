@@ -20,13 +20,13 @@ export function ExpertLibraryPanel({initialSource='',sourceSelection=0}:{initial
  const [discoveryOpen,setDiscoveryOpen]=useState(false),[category,setCategory]=useState('all');
  const [tolerance,setTolerance]=useState(defaultTolerance),[device,setDevice]=useState('auto'),[goal,setGoal]=useState('memory'),[precision,setPrecision]=useState('int4');
  const [selectedAction,setSelectedAction]=useState('probe_all'),[actionMessage,setActionMessage]=useState('');
- const [skipChecked,setSkipChecked]=useState(true);
+ const [skipChecked,setSkipChecked]=useState(true),[submitting,setSubmitting]=useState(false);
  const [selectedIds,setSelectedIds]=useState<string[]>(()=>{try{const saved=JSON.parse(sessionStorage.getItem('finrl-x.champion.selection')??'null');if(Array.isArray(saved)&&saved.every(id=>typeof id==='string'))return saved}catch{}return state?.experts.active??[]});
  const [selectedFailures,setSelectedFailures]=useState<{source_id:string;precision:string}[]>([]);
  const [creating,setCreating]=useState(false),[championResult,setChampionResult]=useState<Champion|null>(()=>{try{const result=JSON.parse(sessionStorage.getItem('finrl-x.champion.result')??'null');return result?.policy_spaces&&typeof result?.identity?.algorithm==='string'?result:null}catch{return null}});
  useEffect(()=>{sessionStorage.setItem('finrl-x.champion.selection',JSON.stringify(selectedIds))},[selectedIds]);
  useEffect(()=>{if(championResult)sessionStorage.setItem('finrl-x.champion.result',JSON.stringify(championResult))},[championResult]);
- const catalog=lib?.catalog,job=lib?.job,busy=Boolean(job?.busy)||creating,items=state?.experts.items??[];
+ const catalog=lib?.catalog,job=lib?.job,busy=Boolean(job?.busy)||creating||submitting,items=state?.experts.items??[];
  const registeredIds=new Set(items.map(item=>item.id));
  const currentSelection=selectedIds.filter(id=>registeredIds.has(id));
  const chosenExperts=currentSelection.filter(id=>items.some(item=>item.id===id&&item.package_available&&!item.metadata_error&&item.input?.supported));
@@ -34,7 +34,7 @@ export function ExpertLibraryPanel({initialSource='',sourceSelection=0}:{initial
  const families=expertFamilies(items),shown=families.filter(f=>category==='all'||expertCategory(f.base)===category);
  const candidate=job?.result?.experts?.find((e:any)=>e.id===key);
  const operation=async(kind:string,payload:unknown)=>{
-  setError('');try{await request(`library/${kind}`,kind==='probe_all'?{...(payload as Record<string,unknown>),skip_checked:skipChecked}:payload);await refresh();return true}catch(e){setError(e instanceof Error?e.message:'Expert 작업 실패');return false}
+  setError('');setSubmitting(true);try{await request(`library/${kind}`,kind==='probe_all'?{...(payload as Record<string,unknown>),skip_checked:skipChecked}:payload);await refresh();return true}catch(e){setError(e instanceof Error?e.message:'Expert 작업 실패');return false}finally{setSubmitting(false)}
  };
  useEffect(()=>{if(initialSource){setSource(initialSource);setOpen(true);void operation('inspect',{source:initialSource})}},[initialSource,sourceSelection]);
  const toggleManaged=(id:string)=>setSelectedIds(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
@@ -43,7 +43,7 @@ export function ExpertLibraryPanel({initialSource='',sourceSelection=0}:{initial
  const removeExpert=async(ids:string[],failures:{source_id:string;precision:string}[]=[])=>{if(!(ids.length+failures.length))return;if(await operation('remove',{ids,failures})){setSelectedIds(current=>current.filter(id=>!ids.includes(id)));setSelectedFailures(current=>current.filter(row=>!failures.some(removed=>removed.source_id===row.source_id&&removed.precision===row.precision)))}};
 
  const runSelected=async()=>{setError('');setActionMessage('');if(!currentSelection.length&&selectedAction!=='apply'){setError('목록에 있는 모델 버전을 선택하세요.');return}const quality={device,goal,max_relative_rmse:tolerance.error/100,min_action_agreement:tolerance.agreement/100};
-  if(selectedAction==='apply'){try{await request('experts/select',{active:currentSelection});await refresh();setActionMessage('운영 Registry에 선택 구성을 적용했습니다. 학습된 Champion의 Expert 구성은 저장된 구성입니다.')}catch(e){setError(e instanceof Error?e.message:'선택 적용 실패')}}
+  if(selectedAction==='apply'){setSubmitting(true);try{await request('experts/select',{active:currentSelection});await refresh();setActionMessage('운영 Registry에 선택 구성을 적용했습니다. 학습된 Champion의 Expert 구성은 저장된 구성입니다.')}catch(e){setError(e instanceof Error?e.message:'선택 적용 실패')}finally{setSubmitting(false)}}
   else if(selectedAction==='convert'||selectedAction==='optimize'){if(currentSelection.length!==1){setError('이 작업은 모델 버전 1개를 선택하세요. 여러 Expert 최적화는 일괄 최적화를 사용하세요.');return}const id=currentSelection[0];let slot=id+'_'+precision,index=2;while(catalog?.experts?.[slot])slot=id+'_'+precision+'_v'+index++;await operation(selectedAction,{...quality,id,precision,slot})}
   else await operation(selectedAction,{...quality,...(currentSelection.length?{ids:currentSelection}:{})});
  };
@@ -65,7 +65,7 @@ export function ExpertLibraryPanel({initialSource='',sourceSelection=0}:{initial
   {!!items.filter(item=>!item.name||!item.role||!item.input).length&&<ErrorMessage message="등록 JSON에 이름·역할·입력 설정이 없는 항목이 있습니다. 파일 목록과 등록 목록은 다릅니다. 누락 정보를 확인하기 전에는 조립하지 않습니다."/>}
   <div className="overflow-x-auto"><Tabs value={category} onChange={setCategory} items={[{id:'all',label:`전체 ${families.length}`},...Object.entries(categoryNames).map(([id,label])=>({id,label:`${label} ${families.filter(f=>expertCategory(f.base)===id).length}`}))]}/></div>
   {busy&&<div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800" aria-live="polite">
-   <p>{creating?algorithm.toUpperCase()+' MoE Champion 생성 중':job?.detail??'Expert 작업 진행 중'}</p>
+   <p>{creating?algorithm.toUpperCase()+' MoE Champion 생성 중':submitting?'요청 전달 중':job?.detail??'Expert 작업 진행 중'}</p>
    {!!job?.total&&<div className="mt-3"><Meter value={(job.completed??0)/job.total*100}/></div>}
   </div>}
   {!busy&&job?.stage==='complete'&&job.kind==='remove'&&<p className="text-xs text-emerald-700" role="status">선택한 등록 항목·실패 기록을 제거했습니다. 모델 파일은 보존했습니다.</p>}
@@ -99,7 +99,7 @@ export function ExpertLibraryPanel({initialSource='',sourceSelection=0}:{initial
      <label className="block space-y-2 text-sm"><span>슬롯 이름</span><input className={field} value={slot} onChange={e=>setSlot(e.target.value)}/></label>
      <Button tone="primary" disabled={busy||!candidate?.input?.supported||!slot} onClick={()=>void operation('import',{source:job?.result?.source??source,expert_id:key,slot,activate:true})}>가져오기 · 자동 등록</Button>
     </>}
-    {busy&&<p className="text-sm text-blue-600" aria-live="polite">{job?.detail}</p>}
+    {busy&&<p className="text-sm text-blue-600" aria-live="polite">{submitting?'요청 전달 중':job?.detail}</p>}
     {job?.error&&<ErrorMessage message={job.error}/>}
    </div>
   </Drawer>

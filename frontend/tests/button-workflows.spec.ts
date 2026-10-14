@@ -214,3 +214,25 @@ test('same model file can reopen import after closing the drawer',async({page})=
   await pick.click();await expect(page.getByRole('dialog')).toBeVisible();
   await expect.poll(()=>seen.filter(operation=>operation==='library/inspect').length).toBe(2);
 });
+
+
+test('MoE waits for request acceptance before enabling another operation',async({page})=>{
+  let release:()=>void=()=>{},calls=0;
+  await page.route('**/api',async route=>{
+    if(envelope(route.request())?.operation==='library/probe_all'){
+      calls++;await new Promise<void>(resolve=>{release=resolve});
+      await route.fulfill({status:400,json:{error:{message:'controlled rejection'}}});return;
+    }
+    await route.continue();
+  });
+  await page.goto('/#finance/moe');
+  await page.getByText('검사 · 양자화 · 관리',{exact:true}).click();
+  const probe=page.getByRole('button',{name:'전체 Expert 실행 검사',exact:true});
+  await probe.click();
+  await expect(probe).toBeDisabled();
+  await expect(page.getByRole('button',{name:'전체 양자화',exact:true})).toBeDisabled();
+  await expect(page.getByText('요청 전달 중',{exact:true})).toBeVisible();
+  expect(calls).toBe(1);release();
+  await expect(probe).toBeEnabled();
+  await expect(page.getByText('controlled rejection',{exact:true})).toBeVisible();
+});

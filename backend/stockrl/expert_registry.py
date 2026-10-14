@@ -4,6 +4,7 @@ from .state_io import atomic_json as _write
 from .state_io import read_json
 from pathlib import Path
 import copy
+import json
 
 def utc_now():return datetime.now(timezone.utc).isoformat()
 def atomic_json(path,value):_write(value,path)
@@ -11,7 +12,11 @@ def atomic_json(path,value):_write(value,path)
 
 def read_catalog(path=None):
     if path is None:path=Path.home()/'Desktop'/'모델'/'experts'/'expert_registry.json'
-    path=Path(path);index=read_json(path)
+    path=Path(path)
+    try:index=json.loads(path.read_text(encoding='utf-8'))
+    except FileNotFoundError:index={}
+    except (OSError,ValueError) as exc:raise ValueError('Expert registry JSON cannot be read: '+str(path)) from exc
+    if not isinstance(index,dict):raise ValueError('Expert registry JSON must be an object: '+str(path))
     if index.get('format')!='expert_model_index_v1':return index or {'experts':{},'active':[]}
     root=path.resolve().parent
     result={key:copy.deepcopy(value) for key,value in index.items() if key not in ('format','models')}
@@ -19,7 +24,9 @@ def read_catalog(path=None):
     for relative in index.get('models',[]):
         manifest=(root/relative).resolve()
         if not manifest.is_relative_to(root):raise ValueError('Model manifest outside Expert folder')
-        model=read_json(manifest)
+        try:model=json.loads(manifest.read_text(encoding='utf-8'))
+        except (OSError,ValueError) as exc:raise ValueError('Model registration JSON cannot be read: '+str(manifest)) from exc
+        if not isinstance(model,dict) or not isinstance(model.get('experts',{}),dict):raise ValueError('Invalid model registration JSON: '+str(manifest))
         for key,item in model.get('experts',{}).items():
             item=copy.deepcopy(item);package=(manifest.parent/item['package']['file']).resolve()
             if not package.is_relative_to(root):raise ValueError('Model package outside Expert folder')
@@ -30,8 +37,11 @@ def read_catalog(path=None):
     return result
 
 
-def write_catalog(value,path):
+def write_catalog(value,path,*,removed_ids=()):
     path=Path(path);root=path.resolve().parent;models={};owners={}
+    previous=read_catalog(path)
+    missing=set(previous.get('experts',{}))-set(value.get('experts',{}))-set(removed_ids)
+    if missing:raise ValueError('Expert registration would be lost without a delete request: '+', '.join(sorted(missing)))
     for key,original in value.get('experts',{}).items():
         item=copy.deepcopy(original);package=(root/item['package']['file']).resolve()
         if not package.is_relative_to(root):raise ValueError('Model package outside Expert folder')

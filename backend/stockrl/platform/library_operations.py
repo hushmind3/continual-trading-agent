@@ -454,7 +454,7 @@ class LibraryOperations:
                 for field in ('selected','previous'):
                     if record.get(field) in ids:record[field]=None
                 if not (record['reports'] or record['failures'] or record['attempts']):records.pop(source)
-            write_catalog(catalog,cfg.registry_file)
+            write_catalog(catalog,cfg.registry_file,removed_ids=ids)
             return {'removed':ids,'removed_failures':failure_records,'model_files_preserved':True}
         if kind=='probe':
             key=payload['id'];started=time.time();metrics={}

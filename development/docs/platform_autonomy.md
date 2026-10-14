@@ -103,3 +103,10 @@
 - 운영 판단·지속학습·비교 평가는 저장 정책 주기를 사용합니다. 일봉 정책과 분봉·Replay가 섞이는 이어 학습과 다른 주기의 결과 반영을 차단합니다. 기존 일봉 기본값과 FinRL/SB3 알고리즘 기본값은 유지합니다.
 - 가격 주기별 조회, 저장 실패 시 수신 확인 취소, 기존 CSV 형식, CLI 주기 상속/불일치 차단, 지속학습 주기 유지에 대한 회귀 코드를 추가했습니다. 실행 명령: PYTHONPATH=backend;development/tests 설정 후 .venv/Scripts/python.exe -B -m unittest test_kiwoom_history test_state_integrity test_training_cli test_market_learning test_continuous_learning. 검사·시세 수집·학습·빌드·서버 재적용은 이번 변경 이후 미실행입니다.
 - 전체 목표는 진행 중입니다. 연결 코드의 추가는 실제 실시간 학습 성공의 증명이 아닙니다. 미국 역사 가격, 추가 Action·시장해석 Expert, 학습 속도 조절, 운영 정책 선택 및 실제 흐름 검증은 남아 있습니다.
+
+## 지속학습의 실제 소비 범위 (2026-10-14, 코드 반영·실행 미확인)
+- 최신 봉을 입력에 포함해도 매번 전체 기간의 처음부터 제한된 단계만 실행하면 최신 봉에 도달하지 못하는 경로를 수정했습니다. 이어 학습은 실제 consumed_end 다음 봉부터 시작하고 관측 문맥을 보존합니다. 에피소드 reset에도 소비 시각·이번 작업 전이 수를 유지합니다.
+- training_input.end(입력 최신 시각)와 consumed_end(실제로 환경 step이 소비한 시각)를 구분합니다. 새 dataset.json·Champion에 소비 기록을 저장합니다. 기존 모델·기록은 변경하지 않았으며 과거 end를 실제 학습 완료 증거로 소급 해석하지 않습니다.
+- 같은 데이터 지문에도 미소비 봉이 있으면 다음 구간을 학습합니다. 작업 완료 신호로 다음 대기를 처리하고, 소비 범위 기록이 없거나 잘못된 결과의 운영 반영을 차단합니다. 동일 입력의 소비가 끝나면 중복 작업을 요청하지 않습니다.
+- 운영 화면에 대기 봉 수와 실제 학습 시각을 추가했습니다. 시작 경계, 문맥, reset 후 소비 기록, 누락 기록 차단, 같은 입력의 남은 구간 처리에 대한 회귀 코드를 추가했습니다.
+- 사용자 검사 명령: PowerShell에서 $env:PYTHONPATH='backend;development/tests' 설정 후 .venv/Scripts/python.exe -B -m unittest test_market_learning test_continuous_learning. 이번 수정 이후 검사·학습·시세·빌드·서버 적용은 미실행입니다. 학습 속도 자동 조절과 전체 실제 운영 검증은 계속 미완료입니다.

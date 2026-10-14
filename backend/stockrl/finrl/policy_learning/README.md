@@ -25,3 +25,5 @@
 학습 환경·분할·체결 회귀 검사(최신 수정 후 미실행): 위 PYTHONPATH 설정 후 `.\.venv\Scripts\python.exe -B -m unittest test_market_learning test_expert_lazy_loading test_training_cli`를 사용합니다. 실제 모델 생성·학습을 실행하는 명령과 구분합니다.
 
 가격 주기: RunRequest.timeframe과 CLI --timeframe은 1d/1m을 지원합니다. 새 학습의 기본값은 기존 일봉이며, 이어 학습은 저장 정책의 주기를 상속합니다. 다른 주기의 이어 학습·Replay 혼합·비교 평가는 거부합니다. dataset.json·새 Champion의 identity에 주기를 기록하고 training_input에는 실제 출처·주기를 남깁니다. 분봉 입력은 수신 완료된 봉만 사용합니다. 이 연결을 적용한 이후 실제 학습·검사는 미실행입니다.
+
+소비 범위: training_input.end는 읽은 입력의 최신 시각입니다. consumed_end는 환경 step이 실제로 소비한 마지막 시각이며 transitions는 이번 작업에서 실행한 전이 수입니다. 에피소드 reset으로 이 누적 기록을 지우지 않습니다. 이어 학습은 consumed_end 다음 봉부터 진행하도록 과거 관측 문맥을 남겨 시작 위치를 정합니다. 과거 기록에 consumed_end가 없으면 end를 실제 학습 증거로 사용하지 않으며 첫 실행에서 새 소비 기록을 만듭니다. 기존 모델·JSON을 소급 변경하지 않습니다. 같은 주기의 SAC Replay 복원과 공식 학습 기본값은 유지합니다. 최신 소비 범위 회귀 검사·학습 실행은 미실행입니다.

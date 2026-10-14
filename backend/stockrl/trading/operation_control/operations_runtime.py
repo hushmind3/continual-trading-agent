@@ -166,7 +166,7 @@ class OperationsRuntime:
         while self.controls['feed']:
             received=self.feed_cycle.wait(timeout=1 if self.learning_context else None);self.feed_cycle.clear()
             if self.learning_context:
-                with self.lock,system.job_lock:self.finish_learning()
+                with self.lock,system.job_lock:received=bool(self.finish_learning()) or received
             if not received:continue
             if not self.controls['feed']:break
             if self.controls['engine']:
@@ -201,9 +201,18 @@ class OperationsRuntime:
                 if key in context['identity'] and identity.get(key)!=context['identity'][key]:raise ValueError('학습 결과의 '+key+' 계약이 기준 정책과 다릅니다.')
             checked=learning.model_state(learning.source_settings(),folder)
             if not checked['compatible']:raise ValueError('학습 결과를 운영에 반영할 수 없습니다: '+' · '.join(checked['reasons']))
+            consumed=identity.get('training_input',{}).get('consumed_end')
+            if not consumed:raise ValueError('실제로 학습한 마지막 시각의 기록이 없습니다.')
+            stamp=pd.Timestamp(consumed);training_input=identity['training_input']
+            if pd.isna(stamp) or stamp>pd.Timestamp(training_input['end']):raise ValueError('학습한 시각이 실제 입력 범위 밖입니다.')
+            if int(training_input.get('transitions') or 0)<1:raise ValueError('실제 학습 전이 기록이 없습니다.')
+            previous=context['identity'].get('training_input',{}).get('consumed_end')
+            if previous and stamp<pd.Timestamp(previous):raise ValueError('학습 완료 시각이 기준 정책보다 이전입니다.')
+            if previous and context['input'].get('pending_observations',0)>0 and stamp<=pd.Timestamp(previous):raise ValueError('대기 중인 새 가격을 학습한 기록이 없습니다.')
             checkpoint=policy_checkpoint(folder);relative=checkpoint.relative_to(root).as_posix()
             self.learning_versions[currency]=identity.get('training_input',{}).get('fingerprint',context['version'])
-            self.status['learning_completed']={'id':context['id'],'currency':currency,'path':relative,'num_timesteps':checked.get('num_timesteps'),'updates':checked.get('updates'),'at':job.get('finished_at')}
+            self.status['learning_completed']={'id':context['id'],'currency':currency,'path':relative,'num_timesteps':checked.get('num_timesteps'),'updates':checked.get('updates'),'at':job.get('finished_at'),
+                'consumed_end':consumed,'transitions':identity['training_input'].get('transitions')}
             applied=False
             def select(current):
                 nonlocal applied
@@ -218,6 +227,7 @@ class OperationsRuntime:
                 self.status['learning_applied']=dict(self.status['learning_completed'])
                 self.policy_models.pop(currency,None)
             self.status.pop('learning_error',None)
+            return True
         except (ValueError,OSError,KeyError) as error:
             self.status.update(learning_status='학습 결과 검증 실패',learning_error=str(error))
 
@@ -239,13 +249,20 @@ class OperationsRuntime:
                 frame=prices(currency,identity['symbols'],timeframe=policy_timeframe(identity))
                 if frame.empty:continue
                 version=sha256(pd.util.hash_pandas_object(frame,index=True).values.tobytes()).hexdigest()
-                candidates[currency]=(path,identity,version,{'observations':len(frame),'end':str(frame.date.max()),'timeframe':frame.attrs.get('timeframe','미지정')})
+                consumed=identity.get('training_input',{}).get('consumed_end')
+                dates=pd.to_datetime(frame.date)
+                pending=int(dates[dates>pd.Timestamp(consumed)].nunique()) if consumed else int(dates.nunique())
+                candidates[currency]=(path,identity,version,{'observations':len(frame),'end':str(frame.date.max()),'timeframe':frame.attrs.get('timeframe','미지정'),
+                    'consumed_end':consumed,'pending_observations':pending})
             with self.lock,system.job_lock:
                 if not self.controls['learning'] or self.learning_context:return
                 current=read_json(ROOT/'runtime/operations/policies.json')
                 for currency,(path,identity,version,data) in candidates.items():
                     if current.get(currency)!=path:continue
-                    if self.learning_versions.get(currency)==version and self.learning_version_sources.get(currency)==path:continue
+                    recorded=identity.get('training_input',{}).get('fingerprint')
+                    if not data['pending_observations'] and (recorded==version or (self.learning_versions.get(currency)==version and self.learning_version_sources.get(currency)==path)):
+                        self.learning_pending=[item for item in self.learning_pending if item!=currency]
+                        continue
                     if currency not in self.learning_pending:self.learning_pending.append(currency)
                 if system.job_state().get('running') or not self.learning_pending:return
                 currency=self.learning_pending.pop(0)

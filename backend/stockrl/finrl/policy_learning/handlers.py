@@ -297,8 +297,9 @@ def preflight(req, command):
         if frame.empty:errors.append('학습·추론 모듈이 사용하는 실제 저장 가격이 없습니다.')
         else:
             try:
-                prepared=learning_frame(frame,include_latest=req.resume)
-                env=MarketLearningEnv(prepared,symbols,req.currency);env.close()
+                consumed=model['identity'].get('training_input',{}).get('consumed_end') if req.resume else None
+                prepared=learning_frame(frame,include_latest=req.resume,since=consumed)
+                env=MarketLearningEnv(prepared,symbols,req.currency,start_index=prepared.attrs.get('initial_time_index'));env.close()
                 periods={'training_observations':int(prepared.date.nunique()),'trade_date':str(frame.date.max()),
                     'train_start':str(prepared.date.min()),'train_end':str(prepared.date.max()),'includes_latest_completed':req.resume}
             except ValueError as exc:errors.append('학습: '+str(exc))

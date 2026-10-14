@@ -14,7 +14,7 @@ def cash_environment(frame,registry,symbols,champion_ids=None,structure_only=Fal
     from .policy_learning.market_environment import MarketLearningEnv
     from ..expert_observation import ExpertObservation
     currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in symbols) else 'USD'
-    raw=MarketLearningEnv(frame,symbols,currency)
+    raw=MarketLearningEnv(frame,symbols,currency,start_index=frame.attrs.get('initial_time_index'))
     wrapped=ExpertObservation(raw,registry,frame,symbols,champion_ids=champion_ids,structure_only=structure_only)
     wrapped.source_environment=CASH_ENVIRONMENT;wrapped.currency=currency
     return wrapped
@@ -55,7 +55,7 @@ def validate_price_panel(frame,symbols):
         raise ValueError(f'PortfolioOptimizationEnv 가격 행렬이 불완전한 날짜 {len(invalid)}개: {stamp}; 누락 종목 {missing}; 행 {int(invalid.iloc[0]["size"])} / 필요 {len(symbols)}. 실제 가격을 준비하거나 학습 종목을 직접 선택하세요.')
 
 
-def learning_frame(frame,training=True,include_latest=False):
+def learning_frame(frame,training=True,include_latest=False,since=None):
     """Keep evaluation chronological; continuation consumes newly completed bars."""
     import pandas as pd
     dates=pd.to_datetime(frame.date)
@@ -68,14 +68,27 @@ def learning_frame(frame,training=True,include_latest=False):
         boundary=pd.Timestamp(unique[max(1,min(len(unique)-1,int(len(unique)*.8)))])
     end=boundary if training and not include_latest else trade_date
     if not training:start=boundary
+    initial_index=None
+    if training and include_latest and since is not None:
+        from .policy_learning.market_environment import MarketLearningEnv
+        eligible=pd.DatetimeIndex(sorted(dates[(dates>=start)&(dates<end)].unique()))
+        if len(eligible)<2:raise ValueError('이어 학습 구간에 서로 다른 시각의 실제 가격이 부족합니다.')
+        consumed=pd.Timestamp(since)
+        if pd.isna(consumed):raise ValueError('저장된 학습 완료 시각이 유효하지 않습니다.')
+        if consumed>dates.max():raise ValueError('저장된 학습 완료 시각보다 최신 입력의 시각이 오래됐습니다.')
+        next_index=min(int(eligible.searchsorted(consumed,side='right')),len(eligible)-1)
+        context_index=max(0,next_index-MarketLearningEnv.WARMUP_BARS)
+        start=pd.Timestamp(eligible[context_index])
+        initial_index=max(0,next_index-context_index-1)
     prepared=frame[(dates>=start)&(dates<end)].sort_values(['date','symbol']).reset_index(drop=True)
     prepared.attrs.update(frame.attrs)
+    if initial_index is not None:prepared.attrs['initial_time_index']=initial_index
     if prepared.date.nunique()<2:raise ValueError('학습·평가 구간에 서로 다른 시각의 실제 가격이 부족합니다.')
     return prepared
 
 
-def training_environment(frame,registry,training=True,champion_ids=None,include_latest=False):
-    prepared=learning_frame(frame,training,include_latest)
+def training_environment(frame,registry,training=True,champion_ids=None,include_latest=False,since=None):
+    prepared=learning_frame(frame,training,include_latest,since)
     active=list(registry.catalog().get('active',[])) if champion_ids is None else list(champion_ids)
     wrapped=cash_environment(prepared,registry,sorted(frame.symbol.unique()),active)
     wrapped.frame=frame
@@ -110,12 +123,13 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     champion_ids = champion.get('identity',{}).get('champion_experts') if champion else None
     from ..state_io import read_json,atomic_json
     currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in frame.symbol.unique()) else 'USD'
-    if champion and champion['identity']['environment']!=CASH_ENVIRONMENT:raise ValueError('PortfolioOptimizationEnv Champion으로 새로 생성하세요.')
+    if champion and champion['identity']['environment']!=CASH_ENVIRONMENT:raise ValueError('현재 학습 환경의 Champion으로 새로 생성하세요.')
     saved=policy_files(currency,source_checkpoint)
     if resume and read_json(saved/'dataset.json').get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경의 정책은 실행하지 않습니다. 현금 정책을 새로 학습하세요.')
     if resume and champion_ids is None:champion_ids=read_json(saved/'dataset.json').get('champion_experts')
     champion_ids=list(registry.catalog().get('active',[])) if champion_ids is None else champion_ids
-    env=training_environment(frame,registry,champion_ids=champion_ids,include_latest=resume)
+    consumed=read_json(saved/'dataset.json').get('training_input',{}).get('consumed_end') if resume else None
+    env=training_environment(frame,registry,champion_ids=champion_ids,include_latest=resume,since=consumed)
     root=Path(output) if output is not None else ROOT/'runtime/official'
     if not root.resolve().is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('정책 출력은 기존 runtime/official 내부에 저장합니다.')
     root.mkdir(parents=True,exist_ok=True)
@@ -159,6 +173,10 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
             kwargs={'policy_kwargs':_policy_kwargs(identity,roles,_original_report())} if algorithm=='sac' else {}
             model=agent.get_model(algorithm,model_kwargs=dict(parameters),**kwargs)
             model=agent.train_model(model=model,tb_log_name=algorithm,total_timesteps=steps)
+        native=env.unwrapped
+        identity['training_input'].update(training_start=str(native._sorted_times[native._start_index]),
+            training_end=str(native._sorted_times[-1]),consumed_end=str(native.consumed_until) if native.consumed_until is not None else None,
+            transitions=int(native.transition_count))
         model.save(root/algorithm)
         if hasattr(model,'save_replay_buffer'):model.save_replay_buffer(root/'replay.pkl')
         atomic_json(identity,root/'dataset.json')

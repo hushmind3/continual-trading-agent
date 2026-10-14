@@ -11,6 +11,34 @@ def row(symbol,date,close=100):
 
 
 class MarketLearningTests(unittest.TestCase):
+    def test_resume_starts_with_first_unconsumed_bar_and_keeps_context(self):
+        from stockrl.finrl.framework import learning_frame
+        dates=pd.date_range('2026-01-01',periods=100)
+        frame=pd.DataFrame([row('A',date) for date in dates])
+        for consumed in (10,50):
+            with self.subTest(consumed=consumed):
+                prepared=learning_frame(frame,include_latest=True,since=str(dates[consumed]))
+                env=MarketLearningEnv(prepared,['A'],'USD',fee=0,slippage=0,start_index=prepared.attrs['initial_time_index'])
+                self.assertEqual(pd.Timestamp(env._info['end_time']),dates[consumed])
+                self.assertEqual(env.reset()[1]['end_time'],str(dates[consumed]))
+                env.step([1,0])
+                self.assertEqual(env.consumed_until,dates[consumed+1])
+                self.assertEqual(env.transition_count,1)
+
+    def test_consumption_watermark_survives_episode_reset(self):
+        dates=pd.date_range('2026-01-01',periods=4)
+        env=MarketLearningEnv(pd.DataFrame([row('A',date) for date in dates]),['A'],'USD',fee=0,slippage=0)
+        self.assertIsNone(env.consumed_until)
+        env.step([1,0]);env.reset()
+        self.assertEqual(env.consumed_until,dates[-1]);self.assertEqual(env.transition_count,1)
+        env.step([1,0]);self.assertEqual(env.transition_count,2)
+
+    def test_resume_rejects_future_or_invalid_consumption_watermark(self):
+        from stockrl.finrl.framework import learning_frame
+        frame=pd.DataFrame([row('A',date) for date in pd.date_range('2026-01-01',periods=40)])
+        for since in ('2027-01-01','NaT'):
+            with self.subTest(since=since),self.assertRaises(ValueError):learning_frame(frame,include_latest=True,since=since)
+
     def test_policy_timeframe_uses_saved_metadata_and_rejects_unknown_units(self):
         from stockrl.finrl.framework import policy_timeframe
         self.assertEqual(policy_timeframe({}),'1d')

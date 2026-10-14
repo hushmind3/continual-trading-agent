@@ -53,7 +53,11 @@ class ContinuousLearningTests(unittest.TestCase):
         return path
 
     def succeed(self, identity=None):
-        self.write_policy(self.job['output'], identity or self.identity)
+        result=dict(identity or self.identity);input_record=dict(result.get('training_input',{}))
+        input_record.setdefault('consumed_end',str(self.frame.date.max()))
+        input_record.setdefault('end',str(self.frame.date.max()));input_record.setdefault('transitions',1)
+        result['training_input']=input_record
+        self.write_policy(self.job['output'],result)
         self.job.update(status='succeeded', running=False, exit_code=0, finished_at='2026-01-02')
 
     def test_running_job_is_pinned_and_does_not_mark_input_complete(self):
@@ -65,6 +69,24 @@ class ContinuousLearningTests(unittest.TestCase):
         self.assertEqual(Path(request.checkpoint), self.root/'runtime/official'/self.source)
         self.assertTrue(flags['continuous'])
         self.assertEqual(self.runtime.learning_versions, {})
+
+    def test_same_input_with_unconsumed_tail_launches_next_chunk(self):
+        self.frame=pd.DataFrame([dict(date=pd.Timestamp(date),tic='AAPL',close=100) for date in ('2026-01-01','2026-01-02')])
+        self.prices.return_value=self.frame
+        self.runtime.queue_learning(['AAPL'])
+        self.succeed({**self.identity,'training_input':{'consumed_end':'2026-01-01'}})
+        self.runtime.queue_learning(['AAPL'])
+        self.assertEqual(len(self.requests),2)
+        self.assertEqual(self.runtime.learning_context['input']['pending_observations'],1)
+        self.assertEqual(Path(self.requests[-1][0].checkpoint),self.root/'runtime/official/policies/result1/sac.zip')
+
+    def test_no_consumption_record_is_not_applied_to_operation(self):
+        self.runtime.queue_learning(['AAPL'])
+        self.succeed({**self.identity,'training_input':{'consumed_end':None}})
+        self.runtime.finish_learning()
+        self.assertEqual(read_json(self.selection)['USD'],self.source)
+        self.assertEqual(self.runtime.learning_versions,{})
+        self.assertIn('학습한 마지막 시각',self.runtime.status['learning_error'])
 
     def test_failed_job_can_retry_same_input(self):
         self.runtime.queue_learning(['AAPL'])
@@ -168,7 +190,8 @@ class ResumeCounterTests(unittest.TestCase):
             stack.enter_context(patch.object(framework, 'ROOT', root))
             stack.enter_context(patch.object(framework, 'sac_example', return_value=({}, {}, 7)))
             env = SimpleNamespace(currency='USD', symbols=['AAPL'],
-                unwrapped=SimpleNamespace(observation_space=SimpleNamespace(shape=(6,))), close=MagicMock())
+                unwrapped=SimpleNamespace(observation_space=SimpleNamespace(shape=(6,)),_sorted_times=[pd.Timestamp('2026-01-01')],
+                    _start_index=0,consumed_until=pd.Timestamp('2026-01-01'),transition_count=7), close=MagicMock())
             stack.enter_context(patch.object(framework, 'training_environment', return_value=env))
             stack.enter_context(patch.object(sac_champion, '_candidate_identity', return_value={}))
             stack.enter_context(patch.object(sac_champion, '_policy_kwargs', return_value={}))

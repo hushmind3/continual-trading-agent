@@ -12,7 +12,10 @@ export function LearningProgress(){
    ['시세 수신',operation.feed.last_as_of?date(operation.feed.last_as_of):'수신 기록 없음'],
    ['지속학습',operation.controls.learning?learning?.status??operation.feed.learning_status??'입력 대기':'꺼짐'],
    ['학습 입력',current?.input?`${current.input.timeframe} · ${number(current.input.observations,0)}행 · ${current.input.end}`:'새 입력 대기'],
+   ['이번 입력의 학습 대기 봉',current?.input.pending_observations!=null?number(current.input.pending_observations,0):'작업 시작 후 표시'],
+   ['직전 실제 학습 시각',current?.input.consumed_end?date(current.input.consumed_end):'소비 범위 기록 없음'],
    ['완료된 학습',completed?`${completed.currency} · ${number(completed.num_timesteps,0)}단계 · 업데이트 ${number(completed.updates,0)}`:'완료 기록 없음'],
+   ['실제로 학습한 마지막 시각',completed?.consumed_end?date(completed.consumed_end):'소비 범위 기록 없음'],
    ['운영 반영',applied?`${applied.currency} · ${applied.path}`:'반영 기록 없음'],
   ]}/>
   <ErrorMessage message={learning?.error??operation.feed.learning_error??''}/>

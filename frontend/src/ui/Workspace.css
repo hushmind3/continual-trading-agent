@@ -250,3 +250,82 @@
 @media(max-width:960px) {.rea-browser-grid {grid-template-columns:190px minmax(0,1fr)}.rea-file-entry>small {display:none}.rea-target-grid {gap:10px}.workspace-app .ui-button.rea-target-card {padding:20px}}
 @media(max-width:760px) {.policy-model-grid {gap:10px}.policy-model-card {padding:14px}.policy-training-summary {padding:20px;border-radius:16px}.policy-summary-heading {flex-direction:column;gap:16px}.policy-result-metrics {gap:14px}.policy-result-metrics strong {font-size:21px}.policy-result-metrics strong.policy-result-time {font-size:11px}.policy-training-actions {gap:14px}.policy-training-actions>div {width:100%}.policy-training-actions .ui-button {flex:1}.workspace-app .rea-analysis-entry {padding:22px}.rea-target-grid {grid-template-columns:minmax(0,1fr)}.workspace-app .ui-button.rea-target-card {min-height:112px;padding:18px 20px 18px 72px}.rea-target-card>svg:first-child {position:absolute;top:21px;left:22px;margin:0}.rea-target-card>b {font-size:14px}.rea-target-card>span {font-size:10px;margin-top:5px}.rea-target-arrow {top:20px;right:18px}.rea-website-form>div {flex-wrap:wrap}.rea-website-form .ui-button {width:100%}.rea-analysis-progress {align-items:flex-start;flex-wrap:wrap}.rea-result-metrics {gap:14px}.rea-result-metrics strong {font-size:24px}.rea-result-actions .ui-button {flex:1;justify-content:center}.rea-project-toolbar select {width:100%;flex-basis:100%}.rea-project-toolbar .ui-button {flex:1}.rea-project-meta {align-items:flex-start;flex-wrap:wrap;gap:0}.rea-project-meta .ui-status {margin-top:8px}.rea-browser-actions {width:100%}.rea-browser-actions input {min-width:0;flex:1}.rea-browser-grid {grid-template-columns:minmax(0,1fr);min-height:0}.rea-file-sidebar {border-right:0;border-bottom:1px solid #e7e7ed}.rea-file-list {max-height:235px}.rea-file-entry {font-size:12px}.rea-code-heading {padding:14px 16px}.rea-code {padding:16px;min-height:280px;font-size:11px}.rea-code-empty,.rea-code-loading {min-height:280px}}
 @media(max-width:380px) {.policy-model-grid {grid-template-columns:minmax(0,1fr)}.policy-result-metrics {grid-template-columns:minmax(0,1fr);gap:16px}.policy-training-grid {grid-template-columns:minmax(0,1fr)}}
+
+/* Accounts: one balance, a small set of metrics, then holdings and executions. */
+.account-currency-bar {display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.account-detail-layout {display:grid;gap:24px}
+.workspace-app .account-overview {padding:28px;background:linear-gradient(125deg,#fff 65%,#f7faff)}
+.account-balance {display:flex;align-items:center;justify-content:space-between;gap:24px;padding:6px 0 26px}
+.account-balance p {font-size:12px;color:#72727c}
+.account-balance strong {display:block;margin-top:10px;font-size:clamp(30px,3.2vw,43px);font-weight:600;line-height:1.2;letter-spacing:-1.4px;font-variant-numeric:tabular-nums;color:#27272f}
+.account-wallet {display:grid;place-items:center;width:58px;height:58px;border:1px solid #eceef3;border-radius:17px;background:#f5f7fa;color:#7c899c;flex-shrink:0}
+.account-wallet svg {stroke-width:1.4}
+.account-metrics {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;padding:23px 0;border-top:1px solid #e9eaf0;border-bottom:1px solid #e9eaf0}
+.account-metrics p {font-size:11px;color:#72727c}
+.account-metrics strong {display:block;margin-top:7px;font-size:21px;font-weight:600;letter-spacing:-.6px;font-variant-numeric:tabular-nums;color:#3b3b46;overflow-wrap:anywhere}
+.account-pnl-positive {color:#277454!important}
+.account-pnl-negative {color:#b74747!important}
+.account-summary-footer {display:flex;gap:12px 32px;flex-wrap:wrap;margin-top:19px;font-size:11px;color:#72727c}
+.account-summary-footer strong {margin-left:8px;font-weight:500;font-variant-numeric:tabular-nums;color:#555563}
+.account-records .ui-tabs {margin-top:1px}
+.account-records th:not(:first-child),.account-records td:not(:first-child) {text-align:right}
+.account-instrument b {font-size:13px;font-weight:500;color:#44444f}
+.account-instrument span {display:block;margin-top:2px;font-size:10px;color:#797985}
+.account-buy-label,.account-sell-label {display:inline-block;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:500}
+.account-buy-label {background:#eef6f0;color:#347853}
+.account-sell-label {background:#fff1ee;color:#a65542}
+.account-order-form {display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:20px;margin-bottom:15px}
+.account-order-form label {font-size:11px;color:#72727c}
+.account-order-form label:first-child {flex:1;min-width:200px}
+.account-order-form label:nth-child(2) {width:110px}
+.account-order-form .ui-input {display:block;margin-top:7px}
+.account-order-form .ui-button {min-height:42px}
+.data-table-toolbar {display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.data-table-toolbar>span {font-size:10px;color:#72727c;white-space:nowrap}
+.data-table-scroll {overflow:auto;border:1px solid #e8e8ef;border-radius:12px}
+.data-table-scroll thead {background:#f8f8fb}
+.workspace-app .data-table-scroll th {font-size:11px;font-weight:500;color:#777781}
+.workspace-app .data-table-scroll td {font-size:12px}
+.data-table-sort {display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:500;color:#70707b;cursor:pointer}
+.data-table-sort>svg {color:#a0a0ae}
+.data-table-sort:hover,.data-table-sort:hover>svg {color:#0071e3}
+.data-table-pagination {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;font-size:10px;color:#72727c}
+.data-table-pagination .ui-button {min-height:32px;padding:5px 10px;font-size:11px}
+/* Connections: current state, authentication, then user settings. */
+.connection-api-state {display:flex;align-items:center;gap:18px;margin-bottom:14px}
+.connection-api-state>span {display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:#44444f}
+.connection-api-state>span>svg {color:#7b879b;stroke-width:1.6}
+.connection-status dl {grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.connection-status dl>div {padding:10px 0;border-bottom:0}
+.connection-status dt {font-size:10px}
+.connection-status dd {font-size:12px;line-height:1.7;font-weight:400}
+.connection-config-grid,.connection-secondary-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:24px}
+.connection-provider-status {display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid #eeeef2}
+.connection-provider-status>span:last-child {font-size:11px;color:#72727c}
+.connection-provider-fields {display:grid;gap:18px;margin-top:20px}
+.connection-key-grid,.connection-setting-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.connection-key-grid>label {font-size:11px;color:#72727c}
+.connection-key-grid .ui-input {margin-top:8px}
+.connection-auth-actions {display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:4px}
+.connection-public-choice {width:100%;margin-top:7px;font-size:11px;color:#72727c}
+.connection-public-choice summary {cursor:pointer}
+.connection-public-choice .ui-button {margin-top:10px}
+.connection-device-settings {padding-top:14px;border-top:1px solid #eeeef2;font-size:11px;color:#72727c}
+.connection-device-settings summary {cursor:pointer}
+.connection-device-settings textarea {min-height:110px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
+.connection-save-row {display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding-top:18px;border-top:1px solid #eeeef2}
+.connection-save-row>p {width:100%}
+.connection-extra-providers .ui-panel {padding:14px 0 0;border:0;border-radius:0;background:transparent;box-shadow:none}
+/* Descriptions stay available beside their subject, rather than filling the page. */
+.workspace-app .ui-panel {position:relative}
+.ui-panel-title {display:flex;align-items:center;gap:9px}
+.ui-panel-help {flex-shrink:0}
+.ui-panel-help>summary {display:grid;place-items:center;width:26px;height:26px;border-radius:7px;list-style:none;color:#9a9aa6;cursor:pointer}
+.ui-panel-help>summary::-webkit-details-marker {display:none}
+.ui-panel-help>summary:hover {background:#f1f1f6;color:#65728a}
+.ui-panel-help[open]>summary {color:#0071e3;background:#eff6ff}
+.ui-panel-help-copy {position:absolute;top:62px;left:24px;right:24px;z-index:25;max-width:460px;padding:15px 18px;border:1px solid #e0e3eb;border-radius:12px;background:#fff;font-size:12px;font-weight:400;line-height:1.85;color:#626274;box-shadow:0 8px 30px #1d1d1f12}
+@media(max-width:1200px) {.connection-status dl {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px}}
+@media(max-width:1100px) {.connection-config-grid,.connection-secondary-grid {grid-template-columns:minmax(0,1fr)}}
+@media(max-width:760px) {.account-detail-layout {gap:16px}.workspace-app .account-overview {padding:22px}.account-balance {gap:16px;padding-bottom:22px}.account-balance strong {font-size:31px;letter-spacing:-1px}.account-wallet {width:46px;height:46px;border-radius:14px}.account-metrics {gap:16px;padding:20px 0}.account-metrics strong {font-size:17px}.account-summary-footer {gap:9px 18px}.account-order-form {gap:10px}.account-order-form label:first-child {width:100%;flex-basis:100%}.account-order-form label:nth-child(2) {width:100%;flex-basis:100%}.account-order-form .ui-button {flex:1}.connection-config-grid,.connection-secondary-grid {gap:16px}.connection-status dl {gap:12px}.connection-key-grid,.connection-setting-grid {gap:14px}.connection-auth-actions .ui-button {flex:1;white-space:nowrap;font-size:11px;padding:8px 10px}.data-table-toolbar {gap:12px}.ui-panel-help-copy {left:20px;right:20px}}
+@media(max-width:380px) {.account-metrics {grid-template-columns:minmax(0,1fr);gap:18px}.account-metrics strong {font-size:21px}.connection-key-grid,.connection-setting-grid {grid-template-columns:minmax(0,1fr)}}

@@ -5,7 +5,7 @@ import {useSystemState,useOperations} from '../../../../data/Operations';
 import type {Connections} from '../../../../data/types';
 import {Panel,KeyValues} from '../../../../ui/Panel';
 import {Button,ErrorMessage,Skeleton,Status,inputClass} from '../../../../ui/Primitives';
-import {Capability} from '../../../../ui/Capability';
+const providerStatusNames:Record<string,string>={requires_configuration:'설정 필요',not_configured:'미설정',configured:'설정됨',unknown:'미확인',error:'오류'};
 interface Provider {provider:string;environment:string;saved:boolean;vault_error?:string;last_test?:{ok:boolean;message:string}}
 interface Settings {risk:{fee:number;slippage:number};data:{poll_seconds:number;timeout_seconds:number};symbols:string[];expert_devices:Record<string,string>}
 function ProviderForm(){
@@ -32,7 +32,7 @@ function OperationalSettings(){
  const endpoint=useSystemState<Settings>('settings'),{execute,pending}=useOperations();const [draft,setDraft]=useState<Settings|null>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[deviceJsonError,setDeviceJsonError]=useState('');
  const value=draft||endpoint.data;
  async function save(){if(!value||deviceJsonError)return;setError('');setMessage('');try{const {risk,data,symbols,expert_devices}=value;await execute('settings',{risk,data,symbols,expert_devices});setMessage('운영 설정을 저장했습니다.');setDraft(null);}catch(e){setError(e instanceof Error?e.message:String(e));}}
- return <Panel title="운영 설정" className="connection-operational-settings" description="시세 수신·가상매매·Expert 장치를 설정합니다. 알고리즘 기본값은 변경하지 않습니다."><ErrorMessage message={deviceJsonError||error||endpoint.error}/>{value&&<div className="space-y-4">
+ return <Panel title="운영 설정" className="connection-operational-settings" description="시세 수신·가상매매·Expert 장치를 설정합니다. 알고리즘 기본값은 변경하지 않습니다."><ErrorMessage message={deviceJsonError||error||endpoint.error}/>{!value&&!endpoint.error&&<div role="status" className="connection-settings-loading"><Skeleton/><span>운영 설정을 불러오는 중</span></div>}{value&&<div className="space-y-4">
   <div className="connection-setting-grid">{(['fee','slippage'] as const).map(key=><label key={key} className="block text-xs text-slate-500">{key==='fee'?'수수료 (%)':'슬리피지 (%)'}<input type="number" step="any" className={inputClass+' mt-2'} value={value.risk[key]*100} onChange={e=>setDraft({...value,risk:{...value.risk,[key]:Number(e.target.value)/100}})}/></label>)}
   {(['poll_seconds','timeout_seconds'] as const).map(key=><label key={key} className="block text-xs text-slate-500">{key==='poll_seconds'?'시세 폴링 주기(초)':'시세 요청 대기(초)'}<input type="number" step="any" className={inputClass+' mt-2'} value={value.data[key]} onChange={e=>setDraft({...value,data:{...value.data,[key]:Number(e.target.value)}})}/></label>)}
   </div><label className="block text-xs text-slate-500">수신 종목 (쉼표 구분 · 비우면 기존 전체 목록)<input className={inputClass+' mt-2'} value={value.symbols.join(', ')} onChange={e=>setDraft({...value,symbols:e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})}/></label>
@@ -42,9 +42,9 @@ function OperationalSettings(){
 }
 export function ConnectionSettings(){const {state:s}=useOperations();const connection=useSystemState<Connections>('connections');if(!s)return <Skeleton/>;
  return <div className="connection-workspace space-y-6"><Panel title="연결 상태" description="로컬 API와 데이터 공급원의 현재 상태입니다." className="connection-status" actions={<Button busy={connection.loading} onClick={()=>void connection.refresh()}><RefreshCw size={14}/>연결 확인</Button>}>
- <ErrorMessage message={connection.error}/><div className="connection-api-state"><span><Link2 size={17}/>로컬 API</span><Status tone={connection.error?'bad':connection.data?'good':'idle'}>{connection.error?'조회 오류':connection.data?'응답 확인':'확인 중'}</Status></div><KeyValues items={[["API 주소",new URL('/api',location.origin).href],["현재 가격 DB",s.data.path],["추가 데이터 공급원",connection.data?.data.source||'미설정'],["공급원 상태",connection.data?.data.status]]}/></Panel>
+ <ErrorMessage message={connection.error}/><div className="connection-api-state"><span><Link2 size={17}/>플랫폼 연결</span><Status tone={connection.error?'bad':connection.data?'good':'idle'}>{connection.error?'조회 오류':connection.data?'응답 확인':'확인 중'}</Status></div><details className="connection-technical-details"><summary>접속 정보</summary><KeyValues items={[["API 주소",new URL('/api',location.origin).href],["현재 가격 DB",s.data.path],["추가 데이터 공급원",connection.data?.data.source||'미설정'],["공급원 상태",providerStatusNames[connection.data?.data.status??'']??connection.data?.data.status??'미확인']]}/></details></Panel>
  <div className="connection-config-grid"><ProviderForm/><OperationalSettings/></div>
- <div className="connection-secondary-grid"><Panel title="연결 기능" description="현재 실행 경로의 지원 상태"><div className="space-y-4"><Capability name="kiwoom" label="키움 시세 연결"/><Capability name="live_feed" label="실시간 입력"/></div></Panel><details className="workspace-disclosure"><summary>학습 설정 출처</summary><KeyValues items={[["학습 설정",s.settings.parameter_source],["환경 설정",s.settings.environment_source],["실행 단계",s.settings.steps_per_run]]}/></details></div>
+ <div className="connection-secondary-grid"><details className="workspace-disclosure"><summary>학습 설정 출처</summary><KeyValues items={[["학습 설정",s.settings.parameter_source],["환경 설정",s.settings.environment_source],["실행 단계",s.settings.steps_per_run]]}/></details></div>
  <details className="workspace-disclosure connection-extra-providers"><summary>추가 시세·데이터 공급원</summary><p className="my-3 text-xs leading-6 text-slate-500">FMP는 금융 백엔드의 공급원 인증 저장소에서 설정을 읽습니다.</p><FrameworkProviders/></details>
  </div>;
 }

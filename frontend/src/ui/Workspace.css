@@ -413,3 +413,10 @@
 
 .operations-currency-select {width:130px}
 @media(max-width:760px) {.operations-command-actions .operations-currency-select {width:100%;flex-basis:100%}.operations-flow-step .ui-status {white-space:normal;align-items:flex-start;max-width:100%;line-height:1.65;font-size:10px}.operations-flow-step .ui-status>* {min-width:0;overflow-wrap:anywhere}.operations-flow-step .ui-status::before {flex-shrink:0}}
+
+/* Connection setup keeps credentials and settings visible, with implementation details folded. */
+.connection-technical-details {margin-top:18px;padding-top:16px;border-top:1px solid #e9edf3;font-size:11px;color:#7b8798}
+.connection-technical-details>summary {cursor:pointer}
+.connection-technical-details>dl {margin-top:18px}
+.connection-settings-loading {padding-top:8px;font-size:11px;color:#8a94a4}
+.connection-settings-loading>span {display:block;margin-top:12px}

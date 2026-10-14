@@ -1,4 +1,4 @@
-import {useCallback,useState,useMemo,Suspense,type ReactNode} from 'react';
+import {useCallback,useState,useMemo,useLayoutEffect,Suspense,type ReactNode} from 'react';
 import {Layers,Bell,Menu,PanelLeftClose,RefreshCw,AlertTriangle} from 'lucide-react';
 import {useOperations,useSystemState} from '../data/Operations';
 import {Drawer,Empty,ErrorMessage,Status} from '../ui/Primitives';
@@ -32,6 +32,7 @@ export function Page({active}:{active:string}){
  return <>{missing.length?<ErrorMessage message={missing.map(key=>key+': '+(state?.module_errors?.[key]||'상태 조회 실패')).join(' · ')}/>:<Suspense fallback={<p className="text-xs text-slate-500">화면을 여는 중입니다.</p>}><Component key={active}/></Suspense>}</>;
 }
 export function Shell({active,children}:{active:string;children:ReactNode}){
+ useLayoutEffect(()=>{window.scrollTo(0,0)},[active]);
  const {state,error,refresh}=useOperations(),[alerts,setAlerts]=useState(false),[compact,setCompact]=useState(false),[mobileMenu,setMobileMenu]=useState(false),[closedGroups,setClosedGroups]=useState(new Set<string>()),close=useCallback(()=>setAlerts(false),[]);
  const closeMobile=useCallback(()=>setMobileMenu(false),[]);
  const issues=state?.experts?.items.filter(item=>item.active&&item.inference?.reason)||[],items=useNavigation(),page=items.find(item=>item.hash===active);

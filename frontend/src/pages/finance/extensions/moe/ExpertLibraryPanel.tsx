@@ -12,7 +12,7 @@ import {ExpertVariants} from './ExpertVariants';
 import {expertFamilies,expertCategory,categoryNames} from './expertFamilies';
 
 const field='w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
-export function ExpertLibraryPanel({initialSource=''}:{initialSource?:string}){
+export function ExpertLibraryPanel({initialSource='',sourceSelection=0}:{initialSource?:string;sourceSelection?:number}){
  const {state,refresh,algorithm:algorithmChoice,selectAlgorithm}=useOperations();const lib=state?.library;
  const algorithms=useSystemState<{default:string;items:{name:string}[]}>('algorithms');
  const algorithm=algorithmChoice||algorithms.data?.default||'';
@@ -36,7 +36,7 @@ export function ExpertLibraryPanel({initialSource=''}:{initialSource?:string}){
  const operation=async(kind:string,payload:unknown)=>{
   setError('');try{await request(`library/${kind}`,kind==='probe_all'?{...(payload as Record<string,unknown>),skip_checked:skipChecked}:payload);await refresh();return true}catch(e){setError(e instanceof Error?e.message:'Expert 작업 실패');return false}
  };
- useEffect(()=>{if(initialSource){setSource(initialSource);setOpen(true);void operation('inspect',{source:initialSource})}},[initialSource]);
+ useEffect(()=>{if(initialSource){setSource(initialSource);setOpen(true);void operation('inspect',{source:initialSource})}},[initialSource,sourceSelection]);
  const toggleManaged=(id:string)=>setSelectedIds(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
  const toggleFailure=(source_id:string,precision:string)=>setSelectedFailures(current=>current.some(row=>row.source_id===source_id&&row.precision===precision)?current.filter(row=>row.source_id!==source_id||row.precision!==precision):[...current,{source_id,precision}]);
  const createChampion=async()=>{setError('');setCreating(true);try{setChampionResult(await request<Champion>('champions/create',{algorithm,experts:[...chosenExperts],...(sessionStorage.getItem('training_currency')?{currency:sessionStorage.getItem('training_currency')}:{} )}));await refresh()}catch(e){setError(e instanceof Error?e.message:'MoE Champion 생성 실패')}finally{setCreating(false)}};

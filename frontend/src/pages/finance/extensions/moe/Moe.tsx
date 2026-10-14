@@ -8,7 +8,7 @@ import {ExpertLibraryPanel} from './ExpertLibraryPanel';
 import {ModelGuide} from './ModelGuide';
 
 export function Moe(){
- const {state}=useOperations();const [error,setError]=useState(''),[source,setSource]=useState('');
+ const {state}=useOperations();const [error,setError]=useState(''),[source,setSource]=useState({path:'',selection:0});
  if(!state)return <Skeleton/>;
  return <div className="space-y-6">
   <header className="flex flex-wrap items-start justify-between gap-4 rounded-xl bg-[#202e4a] px-4 py-3 text-white">
@@ -23,7 +23,7 @@ export function Moe(){
   </header>
   <details className="text-xs text-slate-500"><summary className="cursor-pointer">사용 안내</summary><div className="mt-2"><ModelGuide/></div></details>
   {error&&<ErrorMessage message={error}/>}
-  <ExpertLibraryPanel initialSource={source}/><details className="rounded-xl border border-slate-200 bg-white px-4 py-3"><summary className="cursor-pointer text-sm font-semibold text-slate-600">모델 폴더 파일</summary><div className="mt-3"><ModelFiles onPick={setSource}/></div></details>
+  <ExpertLibraryPanel initialSource={source.path} sourceSelection={source.selection}/><details className="rounded-xl border border-slate-200 bg-white px-4 py-3"><summary className="cursor-pointer text-sm font-semibold text-slate-600">모델 폴더 파일</summary><div className="mt-3"><ModelFiles onPick={path=>setSource(current=>({path,selection:current.selection+1}))}/></div></details>
   <a href="#finance/policy_learning" className="text-xs font-semibold text-blue-600">FinRL 정책 학습 →</a>
  </div>;
 }

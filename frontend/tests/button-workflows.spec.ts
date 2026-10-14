@@ -201,3 +201,16 @@ test('MoE selected operations, version details and removal dispatch only chosen 
   await page.getByRole('button',{name:'파일 구성 확인',exact:true}).click();
   await expect(page.getByRole('dialog').getByText('버튼 검사: library/inspect',{exact:true})).toBeVisible();
 });
+
+
+test('same model file can reopen import after closing the drawer',async({page})=>{
+  const seen:string[]=[];await rejectWrites(page,seen);await page.goto('/#finance/moe');
+  await page.locator('summary').filter({hasText:/^모델 폴더 파일$/}).click();
+  const pick=page.getByRole('button',{name:'구성 확인 · 가져오기',exact:true}).first();
+  await expect(pick).toBeVisible();
+  await pick.click();await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('버튼 검사: library/inspect',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'닫기',exact:true}).last().click();
+  await pick.click();await expect(page.getByRole('dialog')).toBeVisible();
+  await expect.poll(()=>seen.filter(operation=>operation==='library/inspect').length).toBe(2);
+});

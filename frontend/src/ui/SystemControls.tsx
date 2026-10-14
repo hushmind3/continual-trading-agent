@@ -3,7 +3,6 @@ import {useOperations} from '../data/Operations';
 import type {OperationProgress} from '../data/types';
 import {Panel} from './Panel';
 import {Button,ErrorMessage,Status,inputClass} from './Primitives';
-import {OperationsControls} from './OperationsControls';
 const labels:Record<string,string>={pending:'대기',running:'진행',complete:'완료',failed:'실패',blocked:'보류'};
 export function Progress({value}:{value:OperationProgress|undefined}){
  if(!value)return <p className="text-xs text-slate-400">실행 기록 없음</p>;
@@ -14,13 +13,12 @@ export function Progress({value}:{value:OperationProgress|undefined}){
 }
 export function SystemControls(){
  const {state,execute,error:connection}=useOperations();const value=state?.automation;
- const [error,setError]=useState(''),[pending,setPending]=useState(''),[currency,setCurrency]=useState('both');
+ const [error,setError]=useState(''),[pending,setPending]=useState(''),[currency,setCurrency]=useState(()=>{const approved=Object.keys(state?.operations?.policies??{});return approved.length===1?approved[0]:'both'});
  async function command(name:string){setError('');setPending(name);try{await execute('system/'+name,name==='start'?{currencies:currency==='both'?['USD','KRW']:[currency]}:{});}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setPending('');}}
  const applying=value?.apply.status==='running';
- return <Panel title="운영 실행" description="자동 운영과 개별 실행을 여기서 제어합니다.">
+ return <Panel title="운영 실행" description="시세·판단·가상매매·지속학습을 함께 시작하고 중지합니다.">
  <div className="flex flex-wrap items-center gap-3"><select aria-label="자동 운영 통화" className={inputClass+' !w-auto'} value={currency} onChange={e=>setCurrency(e.target.value)}><option value="both">KRW + USD</option><option value="KRW">KRW</option><option value="USD">USD</option></select><Button tone="primary" disabled={applying} busy={pending==='start'||value?.system.active} onClick={()=>void command('start')}>자동 운영 시작</Button><Button tone="danger" busy={pending==='stop'} onClick={()=>void command('stop')}>운영 중지</Button></div>
- <p className="mt-3 text-xs leading-5 text-slate-500">자동 운영: 선택 통화의 정책 준비 → 시세 수신 → 선택 정책 판단·가상매매. 호환 정책이 없으면 정책 학습 후 직접 승인하세요.</p>
- <div className="mt-4 border-t border-slate-100 pt-4"><h3 className="mb-3 text-sm font-semibold">개별 실행</h3><OperationsControls/></div>
+ <p className="mt-3 text-xs leading-5 text-slate-500">자동 운영: 선택 통화의 정책 준비 → 시세 수신 → 선택 정책 판단·가상매매·지속학습. 호환 정책이 없으면 정책 학습 후 직접 승인하세요.</p>
  <div className="mt-4"><ErrorMessage message={error}/>{connection&&<p className="mt-2 text-xs text-amber-700">{connection} · 마지막 진행 상태를 유지하며 관리 API 재연결을 기다립니다.</p>}</div>
  <div className="mt-3 flex flex-wrap gap-3 text-xs"><Status tone={value?.system.status==='failed'?'bad':value?.system.status==='blocked'?'warn':'idle'}>자동 운영 {labels[value?.system.status??'pending']??'대기'}</Status></div>
  {(value?.system.detail||value?.system.error)&&<p className="mt-2 whitespace-pre-wrap text-xs text-amber-700">{value.system.detail||value.system.error}</p>}

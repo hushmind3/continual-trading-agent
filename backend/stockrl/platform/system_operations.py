@@ -341,7 +341,7 @@ class SystemOperations:
         with self.lock:
             if self.active:return self.snapshot()
             from stockrl.trading.operation_control.operations_runtime import runtime
-            if self.value.get('status')=='complete' and all(runtime.controls[name] for name in ('feed','paper','engine')) and self.value.get('currencies')==(currencies or ['USD','KRW']):return self.snapshot()
+            if self.value.get('status')=='complete' and all(runtime.controls[name] for name in ('feed','paper','engine','learning')) and self.value.get('currencies')==(currencies or ['USD','KRW']):return self.snapshot()
             if apply_running() or self.restarting:raise ValueError('변경 적용이 끝난 후 운영을 시작하세요.')
             if library.active:raise ValueError('현재 모델 작업이 끝난 후 전체 시작을 요청하세요.')
             self.cancelled.clear();self.active=True
@@ -349,7 +349,7 @@ class SystemOperations:
             self.value=dict(id=uuid.uuid4().hex,status='running',started_at=time.time(),stages=[],currencies=currencies or ['USD','KRW'])
             phases=[('accounts','KRW/USD 가상계좌 준비'),('experts','선택 Frozen Expert 적재')]
             for currency in self.value['currencies']:phases.extend([('policy-'+currency,currency+' SAC 정책 호환성'),('train-'+currency,currency+' 신규 SAC 학습')])
-            phases.extend([('connection','인증 · 실제 시세 연결'),('trading','실제 입력 추론 · 가상매매')])
+            phases.extend([('connection','인증 · 실제 시세 연결'),('trading','실제 입력 추론 · 가상매매'),('learning','선택 정책 지속학습')])
             self.value['stages']=[dict(id=key,title=title,status='pending') for key,title in phases]
             atomic_json(self.value,self.path)
             threading.Thread(target=self.run,name='system-start',daemon=True).start()
@@ -433,17 +433,18 @@ class SystemOperations:
                 return
             with runtime.lock:
                 self.interrupted()
-                runtime.command('paper',True);runtime.command('engine',True)
+                runtime.command('paper',True);runtime.command('engine',True);runtime.command('learning',True)
             runtime.sac_decision()
             pending=[currency for currency in ready_policies if runtime.status.get('policy_inputs',{}).get(currency,{}).get('status')!='ready']
             if pending:raise ValueError('선택 종목의 실제 가격 행렬이 준비되지 않아 추론을 실행하지 않았습니다: '+', '.join(pending))
             report=read_json(ROOT/'runtime/experts/status.json')
             failures.extend(expert+': '+str(row.get('reason','Expert 추론 실패')) for expert,row in report.get('experts',{}).items() if expert in catalog.get('active',[]) and row.get('status')!='ready')
             self.phase(key,title,'complete',', '.join(ready_policies)+' 실제 가격·Expert 관측으로 SAC 판단 실행; 이후 완료 바에서 기존 가상체결. 실제 증권 주문 미전송')
+            self.phase('learning','선택 정책 지속학습','complete','기존 모델·Replay로 새 완료 입력을 이어 학습; 원본 Expert는 동결 유지')
             with self.lock:
                 self.value.update(status='blocked' if failures else 'complete',detail=' · '.join(failures) if failures else '전체 운영 시작',finished_at=time.time());atomic_json(self.value,self.path)
         except Exception as exc:
-            if key=='trading':runtime.command('engine',False);runtime.command('paper',False)
+            if key=='trading':runtime.command('learning',False);runtime.command('engine',False);runtime.command('paper',False)
             self.phase(key,title,'blocked' if isinstance(exc,InterruptedError) or isinstance(exc,ValueError) else 'failed',str(exc))
             with self.lock:self.value.update(status='blocked' if isinstance(exc,(InterruptedError,ValueError)) else 'failed',detail=str(exc));atomic_json(self.value,self.path)
         finally:self.active=False

@@ -1,32 +1,64 @@
 import {LearningProgress} from './LearningProgress';
-import {ArrowRight,Boxes,Database,GraduationCap,Radio} from 'lucide-react';
+import {ArrowUpRight,Boxes,BrainCircuit,GraduationCap,Radio} from 'lucide-react';
 import {useOperations} from '../../../../data/Operations';
-import {Skeleton,Meter,Status} from '../../../../ui/Primitives';
-import {Panel} from '../../../../ui/Panel';
+import {Skeleton,Meter} from '../../../../ui/Primitives';
+import {CollapsiblePanels} from '../../../../ui/Panel';
 import {bytes,number,date} from '../../../../ui/format';
 import {ServiceProgress} from '../../../../ui/ServiceProgress';
 import {SystemControls} from '../../../../ui/SystemControls';
-export function OperationControl(){
- const {state:s}=useOperations();if(!s)return <Skeleton/>;
- const r=s.resources,broker=s.operations?.broker,connected=Boolean(broker?.connected),receiving=Boolean(s.operations?.controls.feed);
- const connectionLabel=!receiving?'수신 중지':connected?'실제 연결됨':broker?.transport_status==='reconnecting'?'재연결 대기':'연결 대기';
- return <div className="operations-layout">
-  <SystemControls/>
-  <div className="operations-overview">
-   <Panel title="키움 시세 연결" description="최근 시세는 실제 가격 이벤트 기준입니다. 서버 연결과 시세 수신 상태는 구분합니다." className="operations-market-card" actions={<Status tone={!receiving?'idle':connected?'good':'warn'}>{connectionLabel}</Status>}>
-    <dl className="operations-connection-metrics"><div><dt className="operations-stat-label">실제 시세 수신</dt><dd className="operations-stat-value">{number(broker?.quote_events??0,0)} <span className="text-xs font-normal text-slate-400">건</span></dd></div><div><dt className="operations-stat-label">최근 시세</dt><dd className="operations-stat-value operations-stat-value-small">{date(broker?.last_quote_utc)}</dd></div></dl>
-    <div className="operations-region-row"><span>국내<strong className={receiving&&broker?.kr_connected?'operations-connected':'operations-disconnected'}>{receiving&&broker?.kr_connected?'연결됨':'미연결'}</strong></span><span>미국<strong className={receiving&&broker?.us_connected?'operations-connected':'operations-disconnected'}>{receiving&&broker?.us_connected?'연결됨':'미연결'}</strong></span></div>
-    {receiving&&!connected&&!!broker?.reconnect_in_seconds&&<p className="mt-3 text-xs text-amber-700">{String(broker.reconnect_in_seconds)}초 후 연결 재시도</p>}
-   </Panel>
 
-  </div>
-  <LearningProgress/>
-  <section className="operations-flow"><div className="operations-flow-heading"><div><h2>운영 흐름</h2></div><a className="operations-flow-link" href="#finance/policy_learning">학습 화면 <span aria-hidden="true">→</span></a></div><div className="grid grid-cols-2 lg:grid-cols-4">
-   {([{role:'feed',title:'시세 수신',Icon:Radio},{role:'experts',title:'모델 분석',Icon:Boxes},{role:'agent',title:'매매 판단',Icon:Database},{role:'learner',title:'지속 학습',Icon:GraduationCap}] as const).map(({role,title,Icon},i)=><div key={role} className="operations-flow-step"><span className="operations-flow-icon"><Icon size={19}/></span><div className="min-w-0"><h3>{title}</h3><div className="mt-2"><ServiceProgress role={role}/></div></div>{i<3&&<ArrowRight size={14} className="absolute right-0 top-9 hidden text-slate-200 lg:block"/>}</div>)}
-  </div></section>
-  <details className="workspace-disclosure operations-device-details"><summary>실행 장치</summary><div className="operations-device-content">   <Panel title="시스템 리소스">
-    <div className="operations-resource-grid"><div><p className="operations-stat-label">시스템 RAM</p><p className="operations-stat-value">{bytes(r.ram_used_bytes)} <span className="text-xs font-normal text-slate-400">/ {bytes(r.ram_total_bytes)}</span></p><div className="mt-3"><Meter value={r.ram_used_bytes/r.ram_total_bytes*100}/></div><p className="mt-2 text-xs text-slate-400">사용 가능 {bytes(r.ram_available_bytes)}</p></div><div><p className="operations-stat-label">{r.gpu.name||'GPU 측정 없음'}</p><p className="operations-stat-value">{bytes(r.gpu.used_bytes)} <span className="text-xs font-normal text-slate-400">/ {bytes(r.gpu.total_bytes)}</span></p>{r.gpu.total_bytes&&<div className="mt-3"><Meter value={(r.gpu.used_bytes||0)/r.gpu.total_bytes*100}/></div>}<p className="mt-2 text-xs text-slate-400">GPU 사용률 {number(r.gpu.utilization_percent)}%</p></div></div>
-    <p className="operations-resource-footnote">CPU {number(r.cpu_percent)}% · 디스크 여유 {bytes(r.disk_free_bytes)}</p>
-   </Panel></div></details>
+export function OperationControl(){
+ const {state:s}=useOperations();
+ if(!s)return <Skeleton/>;
+ const operation=s.operations,broker=operation?.broker,receiving=Boolean(operation?.controls.feed),connected=Boolean(broker?.connected);
+ const currencies=['KRW','USD'] as const;
+ const policyName=(currency:'KRW'|'USD')=>{
+  const policy=operation?.policies?.[currency];
+  if(!policy)return null;
+  return s.checkpoints.find(item=>item.path===policy.path)?.name??policy.path.split(/[\\/]/).filter(Boolean).pop()??'선택된 모델';
+ };
+ const learningActive=Boolean(operation?.controls.learning),learning=operation?.learning;
+ const quoteState=connected&&receiving?'연결됨':receiving?'연결 대기':'수신 중지';
+ const quoteTone=connected&&receiving?'good':receiving?'warn':'idle';
+ const resource=s.resources;
+ return <div className="ops-workspace">
+  <SystemControls/>
+  <section className="ops-overview" aria-labelledby="ops-current-state">
+   <header className="ops-overview-head"><h2 id="ops-current-state">현재 상태</h2><span>실시간</span></header>
+   <div className="ops-state-grid">
+    <div className="ops-state-item">
+     <div className="ops-state-label"><Radio size={16}/><span>시세 연결</span></div>
+     <strong className={'ops-state-value ops-value-'+quoteTone}>{quoteState}</strong>
+     <span className="ops-state-meta">{connected&&broker?.last_quote_utc?'최근 '+date(broker.last_quote_utc):number(broker?.quote_events??0,0)+'건 수신'}</span>
+    </div>
+    {currencies.map(currency=>{
+     const policy=operation?.policies?.[currency],name=policyName(currency);
+     return <div className="ops-state-item" key={currency}>
+      <div className="ops-state-label"><BrainCircuit size={16}/><span>{currency} 모델</span></div>
+      {name?<><strong className="ops-state-value ops-model-name" title={name}>{name}</strong><span className="ops-state-meta">{policy?.loaded?'로드 완료':'선택됨 · 로드 대기'}</span></>:<><strong className="ops-state-value ops-value-idle">미선택</strong><a href="#finance/policy_learning" className="ops-state-action">모델 선택 <ArrowUpRight size={12}/></a></>}
+     </div>;
+    })}
+    <div className="ops-state-item">
+     <div className="ops-state-label"><GraduationCap size={16}/><span>지속 학습</span></div>
+     <strong className={'ops-state-value '+(learningActive?'ops-value-good':'ops-value-idle')}>{learningActive?learning?.status??operation?.feed.learning_status??'대기 중':'중지됨'}</strong>
+     <a href="#finance/policy_learning" className="ops-state-action">학습 관리 <ArrowUpRight size={12}/></a>
+    </div>
+   </div>
+  </section>
+  <details className="ops-more">
+   <summary>자세한 상태 보기 <span aria-hidden="true">⌄</span></summary>
+   <div className="ops-more-content">
+    <CollapsiblePanels.Provider value={false}><LearningProgress/></CollapsiblePanels.Provider>
+    <section className="ops-stages" aria-label="운영 단계">
+     {([{role:'feed',title:'시세 수신',Icon:Radio},{role:'experts',title:'모델 분석',Icon:Boxes},{role:'agent',title:'매매 판단',Icon:BrainCircuit},{role:'learner',title:'지속 학습',Icon:GraduationCap}] as const).map(({role,title,Icon})=><div className="ops-stage" key={role}><div className="ops-stage-title"><Icon size={17}/><span>{title}</span></div><ServiceProgress role={role}/></div>)}
+    </section>
+    <details className="ops-resources"><summary>실행 장치</summary>
+     <div className="ops-resources-grid">
+      <div><span>RAM</span><strong>{bytes(resource.ram_used_bytes)} / {bytes(resource.ram_total_bytes)}</strong>{resource.ram_total_bytes>0&&<Meter value={resource.ram_used_bytes/resource.ram_total_bytes*100}/>}</div>
+      <div><span>{resource.gpu.name||'GPU'}</span><strong>{bytes(resource.gpu.used_bytes)} / {bytes(resource.gpu.total_bytes)}</strong>{Boolean(resource.gpu.total_bytes)&&<Meter value={(resource.gpu.used_bytes||0)/resource.gpu.total_bytes*100}/>}</div>
+     </div>
+    </details>
+   </div>
+  </details>
  </div>;
 }

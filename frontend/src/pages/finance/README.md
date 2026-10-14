@@ -16,5 +16,6 @@
 | 정책 학습 | #finance/policy_learning · finrl/policy_learning/ |
 | MoE | #finance/moe · extensions/moe/ |
 | 연결 · 설정 | #finance/connection_settings · management/connection_settings/ |
-| 진단 · 로그 · 코드 적용 | #finance/diagnostics_logs_code_apply · management/diagnostics_logs_code_apply/ |
-| 백엔드 기능 전체 | #finance/all_backend_features · management/all_backend_features/ |
+
+
+사용자 메뉴는 연결·설정만 등록합니다. 진단·코드 적용 및 전체 백엔드 카탈로그는 사용자 메뉴에서 제외합니다. 공통 기능 실행에 사용하는 내부 모듈은 유지합니다.

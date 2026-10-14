@@ -236,3 +236,27 @@ test('MoE waits for request acceptance before enabling another operation',async(
   await expect(probe).toBeEnabled();
   await expect(page.getByText('controlled rejection',{exact:true})).toBeVisible();
 });
+
+
+test('import registers the selected Expert without activating the operating configuration',async({page})=>{
+  let submitted:Record<string,unknown>|undefined;
+  await page.route('**/api',async route=>{
+    const body=envelope(route.request());
+    if(body?.operation==='library/import'){
+      submitted=body.payload;await route.fulfill({status:400,json:{detail:'등록 요청 확인'}});return;
+    }
+    if(body?.operation==='state'){
+      const response=await route.fetch(),state=await response.json();
+      state.library.job={busy:false,stage:'complete',kind:'inspect',result:{source:'fixture/MODEL.json',experts:[{id:'import_fixture',name:'Metadata fixture',input:{supported:true,requires:['등록 정보']}}]}};
+      await route.fulfill({response,json:state});return;
+    }
+    await route.continue();
+  });
+  await page.goto('/#finance/moe');
+  await page.getByRole('button',{name:'가져오기',exact:true}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByRole('combobox').selectOption('import_fixture');
+  await dialog.getByRole('button',{name:'가져오기 · 등록',exact:true}).click();
+  await expect(dialog.getByText('등록 요청 확인',{exact:true})).toBeVisible();
+  expect(submitted).toMatchObject({source:'fixture/MODEL.json',expert_id:'import_fixture',slot:'import_fixture',activate:false});
+});

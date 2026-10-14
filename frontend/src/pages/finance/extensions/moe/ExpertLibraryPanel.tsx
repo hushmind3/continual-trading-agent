@@ -97,7 +97,7 @@ export function ExpertLibraryPanel({initialSource='',sourceSelection=0}:{initial
      {candidate?.native_template&&<p className="text-xs leading-5 text-slate-500">원본 가중치는 선택한 모델의 구조·입력 규칙·학습 종목 범위를 사용합니다. 이 규칙이 달라진 모델은 원본 정의를 포함한 Expert 패키지가 필요합니다.</p>}
      {!!candidate?.input?.universe?.length&&<details className="text-xs text-slate-500"><summary className="cursor-pointer">입력 종목 {candidate.input?.universe.length}개 확인</summary><p className="mt-2 leading-5">{candidate.input?.universe.join(' · ')}</p></details>}
      <label className="block space-y-2 text-sm"><span>슬롯 이름</span><input className={field} value={slot} onChange={e=>setSlot(e.target.value)}/></label>
-     <Button tone="primary" disabled={busy||!candidate?.input?.supported||!slot} onClick={()=>void operation('import',{source:job?.result?.source??source,expert_id:key,slot,activate:true})}>가져오기 · 자동 등록</Button>
+     <Button tone="primary" disabled={busy||!candidate?.input?.supported||!slot} onClick={()=>void operation('import',{source:job?.result?.source??source,expert_id:key,slot,activate:false})}>가져오기 · 등록</Button>
     </>}
     {busy&&<p className="text-sm text-blue-600" aria-live="polite">{submitting?'요청 전달 중':job?.detail}</p>}
     {job?.error&&<ErrorMessage message={job.error}/>}

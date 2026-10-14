@@ -17,7 +17,7 @@ class ExpertObservation(gym.ObservationWrapper):
 
     def observation(self,value):
         if self.structure_only:return np.zeros(self.observation_space.shape,dtype=np.float32)
-        base=self.unwrapped.gym_env
+        base=self.unwrapped
         stamp=pd.Timestamp(base._info['end_time'])
         portfolio_value=float(base._portfolio_value);self.assets.append(portfolio_value)
         history=self.frame[self.frame.date<=stamp];nav=max(portfolio_value,1e-9)
@@ -25,7 +25,7 @@ class ExpertObservation(gym.ObservationWrapper):
         marks=history.sort_values('date').groupby('symbol').close.last()
         cash=nav*float(allocation[0])
         account={'currency':getattr(self,'currency','USD'),'cash':cash,'nav':nav,
-            'positions':{symbol:float(weight*nav/marks[symbol]) for symbol,weight in zip(self.symbols,weights)},
+            'positions':{symbol:float(weight*nav/marks[symbol]) for symbol,weight in zip(self.symbols,weights) if weight and symbol in marks},
             'drawdown':1-nav/max(self.assets),'volatility':float(np.std(np.diff(np.log(np.maximum(self.assets,1e-9))))) if len(self.assets)>1 else 0.}
         initial_amount=float(base._initial_amount)
         if getattr(self,'live_account',None):
@@ -42,6 +42,7 @@ class ExpertObservation(gym.ObservationWrapper):
             if not values or values[-1]!=nav:values.append(nav)
             account['drawdown']=1-nav/max(initial_amount,*values)
             account['volatility']=float(np.std(np.diff(np.log(np.maximum(values,1e-9))))) if len(values)>1 else 0.
+            if hasattr(base,'observation_for_account'):value=base.observation_for_account(value,account)
         signals=self.registry.outputs(history,account,champion_ids=self.champion_ids)
         fractions=np.asarray(weights,dtype=np.float32)
         quantiles=np.quantile(fractions,[0,.25,.5,.75,1]).astype(np.float32) if len(fractions) else np.zeros(5,dtype=np.float32)
@@ -55,7 +56,7 @@ class ExpertObservation(gym.ObservationWrapper):
 
     @property
     def df(self):
-        return self.unwrapped.gym_env._df
+        return self.unwrapped._df
 
     def get_sb_env(self):
         from stable_baselines3.common.vec_env import DummyVecEnv

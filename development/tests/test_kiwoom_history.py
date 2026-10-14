@@ -70,6 +70,7 @@ class KiwoomHistoryTests(unittest.TestCase):
             self.assertEqual(summary['rows'],2);self.assertEqual(summary['status'],'partial')
             self.assertEqual(summary['errors'][0]['symbol'],'000660.KS')
             self.assertEqual(len(store.get_price_data(['005930.KS'],'2020','2030')),2)
+            self.assertEqual(len(store.get_price_data(['005930.KS'],'2020','2030',source='kiwoom',timeframe='1d')),2)
             self.assertTrue(store.get_price_data(['000660.KS'],'2020','2030').empty)
             self.assertEqual(json.loads(sdk.call_args.kwargs['input'])['operation'],'daily_history')
 

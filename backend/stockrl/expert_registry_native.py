@@ -22,7 +22,8 @@ class ExpertRegistry:
             self.state_dir=ROOT/'runtime/experts';self.state_dir.mkdir(parents=True,exist_ok=True)
         else:
             import tempfile,torch
-            self._embedded_temp=tempfile.TemporaryDirectory(prefix='sac-champion-experts-')
+            temporary_root=ROOT/'runtime/experts/embedded';temporary_root.mkdir(parents=True,exist_ok=True)
+            self._embedded_temp=tempfile.TemporaryDirectory(prefix='champion-',dir=temporary_root)
             root=Path(self._embedded_temp.name);self.model_dir=root/'models';self.model_dir.mkdir()
             self.registry_file=self.model_dir/'expert_registry.json'
             (self.model_dir/'expert_registry.json').write_text('{}',encoding='utf8')
@@ -95,7 +96,7 @@ class ExpertRegistry:
         input_signature=hashlib.blake2b(pd.util.hash_pandas_object(frame,index=True).values.tobytes()+json.dumps(account,sort_keys=True,default=str).encode()).digest()
         for key in selected:
             try:
-                entry=self.pool.entries[key];cache_key=(key,account.get('currency'));cached=self.cache.get(cache_key)
+                entry=self.pool.entry(key);cache_key=(key,account.get('currency'));cached=self.cache.get(cache_key)
                 if not entry.get('stock_policy') and cached and cached[0]==input_signature:packets=cached[1]
                 else:
                     snapshot,batches=prepare_inputs(entry,frame,account,self.input_frames)

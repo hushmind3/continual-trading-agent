@@ -328,7 +328,7 @@ class OperationsRuntime:
 
     def fixture(self,key,*,frame=None,account=None,all_batches=False):
         from stockrl.platform.expert_inference import prepare_inputs
-        with self.lock:entry=self.expert_pool().entries[key]
+        with self.lock:entry=self.expert_pool().entry(key)
         if frame is None:frame=prices('USD')
         if frame.empty:raise ValueError('실제 USD 가격 데이터가 없습니다.')
         if account is None:
@@ -406,20 +406,11 @@ class OperationsRuntime:
         if frame.empty:
             self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'실제 저장 가격이 없습니다.'}
             return
-        counts=frame.groupby('date').symbol.nunique()
-        complete=counts[counts==len(symbols)].index
-        if len(complete)==0:
-            self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'모든 종목이 있는 완료 일봉을 기다립니다.'}
-            return
-        frame=frame[frame.date<=complete.max()]
         input_stamp=str(frame.date.max());latest_rows=frame[frame.date==frame.date.max()]
-        if len(latest_rows)!=len(symbols) or latest_rows.symbol.nunique()!=len(symbols):
-            self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','as_of':input_stamp,'missing_symbols':sorted(set(symbols)-set(latest_rows.symbol))}
-            return
         if self.last_policy_dates.get(currency)==input_stamp:return
         registry=system.expert_registry(files,self.expert_pool);champion_ids=identity.get('champion_experts',[])
         prepared=training_environment(frame,registry,training=False,champion_ids=champion_ids)
-        latest=prepared.unwrapped.gym_env
+        latest=prepared.unwrapped
         latest._time_index=len(latest._sorted_times)-1
         latest._state,latest._info=latest._get_state_and_info_from_time_index(latest._time_index)
         wrapped=prepared
@@ -440,13 +431,13 @@ class OperationsRuntime:
             observation=wrapped.observation(latest._state)
             action,_=model.predict(observation,deterministic=True)
             import math
-            allocation=action if math.isclose(float(np.sum(action)),1,abs_tol=1e-6) and np.min(action)>=0 else latest._softmax_normalization(action)
+            allocation=latest.normalized_action(action)
             weights=allocation[1:];cash_weight=float(allocation[0])
-            bars=frame[frame.date==frame.date.max()].set_index('symbol')
+            bars=frame[frame.date==frame.date.max()].set_index('symbol').reindex(symbols)
             stamp=str(bars.date.iloc[0])
             panel=SimpleNamespace(dates=[stamp],symbols=symbols,groups={
                 s:('KRX' if s.endswith('.KS') else 'KOSDAQ' if s.endswith('.KQ') else 'US','equity') for s in symbols},
-                observed=np.ones((1,len(symbols)),dtype=bool),closes=np.array([[float(bars.loc[s,'close']) for s in symbols]]),
+                observed=np.array([[pd.notna(bars.loc[s,'close']) and float(bars.loc[s,'close'])>0 for s in symbols]],dtype=bool),closes=np.array([[float(bars.loc[s,'close']) for s in symbols]]),
                 features=np.zeros((1,len(symbols),8)))
             with self.lock:
                 book=self.ledger().snapshot()['books'][currency];nav=book['equity']
@@ -454,10 +445,7 @@ class OperationsRuntime:
                     self.status.setdefault('policy_inputs',{})[currency]={'status':'pending','detail':'추론 중 보유 상태가 변경되어 다시 판단합니다.'}
                     self.feed_cycle.set();return
                 panel.dates=[pd.Timestamp.now(tz='UTC').isoformat()]
-                current=[book['positions'].get(s,{}).get('quantity',0)*float(bars.loc[s,'close'])/nav if nav else 0 for s in symbols]
-                actions=np.array([2 if weight>held else 0 if weight<held else 1 for weight,held in zip(weights,current)])
-                self.ledger().queue_decisions(panel,0,np.tile([0.,1.,0.],(len(symbols),1)),self.controls['paper'],
-                    allocation=[*weights,cash_weight],actions=actions)
+                if self.controls['paper']:self.ledger().queue_allocations(panel,0,allocation,currency)
                 self.ledger().save()
                 self.decisions.extend({'symbol':s,'currency':currency,'target_weight':float(weight),'as_of':stamp} for s,weight in zip(symbols,weights))
                 self.decisions.append({'symbol':'CASH','currency':currency,'target_weight':cash_weight,'as_of':stamp,'cash_action':cash_enabled})

@@ -332,7 +332,8 @@ class PaperAccount:
         if not enabled:
             self.state["pending"].clear()
         filled=[]
-        for j, symbol in enumerate(panel.symbols):
+        ordered=sorted(enumerate(panel.symbols),key=lambda pair:self.state['pending'].get(pair[1],{}).get('action')!='SELL')
+        for j, symbol in ordered:
             if not panel.observed[index, j]:
                 continue
             if symbol in processed and moment<=_moment(processed[symbol]):continue
@@ -365,6 +366,26 @@ class PaperAccount:
         previous=self.state.get('last_timestamp')
         if previous is None or moment>_moment(previous):self.state['last_timestamp']=timestamp
         return filled
+
+    def queue_allocations(self,panel,index,weights,currency):
+        """Queue whole-share targets using observed prices; execute on a later bar."""
+        values=[float(value) for value in weights]
+        if len(values)!=len(panel.symbols)+1 or not all(math.isfinite(value) and value>=0 for value in values):
+            raise ValueError('현금·종목 비중은 유한한 음수 없는 값이어야 합니다.')
+        total=sum(values);values=[value/total for value in values] if total>0 else [1.,*[0.]*len(panel.symbols)]
+        equity=self._equity(currency);book=self.state['books'][currency]
+        for j,symbol in enumerate(panel.symbols):
+            if not panel.observed[index,j]:continue
+            if _currency(*panel.groups[symbol])!=currency:continue
+            price=float(panel.closes[index,j])
+            if not math.isfinite(price) or price<=0:continue
+            current=int(book['positions'].get(symbol,{}).get('quantity',0))
+            target=math.floor(max(0,equity*values[j+1]/price));delta=target-current
+            self.state['pending'].pop(symbol,None)
+            if not delta:continue
+            self.state['pending'][symbol]={'date':str(panel.dates[index]),'action':'BUY' if delta>0 else 'SELL',
+                'budget':delta*price if delta>0 else -delta,'requested_quantity':delta if delta>0 else None,
+                'decision_id':str(panel.dates[index])+'|'+symbol}
 
     def queue_decisions(self, panel, index: int, probabilities, enabled: bool,
                         allocation=None, actions=None) -> set[str]:

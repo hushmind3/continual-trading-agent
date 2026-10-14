@@ -38,7 +38,7 @@ class IntegrityTests(unittest.TestCase):
  def observation(self,seed,currency):
   frame=pd.DataFrame([row('AAPL','2026-01-01'),row('MSFT','2026-01-01')]);frame['date']=pd.to_datetime(frame.date)
   raw=SimpleNamespace(_info={'end_time':'2026-01-01'},_portfolio_value=1000000,_final_weights=[np.array([1.,0.,0.])],_initial_amount=1000000)
-  subject=SimpleNamespace(structure_only=False,unwrapped=SimpleNamespace(gym_env=raw),frame=frame,symbols=['AAPL','MSFT'],assets=[],currency=currency,champion_ids=[],registry=SimpleNamespace(outputs=lambda *args,**kwargs:np.empty(0)),
+  subject=SimpleNamespace(structure_only=False,unwrapped=raw,frame=frame,symbols=['AAPL','MSFT'],assets=[],currency=currency,champion_ids=[],registry=SimpleNamespace(outputs=lambda *args,**kwargs:np.empty(0)),
    live_account={'currency':currency,'initial_cash':seed,'nav':seed,'cash':seed*.7,'positions':{'AAPL':seed*.3/100},'marks':{'AAPL':100},'equity_history':[{'nav':seed}]})
   return ExpertObservation.observation(subject,np.zeros(6))[-16:]
  def test_equal_relative_accounts_have_equal_features(self):

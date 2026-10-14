@@ -78,16 +78,14 @@ def source_settings():
                     "optimizer": policy.actor.optimizer.__class__.__name__,
                     "feature_extractor": "stockrl.platform.sac_champion.ChampionExtractor"}
     versions = {name: importlib.metadata.version(name) for name in ("stable-baselines3","finrl","torch","gymnasium")}
-    env_class=finrl_file('meta/env_portfolio_optimization/env_portfolio_optimization.py').PortfolioOptimizationEnv
-    env_args={key:value.default for key,value in inspect.signature(env_class).parameters.items()
-        if value.default is not inspect.Parameter.empty and isinstance(value.default,(str,int,float,bool,list,type(None)))}
+    env_args={'features':['return','high_ratio','low_ratio','volume','observed','position_weight'],'time_window':1}
     return {"parameters":params,"steps_per_run":steps,"environment":ENVIRONMENT,"environment_args":env_args,
         "covariance_lookback":0,"rolling_days":[1095,365],"sb3_defaults":defaults,"policy":architecture,"versions":versions,
         "parameter_source":"finrl.agents.stablebaselines3.models::MODEL_KWARGS['sac']",
-        "environment_source":"finrl/meta/env_portfolio_optimization/env_portfolio_optimization.py::PortfolioOptimizationEnv",
+        "environment_source":"stockrl/finrl/policy_learning/market_environment.py::MarketLearningEnv",
         "save_policy":"정상 종료 시 동일 SAC 정책·Replay·Champion 새 버전 저장",
-        "observation":"공식 가격 관측 + Expert별 실제 출력 64D + 계좌 16D → ChampionExtractor",
-        "notes":["공식 PortfolioOptimizationEnv의 정규화·보상·수수료 기본값을 사용합니다.",
+        "observation":"관측된 가격·가용 여부 + Expert별 실제 출력 64D + 계좌 16D → ChampionExtractor",
+        "notes":["학습과 가상운영이 같은 정수 수량 원장을 사용합니다. 보상은 비용 반영 순자산의 로그 증가율입니다.",
             "SAC 행동은 현금(첫 항목)과 종목별 비중입니다. 가상원장 전달 시 현금을 마지막 항목으로 옮깁니다.",
             "Frozen Expert와 결합부·Actor·Twin Critic은 단일 SAC 정책에 연결됩니다."]}
 
@@ -283,19 +281,18 @@ def preflight(req, command):
     periods=None
     if symbols and not errors:
         from stockrl.finrl.price_data.operations import prices
-        from stockrl.finrl.framework import validate_price_panel
+        from stockrl.finrl.framework import learning_frame
+        from stockrl.finrl.policy_learning.market_environment import MarketLearningEnv
         from pandas import Timedelta,to_datetime
         frame=prices(req.currency,symbols)
         if frame.empty:errors.append('학습·추론 모듈이 사용하는 실제 저장 가격이 없습니다.')
         else:
-            dates=to_datetime(frame.date,utc=True);trade=dates.max()+Timedelta(days=1)
-            train_mask=(dates>=trade-Timedelta(days=1095))&(dates<trade-Timedelta(days=365))
-            train_count=int(dates[train_mask].nunique())
-            if train_count<2:errors.append('공식 rolling 학습 구간에 데이터가 부족합니다.')
-            try:validate_price_panel(frame[train_mask],symbols)
+            try:
+                prepared=learning_frame(frame,include_latest=req.resume)
+                env=MarketLearningEnv(prepared,symbols,req.currency);env.close()
+                periods={'training_observations':int(prepared.date.nunique()),'trade_date':str(frame.date.max()),
+                    'train_start':str(prepared.date.min()),'train_end':str(prepared.date.max()),'includes_latest_completed':req.resume}
             except ValueError as exc:errors.append('학습: '+str(exc))
-            periods={'training_observations':train_count,'trade_date':str(trade),
-                'train_start':str(trade-Timedelta(days=1095)),'train_end_exclusive':str(trade-Timedelta(days=365))}
     return {"ok": not errors, "errors": errors, "symbols": symbols, "currency": req.currency, "periods": periods,
             "mode": "이어 학습" if req.resume else "새 학습",
             "steps_per_run": req.total_timesteps or steps}

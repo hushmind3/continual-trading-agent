@@ -5,24 +5,19 @@ import threading
 from pathlib import Path
 
 from .. import ROOT
-CASH_ENVIRONMENT='finrl.meta.env_portfolio_optimization.env_portfolio_optimization.PortfolioOptimizationEnv'
+CASH_ENVIRONMENT='stockrl.finrl.policy_learning.market_environment.MarketLearningEnv'
 _module_lock=threading.RLock()
 
 
 def cash_environment(frame,registry,symbols,champion_ids=None,structure_only=False):
-    """Adapt the official cash-enabled Gym environment to Gymnasium; no trading rules."""
-    from shimmy import GymV21CompatibilityV0
+    """Learn against the same sparse-price, whole-share ledger used in operation."""
+    from .policy_learning.market_environment import MarketLearningEnv
     from ..expert_observation import ExpertObservation
-    raw=finrl_file('meta/env_portfolio_optimization/env_portfolio_optimization.py').PortfolioOptimizationEnv(
-        df=frame.rename(columns={'symbol':'tic'}).copy(),initial_amount=1000000,
-        cwd=str(ROOT/'runtime/official'))
-    wrapped=ExpertObservation(GymV21CompatibilityV0(env=raw),registry,frame,list(raw._tic_list),
-        champion_ids=champion_ids,structure_only=structure_only)
-    wrapped.source_environment=CASH_ENVIRONMENT
-    wrapped.currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in symbols) else 'USD'
+    currency='KRW' if any(str(s).endswith(('.KS','.KQ')) for s in symbols) else 'USD'
+    raw=MarketLearningEnv(frame,symbols,currency)
+    wrapped=ExpertObservation(raw,registry,frame,symbols,champion_ids=champion_ids,structure_only=structure_only)
+    wrapped.source_environment=CASH_ENVIRONMENT;wrapped.currency=currency
     return wrapped
-
-
 
 
 def finrl_file(relative):
@@ -60,27 +55,38 @@ def validate_price_panel(frame,symbols):
         raise ValueError(f'PortfolioOptimizationEnv 가격 행렬이 불완전한 날짜 {len(invalid)}개: {stamp}; 누락 종목 {missing}; 행 {int(invalid.iloc[0]["size"])} / 필요 {len(symbols)}. 실제 가격을 준비하거나 학습 종목을 직접 선택하세요.')
 
 
-def training_environment(frame,registry,training=True,champion_ids=None):
+def learning_frame(frame,training=True,include_latest=False):
+    """Keep evaluation chronological; continuation consumes newly completed bars."""
     import pandas as pd
-    from finrl.meta.preprocessor.preprocessors import data_split
-    trade_date=frame.date.max()+pd.Timedelta(days=1)
+    dates=pd.to_datetime(frame.date)
+    unique=sorted(dates.dropna().unique())
+    if len(unique)<2:raise ValueError('학습·평가 구간에 서로 다른 시각의 실제 가격이 부족합니다.')
+    trade_date=dates.max()+pd.Timedelta(nanoseconds=1)
     start=trade_date-pd.Timedelta(days=1095 if training else 365)
-    end=trade_date-pd.Timedelta(days=365) if training else trade_date
-    prepared=data_split(frame.rename(columns={'symbol':'tic'}),start,end)
-    prepared=prepared.rename(columns={'tic':'symbol'})
-    if prepared.empty:raise ValueError('공식 rolling 구간에 PortfolioOptimizationEnv 가격 입력이 없습니다.')
-    validate_price_panel(prepared,sorted(frame.symbol.unique()))
+    boundary=trade_date-pd.Timedelta(days=365)
+    if dates.min()>=boundary:
+        boundary=pd.Timestamp(unique[max(1,min(len(unique)-1,int(len(unique)*.8)))])
+    end=boundary if training and not include_latest else trade_date
+    if not training:start=boundary
+    prepared=frame[(dates>=start)&(dates<end)].sort_values(['date','symbol']).reset_index(drop=True)
+    prepared.attrs.update(frame.attrs)
+    if prepared.date.nunique()<2:raise ValueError('학습·평가 구간에 서로 다른 시각의 실제 가격이 부족합니다.')
+    return prepared
+
+
+def training_environment(frame,registry,training=True,champion_ids=None,include_latest=False):
+    prepared=learning_frame(frame,training,include_latest)
     active=list(registry.catalog().get('active',[])) if champion_ids is None else list(champion_ids)
-    wrapped=cash_environment(prepared,registry,sorted(prepared.symbol.unique()),active)
+    wrapped=cash_environment(prepared,registry,sorted(frame.symbol.unique()),active)
     wrapped.frame=frame
     return wrapped
 
 
 def champion_structure_environment(currency,symbols,registry,champion_ids):
-    """Inspect the same official cash-enabled spaces without market or Expert inference."""
+    """Inspect the selected cash-enabled spaces without market or Expert inference."""
     import pandas as pd
     count=len(symbols);stamp=pd.Timestamp('2000-01-01')
-    frame=pd.DataFrame({'date':[stamp]*count,'symbol':symbols,'close':[1.]*count,'high':[1.]*count,'low':[1.]*count})
+    frame=pd.DataFrame({'date':[stamp]*count+[stamp+pd.Timedelta(days=1)]*count,'symbol':symbols*2,'open':[1.]*(count*2),'close':[1.]*(count*2),'high':[1.]*(count*2),'low':[1.]*(count*2),'volume':[0.]*(count*2)})
     wrapped=cash_environment(frame,registry,symbols,champion_ids,structure_only=True)
     wrapped.currency=currency
     return wrapped
@@ -103,7 +109,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     if resume and read_json(saved/'dataset.json').get('environment')!=CASH_ENVIRONMENT:raise ValueError('구형 환경의 정책은 실행하지 않습니다. 현금 정책을 새로 학습하세요.')
     if resume and champion_ids is None:champion_ids=read_json(saved/'dataset.json').get('champion_experts')
     champion_ids=list(registry.catalog().get('active',[])) if champion_ids is None else champion_ids
-    env=training_environment(frame,registry,champion_ids=champion_ids)
+    env=training_environment(frame,registry,champion_ids=champion_ids,include_latest=resume)
     root=Path(output) if output is not None else ROOT/'runtime/official'
     if not root.resolve().is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('정책 출력은 기존 runtime/official 내부에 저장합니다.')
     root.mkdir(parents=True,exist_ok=True)

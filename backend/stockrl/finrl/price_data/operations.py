@@ -93,7 +93,7 @@ def collect_kiwoom_prices(symbols=None):
     store=price_store()
     for result in results:
         try:
-            frame=normalize_kiwoom_daily(result);saved=store.save_price_data(frame)
+            frame=normalize_kiwoom_daily(result);frame.attrs.update(source='kiwoom',timeframe='1d');saved=store.save_price_data(frame)
             if saved!=len(frame):raise ValueError('가격 저장 개수가 수신 결과와 다릅니다.')
             summary['symbols'].append({'symbol':result['symbol'],'rows':saved,'start':frame.date.min(),'end':frame.date.max()});summary['rows']+=saved
         except (ValueError,KeyError) as error:summary['errors'].append({'symbol':result.get('symbol'),'error':str(error)})
@@ -122,9 +122,16 @@ def prices(currency='USD',symbols=None):
     allowed=set(available) if currency is None else {i['symbol'] for i in market['instruments'] if i.get('market') in (('KRX','KOSDAQ') if currency=='KRW' else ('US','NASDAQ','NYSE','NYSEARCA','AMEX')) and i.get('asset_class') in ('equity','etf')}
     names=symbols or [s for s in available if s in allowed]
     if start is None:return pd.DataFrame()
-    data=store.get_price_data(names,start,end)
+    from stockrl.management.connection_settings.provider_credentials import read_settings
+    kiwoom=currency=='KRW' and read_settings(ROOT/'runtime/operations').get('provider')=='kiwoom'
+    data=store.get_price_data(names,start,end,source='kiwoom',timeframe='1d') if kiwoom else store.get_price_data(names,start,end)
+    if data.empty:return pd.DataFrame()
     data=data.rename(columns={'tic':'symbol','datadate':'date','prcod':'open','prchd':'high','prcld':'low','prccd':'close','cshtrd':'volume'})
     dates=pd.to_datetime(data.date,utc=True,format='mixed')
+    if kiwoom:
+        data['date']=dates.dt.tz_localize(None)
+        data=data.sort_values(['date','symbol']).reset_index(drop=True);data.attrs.update(timeframe='1d',source='kiwoom')
+        return data
     feed=ROOT/'runtime/operations/live/timeframes.sqlite3'
     if feed.is_file():
         with closing(sqlite3.connect('file:'+feed.as_posix()+'?mode=ro',uri=True)) as connection:

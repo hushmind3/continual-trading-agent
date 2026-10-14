@@ -15,6 +15,9 @@ class PriceStore:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,ticker TEXT NOT NULL,date TEXT NOT NULL,
                 open REAL,high REAL,low REAL,close REAL,adj_close REAL,volume REAL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE(ticker,date))''')
+            columns={row[1] for row in db.execute('PRAGMA table_info(price_data)')}
+            for name in ('source','timeframe'):
+                if name not in columns:db.execute('ALTER TABLE price_data ADD COLUMN '+name+" TEXT NOT NULL DEFAULT 'unknown'")
 
     def save_price_data(self,frame):
         if frame.empty:return 0
@@ -32,17 +35,21 @@ class PriceStore:
             for _,row in data.iterrows():
                 try:
                     values=[row.ticker,row.date,*[float(row[name]) if pd.notna(row[name]) else None for name in ('open','high','low','close','adj_close','volume')]]
-                    db.execute('INSERT OR REPLACE INTO price_data (ticker,date,open,high,low,close,adj_close,volume) VALUES (?,?,?,?,?,?,?,?)',values)
+                    values.extend([str(row.get(name,data.attrs.get(name,'unknown'))) for name in ('source','timeframe')])
+                    db.execute('INSERT OR REPLACE INTO price_data (ticker,date,open,high,low,close,adj_close,volume,source,timeframe) VALUES (?,?,?,?,?,?,?,?,?,?)',values)
                     affected+=1
                 except (sqlite3.Error,TypeError,ValueError) as exc:logging.getLogger(__name__).warning('Price save failed: %s',exc)
         return affected
 
-    def get_price_data(self,tickers,start,end):
+    def get_price_data(self,tickers,start,end,source=None,timeframe=None):
         names=tickers.astype(str).tolist() if isinstance(tickers,pd.Series) else list(tickers or [])
         if not names:return pd.DataFrame()
         placeholders=','.join('?' for _ in names)
         with closing(sqlite3.connect(self.db_path)) as db:
-            data=pd.read_sql_query('SELECT ticker,date,open,high,low,close,adj_close,volume FROM price_data WHERE ticker IN ('+placeholders+') AND date>=? AND date<=? ORDER BY ticker,date',db,params=[*names,start,end])
+            clause='';params=[*names,start,end]
+            for key,value in [('source',source),('timeframe',timeframe)]:
+                if value is not None:clause+=' AND '+key+'=?';params.append(value)
+            data=pd.read_sql_query('SELECT ticker,date,open,high,low,close,adj_close,volume,source,timeframe FROM price_data WHERE ticker IN ('+placeholders+') AND date>=? AND date<=?'+clause+' ORDER BY ticker,date',db,params=params)
         if not data.empty:
             data=data.rename(columns={'ticker':'tic','date':'datadate','open':'prcod','high':'prchd','low':'prcld','close':'prccd','volume':'cshtrd'})
             data['gvkey']=data.tic

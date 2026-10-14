@@ -30,15 +30,14 @@ class ExpertPool:
         for key,reference in (extra_packages or {}).items():
             catalog.setdefault('experts',{})[key]={'package':reference}
         self.path=settings.model_dir/'expert_registry.json'
-        self.entries={};references={};sizes={};counts={}
+        self.entries={};references={};counts={};self.materialized=set()
         for key,item in catalog.get('experts',{}).items():
             if item.get('executor')=='repository_source':continue
-            package=load_package(self.path,item['package'])
-            self.entries[key]={**package['entry'],'id':key};references[key]=item['package']
-            sizes[key]=package['feature_size'];counts[key]=package['module_count']
+            self.entries[key]={**item,'id':key};references[key]=item['package']
         self.references=references;self.counts=counts
         self.active=set(catalog.get('active',[]))
-        self.temp=tempfile.TemporaryDirectory(prefix='frozen-expert-definitions-')
+        temporary_root=settings.state_dir/'definitions';temporary_root.mkdir(parents=True,exist_ok=True)
+        self.temp=tempfile.TemporaryDirectory(prefix='frozen-',dir=temporary_root)
         self.root=Path(self.temp.name)
         self.loaded = OrderedDict()
         self.roots={key:self.root for key in self.entries}
@@ -57,13 +56,20 @@ class ExpertPool:
                 for values in (self.entries,self.references,self.counts,self.roots,self.metrics):values.pop(key,None)
                 continue
             if catalog['experts'][key].get('executor')=='repository_source':continue
-            package=load_package(self.path,references[key])
-            self.entries[key]={**package['entry'],'id':key}
-            self.references[key]=references[key];self.counts[key]=package['module_count'];self.roots[key]=self.root
+            self.materialized.discard(key)
+            self.entries[key]={**catalog['experts'][key],'id':key}
+            self.references[key]=references[key];self.counts.pop(key,None);self.roots[key]=self.root
         self.active=set(catalog.get('active',[]));self.ids=sorted(self.entries)
 
+    def entry(self,key):
+        if key not in self.materialized:
+            package=load_package(self.path,self.references[key])
+            self.entries[key]={**package['entry'],'id':key}
+            self.counts[key]=package['module_count'];self.materialized.add(key)
+        return self.entries[key]
+
     def catalog(self):
-        return [dict(id=key, name=e.get("name", key), role="action" if e.get("stock_policy") else "market",
+        return [dict(id=key, name=e.get("name", key), role=e.get('role') or ("action" if e.get("stock_policy") else "market"),
                      frozen=True, parameters=e.get("parameters"), symbols=e.get("stock_policy", {}).get("universe"),
                      enabled=key in self.active,
                      **{**self.metrics.get(key,{}),'loaded':key in self.loaded}) for key,e in sorted(self.entries.items())]
@@ -72,7 +78,7 @@ class ExpertPool:
         if key in self.loaded:
             self.loaded.move_to_end(key)
             return self.loaded[key]
-        entry=self.entries[key]
+        entry=self.entry(key)
         estimated=max(float(entry.get('weight_bytes',0)),self.metrics.get(key,{}).get('peak_ram_increment',0))
         while self.loaded and psutil.virtual_memory().available < estimated:
             self.release(next(iter(self.loaded)))

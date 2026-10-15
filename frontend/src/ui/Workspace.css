@@ -479,3 +479,12 @@
 .workspace-notice details {margin-top:12px;padding-top:12px;border-top:1px solid #eeeef2;font-size:12px;color:#71717c}
 .workspace-notice summary {cursor:pointer}
 .workspace-notice details p,.workspace-notice .ui-error {margin-top:10px;white-space:pre-wrap;overflow-wrap:anywhere}
+
+.account-history-labels,.account-history-dates {display:flex;justify-content:space-between;gap:12px;font-size:11px;color:#71717c;font-variant-numeric:tabular-nums}
+.account-equity-history svg {display:block;width:100%;max-height:230px;margin-top:10px}
+.account-history-caption {margin-top:14px;color:#71717c;font-size:11px;line-height:1.8}
+.account-history-table {max-height:240px;overflow:auto;margin-top:14px}
+.account-history-table table {width:100%;font-size:12px;text-align:left;font-variant-numeric:tabular-nums}
+.account-history-table :is(th,td) {padding:10px 6px;border-bottom:1px solid #e7edf4}
+.account-history-table :is(th,td):last-child {text-align:right}
+.account-history-table:focus-visible {outline:3px solid #0071e3;outline-offset:3px}

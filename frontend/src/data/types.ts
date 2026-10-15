@@ -1,4 +1,5 @@
 export type Currency = "USD" | "KRW";
+export interface AccountEquityPoint {date:string;nav:number}
 export type FrameworkScope = "FinRL" | "stockrl";
 export type Control = "learning";
 export interface Worker {alive?:boolean;requested?:boolean;status?:string;error?:string}
@@ -69,7 +70,7 @@ export interface OperationsState {
   controls:{feed:boolean;paper:boolean;engine:boolean;learning:boolean};
   account:{books:Record<Currency,{initial_cash:number;cash:number;equity:number;net_pnl:number;
     holdings_value:number;fees:number;realized_pnl:number;trade_count:number;
-    positions:Record<string,{quantity:number;average_cost:number}>;marks:Record<string,number>}>;
+    positions:Record<string,{quantity:number;average_cost:number}>;marks:Record<string,number>;equity_history?:AccountEquityPoint[]}>;
     fills:Record<string,unknown>[];pending:Record<string,unknown>};
   quotes:Record<string,Record<string,unknown>>;decisions:Record<string,unknown>[];
   feed:{status:string;error?:string;policy_error?:string;learning_status?:string;learning_error?:string;last_as_of?:string};

@@ -1,3 +1,3 @@
 # Settings
 
-Model, MCP catalog/connections and skills live under this folder. Settings.tsx switches these panels; chat stays mounted while settings are open so drafts and selected sessions survive. No model or tool starts merely by opening settings.
+Settings.tsx owns model/MCP/skills navigation: a descriptive sidebar on desktop and compact tabs on mobile. The last section persists for the browser session; the model chip explicitly opens Models. Child modules live in models/, mcp/ and skills/. Chat remains mounted behind settings, preserving draft and session. Navigation does not start a model or tool.

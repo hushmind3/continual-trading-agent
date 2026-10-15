@@ -452,3 +452,7 @@
  .policy-training-summary .policy-result-metrics p {min-width:0;word-break:keep-all}
  .policy-training-summary .policy-result-metrics strong {margin:0;font-size:19px;text-align:right;word-break:keep-all;overflow-wrap:normal}
 }
+
+.expert-filter-summary {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:0 2px;font-size:12px;color:#71717c}
+.expert-filter-summary label {display:flex;align-items:center;gap:8px;cursor:pointer;color:#424854}
+.expert-filter-summary input {width:16px;height:16px;accent-color:#0071e3}

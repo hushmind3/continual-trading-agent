@@ -189,13 +189,25 @@ export function Tabs({
   value: string;
   onChange: (id: string) => void;
 }) {
+  const list=useRef<HTMLDivElement>(null);
+  const selectedIndex=Math.max(0,items.findIndex(item=>item.id===value));
   return (
-    <div className="ui-tabs inline-flex rounded-xl bg-slate-100 p-1" role="tablist">
-      {items.map((item) => (
+    <div ref={list} className="ui-tabs inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-orientation="horizontal">
+      {items.map((item,index) => (
         <button
           key={item.id}
+          type="button"
           role="tab"
+          tabIndex={index===selectedIndex?0:-1}
           aria-selected={value === item.id}
+          onKeyDown={event=>{
+            if(event.altKey||event.ctrlKey||event.metaKey)return;
+            const next=event.key==='ArrowRight'?(index+1)%items.length:event.key==='ArrowLeft'?(index-1+items.length)%items.length:event.key==='Home'?0:event.key==='End'?items.length-1:null;
+            if(next==null)return;
+            event.preventDefault();
+            list.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+            onChange(items[next].id);
+          }}
           onClick={() => onChange(item.id)}
           className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${value === item.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
         >

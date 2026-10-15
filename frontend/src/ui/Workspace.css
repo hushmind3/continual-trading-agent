@@ -456,3 +456,6 @@
 .expert-filter-summary {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:0 2px;font-size:12px;color:#71717c}
 .expert-filter-summary label {display:flex;align-items:center;gap:8px;cursor:pointer;color:#424854}
 .expert-filter-summary input {width:16px;height:16px;accent-color:#0071e3}
+
+.connection-save-actions {display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+@media(max-width:760px) {.connection-save-row>.ui-status {flex-basis:100%}.connection-save-actions {width:100%}.connection-save-actions .ui-button {flex:1}}

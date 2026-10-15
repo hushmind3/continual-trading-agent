@@ -1,0 +1,8 @@
+backend/ai_agent/Hermes/engine/upstream/
+runtime/
+휴지통/
+.venv/
+node_modules/
+frontend/dist/
+venv/
+**/__pycache__/

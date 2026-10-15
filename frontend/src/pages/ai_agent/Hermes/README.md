@@ -1,5 +1,7 @@
-# Hermes
+# 헤르메스
 
-One submenu with Chat, Model settings, MCP and Skills tabs. Session selection/history/archive are part of Chat. Feature components live in matching folders. The backend reuses original AIAgent, SessionDB, MCP and skill functions; the React components provide this platform's interface only.
+대화 / 모델 / 외부 도구 / 스킬을 한 소메뉴에서 사용합니다. 모델 폴더의 GGUF를 목록에서 선택하고 불러온 뒤 대화를 시작합니다. 서버 연결과 세부 설정은 모델 탭에 분리했습니다.
 
-All requests target `ai_agent/Hermes/*` through the existing `/api` transport. Sending is asynchronous; polling retrieves streaming text and tool progress. Unmount cancels polling, not the user's task. No model/tool execution occurs on page load.
+기존 단일 `/api`의 `ai_agent/Hermes/*`를 사용합니다. 대화·도구·세션·MCP·스킬 실행은 복사한 원본 엔진이 담당합니다. React는 화면과 상태 표시만 담당합니다. 스킬의 화면 제목은 한글로 표시하며 원본 작업 지침과 식별자는 유지합니다.
+
+상태 조회는 첫 진입과 화면 복귀 때 수행합니다. 작업 중 또는 모델 로딩 중에만 반복 조회하며, 숨겨진 탭은 간격을 늘립니다. 화면 진입으로 모델이나 외부 도구를 실행하지 않습니다. 화면을 떠나도 사용자 작업은 취소하지 않습니다.

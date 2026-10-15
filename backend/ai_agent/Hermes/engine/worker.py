@@ -158,7 +158,8 @@ class HermesWorker:
         session_id = uuid.uuid4().hex
         cfg = load_settings()
         self.db.create_session(session_id, 'platform', model=cfg['model'] or None)
-        self.db.set_session_title(session_id, str(request.get('title') or '새 대화')[:100])
+        title = str(request.get('title') or '새 대화')[:100]
+        self.db.set_session_title(session_id, self.db.get_next_title_in_lineage(title))
         return self.session(session_id)
 
     def start_chat(self, request):
@@ -166,6 +167,8 @@ class HermesWorker:
         cfg = load_settings()
         if not cfg['model']:
             raise ValueError('모델 설정에서 모델을 선택하고 저장하세요.')
+        if cfg.get('local_model') and self.status()['local_model']['state'] != 'ready':
+            raise ValueError('모델 탭에서 로컬 모델을 불러온 뒤 대화를 시작하세요.')
         prompt = str(request.get('message') or '').strip()
         if not prompt:
             raise ValueError('메시지를 입력하세요.')
@@ -174,8 +177,8 @@ class HermesWorker:
         session_id = str(request.get('session_id') or '')
         row = self.session(session_id) if session_id else self.create_session({'title': prompt[:60]})
         session_id = row['session']['id']
-        if row['session'].get('title') == '새 대화':
-            self.db.set_session_title(session_id, prompt[:60])
+        if str(row['session'].get('title') or '').startswith('새 대화'):
+            self.db.set_session_title(session_id, self.db.get_next_title_in_lineage(prompt[:60]))
         history = row['messages']
         with self.lock:
             self.job = {'state': 'starting', 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time()}
@@ -202,6 +205,13 @@ class HermesWorker:
                 session_id=session_id, session_db=self.db, platform='platform',
                 enabled_toolsets=toolsets, max_iterations=cfg['max_iterations'], cwd=cfg['workspace'],
                 skip_background_review=True, skip_context_files=True,
+                max_tokens=2048 if cfg.get('local_model') else None,
+                reasoning_config={'enabled': False} if cfg.get('local_model') else None,
+                ephemeral_system_prompt=(
+                    f'The selected working directory is {cfg["workspace"]}. '
+                    'Resolve relative file paths against this exact directory. '
+                    'Never invent or substitute another working directory. '
+                    'Report success only when tool results confirm it.'),
                 stream_delta_callback=self.delta, event_callback=self.event,
                 status_callback=lambda *args, **kw: self.event('status', args),
                 tool_start_callback=lambda *args, **kw: self.event('tool_start', args),
@@ -213,6 +223,8 @@ class HermesWorker:
             if self.stopping:
                 self.agent.interrupt(hard_cancel=True)
             result = self.agent.run_conversation(prompt, conversation_history=history, task_id=uuid.uuid4().hex)
+            if result.get('error'):
+                raise RuntimeError(str(result['error']))
             with self.lock:
                 self.job.update(state='stopped' if self.stopping else 'complete', text=result.get('final_response') or self.job['text'], finished_at=time.time())
         except Exception as exc:
@@ -287,13 +299,17 @@ class HermesWorker:
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
         self.model_log = (HOME / 'local-model.log').open('a', encoding='utf-8')
+        alias = path.parent.name if path.stem.upper() in {'GGUF', 'MODEL'} else path.stem
         self.model_process = subprocess.Popen(
             [str(executable), '--model', str(path), '--host', '127.0.0.1', '--port', str(port),
-             '--n-gpu-layers', '999', '--ctx-size', '8192', '--jinja', '--alias', path.stem],
+             '--n-gpu-layers', '999', '--ctx-size', '65536', '--parallel', '1',
+             '--threads', '2', '--threads-batch', '2',
+             '-fa', 'on', '-ctk', 'q8_0', '-ctv', 'q8_0',
+             '--jinja', '--alias', alias],
             cwd=path.parent, stdout=self.model_log, stderr=self.model_log,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
         self.model_base = f'http://127.0.0.1:{port}/v1'
-        self.save_settings({'base_url': self.model_base, 'model': path.stem, 'local_model': str(path)})
+        self.save_settings({'base_url': self.model_base, 'model': alias, 'local_model': str(path)})
         return self.status()
 
     def unload_model(self):

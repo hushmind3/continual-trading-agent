@@ -1,3 +1,5 @@
-# Skills
+# 스킬
 
-Lists the imported native skill catalog and displays original skill content. Reading a skill never executes its instructions or runs external coding agents. The Hermes model can use the skills toolset during an explicitly started chat task.
+원본 스킬 목록과 내용을 읽습니다. 화면의 제목·분류는 한글로 표시하고 원본 지침은 접힌 상세 영역에 보존합니다. 한글 제목과 원본 식별자로 검색할 수 있습니다.
+
+목록을 읽는 행위는 스킬을 실행하지 않습니다. 실제 모델이 스킬 도구로 필요한 지침을 읽으며, 일부 지침은 별도 프로그램이나 서비스 연결이 필요합니다.

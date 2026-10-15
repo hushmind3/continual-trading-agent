@@ -3,6 +3,6 @@ import {Bot} from 'lucide-react';
 import type {MenuItem} from '../../shell/menu_groups/menu_types';
 
 export const menus:MenuItem[]=[{
- hash:'ai_agent/Hermes',name:'Hermes',group:'AI Agent',icon:Bot,
+ hash:'ai_agent/Hermes',name:'헤르메스',group:'AI 에이전트',icon:Bot,
  component:lazy(()=>import('./Hermes/Hermes').then(m=>({default:m.Hermes}))),required:[],
 }];

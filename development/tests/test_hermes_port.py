@@ -130,6 +130,10 @@ class HermesPortTests(unittest.TestCase):
         self.assertEqual(self.wait_job()['state'], 'complete')
 
     def test_02_native_skills(self):
+        first = self.bridge.call('session/create', {'title': '새 대화'})['session']
+        second = self.bridge.call('session/create', {'title': '새 대화'})['session']
+        self.assertNotEqual(first['id'], second['id'])
+        self.assertNotEqual(first['title'], second['title'])
         catalog = self.bridge.call('skills')
         self.assertGreater(len(catalog['skills']), 0)
         view = self.bridge.call('skill', {'name': 'computer-use'})

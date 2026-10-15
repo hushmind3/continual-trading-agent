@@ -1,3 +1,5 @@
-# MCP
+# 외부 도구
 
-Native Hermes MCP configuration editor and explicit Connect action. Shows actual upstream connection status/tool information. No server is launched by opening the tab or saving a configuration.
+MCP 서버를 프로그램 실행 방식 또는 서버 주소 방식으로 추가합니다. 저장은 설정만 바꾸며, 연결하기를 눌러 원본 Hermes의 MCP 검색·연결을 실행합니다. 기존 환경 변수와 인증 헤더 등 추가 필드는 보존하며 고급 설정에서 편집할 수 있습니다.
+
+파일·명령 실행은 내장 도구여서 MCP 연결이 필수는 아닙니다. 연결 설정 삭제는 서버 프로그램 파일을 삭제하지 않습니다. 상태는 실제 연결 여부와 도구 수를 표시하고 원본 진단 정보는 펼쳐 볼 수 있습니다.

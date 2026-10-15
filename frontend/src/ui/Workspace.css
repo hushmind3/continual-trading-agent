@@ -470,3 +470,12 @@
 .workspace-connection-recovery summary {cursor:pointer}
 .workspace-connection-recovery .ui-button {flex-shrink:0}
 @media(max-width:760px) {.workspace-connection-recovery:not([hidden]) {flex-direction:column;gap:16px}.workspace-connection-recovery .ui-button {width:100%}}
+
+.workspace-notice {margin-bottom:14px;padding:16px;border:1px solid #e7e7eb;border-radius:14px;background:#fff}
+.workspace-notice header {display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.workspace-notice h3 {min-width:0;font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.workspace-notice a {flex-shrink:0;color:#0071e3;font-size:12px;white-space:nowrap}
+.workspace-notice>p {margin:8px 0;font-size:12px;color:#71717c}
+.workspace-notice details {margin-top:12px;padding-top:12px;border-top:1px solid #eeeef2;font-size:12px;color:#71717c}
+.workspace-notice summary {cursor:pointer}
+.workspace-notice details p,.workspace-notice .ui-error {margin-top:10px;white-space:pre-wrap;overflow-wrap:anywhere}

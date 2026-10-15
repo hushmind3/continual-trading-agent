@@ -436,3 +436,11 @@
 .rea-code-provenance-original {border-color:#d6e8fa;background:#eff7ff;color:#437caa}
 .rea-code-provenance-inferred {border-color:#efdfc5;background:#fff8ec;color:#a0783c}
 .rea-code-provenance-analysis {border-color:#e3dcf2;background:#f6f3fc;color:#81709f}
+
+/* Holdings and executions keep their row identity visible during horizontal scrolling. */
+.account-records .data-table-scroll :is(th,td):first-child {position:sticky;left:0;min-width:130px;max-width:180px;white-space:normal;box-shadow:1px 0 #e7edf4}
+.account-records .data-table-scroll th:first-child {z-index:3;background:#f5f7fa}
+.account-records .data-table-scroll td:first-child {z-index:2;background:#fff}
+.account-records .data-table-scroll tbody tr:hover td:first-child {background:#f8faff}
+.account-records .account-instrument b {overflow-wrap:anywhere}
+.data-table-scroll:focus-visible {outline:3px solid #0071e3;outline-offset:3px}

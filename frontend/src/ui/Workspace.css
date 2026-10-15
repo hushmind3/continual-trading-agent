@@ -488,3 +488,5 @@
 .account-history-table :is(th,td) {padding:10px 6px;border-bottom:1px solid #e7edf4}
 .account-history-table :is(th,td):last-child {text-align:right}
 .account-history-table:focus-visible {outline:3px solid #0071e3;outline-offset:3px}
+
+.connection-save-actions .ui-button {white-space:nowrap}

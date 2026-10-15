@@ -1,14 +1,17 @@
-import { useEffect,useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect,useRef, type ButtonHTMLAttributes, type ReactNode, type Ref, type ComponentPropsWithRef } from "react";
 import { Inbox, LoaderCircle, X } from "lucide-react";
 
 export function Button({
   tone = "neutral",
+  variant = "solid",
   busy = false,
   className = "",
   children,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   tone?: "neutral" | "primary" | "danger";
+  ref?: Ref<HTMLButtonElement>;
+  variant?: "solid" | "ghost";
   busy?: boolean;
 }) {
   return (
@@ -16,12 +19,25 @@ export function Button({
       type="button"
       {...props}
       disabled={props.disabled || busy}
-      className={`ui-button ui-button-${tone} inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-150 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-45 ${tone === "primary" ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20" : tone === "danger" ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "bg-slate-100 text-slate-700 hover:bg-slate-200"} ${className}`}
+      className={`ui-button ui-button-${tone} inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-150 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-45 ${variant === "ghost" ? "bg-transparent text-slate-600 hover:bg-slate-100" : tone === "primary" ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20" : tone === "danger" ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "bg-slate-100 text-slate-700 hover:bg-slate-200"} ${className}`}
     >
       {busy && <LoaderCircle size={15} className="animate-spin" />}
       {children}
     </button>
   );
+}
+/** Compact action button with the same disabled/loading contract as Button. */
+export function IconButton({className="",...props}:ComponentPropsWithRef<typeof Button>){
+  return <Button variant="ghost" {...props} className={`ui-icon-button shrink-0 p-2 ${className}`}/>;
+}
+export function Input({className="",...props}:ComponentPropsWithRef<'input'>){
+  return <input {...props} className={`${props.type==='checkbox'||props.type==='radio'?'ui-checkbox size-4 accent-blue-600':inputClass} ${className}`}/>;
+}
+export function Select({className="",...props}:ComponentPropsWithRef<'select'>){
+  return <select {...props} className={`${inputClass} ${className}`}/>;
+}
+export function Textarea({className="",...props}:ComponentPropsWithRef<'textarea'>){
+  return <textarea {...props} className={`${inputClass} resize-none ${className}`}/>;
 }
 export function Status({
   tone = "idle",

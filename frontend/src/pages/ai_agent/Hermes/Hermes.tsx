@@ -4,8 +4,6 @@ import {Button,ErrorMessage} from '../../../ui/Primitives';
 import {Chat} from './chat/Chat';
 import {Settings as AgentSettings} from './settings/Settings';
 import {prefix,failure,working,type AgentStatus,type Settings} from './types';
-import './Hermes.css';
-import './Workspace.css';
 
 export function Hermes(){
  const [tab,setTab]=useState('chat'),[status,setStatus]=useState<AgentStatus>(),[error,setError]=useState('');

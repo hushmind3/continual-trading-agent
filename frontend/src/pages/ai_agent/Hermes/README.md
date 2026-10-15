@@ -7,10 +7,12 @@
 ## 파일 안내
 
 - Hermes.tsx: 대화/설정 전환, 집중 모드, 선택 모델과 상태 조회.
-- chat/Chat.tsx: 세션 검색·초안 보존·전송·중지·승인·자율 실행·스크롤과 패널.
+- chat/Chat.tsx: 세션·초안·전송·중지·승인 등 상태와 API 연결.
+- chat/ChatHeader.tsx·SessionSidebar.tsx·ActivityPanel.tsx·ChatComposer.tsx·ChatWelcome.tsx: 공통 UI를 사용하는 역할별 표시 컴포넌트.
 - chat/ChatStream.tsx: 연속 도구 호출 묶음, 실제 실행 수치와 타임라인.
 - chat/MessageBody.tsx: Markdown/GFM 답변·코드·표·목록 표시와 복사. 원본 HTML은 실행하지 않습니다.
-- Workspace.css: 이 화면에 한정한 레이아웃·서식·모바일 디자인. Hermes.css는 설정의 공통 스타일을 제공합니다.
+- ../../../tailwind.css: 공통 테마·디자인 값과 Tailwind 유틸리티 기반 레이아웃·반응형 스타일. 메뉴별 CSS는 불러오지 않습니다.
+- ../../../ui/Primitives.tsx: Button·IconButton·Input·Select·Textarea 등 공통 UI.
 
 설정을 열어도 대화가 유지됩니다. 초안은 세션별 브라우저 저장소에 남고, 위로 스크롤한 사용자를 강제로 마지막으로 이동시키지 않습니다. 모바일 패널은 배경 클릭·Escape로 닫고 포커스를 돌려줍니다. 작업/로딩 중에만 반복 조회합니다. 수치는 기존 엔진의 보고 값을 표시하며 미수신 값은 대기 상태로 표시합니다.
 

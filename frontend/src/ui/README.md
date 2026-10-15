@@ -2,7 +2,8 @@
 
 - Panel.tsx: 접이식 패널·키/값 표시.
 - 패널 설명은 제목 옆 안내 아이콘으로 분리합니다. 기본 화면은 제목·제어·상태·결과를 표시하며, 설명은 선택했을 때 펼칩니다.
-- Primitives.tsx: 버튼·상태·탭·Drawer·오류·빈 상태 등 재사용 요소.
+- Primitives.tsx: Button·IconButton·Input·Select·Textarea·상태·탭·Drawer·오류·빈 상태 등 재사용 요소. Button은 기존 기본 동작을 유지하며 아이콘 버튼은 같은 로딩·비활성화·ref 계약을 사용합니다.
+- ../tailwind.css: 공통 Tailwind 진입점·테마·대화 폭·서식·에이전트 화면 스타일.
 - DataTable.tsx: 검색·정렬·선택·페이지 이동.
 - 표의 정렬 가능한 열만 버튼을 제공하고 정렬 방향을 표시합니다. 정렬이 없는 열은 일반 제목으로 읽힙니다. 검색·선택·페이지 이동은 유지합니다.
 - SystemControls.tsx: 기존 자동 운영 시작·중지 명령과 실제 실행 단계 표시.

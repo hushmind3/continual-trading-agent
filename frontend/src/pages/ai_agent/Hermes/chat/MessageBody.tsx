@@ -1,3 +1,4 @@
+import {Button} from '../../../../ui/Primitives';
 import {Children,isValidElement,memo,useState,type ReactNode} from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -5,7 +6,7 @@ import {Check,Copy,TriangleAlert} from 'lucide-react';
 
 export function CopyButton({text,label='복사'}:{text:string;label?:string}){
  const [state,setState]=useState<'idle'|'copied'|'error'>('idle');
- return <button type="button" className="ha-copy" title={label} aria-label={state==='copied'?'복사됨':label} onClick={()=>{void navigator.clipboard.writeText(text).then(()=>{setState('copied');setTimeout(()=>setState('idle'),1800)}).catch(()=>setState('error'))}}>{state==='copied'?<Check size={14}/>:state==='error'?<TriangleAlert size={14}/>:<Copy size={14}/>}<span>{state==='copied'?'복사됨':state==='error'?'복사 실패':label}</span></button>;
+ return <Button type="button" className="ha-copy" title={label} aria-label={state==='copied'?'복사됨':label} onClick={()=>{void navigator.clipboard.writeText(text).then(()=>{setState('copied');setTimeout(()=>setState('idle'),1800)}).catch(()=>setState('error'))}}>{state==='copied'?<Check size={14}/>:state==='error'?<TriangleAlert size={14}/>:<Copy size={14}/>}<span>{state==='copied'?'복사됨':state==='error'?'복사 실패':label}</span></Button>;
 }
 function CodeBlock({children}:{children?:ReactNode}){
  const child=Children.toArray(children)[0];

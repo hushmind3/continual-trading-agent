@@ -173,7 +173,7 @@ export function Drawer({
       aria-modal="true"
       aria-label={title}
     >
-      <button
+      <Button
         aria-label="닫기"
         tabIndex={-1}
         className="ui-drawer-backdrop absolute inset-0 z-0 bg-slate-950/30 backdrop-blur-sm"
@@ -210,7 +210,7 @@ export function Tabs({
   return (
     <div ref={list} className="ui-tabs inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-orientation="horizontal">
       {items.map((item,index) => (
-        <button
+        <Button
           key={item.id}
           type="button"
           role="tab"
@@ -228,7 +228,7 @@ export function Tabs({
           className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${value === item.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
         >
           {item.label}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -271,7 +271,8 @@ export function Sparkline({
     >
       <polyline
         fill="none"
-        stroke={up ? "#f43f5e" : "#3b82f6"}
+        stroke="currentColor"
+        className={up ? "text-rose-500" : "text-blue-500"}
         strokeWidth="2"
         vectorEffect="non-scaling-stroke"
         points={points}

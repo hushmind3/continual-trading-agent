@@ -1,4 +1,4 @@
-import {inputClass,ErrorMessage} from '../../../../ui/Primitives';
+import {inputClass,ErrorMessage,Select,Input} from '../../../../ui/Primitives';
 export interface NativeParameter {name:string;annotation?:string;required:boolean;default?:string;kind?:string}
 export function NativeParameterFields({title,parameters,value,onChange}:{title:string;parameters:NativeParameter[];value:string;onChange:(value:string)=>void}){
  let values:Record<string,unknown>;
@@ -19,7 +19,7 @@ export function NativeParameterFields({title,parameters,value,onChange}:{title:s
  return <details open className="my-3 text-xs text-slate-600"><summary>{title} · 필수·선택 입력 전체</summary><div className="mt-3 grid gap-3 sm:grid-cols-2">{parameters.map(parameter=>{
   const current=values[parameter.name],text=current==null?'':typeof current==='object'?JSON.stringify(current):String(current);
   return <label key={parameter.name}>{parameter.name}{parameter.required?' · 필수':' · 선택'}<span className="ml-2 text-slate-400">{parameter.annotation||'원본 타입'}</span>
-   {parameter.kind?.includes('VAR_')?<p className="mt-1">가변 인자는 고급 JSON에서 입력</p>:/bool/i.test(parameter.annotation??'')?<select className={inputClass+' mt-1'} value={text} onChange={e=>update(parameter,e.target.value)}><option value="">원본 기본값 사용</option><option value="true">true</option><option value="false">false</option></select>:<input className={inputClass+' mt-1'} value={text} onChange={e=>update(parameter,e.target.value)} placeholder={parameter.default==null?'비우면 원본 기본값':parameter.default}/>}
+   {parameter.kind?.includes('VAR_')?<p className="mt-1">가변 인자는 고급 JSON에서 입력</p>:/bool/i.test(parameter.annotation??'')?<Select className={inputClass+' mt-1'} value={text} onChange={e=>update(parameter,e.target.value)}><option value="">원본 기본값 사용</option><option value="true">true</option><option value="false">false</option></Select>:<Input className={inputClass+' mt-1'} value={text} onChange={e=>update(parameter,e.target.value)} placeholder={parameter.default==null?'비우면 원본 기본값':parameter.default}/>}
   </label>;
  })}</div></details>;
 }

@@ -14,9 +14,9 @@ export function AccountEquityHistory({history,currency}:{history?:AccountEquityP
  return <Panel title="평가자산 추이" className="account-equity-history" collapsible={false}>
   <div className="account-history-labels"><span>최고 {money(high,currency)}</span><span>최저 {money(low,currency)}</span></div>
   <svg viewBox="0 0 600 192" role="img" aria-label={'저장된 평가자산 '+points.length+'개 시점의 추이. 시작 '+money(first.nav,currency)+', 마지막 '+money(last.nav,currency)}>
-   {[24,96,168].map(row=><line key={row} x1="12" x2="588" y1={row} y2={row} stroke="#e7edf4" strokeDasharray="4 5"/>)}
-   <polyline points={line} fill="none" stroke="#0071e3" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
-   <circle cx={x(last.time)} cy={y(last.nav)} r="4" fill="#0071e3"/>
+   {[24,96,168].map(row=><line key={row} x1="12" x2="588" y1={row} y2={row} stroke="currentColor" className="text-slate-200" strokeDasharray="4 5"/>)}
+   <polyline points={line} fill="none" stroke="currentColor" className="text-blue-600" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
+   <circle cx={x(last.time)} cy={y(last.nav)} r="4" fill="currentColor" className="text-blue-600"/>
   </svg>
   <div className="account-history-dates"><span>{date(first.date)}</span><span>{date(last.date)}</span></div>
   <p className="account-history-caption">최근 {points.length}개 저장 시점 · 시점 사이를 잇는 선입니다. 현재 시세나 실계좌 수익을 표시하지 않습니다.</p>

@@ -13,3 +13,5 @@
 모듈·도구 소메뉴를 흡수했습니다. 원본 모듈·함수 탭의 목록(FrameworkWorkspace/ModuleCatalog), 입력(NativeParameterFields), 실행(NativeModuleRunner), 결과(FrameworkResult)는 같은 프론트 폴더에 있습니다. 별도 modules_tools 메뉴·폴더는 없습니다.
 
 2026-10-14: 원본 str 인자는 JSON처럼 보이는 문자열도 그대로 전달합니다. 함수·생성자 인자의 최상위 배열/null을 전송 전에 거부합니다. 실제 선택 모듈이 바뀌면 입력값을 초기화합니다. 브라우저에서 문자열 보존·배열 거부 및 요청 완료를 확인했습니다.
+
+2026-10-16: React·Vite·공통 tailwind.css를 사용하며 버튼·입력·선택 요소는 src/ui/Primitives.tsx를 재사용합니다. 화면의 API·데이터 처리 계약은 유지합니다.

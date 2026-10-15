@@ -1,6 +1,6 @@
 import {useState,useCallback} from 'react';
 import type {LibraryExpert,Optimization,OptimizationReport} from '../../../../data/library';
-import {Drawer} from '../../../../ui/Primitives';
+import {Drawer,Input,Button} from '../../../../ui/Primitives';
 import {bytes,number,inspectionDetail,date,percent} from '../../../../ui/format';
 export function ExpertVariants({disabled=false,variants,quantization,legacyFailures,selectedIds,selectedFailurePrecisions,onToggle,onToggleFailure}:{disabled?:boolean;variants:LibraryExpert[];quantization?:Optimization;legacyFailures?:Optimization;selectedIds:string[];selectedFailurePrecisions:string[];onToggle:(id:string)=>void;onToggleFailure:(precision:string)=>void}){
  const [detailId,setDetailId]=useState<string|null>(null),detail=variants.find(item=>item.id===detailId);
@@ -17,16 +17,16 @@ export function ExpertVariants({disabled=false,variants,quantization,legacyFailu
  return <div className="min-w-0">
   <div className="flex flex-wrap gap-2" role="group" aria-label="Champion 조립용 모델 버전">
    {variants.map(item=>{const selected=selectedIds.includes(item.id),conversion=item.conversion;const failed=!item.package_available||!!item.metadata_error;const precision=conversion?.precision?.toUpperCase()??item.representation??'정밀도 미확인',bits=/^(INT4|NF4)/.test(precision)?'4비트':/^INT8/.test(precision)?'8비트':/^(FP16|BF16)/.test(precision)?'16비트':/^FP32/.test(precision)?'32비트':null;const label=item.executor==='repository_source'?'원본 등록':item.executor==='llama_cpp'?item.representation??'GGUF':precision+(bits?' · '+bits:'');return <div key={item.id} className={'expert-version '+(selected?'expert-version-selected ':failed?'expert-version-warning ':'')}>
-    <label className="expert-version-selection"><input type="checkbox" disabled={disabled} checked={selected} onChange={()=>onToggle(item.id)} aria-label={(item.name||item.id)+' '+label+' 선택'}/><span>{label}</span></label>
-    <button aria-label={(item.name||item.id)+' '+label+' 상세·검사 결과'} onClick={()=>setDetailId(item.id)} className="expert-version-detail">
+    <label className="expert-version-selection"><Input type="checkbox" disabled={disabled} checked={selected} onChange={()=>onToggle(item.id)} aria-label={(item.name||item.id)+' '+label+' 선택'}/><span>{label}</span></label>
+    <Button aria-label={(item.name||item.id)+' '+label+' 상세·검사 결과'} onClick={()=>setDetailId(item.id)} className="expert-version-detail">
      <span className="expert-version-size">{item.package_available?bytes(item.weight_bytes??item.package.bytes):'파일 없음 · 크기 미확인'}</span>
      {item.loaded&&<span className="expert-version-meta">로드됨{typeof item.current_resources?.device==='string'?' · '+item.current_resources.device:''}</span>}
      <span className={'expert-version-state '+(failed?'text-rose-700':'text-slate-500')}>{failed?'등록 파일 확인 필요':item.executor==='repository_source'?'입력·실행기 미설정':item.quantized||conversion?.precision?.match(/^(int8|int4|nf4)$/)?'양자화 가중치':conversion?'정밀도 변환':precision==='정밀도 미확인'?'정밀도 정보 미기재':'원본 가중치'}</span>
      <span className="expert-version-link">상세 보기 <span aria-hidden="true">↗</span></span>
-    </button>
+    </Button>
    </div>})}
   </div>
-  {!!failures.size&&<details className="expert-failure-records"><summary>변환 실패 기록 {failures.size}개</summary><div className="mt-2 space-y-1">{[...failures].map(([precision,{reason,finished}])=><label key={precision} className="flex cursor-pointer items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800"><input type="checkbox" disabled={disabled} checked={selectedFailurePrecisions.includes(precision)} onChange={()=>onToggleFailure(precision)} aria-label={precision+' 실패 기록 선택'}/><span>과거 {precision.toUpperCase()} 변환 시도 실패 · {date(finished)} · {inspectionDetail(reason)}</span></label>)}</div></details>}
+  {!!failures.size&&<details className="expert-failure-records"><summary>변환 실패 기록 {failures.size}개</summary><div className="mt-2 space-y-1">{[...failures].map(([precision,{reason,finished}])=><label key={precision} className="flex cursor-pointer items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800"><Input type="checkbox" disabled={disabled} checked={selectedFailurePrecisions.includes(precision)} onChange={()=>onToggleFailure(precision)} aria-label={precision+' 실패 기록 선택'}/><span>과거 {precision.toUpperCase()} 변환 시도 실패 · {date(finished)} · {inspectionDetail(reason)}</span></label>)}</div></details>}
   <Drawer title={detail?.name+' · 정밀도·검사 결과'} open={!!detail} onClose={closeDetail}>{detail&&<div className="space-y-4 text-sm">
    <p className="font-semibold">{detail.representation??detail.conversion?.precision?.toUpperCase()??'정밀도 미확인'} · {detail.quantized?'양자화 가중치':'비양자화 가중치'}</p>
    <p>가중치 크기 {bytes(detail.weight_bytes??detail.package.bytes)} · 출력 {detail.feature_size}D · 실제 파라미터 {number(detail.parameters,0)}개</p>

@@ -1,8 +1,9 @@
 """Import large-menu managers; expose their existing backend connections."""
 from stockrl.finance_menu_manager import GROUP as FINANCE,ROUTERS as FINANCE_ROUTERS
 from rea.rea_menu_manager import GROUP as REA,ROUTERS as REA_ROUTERS
+from ai_agent.ai_agent_menu_manager import GROUP as AI_AGENT,ROUTERS as AI_AGENT_ROUTERS
 
-GROUPS=(FINANCE,REA)
+GROUPS=(FINANCE,REA,AI_AGENT)
 _routes_by_menu={}
 
 def owner(operation):
@@ -84,7 +85,7 @@ def catalog(routes):
 
 def register_api(api,app):
     """Collect small-menu routers through the finance and REA coordinators."""
-    for routers in (FINANCE_ROUTERS,REA_ROUTERS):
+    for routers in (FINANCE_ROUTERS,REA_ROUTERS,AI_AGENT_ROUTERS):
         for router in routers:
             api.include_router(router)
             app.router.on_startup.extend(router.on_startup)

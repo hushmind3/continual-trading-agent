@@ -459,3 +459,6 @@
 
 .connection-save-actions {display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 @media(max-width:760px) {.connection-save-row>.ui-status {flex-basis:100%}.connection-save-actions {width:100%}.connection-save-actions .ui-button {flex:1}}
+
+.policy-selected-heading {display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.policy-selected-heading h3 {min-width:0;font-size:14px;font-weight:600;overflow-wrap:anywhere}

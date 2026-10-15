@@ -444,3 +444,11 @@
 .account-records .data-table-scroll tbody tr:hover td:first-child {background:#f8faff}
 .account-records .account-instrument b {overflow-wrap:anywhere}
 .data-table-scroll:focus-visible {outline:3px solid #0071e3;outline-offset:3px}
+
+@media(max-width:760px) {
+ .policy-training-summary .policy-result-metrics {grid-template-columns:minmax(0,1fr);gap:0;padding:14px 0}
+ .policy-training-summary .policy-result-metrics>div {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 0}
+ .policy-training-summary .policy-result-metrics>div+div {border-top:1px solid #e8ebf1}
+ .policy-training-summary .policy-result-metrics p {min-width:0;word-break:keep-all}
+ .policy-training-summary .policy-result-metrics strong {margin:0;font-size:19px;text-align:right;word-break:keep-all;overflow-wrap:normal}
+}

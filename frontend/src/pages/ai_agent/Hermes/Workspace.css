@@ -29,17 +29,11 @@
 .ha-model-dot.ready{background:#31a182;box-shadow:0 0 0 3px #e5f4ef}
 .ha-heading-actions{display:flex;align-items:center;gap:5px;margin-left:auto}
 .ha-heading-actions .ui-button span{font-size:12px;margin-left:4px}
-.hermes-runtime-metrics{position:relative;display:flex;gap:22px;align-items:center;flex-wrap:nowrap;padding:8px 25px;min-height:36px;flex-shrink:0;border:0;background:#fff;color:#8490a2;font-size:11px}
-.hermes-runtime-metrics>div{display:flex;gap:7px;align-items:center;white-space:nowrap}
-.hermes-runtime-metrics b{font-weight:500;color:#64738c;font-size:11px;font-variant-numeric:tabular-nums}
-.hermes-runtime-metrics b i{font-style:normal;color:#9da7b6}
-.hermes-runtime-metrics meter{height:6px;width:45px;opacity:.7}
-.ha-metrics-detail{position:relative;margin-left:auto}
-.hermes-workspace .ha-metrics-detail>summary{gap:6px;font-size:11px;color:#8793a5}
-.hermes-workspace .ha-metrics-detail>summary:before{display:none}
-.ha-metrics-detail>dl{position:absolute;right:0;top:30px;z-index:9;display:grid;grid-template-columns:1fr auto;gap:12px 25px;width:280px;padding:20px 20px 74px;background:#fff;border:1px solid #e2e8f0;border-radius:13px;box-shadow:0 12px 40px #21314b18;color:#68788f;font-size:12px}
-.ha-metrics-detail dd{margin:0;color:#273c5b;font-variant-numeric:tabular-nums}
-.ha-metrics-detail>p{position:absolute;right:15px;top:220px;z-index:10;width:250px;font-size:10px;color:#96a1b1;line-height:1.7;pointer-events:none}
+.hermes-runtime-metrics{display:flex;flex:1;min-width:0;align-items:baseline;justify-content:flex-start;flex-wrap:wrap;gap:4px 16px;margin:0 12px;padding:0;color:#526176;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}
+.hermes-runtime-metrics>div{display:flex;align-items:baseline;gap:6px;min-width:0}
+.hermes-runtime-metrics dt{color:#64748b;white-space:nowrap}
+.hermes-runtime-metrics dd{margin:0;color:#334155;white-space:nowrap;font-weight:500}
+.hermes-runtime-metrics dd span{color:#64748b;font-weight:400}
 .hermes-chat-body{position:relative;display:flex;flex:1;min-height:0;min-width:0}
 .hermes-messages{flex:1;min-height:0;min-width:0;width:100%;padding:16px 20px 12px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
 .ha-conversation{width:100%;max-width:none;margin:0}
@@ -236,7 +230,8 @@
  .workspace-layout:has(.hermes-workspace.is-focused),.workspace-content:has(>.hermes-workspace.is-focused){height:100dvh}
  .hermes-chat-layout,.hermes-chat-layout.sessions-open{display:flex;position:relative}
  .hermes-chat{width:100%;flex:1}
- .hermes-chat-heading{min-height:63px;padding:10px 11px;gap:6px;flex-wrap:nowrap}
+ .hermes-chat-heading{min-height:63px;padding:10px 11px;gap:6px;flex-wrap:wrap}
+ .hermes-chat-heading>.hermes-runtime-metrics{order:5;flex-basis:100%;margin:0;padding:6px 0 0;border-top:1px solid var(--ha-border);grid-template-columns:repeat(3,minmax(0,1fr))}
  .hermes-chat-title{max-width:110px}
  .hermes-chat-title h2{font-size:14px}
  .hermes-chat-title p{font-size:10px;max-width:100px}
@@ -245,14 +240,10 @@
  .ha-heading-actions{gap:0}
  .hermes-chat-heading .ui-button{height:32px;min-width:28px;padding:5px}
  .ha-heading-actions .ui-button:first-child{display:none}
- .hermes-runtime-metrics{padding:7px 13px;min-height:33px;gap:12px;font-size:10px}
- .hermes-runtime-metrics span,.hermes-runtime-metrics b{font-size:10px}
- .hermes-runtime-metrics meter{display:none}
- .hermes-runtime-metrics>div>svg{display:none}
- .hermes-runtime-metrics .ha-context{gap:5px}
- .ha-metrics-detail>summary>span{display:none}
- .ha-metrics-detail>dl{right:-3px}
- .ha-metrics-detail>p{right:12px}
+ .hermes-runtime-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 6px;padding:0;font-size:10px}
+ .hermes-runtime-metrics>div{display:block}
+ .hermes-runtime-metrics .ha-context{grid-column:span 2}
+ .hermes-runtime-metrics dd{font-size:11px;overflow-wrap:anywhere;white-space:normal}
  .hermes-messages{padding:16px 12px 12px;scrollbar-gutter:auto}
  .hermes-message{gap:10px;margin-bottom:16px}
  .ha-assistant-mark{width:23px;height:25px;font-size:24px}
@@ -273,7 +264,11 @@
  .hermes-composer{padding:12px 12px 9px;border-radius:15px}
  .hermes-composer textarea{font-size:16px;min-height:40px}
  .hermes-composer .ha-enter-hint{display:none}
- .hermes-composer .ui-button{margin-left:auto}
+ .hermes-composer .ui-button{margin-left:0;flex-shrink:0}
+ .hermes-composer .ha-composer-bottom{gap:8px}
+ .ha-mode-select{flex-shrink:0}
+ .ha-mode-select>svg{display:none}
+ .ha-mode-select select{max-width:88px}
  .ha-composer-note{font-size:9px;padding:7px 0 max(8px,env(safe-area-inset-bottom))}
  .ha-mode-select select{font-size:11px}
  .hermes-run-options label{font-size:10px}

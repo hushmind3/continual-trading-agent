@@ -63,9 +63,9 @@ test('rich answers, grouped tools, copy, reading position and full-focus layout'
  await expect(page.locator('.ha-activity-item')).toContainText('파일 읽기');
  await expect(page.locator('.ha-activity-item')).toContainText('결과 수신');
  await page.getByRole('button',{name:'작업 내역 닫기',exact:true}).click();
- await page.getByLabel('실행 정보 자세히 보기').click();
- await expect(page.locator('.ha-metrics-detail dd').first()).toHaveText('25,000');
- await page.getByLabel('실행 정보 자세히 보기').click();
+ await expect(page.locator('.hermes-chat-heading .hermes-runtime-metrics')).toBeVisible();
+ await expect(page.locator('.hermes-runtime-metrics').getByText('25,000',{exact:true})).toBeVisible();
+ await expect(page.locator('.hermes-runtime-metrics details')).toHaveCount(0);
  await page.locator('.hermes-messages').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll',{bubbles:true}))});
  await expect(page.getByLabel('최신 메시지로 이동')).toBeVisible();
  await page.getByRole('button',{name:'코드 복사',exact:true}).click();

@@ -1,5 +1,5 @@
 import {memo} from 'react';
-import {Check,ChevronDown,Loader2,Wrench,TriangleAlert,Info,Clock3,Activity,Zap,ArrowDownToLine} from 'lucide-react';
+import {Check,ChevronDown,Loader2,Wrench,TriangleAlert,ArrowDownToLine} from 'lucide-react';
 import {contentText,type Message,type Job,type Metrics} from '../types';
 import {toolLabel,eventSummary} from '../labels';
 import {MessageBody,CopyButton} from './MessageBody';
@@ -30,7 +30,14 @@ export const Transcript=memo(function Transcript({messages}:{messages:Message[]}
 const number=(n?:number)=>n==null?'—':n.toLocaleString('ko-KR');
 export function RuntimeMetrics({metrics}:{metrics?:Metrics}){
  const m=metrics,percent=m?.context_limit&&m.context_tokens!=null?Math.min(100,m.context_tokens/m.context_limit*100):undefined;
- return <div className="hermes-runtime-metrics" aria-label="모델 실행 정보"><div className="ha-context" title="엔진이 보고한 최근 입력 컨텍스트"><Activity size={13}/><span>컨텍스트</span><b>{number(m?.context_tokens)}<i> / {number(m?.context_limit)}</i></b>{percent!=null&&<meter aria-label="컨텍스트 사용률" min={0} max={100} value={percent}/>}</div>{m?.generation_tps!=null&&<div title="실제 생성 토큰 증가량을 측정 간격으로 나눈 최근 속도"><Zap size={13}/><b>{m.generation_tps} tok/s</b></div>}{m?.elapsed_seconds!=null&&m.elapsed_seconds>0&&<div><Clock3 size={13}/><b>{Math.round(m.elapsed_seconds)}초</b></div>}<details className="ha-metrics-detail"><summary aria-label="실행 정보 자세히 보기"><Info size={14}/><span>실행 정보</span></summary><dl><dt>입력 토큰 · 누적</dt><dd>{number(m?.input_tokens)}</dd><dt>출력 토큰 · 누적</dt><dd>{number(m?.output_tokens)}</dd><dt>모델 요청</dt><dd>{number(m?.api_calls)}</dd><dt>컨텍스트 사용률</dt><dd>{percent==null?'미측정':percent.toFixed(1)+'%'}</dd><dt>생성 속도</dt><dd>{m?.generation_tps==null?'측정 대기':m.generation_tps+' tok/s'}</dd></dl><p>현재 엔진의 보고 값입니다. 속도는 최근 측정 구간이며 미수신 값은 —로 표시합니다.</p></details></div>;
+ return <dl className="hermes-runtime-metrics" aria-label="모델 실행 정보">
+ <div className="ha-context"><dt>컨텍스트</dt><dd>{number(m?.context_tokens)} <span>/ {number(m?.context_limit)}</span>{percent!=null&&<span> · {percent.toFixed(1)}%</span>}</dd></div>
+ <div><dt>생성 속도</dt><dd>{m?.generation_tps==null?'—':m.generation_tps+' tok/s'}</dd></div>
+ <div title="현재 작업의 누적 입력 토큰"><dt>입력 토큰</dt><dd>{number(m?.input_tokens)}</dd></div>
+ <div title="현재 작업의 누적 출력 토큰"><dt>출력 토큰</dt><dd>{number(m?.output_tokens)}</dd></div>
+ <div><dt>모델 요청</dt><dd>{m?.api_calls==null?'—':number(m.api_calls)+'회'}</dd></div>
+ <div><dt>경과 시간</dt><dd>{m?.elapsed_seconds==null?'—':Math.round(m.elapsed_seconds)+'초'}</dd></div>
+ </dl>;
 }
 export function CurrentActivity({job,active}:{job?:Job;active:boolean}){
  const event=[...(job?.events??[])].reverse().find(e=>['tool_start','tool_complete','starting','autonomy_decision'].includes(e.name));

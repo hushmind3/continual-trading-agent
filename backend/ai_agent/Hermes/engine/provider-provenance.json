@@ -1,0 +1,16 @@
+{
+  "source": "NousResearch/hermes-agent",
+  "source_commit": "09fa65c1470de425a92023d809076967be3c2727",
+  "files": {
+    "plugins/computer_use/cua/plugin.yaml": "2fcf8cf73aa1324e61227c9b6ea799bcfce5b4914e623026f8a3f7713bf36f14",
+    "plugins/computer_use/cua/__init__.py": "d2727f3c945497c91efe3358419ee55ecb6af5b9a032a1d2a08e2ca2db53dd5d"
+  },
+  "platform_patches": [
+    {
+      "file": "tools/computer_use/cua_backend_capture.py",
+      "source_sha256": "3409d16b40415f611e8b9c8ff0d99167e6247692d440e1aa8b02a823ff6cb204",
+      "adapted_sha256": "581d7732b299c99d9e6283259abe48531c958c75dc0d761647d6e09fd9edda08",
+      "reason": "Preserve bounded native AX text in capture notes so a text/tool model can read values and static results; original element indices and actions retained."
+    }
+  ]
+}

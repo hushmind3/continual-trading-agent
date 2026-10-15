@@ -289,6 +289,7 @@ class _CaptureMixin:
             "cua-driver get_window_state returned an empty result over MCP (pid=%s window_id=%s); re-fetching via CLI "
             "transport", self._active_pid, self._active_window_id)
         tree, window_title = _tree_and_title(gws_out)
+        self._last_accessible_text = tree[:8000]
         # Prefer the canonical structuredContent.elements (real frames); the markdown regex fallback yields
         # (0,0,0,0) bounds.
         # Surface 2 of NousResearch/hermes-agent#47072: prefer the canonical structuredContent.elements
@@ -328,6 +329,7 @@ class _CaptureMixin:
         png_bytes_len, width, height = _png_metrics(png_b64, 0, 0) if png_b64 else (0, 0, 0)
         return CaptureResult(mode=mode, width=width, height=height, png_b64=png_b64, elements=elements, app=app_name,
                              window_title=window_title, png_bytes_len=png_bytes_len, image_mime_type=image_mime_type,
+                             note=getattr(self, '_last_accessible_text', '') if mode == 'ax' else '',
                              ax_max_elements=0 if mode == "vision" else self._gws_args().get("max_elements", 0))
 
     def _capture_full_screen(self, mode: str) -> CaptureResult:

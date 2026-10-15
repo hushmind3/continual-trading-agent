@@ -1,0 +1,9 @@
+{
+  "name": "@platform/hermes-browser-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned upstream Hermes browser runtime",
+  "dependencies": {
+    "agent-browser": "0.26.0"
+  }
+}

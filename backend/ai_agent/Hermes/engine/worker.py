@@ -27,6 +27,12 @@ os.environ['TERMINAL_ENV'] = 'local'
 os.environ['CUA_DRIVER_RS_TELEMETRY_ENABLED'] = '0'
 os.environ['HERMES_SKIP_UPDATE_CHECK'] = '1'
 os.environ['HERMES_DISABLE_LAZY_INSTALLS'] = '1'
+os.environ['PATH'] = str(ROOT / 'node_modules/.bin') + os.pathsep + os.environ.get('PATH', '')
+for _browser in (Path('C:/Program Files/Google/Chrome/Application/chrome.exe'),
+                 Path('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe')):
+    if _browser.is_file():
+        os.environ.setdefault('AGENT_BROWSER_EXECUTABLE_PATH', str(_browser))
+        break
 _driver = ROOT / 'runtime/ai_agent/Hermes/tools/cua-driver/cua-driver.exe'
 if _driver.is_file():
     os.environ['HERMES_CUA_DRIVER_CMD'] = str(_driver)
@@ -73,6 +79,13 @@ class HermesWorker:
         self.approval_waiter = threading.Event()
         self.approval_result = False
         self.approval_lock = threading.Lock()
+        # AX results work with local text/tool models without a separate vision projector.
+        cfg = self.native_config()
+        cfg.setdefault('computer_use', {}).setdefault('capture_after_mode', 'ax')
+        if not cfg.setdefault('browser', {}).get('backend'):
+            cfg['browser']['backend'] = 'off'  # native agent-browser stack, not browser-use CLI
+        cfg.setdefault('tools', {}).setdefault('tool_search', {}).setdefault('defer', [])
+        self.write_config(cfg)
         # Original skills loader uses HERMES_HOME/skills; seed without overwriting user files.
         for source in (UPSTREAM / 'skills').rglob('*'):
             if source.is_file():
@@ -101,7 +114,8 @@ class HermesWorker:
         return {**cfg, 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
                 'python': sys.version.split()[0], 'engine': str(UPSTREAM),
                 'available_toolsets': ['terminal', 'file', 'todo', 'skills', 'browser', 'computer_use', 'memory'],
-                'computer_driver_installed': _driver.is_file()}
+                'computer_driver_installed': _driver.is_file(),
+                'browser_runtime_installed': bool(shutil.which('agent-browser') and os.environ.get('AGENT_BROWSER_EXECUTABLE_PATH'))}
 
     def save_settings(self, request):
         self.idle_required()
@@ -187,6 +201,9 @@ class HermesWorker:
         return self.status()
 
     def run_chat(self, cfg, session_id, prompt, history):
+        from tools.approval_context import set_hermes_interactive_context, reset_hermes_interactive_context
+        interactive_token = set_hermes_interactive_context(True)
+        completion = {}
         try:
             # Several upstream file/skill helpers use process cwd as their final fallback.
             # This worker owns a single active task, so pin all helpers to the selected workspace.
@@ -211,6 +228,8 @@ class HermesWorker:
                     f'The selected working directory is {cfg["workspace"]}. '
                     'Resolve relative file paths against this exact directory. '
                     'Never invent or substitute another working directory. '
+                    'Use tool_search then tool_describe to discover configured deferred tools '
+                    'before claiming a browser, desktop, or MCP tool is unavailable. '
                     'Report success only when tool results confirm it.'),
                 stream_delta_callback=self.delta, event_callback=self.event,
                 status_callback=lambda *args, **kw: self.event('status', args),
@@ -225,18 +244,19 @@ class HermesWorker:
             result = self.agent.run_conversation(prompt, conversation_history=history, task_id=uuid.uuid4().hex)
             if result.get('error'):
                 raise RuntimeError(str(result['error']))
-            with self.lock:
-                self.job.update(state='stopped' if self.stopping else 'complete', text=result.get('final_response') or self.job['text'], finished_at=time.time())
+            completion = dict(state='stopped' if self.stopping else 'complete', text=result.get('final_response') or self.job['text'], finished_at=time.time())
         except Exception as exc:
             traceback.print_exc(file=sys.stderr)
-            with self.lock:
-                self.job.update(state='stopped' if self.stopping else 'failed', error=str(exc), finished_at=time.time())
+            completion = dict(state='stopped' if self.stopping else 'failed', error=str(exc), finished_at=time.time())
         finally:
             if self.agent:
                 with contextlib.suppress(Exception): self.agent.close()
             self.agent = None
             self.stopping = False
+            reset_hermes_interactive_context(interactive_token)
             os.chdir(ROOT)
+            with self.lock:
+                self.job.update(completion)
 
     def status(self):
         with self.lock:

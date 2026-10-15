@@ -25,7 +25,7 @@
 
 - Broader autonomous coding quality across models is unverified. The tested 0.8B model initially invented a different output path; the adapter now supplies the exact workspace and an explicit-path task succeeded. Treat its plans and outputs as model-dependent.
 - Other GGUF sizes and architectures were not loaded. Local inference was verified with Qwen3.5-0.8B and the user-selected Ornith-1.5-9B.Q4_K_M.
-- Desktop click/type and agent-driven browser tasks were not run. Remote/authenticated MCP servers were not available for testing.
+- Actual Ornith desktop click/type/confirmation-read and browser navigate/type/click/snapshot now pass in controlled local fixtures (details below). Remote/authenticated MCP servers still require their own credentials and were not tested.
 - Optional upstream skills can require their own software or credentials. Listing/reading a skill does not mean every external integration is installed or authenticated.
 
 ## Use
@@ -53,3 +53,15 @@ The separate original source directory may be removed by the user; the transplan
 - Actual original AIAgent invoked write_file, created verification/local-task/ornith.txt containing exactly ORNITH_HERMES_OK, then replied in Korean. Final status: complete, no engine error. Result saved locally as verification/ornith-result.json.
 - Restored the project workspace, original terminal/file/todo/skills selection and iteration limit after testing. Ornith remains loaded and ready at completion. Test sessions were archived without removing history.
 - Current TypeScript check passed and production assets/backend were applied. Prior five targeted checks passed; no financial training, orders or source-model conversion ran.
+
+## Desktop, browser and MCP completion — 2026-10-16
+
+- Restored the original bundled cua provider registration (plugins/computer_use/cua/__init__.py and plugin.yaml), which had been omitted from the dynamic dependency closure. Fingerprints: engine/provider-provenance.json.
+- Bound the native interactive approval context to the chat thread and retained its callback to the platform approval UI; no approval bypass was enabled. A task stays running until cleanup finishes, fixing the completed-but-still-busy race.
+- Added original-lock-pinned agent-browser 0.26.0 as a backend npm workspace with shared root node_modules. Uses installed Chrome/Edge. Selected the native agent-browser stack explicitly rather than the default browser-use CLI. Selected core tool schemas are visible directly; native MCP discovery remains available.
+- Preserved up to 8,000 characters of the original AX capture text alongside unchanged element indices. The original element-only payload dropped input values/static result text. This deliberate local adaptation is recorded with original/adapted hashes.
+- Actual Ornith-1.5-9B.Q4_K_M, original AIAgent and original computer_use: captured a real Windows Forms test app, clicked its input, typed DESKTOP_HERMES_OK, clicked Confirm, and read Confirmed: DESKTOP_HERMES_OK from a subsequent native capture. The application-written result file and actual tool history were both asserted. Test passed (29.964 seconds).
+- Actual same Ornith and original browser tools: navigated a local page in Chromium, filled BROWSER_HERMES_OK, clicked Confirm and read the rendered confirmation in browser_snapshot. Local page POST and four distinct tool calls were asserted. Test passed as part of the 49.132-second live run.
+- Five existing targeted engine/session/MCP/stop checks pass. Live GUI checks are opt-in with HERMES_LIVE_TOOLS=1 and use temporary project runtime state; ordinary test discovery does not launch models or windows.
+- MCP UI now shows built-in capabilities, connection/tool counts, local/remote setup choices, JSON config import, search, edit, errors and removal. Browser verification imported an actual MCP config, connected a local stdio server, observed one tool, edited without losing its env field, removed the connection and restored the previous configuration. Desktop/mobile layout checks passed without horizontal overflow.
+- No claim is made that every third-party app/site is compatible. Text-only GGUF operation uses accessibility trees; canvas-only screens require a suitable vision model/projector. No user authentication, external messages, financial orders, model training or quantization were performed.

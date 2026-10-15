@@ -4,7 +4,8 @@
   "private": true,
   "workspaces": [
     "frontend",
-    "backend/rea"
+    "backend/rea",
+    "backend/ai_agent/Hermes/engine/browser"
   ],
   "engines": {
     "node": "^22.19.0 || ^24.11.0 || >=26.0.0"

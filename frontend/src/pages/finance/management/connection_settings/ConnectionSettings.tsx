@@ -11,21 +11,23 @@ interface Settings {risk:{fee:number;slippage:number};data:{poll_seconds:number;
 function ProviderForm(){
  const provider=useSystemState<Provider>('provider'),{execute,pending}=useOperations();
  const [environment,setEnvironment]=useState('real'),[appKey,setAppKey]=useState(''),[secret,setSecret]=useState(''),[account,setAccount]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState('');
- async function send(action:string){setError('');setMessage('');try{
+ const providerBusy=['connect','test','disconnect','public'].some(action=>pending.has('provider/'+action));
+ const missingKeys=!provider.data?.saved&&(!appKey.trim()||!secret.trim());
+ async function send(action:string){if(providerBusy||(action==='connect'&&missingKeys))return;setError('');setMessage('');try{
   const result=await execute<{message?:string;last_test?:{message:string}}>('provider/'+action,{environment,app_key:appKey,secret,account});
   setMessage(result.message||result.last_test?.message||'연결 설정을 반영했습니다.');
   if(action==='connect'){setAppKey('');setSecret('');setAccount('');}
  }catch(e){setError(e instanceof Error?e.message:String(e));}}
- return <Panel title="키움 인증" className="connection-provider" description="인증은 OS 보안 저장소에 보관하며 실제 주문을 전송하지 않습니다." actions={<Button busy={pending.has('provider/disconnect')} onClick={()=>void send('disconnect')}>시세 연결 해제</Button>}>
+ return <Panel title="키움 인증" className="connection-provider" description="인증은 OS 보안 저장소에 보관하며 실제 주문을 전송하지 않습니다." actions={<Button disabled={providerBusy} busy={pending.has('provider/disconnect')} onClick={()=>void send('disconnect')}>시세 연결 해제</Button>}>
 
   <div className="connection-provider-status"><Status tone={provider.data?.saved?'good':'idle'}>{provider.data?provider.data.saved?'인증 저장됨':'인증 설정 필요':'인증 상태 조회 중'}</Status><span>{provider.data?.provider==='kiwoom'?'키움':provider.data?.provider??'—'} · {provider.data?.environment==='real'?'실전':provider.data?.environment==='paper'?'모의':provider.data?.environment??'—'}</span></div>
   <ErrorMessage message={error||provider.error||provider.data?.vault_error||''}/>
   {provider.data?.last_test&&<p className="my-3 text-xs text-slate-500">{provider.data.last_test.message}</p>}
-  <div className="connection-provider-fields"><label className="block text-xs text-slate-500">키 발급 환경<select className={inputClass+' mt-2'} value={environment} onChange={e=>setEnvironment(e.target.value)}><option value="real">실전 시세</option><option value="paper">모의투자 시세</option></select></label>
+  <form onSubmit={event=>{event.preventDefault();void send('connect')}}><fieldset disabled={providerBusy} className="connection-provider-fields m-0 min-w-0 border-0 p-0"><legend className="sr-only">키움 인증 입력</legend><label className="block text-xs text-slate-500">키 발급 환경<select className={inputClass+' mt-2'} value={environment} onChange={e=>setEnvironment(e.target.value)}><option value="real">실전 시세</option><option value="paper">모의투자 시세</option></select></label>
   <div className="connection-key-grid"><label>App Key<input aria-label="App Key" type="password" autoComplete="off" className={inputClass} placeholder="발급받은 App Key" value={appKey} onChange={e=>setAppKey(e.target.value)}/></label>
   <label>Secret Key<input aria-label="Secret Key" type="password" autoComplete="off" className={inputClass} placeholder="발급받은 Secret Key" value={secret} onChange={e=>setSecret(e.target.value)}/></label></div>
   <label className="block text-xs text-slate-500">계좌 정보 · 선택<input aria-label="계좌 정보" type="password" autoComplete="off" className={inputClass+' mt-2'} placeholder="필요한 경우에만 입력" value={account} onChange={e=>setAccount(e.target.value)}/></label>
-  <div className="connection-auth-actions"><Button tone="primary" busy={pending.has('provider/connect')} onClick={()=>void send('connect')}>인증 후 저장·선택</Button><Button busy={pending.has('provider/test')} onClick={()=>void send('test')}>저장된 키 인증 확인</Button><details className="connection-public-choice"><summary>다른 시세 연결</summary><Button busy={pending.has('provider/public')} onClick={()=>void send('public')}>공개 시세 선택</Button></details></div>{message&&<p className="text-xs text-slate-600">{message}</p>}</div>
+  <div className="connection-auth-actions"><Button type="submit" tone="primary" disabled={providerBusy||missingKeys} busy={pending.has('provider/connect')}>인증 후 저장·선택</Button><Button disabled={providerBusy||!provider.data?.saved} busy={pending.has('provider/test')} onClick={()=>void send('test')}>저장된 키 인증 확인</Button><details className="connection-public-choice"><summary>다른 시세 연결</summary><Button disabled={providerBusy} busy={pending.has('provider/public')} onClick={()=>void send('public')}>공개 시세 선택</Button></details></div>{missingKeys&&<p className="text-xs leading-5 text-slate-500">새 인증을 저장하려면 App Key와 Secret Key를 모두 입력하세요.</p>}</fieldset>{providerBusy&&<p role="status" className="mt-3 text-xs text-blue-700">인증 요청을 처리하고 있습니다.</p>}{message&&<p role="status" className="mt-3 text-xs text-slate-600">{message}</p>}</form>
  </Panel>;
 }
 function OperationalSettings(){

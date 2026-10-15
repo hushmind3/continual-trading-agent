@@ -15,7 +15,7 @@ function blocks(messages:Message[]):Block[]{
   const m=messages[i],text=contentText(m.content),calls=(m.tool_calls??[]) as Call[];
   if(m.role==='tool'){if(!steps.length)first=i;steps.push({id:'orphan-'+i,name:m.name??'도구',args:'',result:m.content});continue}
   if(!['user','assistant'].includes(m.role))continue;
-  if(text){flush();output.push({kind:'message',index:i,message:m})}
+  if(text.trim()){flush();output.push({kind:'message',index:i,message:m})}
   if(calls.length){if(!steps.length)first=i;const results:Message[]=[];let j=i+1;for(;j<messages.length&&messages[j].role==='tool';j++)results.push(messages[j]);for(let n=0;n<calls.length;n++){const c=calls[n],r=results.find(r=>r.tool_call_id&&r.tool_call_id===c.id)??results[n];steps.push({id:c.id??i+'-'+n,name:c.function?.name??'도구',args:c.function?.arguments??'',result:r?.content})}i=j-1}
  }
  flush();return output;

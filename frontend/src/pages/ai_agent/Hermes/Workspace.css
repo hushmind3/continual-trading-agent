@@ -41,11 +41,11 @@
 .ha-metrics-detail dd{margin:0;color:#273c5b;font-variant-numeric:tabular-nums}
 .ha-metrics-detail>p{position:absolute;right:15px;top:220px;z-index:10;width:250px;font-size:10px;color:#96a1b1;line-height:1.7;pointer-events:none}
 .hermes-chat-body{position:relative;display:flex;flex:1;min-height:0;min-width:0}
-.hermes-messages{flex:1;min-height:0;min-width:0;width:100%;padding:30px 32px 22px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
-.ha-conversation{width:100%;max-width:1040px;margin:0 auto}
+.hermes-messages{flex:1;min-height:0;min-width:0;width:100%;padding:16px 12px 12px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.ha-conversation{width:100%;max-width:none;margin:0}
 .hermes-messages.is-empty{display:flex;justify-content:center;align-items:center}
-.hermes-messages.is-empty .ha-conversation{max-width:900px}
-.hermes-welcome{max-width:none;margin:0 auto;padding:15px 0 65px}
+.hermes-messages.is-empty .ha-conversation{max-width:none}
+.hermes-welcome{max-width:none;margin:0;padding:12px 0}
 .ha-welcome-symbol{display:grid;place-items:center;color:#566fd5;background:#f0f3ff;width:62px;height:62px;border:1px solid #e4eafd;border-radius:20px;margin-bottom:22px}
 .ha-welcome-eyebrow{font-size:12px!important;letter-spacing:.3px;color:#8b99af!important;margin-bottom:10px}
 .hermes-welcome h1{font-size:34px;font-weight:650;letter-spacing:-1.3px;line-height:1.45;color:#27364d;margin:0 0 12px}
@@ -112,7 +112,7 @@
 .ha-tool-step>div{padding:0 10px 15px}
 .ha-tool-step small{font-size:10px;color:#8695ad}
 .hermes-workspace .ha-tool-step pre{font:11px/1.7 ui-monospace,monospace;padding:10px;background:#fff;border:1px solid #e9eef5;border-radius:7px;max-height:260px;overflow:auto;margin:6px 0 12px}
-.ha-composer-dock{width:100%;max-width:1104px;margin:0 auto;padding:8px 32px 0;flex-shrink:0}
+.ha-composer-dock{width:100%;max-width:none;margin:0;padding:8px 12px 0;flex-shrink:0}
 .hermes-composer{margin:0;padding:15px 17px 11px;border:1px solid #dae2ef;border-radius:18px;background:#fff;box-shadow:0 5px 25px #2e45670a}
 .hermes-composer:focus-within{border-color:#9db3eb;box-shadow:0 0 0 3px #597fdb09,0 5px 25px #2e45670a}
 .hermes-composer textarea{display:block;min-height:48px;max-height:160px;resize:none;overflow:auto;font-size:15px;line-height:1.7;padding:2px 1px 8px;color:#344862}

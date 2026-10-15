@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useRef,useState} from 'react';
 import {Play,Square} from 'lucide-react';
 import {useOperations} from '../data/Operations';
 import type {OperationProgress} from '../data/types';
@@ -15,12 +15,14 @@ export function Progress({value}:{value:OperationProgress|undefined}){
 export function SystemControls(){
  const {state,execute,error:connection}=useOperations();const value=state?.automation;
  const [error,setError]=useState(''),[pending,setPending]=useState(''),[currency,setCurrency]=useState(()=>{const approved=Object.keys(state?.operations?.policies??{});return approved.length===1?approved[0]:'both'});
- async function command(name:string){setError('');setPending(name);try{await execute('system/'+name,name==='start'?{currencies:currency==='both'?['USD','KRW']:[currency]}:{});}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setPending('');}}
+ const commandSequence=useRef(0),activeCommand=useRef('');
+ async function command(name:string){if(activeCommand.current===name)return;const current=++commandSequence.current;activeCommand.current=name;setError('');setPending(name);try{await execute('system/'+name,name==='start'?{currencies:currency==='both'?['USD','KRW']:[currency]}:{});}catch(e){if(current===commandSequence.current)setError(e instanceof Error?e.message:String(e));}finally{if(current===commandSequence.current){activeCommand.current='';setPending('');}}}
  const applying=value?.apply.status==='running';
  const controls=state?.operations?.controls,operating=Boolean(controls?.feed&&controls?.paper&&controls?.engine&&controls?.learning);
- const status=value?.system.active?'시작 중':operating?'운영 중':controls&&Object.values(controls).some(Boolean)?'일부 실행':'중지됨';
- return <Panel title="자동 운영" description="선택한 모델로 시세를 받고, 판단·가상매매·학습을 이어갑니다." className="operations-hero" collapsible={false} actions={<Status tone={value?.system.status==='failed'?'bad':value?.system.status==='blocked'?'warn':operating?'good':'idle'}>{status}</Status>}>
- <div className="operations-command-row"><div className="operations-command-actions"><select aria-label="자동 운영 통화" className={inputClass+' operations-currency-select'} value={currency} onChange={e=>setCurrency(e.target.value)}><option value="both">KRW + USD</option><option value="KRW">KRW</option><option value="USD">USD</option></select><Button tone="primary" disabled={applying} busy={pending==='start'||value?.system.active} onClick={()=>void command('start')}><Play size={14}/>자동 운영 시작</Button><Button tone="danger" busy={pending==='stop'} onClick={()=>void command('stop')}><Square size={13}/>운영 중지</Button></div></div>
+ const partial=Boolean(controls&&Object.values(controls).some(Boolean));
+ const status=pending==='stop'?'중지 중':pending==='start'||value?.system.active?'시작 중':operating?'운영 중':value?.system.status==='failed'?(partial?'시작 실패 · 일부 실행':'시작 실패'):value?.system.status==='blocked'?(partial?'시작 보류 · 일부 실행':'시작 보류'):partial?'일부 실행':'중지됨';
+ return <Panel title="자동 운영" description="선택한 모델로 시세를 받고, 판단·가상매매·학습을 이어갑니다." className="operations-hero" collapsible={false} actions={<span role="status"><Status tone={value?.system.status==='failed'?'bad':value?.system.status==='blocked'?'warn':operating?'good':'idle'}>{status}</Status></span>}>
+ <div className="operations-command-row"><div className="operations-command-actions"><select aria-label="자동 운영 통화" disabled={!!pending||value?.system.active} className={inputClass+' operations-currency-select'} value={currency} onChange={e=>setCurrency(e.target.value)}><option value="both">원화 + 달러</option><option value="KRW">원화 · KRW</option><option value="USD">달러 · USD</option></select><Button tone="primary" disabled={applying||pending==='stop'} busy={pending==='start'||value?.system.active} onClick={()=>void command('start')}><Play size={14}/>자동 운영 시작</Button><Button tone="danger" busy={pending==='stop'} onClick={()=>void command('stop')}><Square size={13}/>{pending==='stop'?'중지 중':'운영 중지'}</Button></div></div>
  <div className="mt-4"><ErrorMessage message={error}/>{connection&&<p className="mt-2 text-xs text-amber-700">{connection} · 마지막 진행 상태를 유지하며 관리 API 재연결을 기다립니다.</p>}</div>
  {(value?.system.status==='failed'||value?.system.status==='blocked')&&(value.system.detail||value.system.error)&&<p className="mt-2 whitespace-pre-wrap text-xs text-amber-700">{value.system.detail||value.system.error}</p>}
  <div className="operations-hero-status"><details className="w-full"><summary className="operations-detail-summary">실행 단계와 상세 상태</summary><p className="my-3 text-xs leading-5 text-slate-500">선택 통화의 정책 준비 → 시세 수신 → 선택 정책 판단·가상매매·지속학습. 호환 정책이 없으면 정책 학습 후 직접 승인하세요.</p><Progress value={value?.system}/></details></div>

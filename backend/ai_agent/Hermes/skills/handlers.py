@@ -3,6 +3,15 @@ from ai_agent.Hermes.engine.http_adapter import invoke
 
 router = APIRouter(prefix='/api/ai_agent/Hermes')
 
+@router.post('/skill/toggle')
+def toggle(request: dict): return invoke('skill/toggle', request)
+
+@router.get('/skill/content')
+def content(name: str): return invoke('skill/content', {'name':name})
+
+@router.post('/skill/save')
+def save(request: dict): return invoke('skill/save', request)
+
 @router.get('/skills')
 def skills(): return invoke('skills')
 

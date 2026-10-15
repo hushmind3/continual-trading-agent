@@ -4,7 +4,7 @@ import {request} from '../../../data/api';
 import {Button,ErrorMessage} from '../../../ui/Primitives';
 import {Chat} from './chat/Chat';
 import {ModelSettings} from './models/ModelSettings';
-import {McpSettings} from './mcp/McpSettings';
+import {McpPage} from './mcp/McpPage';
 import {Skills} from './skills/Skills';
 import {prefix,failure,working,type AgentStatus} from './types';
 import './Hermes.css';
@@ -21,6 +21,6 @@ export function Hermes(){
  return <div className="hermes-workspace"><header className="hermes-intro"><span className="hermes-brand"><Bot size={22}/></span><div><h2>내 컴퓨터에서, 함께 작업하기</h2><p>모델을 선택하고 대화로 작업을 맡기세요.</p></div><span className={'hermes-state '+(working(status)?'active':'')}>{working(status)?'작업 중':status?.local_model.state==='ready'?'로컬 모델 준비됨':'작업 대기'}</span><Button aria-label="작업 상태 새로고침" title="작업 상태 새로고침" onClick={()=>setRetry(v=>v+1)}><RefreshCw size={15}/></Button></header>
  <nav className="hermes-tabs" aria-label="Hermes 기능">{tabs.map(({id,name,icon:Icon})=><Button key={id} aria-pressed={tab===id} onClick={()=>setTab(id)}><Icon size={16}/>{name}</Button>)}</nav>
  {error&&<div className="hermes-error"><ErrorMessage message={error}/><Button onClick={()=>setRetry(v=>v+1)}>다시 연결</Button></div>}
- {tab==='chat'&&<Chat status={status} onStatus={setStatus} onModels={()=>setTab('models')}/>}{tab==='models'&&<ModelSettings busy={working(status)} localModel={status?.local_model} onStatus={setStatus} onChat={()=>setTab('chat')}/>}{tab==='mcp'&&<McpSettings busy={working(status)} onModels={()=>setTab('models')}/>}{tab==='skills'&&<Skills/>}
+ {tab==='chat'&&<Chat status={status} onStatus={setStatus} onModels={()=>setTab('models')}/>}{tab==='models'&&<ModelSettings busy={working(status)} localModel={status?.local_model} onStatus={setStatus} onChat={()=>setTab('chat')}/>}{tab==='mcp'&&<McpPage busy={working(status)} onModels={()=>setTab('models')}/>}{tab==='skills'&&<Skills busy={working(status)}/>}
  </div>;
 }

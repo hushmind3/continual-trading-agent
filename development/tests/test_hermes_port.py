@@ -77,7 +77,7 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
             else:
                 self.wfile.write(json.dumps({'id': 'port', 'object': 'chat.completion', 'model': 'port-fixture', 'created': 1,
                     'choices': [{'index': 0, 'message': message, 'finish_reason': finish}]}).encode())
-        except (BrokenPipeError, ConnectionResetError): pass
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError): pass
 
 
 @unittest.skipUnless((ROOT / '.venv/hermes/Scripts/python.exe').exists(), 'Hermes Python environment is not installed')
@@ -178,6 +178,56 @@ for line in sys.stdin:
         result = self.bridge.call('stop')
         self.assertEqual(result['job']['state'], 'stopping')
         self.assertEqual(self.wait_job()['state'], 'stopped')
+
+    def test_06_catalog_install_and_skills_edit_persist(self):
+        catalog = self.bridge.call('mcp/catalog')
+        self.assertEqual(len(catalog['entries']), 65)
+        self.assertTrue(all(row['description'] for row in catalog['entries']))
+        with self.assertRaisesRegex(RuntimeError, '카탈로그'):
+            self.bridge.call('mcp/catalog/install', {'name': 'not-a-real-catalog-entry'})
+        self.bridge.call('mcp/catalog/install', {'name': 'alltrails'})
+        end = time.monotonic() + 8
+        while time.monotonic() < end:
+            install = self.bridge.call('mcp/catalog')['installation']
+            if install['state'] != 'running': break
+            time.sleep(.1)
+        self.assertEqual(install['state'], 'complete', install)
+        installed = self.bridge.call('mcp')['servers']['alltrails']
+        self.assertEqual(installed['url'], 'https://www.alltrails.com/mcp')
+        self.bridge.call('mcp/save', {'servers': {}})
+        off = self.bridge.call('skill/toggle', {'name': 'arxiv', 'enabled': False})
+        self.assertFalse(next(r for r in off['skills'] if r['name'] == 'arxiv')['enabled'])
+        self.bridge.close()
+        self.assertFalse(next(r for r in self.bridge.call('skills')['skills'] if r['name'] == 'arxiv')['enabled'])
+        self.bridge.call('skill/toggle', {'name': 'arxiv', 'enabled': True})
+        content = '---\nname: port-check\ndescription: Fixture instructions\n---\n# Check\nRead a local file when asked.\n'
+        created = self.bridge.call('skill/save', {'name': 'port-check', 'content': content, 'create': True})
+        self.assertTrue(created['success'], created)
+        edited = content.replace('Read a local file', 'Summarize a local file')
+        self.bridge.call('skill/save', {'name': 'port-check', 'content': edited})
+        self.assertEqual(self.bridge.call('skill/content', {'name': 'port-check'})['content'], edited)
+
+    def test_07_native_loop_stop_resume_and_session_reopen(self):
+        status = self.bridge.call('chat', {'message': 'PORT_LOOP: report progress on each wakeup.',
+            'mode': 'loop', 'times': 2, 'interval_seconds': 5})
+        sid = status['job']['session_id']
+        end = time.monotonic() + 15
+        while time.monotonic() < end:
+            state = self.bridge.call('status')['job']
+            if state.get('autonomy', {}).get('ticks_fired') == 1 and any(r['name'] == 'autonomy_decision' for r in state['events']): break
+            time.sleep(.1)
+        self.assertEqual(state['state'], 'running', state)
+        self.assertEqual(state['autonomy']['mode'], 'loop')
+        self.bridge.call('stop')
+        self.assertEqual(self.wait_job()['state'], 'stopped')
+        self.assertEqual(self.bridge.call('autonomy', {'id': sid})['loop']['status'], 'paused')
+        self.bridge.close()
+        self.assertEqual(self.bridge.call('autonomy', {'id': sid})['loop']['ticks_fired'], 1)
+        self.bridge.call('chat', {'session_id': sid, 'message': '/loop resume'})
+        result = self.wait_job(timeout=30)
+        self.assertEqual(result['state'], 'complete', result)
+        self.assertEqual(result['autonomy']['ticks_fired'], 2)
+        self.assertEqual(result['autonomy']['status'], 'done')
 
 
 if __name__ == '__main__': unittest.main()

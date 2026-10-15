@@ -37,6 +37,7 @@ _driver = ROOT / 'runtime/ai_agent/Hermes/tools/cua-driver/cua-driver.exe'
 if _driver.is_file():
     os.environ['HERMES_CUA_DRIVER_CMD'] = str(_driver)
 sys.path.insert(0, str(UPSTREAM))
+sys.path.insert(1, str(ROOT / 'backend'))
 OUTPUT = sys.stdout
 sys.stdout = sys.stderr
 
@@ -79,6 +80,8 @@ class HermesWorker:
         self.approval_waiter = threading.Event()
         self.approval_result = False
         self.approval_lock = threading.Lock()
+        from ai_agent.Hermes.mcp.catalog import Catalog
+        self.catalog = Catalog(self)
         # AX results work with local text/tool models without a separate vision projector.
         cfg = self.native_config()
         cfg.setdefault('computer_use', {}).setdefault('capture_after_mode', 'ax')
@@ -95,6 +98,8 @@ class HermesWorker:
                     shutil.copyfile(source, target)
 
     def idle_required(self):
+        if getattr(self, 'catalog', None) and self.catalog.thread and self.catalog.thread.is_alive():
+            raise ValueError('MCP 설치가 진행 중입니다. 완료 후 다시 시도하세요.')
         if self.thread and self.thread.is_alive():
             raise ValueError('에이전트가 작업 중입니다. 중지 또는 완료 후 변경하세요.')
 
@@ -177,6 +182,22 @@ class HermesWorker:
         return self.session(session_id)
 
     def start_chat(self, request):
+        request = dict(request)
+        raw = str(request.get('message') or '').strip()
+        if raw in {'/stop','/goal pause','/loop pause','/loop stop'}: return self.stop()
+        if raw in {'/goal resume','/loop resume'}:
+            from ai_agent.Hermes.chat.autonomy import snapshot
+            mode='goal' if raw.startswith('/goal') else 'loop'
+            state=snapshot(str(request.get('session_id') or '')).get(mode)
+            if not state:raise ValueError('재개할 작업이 없습니다.')
+            request.update(mode=mode,resume=True,message=state.get('goal') or state.get('prompt'))
+        elif raw.startswith('/goal '):
+            request.update(mode='goal',message=raw[6:].removeprefix('set '))
+        elif raw.startswith('/loop '):
+            from hermes_cli.loops import parse_loop_args
+            parsed = parse_loop_args(raw[6:])
+            if parsed.pop('error',None):raise ValueError('반복 명령을 확인하세요. 예: /loop 5m 작업내용')
+            request.update(mode='loop',message=parsed.pop('prompt'), **parsed)
         self.idle_required()
         cfg = load_settings()
         if not cfg['model']:
@@ -196,11 +217,11 @@ class HermesWorker:
         history = row['messages']
         with self.lock:
             self.job = {'state': 'starting', 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time()}
-        self.thread = threading.Thread(target=self.run_chat, args=(cfg, session_id, prompt, history), daemon=True)
+        self.thread = threading.Thread(target=self.run_chat, args=(cfg, session_id, prompt, history, request), daemon=True)
         self.thread.start()
         return self.status()
 
-    def run_chat(self, cfg, session_id, prompt, history):
+    def run_chat(self, cfg, session_id, prompt, history, request=None):
         from tools.approval_context import set_hermes_interactive_context, reset_hermes_interactive_context
         interactive_token = set_hermes_interactive_context(True)
         completion = {}
@@ -241,10 +262,13 @@ class HermesWorker:
                 self.job['state'] = 'running'
             if self.stopping:
                 self.agent.interrupt(hard_cancel=True)
-            result = self.agent.run_conversation(prompt, conversation_history=history, task_id=uuid.uuid4().hex)
+            from ai_agent.Hermes.chat.autonomy import run
+            result = run(self,self.agent,cfg,session_id,prompt,history,request or {})
             if result.get('error'):
                 raise RuntimeError(str(result['error']))
-            completion = dict(state='stopped' if self.stopping else 'complete', text=result.get('final_response') or self.job['text'], finished_at=time.time())
+            autonomy = self.job.get('autonomy') or {}
+            state = 'stopped' if self.stopping else 'paused' if autonomy.get('status') == 'paused' else 'complete'
+            completion = dict(state=state, text=result.get('final_response') or self.job['text'], finished_at=time.time())
         except Exception as exc:
             traceback.print_exc(file=sys.stderr)
             completion = dict(state='stopped' if self.stopping else 'failed', error=str(exc), finished_at=time.time())
@@ -371,6 +395,16 @@ class HermesWorker:
         return self.mcp()
 
     def execute(self, operation, payload):
+        if operation == 'autonomy':
+            from ai_agent.Hermes.chat.autonomy import snapshot
+            self.session(str(payload.get('id') or ''))
+            running = self.thread and self.thread.is_alive() and self.job.get('session_id') == payload['id']
+            return snapshot(str(payload['id']), recover=not running)
+        if operation == 'mcp/catalog': return self.catalog.listing()
+        if operation == 'mcp/catalog/install': return self.catalog.install(payload)
+        if operation in {'skills','skill/toggle','skill/content','skill/save'}:
+            from ai_agent.Hermes.skills.catalog import execute
+            return execute(self,operation,payload)
         if operation == 'engine/info':
             return {'root': str(UPSTREAM), 'modules': {name: str(Path(module.__file__).resolve())
                 for name, module in tuple(sys.modules.items()) if getattr(module, '__file__', None)

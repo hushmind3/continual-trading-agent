@@ -3,6 +3,9 @@ from ai_agent.Hermes.engine.http_adapter import invoke
 
 router = APIRouter(prefix='/api/ai_agent/Hermes')
 
+@router.get('/autonomy')
+def autonomy(id: str): return invoke('autonomy', {'id':id})
+
 @router.get('/status')
 def status(): return invoke('status')
 

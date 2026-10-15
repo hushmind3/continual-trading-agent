@@ -3,7 +3,8 @@ export interface Session {id:string;title?:string;model?:string;updated_at?:numb
 export interface Message {role:string;content:unknown;tool_calls?:unknown[];name?:string}
 export interface SessionDetail {session:Session;messages:Message[]}
 export interface Settings {base_url:string;model:string;api_key:string;has_api_key:boolean;workspace:string;max_iterations:number;toolsets:string[];local_model:string;python:string;engine:string;available_toolsets:string[];computer_driver_installed:boolean;browser_runtime_installed?:boolean}
-export interface Job {state:string;session_id:string|null;text:string;error:string;events:{name:string;detail:string;time:number}[];started_at?:number;approval?:{kind:'tool'|'question';detail:string}}
+export interface AutonomousState {mode:string;status:string;goal?:string;prompt?:string;turns_used?:number;max_turns?:number;ticks_fired?:number;times?:number;paused_reason?:string;last_stop_reason?:string;last_reason?:string;next_due_at?:number}
+export interface Job {autonomy?:AutonomousState;state:string;session_id:string|null;text:string;error:string;events:{name:string;detail:string;time:number}[];started_at?:number;approval?:{kind:'tool'|'question';detail:string}}
 export interface AgentStatus {job:Job;local_model:{running:boolean;base_url:string;state?:string;error?:string}}
 export const working=(s?:AgentStatus)=>!!s&&['starting','running','stopping'].includes(s.job.state);
 export function failure(e:unknown){return e instanceof Error?e.message:String(e)}

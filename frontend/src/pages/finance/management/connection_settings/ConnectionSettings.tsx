@@ -9,12 +9,14 @@ const providerStatusNames:Record<string,string>={requires_configuration:'설정 
 interface Provider {provider:string;environment:string;saved:boolean;vault_error?:string;last_test?:{ok:boolean;message:string}}
 interface Settings {risk:{fee:number;slippage:number};data:{poll_seconds:number;timeout_seconds:number};symbols:string[];expert_devices:Record<string,string>}
 function ProviderForm(){
- const provider=useSystemState<Provider>('provider'),{execute,pending}=useOperations();
- const [environment,setEnvironment]=useState('real'),[appKey,setAppKey]=useState(''),[secret,setSecret]=useState(''),[account,setAccount]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState('');
+ const provider=useSystemState<Provider>('provider'),{state,execute,pending}=useOperations();
+ const [environment,setEnvironment]=useState<string|null>(null),[appKey,setAppKey]=useState(''),[secret,setSecret]=useState(''),[account,setAccount]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState('');
  const providerBusy=['connect','test','disconnect','public'].some(action=>pending.has('provider/'+action));
- const missingKeys=!provider.data?.saved&&(!appKey.trim()||!secret.trim());
- async function send(action:string){if(providerBusy||(action==='connect'&&missingKeys))return;setError('');setMessage('');try{
-  const result=await execute<{message?:string;last_test?:{message:string}}>('provider/'+action,{environment,app_key:appKey,secret,account});
+ const issuedEnvironment=environment??(provider.data?.environment==='paper'?'paper':'real'),receiving=!!state?.operations?.controls.feed;
+ const missingKeys=!appKey.trim()||!secret.trim();
+ async function send(action:string){if(providerBusy||(action==='connect'&&missingKeys)||(receiving&&['connect','public'].includes(action)))return;setError('');setMessage('');try{
+  const result=await execute<{ok?:boolean;message?:string;last_test?:{ok?:boolean;message:string}}>('provider/'+action,{environment:issuedEnvironment,app_key:appKey,secret,account});
+  if(['connect','test'].includes(action)&&result.ok!==true&&result.last_test?.ok!==true){setError(result.message||result.last_test?.message||'인증 성공을 확인하지 못했습니다.');return;}
   setMessage(result.message||result.last_test?.message||'연결 설정을 반영했습니다.');
   if(action==='connect'){setAppKey('');setSecret('');setAccount('');}
  }catch(e){setError(e instanceof Error?e.message:String(e));}}
@@ -23,11 +25,12 @@ function ProviderForm(){
   <div className="connection-provider-status"><Status tone={provider.data?.saved?'good':'idle'}>{provider.data?provider.data.saved?'인증 저장됨':'인증 설정 필요':'인증 상태 조회 중'}</Status><span>{provider.data?.provider==='kiwoom'?'키움':provider.data?.provider??'—'} · {provider.data?.environment==='real'?'실전':provider.data?.environment==='paper'?'모의':provider.data?.environment??'—'}</span></div>
   <ErrorMessage message={error||provider.error||provider.data?.vault_error||''}/>
   {provider.data?.last_test&&<p className="my-3 text-xs text-slate-500">{provider.data.last_test.message}</p>}
-  <form onSubmit={event=>{event.preventDefault();void send('connect')}}><fieldset disabled={providerBusy} className="connection-provider-fields m-0 min-w-0 border-0 p-0"><legend className="sr-only">키움 인증 입력</legend><label className="block text-xs text-slate-500">키 발급 환경<select className={inputClass+' mt-2'} value={environment} onChange={e=>setEnvironment(e.target.value)}><option value="real">실전 시세</option><option value="paper">모의투자 시세</option></select></label>
+  {receiving&&<p className="my-3 rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-800">인증 저장·시세 공급원 변경은 수신을 중지한 뒤 가능합니다. <a className="underline" href="#finance/operation_control">운영 제어로 이동</a></p>}
+  <form onSubmit={event=>{event.preventDefault();void send('connect')}}><fieldset disabled={providerBusy} className="connection-provider-fields m-0 min-w-0 border-0 p-0"><legend className="sr-only">키움 인증 입력</legend><label className="block text-xs text-slate-500">키 발급 환경<select className={inputClass+' mt-2'} value={issuedEnvironment} onChange={e=>setEnvironment(e.target.value)}><option value="real">실전 시세</option><option value="paper">모의투자 시세</option></select></label>
   <div className="connection-key-grid"><label>App Key<input aria-label="App Key" type="password" autoComplete="off" className={inputClass} placeholder="발급받은 App Key" value={appKey} onChange={e=>setAppKey(e.target.value)}/></label>
   <label>Secret Key<input aria-label="Secret Key" type="password" autoComplete="off" className={inputClass} placeholder="발급받은 Secret Key" value={secret} onChange={e=>setSecret(e.target.value)}/></label></div>
   <label className="block text-xs text-slate-500">계좌 정보 · 선택<input aria-label="계좌 정보" type="password" autoComplete="off" className={inputClass+' mt-2'} placeholder="필요한 경우에만 입력" value={account} onChange={e=>setAccount(e.target.value)}/></label>
-  <div className="connection-auth-actions"><Button type="submit" tone="primary" disabled={providerBusy||missingKeys} busy={pending.has('provider/connect')}>인증 후 저장·선택</Button><Button disabled={providerBusy||!provider.data?.saved} busy={pending.has('provider/test')} onClick={()=>void send('test')}>저장된 키 인증 확인</Button><details className="connection-public-choice"><summary>다른 시세 연결</summary><Button disabled={providerBusy} busy={pending.has('provider/public')} onClick={()=>void send('public')}>공개 시세 선택</Button></details></div>{missingKeys&&<p className="text-xs leading-5 text-slate-500">새 인증을 저장하려면 App Key와 Secret Key를 모두 입력하세요.</p>}</fieldset>{providerBusy&&<p role="status" className="mt-3 text-xs text-blue-700">인증 요청을 처리하고 있습니다.</p>}{message&&<p role="status" className="mt-3 text-xs text-slate-600">{message}</p>}</form>
+  <div className="connection-auth-actions"><Button type="submit" tone="primary" disabled={providerBusy||receiving||missingKeys} busy={pending.has('provider/connect')}>인증 후 저장·선택</Button><Button disabled={providerBusy||!provider.data?.saved} busy={pending.has('provider/test')} onClick={()=>void send('test')}>저장된 키 인증 확인</Button><details className="connection-public-choice"><summary>다른 시세 연결</summary><Button disabled={providerBusy||receiving} busy={pending.has('provider/public')} onClick={()=>void send('public')}>공개 시세 선택</Button></details></div>{missingKeys&&<p className="text-xs leading-5 text-slate-500">새 인증을 저장하려면 App Key와 Secret Key를 모두 입력하세요.</p>}</fieldset>{providerBusy&&<p role="status" className="mt-3 text-xs text-blue-700">인증 요청을 처리하고 있습니다.</p>}{message&&<p role="status" className="mt-3 text-xs text-slate-600">{message}</p>}</form>
  </Panel>;
 }
 function OperationalSettings(){

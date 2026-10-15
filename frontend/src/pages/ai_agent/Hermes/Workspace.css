@@ -1,0 +1,102 @@
+
+/* The Hermes route owns the available viewport; other platform pages retain their layout. */
+.workspace-content:has(>.hermes-workspace){padding:0!important;background:#fff;min-height:0;height:calc(100dvh - 68px);overflow:hidden}
+.workspace-content:has(>.hermes-workspace)>:not(.hermes-workspace){display:none}
+.workspace-layout:has(.hermes-workspace){height:calc(100dvh - 68px);min-height:0}
+.hermes-workspace{height:100%;max-width:none;margin:0;display:flex;flex-direction:column;background:white;min-height:0;--ha-muted:#6f7b8d}
+.hermes-toolbar{height:54px;min-height:54px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--ha-border);padding:0 18px;background:#fff}
+.hermes-toolbar .hermes-brand{width:30px;height:30px;border-radius:9px}
+.hermes-toolbar h2{font-size:15px;font-weight:700;margin:0 18px 0 0}
+.hermes-toolbar nav{display:flex;align-items:center;gap:4px}
+.hermes-toolbar .ui-button{font-size:12px;padding:7px 10px;background:transparent;border:0;box-shadow:none;color:#6c788c}
+.hermes-toolbar nav .ui-button[aria-pressed=true]{background:#eef3ff;color:#355fca}
+.hermes-chat-mount{flex:1;min-height:0;display:flex}
+.hermes-chat-mount[hidden]{display:none}
+.hermes-chat-layout{width:100%;height:100%;min-height:0;max-height:none;border:0;border-radius:0;box-shadow:none;grid-template-columns:232px minmax(0,1fr)}
+.hermes-chat-layout.sessions-closed{grid-template-columns:minmax(0,1fr)}
+.hermes-sessions{padding:15px 12px;background:#f8faff}
+.hermes-chat-heading{padding:9px 18px;min-height:58px;gap:10px}
+.hermes-chat-heading .hermes-chat-title{flex:1;min-width:0}
+.hermes-chat-heading h3{font-size:14px;max-width:100%;margin:0}
+.hermes-chat-heading p{font-size:11px;margin-top:3px}
+.hermes-chat-heading .ui-button{padding:7px;flex-shrink:0}
+.hermes-chat-heading .ui-button span{font-size:11px}
+.hermes-chat-body{display:flex;min-height:0;flex:1;position:relative}
+.hermes-messages{width:100%;padding:22px clamp(18px,4vw,66px);font-size:14px}
+.hermes-message{max-width:100%;margin-bottom:20px;line-height:1.8}
+.hermes-message pre,.hermes-message.assistant pre{font-size:14px;line-height:1.85}
+.hermes-message.user{margin-left:20%;padding:11px 16px;background:#edf3ff;color:#2f476d}
+.hermes-message>b{font-size:11px;color:#64758d;margin-bottom:5px}
+.hermes-turn{margin-bottom:8px}
+.hermes-action-card{margin:7px 0;border:1px solid #e6ecf4;border-radius:9px;background:#fbfcfe;color:#65758c}
+.hermes-action-card summary{padding:9px 12px;font-size:12px;gap:9px}
+.hermes-action-card summary:before{display:none}
+.hermes-action-card summary>b{font-weight:550}
+.hermes-action-card summary>span{font-size:11px;margin-left:auto;color:#8290a4}
+.hermes-action-card summary>svg:last-child{transition:transform .15s}
+.hermes-action-card[open] summary>svg:last-child{transform:rotate(180deg)}
+.hermes-action-card>div{border-top:1px solid #e9eef6;padding:12px}
+.hermes-action-card pre{font:11px/1.65 ui-monospace,monospace;max-height:300px;overflow:auto}
+.hermes-action-card small{font-size:10px;font-weight:650}
+.hermes-action-card.is-error{border-color:#f1cfcd;background:#fff9f8}
+.hermes-runtime-metrics{display:flex;align-items:center;gap:20px;padding:8px 20px;flex-wrap:wrap;border-bottom:1px solid #edf0f5;background:#fafcff;font-size:11px}
+.hermes-runtime-metrics>div{display:flex;gap:6px;align-items:center;white-space:nowrap}
+.hermes-runtime-metrics span{color:#77869b}
+.hermes-runtime-metrics b{font-size:12px;color:#405674;font-weight:550;font-variant-numeric:tabular-nums}
+.hermes-runtime-metrics meter{width:48px;height:7px}
+.hermes-current-activity{display:flex;gap:8px;align-items:center;min-height:32px;padding:6px 20px;color:#8290a3;background:#fff;border-bottom:1px solid #f0f3f8;font-size:11px;flex-shrink:0}
+.hermes-current-activity b{font-weight:550;white-space:nowrap}
+.hermes-current-activity span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.hermes-current-activity.is-active{color:#4769aa;background:#f5f8ff}
+.hermes-spin{animation:hermes-spin 1s linear infinite;flex-shrink:0}
+@keyframes hermes-spin{to{transform:rotate(360deg)}}
+.hermes-log{width:300px;flex-shrink:0;border-left:1px solid #e8edf5;background:#f9fbff;overflow:auto;padding:14px;font-size:11px}
+.hermes-log header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.hermes-log details{border-top:1px solid #e7edf6;padding:10px 0}
+.hermes-log summary{align-items:flex-start;font-size:11px}
+.hermes-log time{font-size:10px;color:#99a5b5}
+.hermes-log pre{font:10px/1.6 ui-monospace,monospace}
+.hermes-composer{margin:0 18px 14px;padding:10px 13px 9px;flex-shrink:0;border-radius:12px;box-shadow:0 3px 15px #203a5807}
+.hermes-composer textarea{min-height:38px;max-height:130px;font-size:14px;resize:vertical}
+.hermes-composer .ui-button{font-size:12px;padding:8px 14px}
+.hermes-composer span{color:#94a0b0;font-size:10px}
+.hermes-run-options{padding:7px 20px;gap:12px;flex-shrink:0;flex-wrap:wrap;margin:0}
+.hermes-run-options label{font-size:10px;gap:5px;color:#7c899c}
+.hermes-run-options select,.hermes-run-options input{font-size:11px;padding:5px 8px}
+.hermes-autonomy-state{margin:0;padding:7px 20px;border-radius:0;font-size:11px;flex-shrink:0}
+.hermes-autonomy-state details{margin-left:auto}
+.hermes-approval{max-height:230px;overflow:auto;flex-shrink:0}
+.hermes-settings-page{flex:1;min-height:0;overflow:auto;background:#f7f9fc;padding:22px}
+.hermes-settings-page>header{display:flex;gap:15px;align-items:center;max-width:1200px;margin:0 auto 15px}
+.hermes-settings-page>header h3{font-size:17px;font-weight:650}
+.hermes-settings-page>nav{display:flex;gap:6px;max-width:1200px;margin:0 auto 18px}
+.hermes-settings-page>nav .ui-button[aria-pressed=true]{background:#e8efff;color:#315fc5}
+.hermes-settings-page .hermes-settings{max-width:1200px}
+.hermes-settings-page .hermes-subtabs{max-width:1200px;margin:0 auto 15px}
+@media(max-width:700px){
+ .workspace-content:has(>.hermes-workspace),.workspace-layout:has(.hermes-workspace){height:calc(100dvh - 60px)}
+ .hermes-toolbar{padding:0 10px;gap:6px;height:48px;min-height:48px}
+ .hermes-toolbar h2{font-size:13px;margin-right:3px}
+ .hermes-toolbar .hermes-state{font-size:10px}
+ .hermes-toolbar nav .ui-button{padding:6px;font-size:11px;gap:4px}
+ .hermes-chat-layout,.hermes-chat-layout.sessions-open{display:flex;position:relative}
+ .hermes-sessions{position:absolute;left:0;top:0;bottom:0;width:240px;z-index:4;box-shadow:8px 0 30px #27395020;flex-direction:column}
+ .hermes-session-list{display:grid;overflow:auto;max-height:none}
+ .hermes-chat{width:100%;flex:1}
+ .hermes-chat-heading{padding:8px 10px;gap:6px;min-height:54px}
+ .hermes-chat-heading .ui-button span{display:none}
+ .hermes-runtime-metrics{gap:6px 12px;padding:7px 12px}
+ .hermes-runtime-metrics>div{font-size:9px;gap:4px}
+ .hermes-runtime-metrics b{font-size:10px}
+ .hermes-runtime-metrics>div:nth-child(4){display:none}
+ .hermes-messages{padding:18px 14px}
+ .hermes-message.user{margin-left:8%}
+ .hermes-message pre,.hermes-message.assistant pre{font-size:13px}
+ .hermes-log{position:absolute;right:0;top:0;bottom:0;z-index:3;width:min(300px,90%);box-shadow:-8px 0 25px #243c5f12}
+ .hermes-current-activity{padding:6px 12px;font-size:10px}
+ .hermes-composer{margin:0 10px 10px}
+ .hermes-run-options{padding:7px 12px}
+ .hermes-settings-page{padding:14px 10px}
+ .hermes-settings-page .hermes-settings{padding:16px}
+ .hermes-welcome h3{font-size:23px}
+}

@@ -73,10 +73,11 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
                     for index, tool in enumerate(delta.get('tool_calls', [])): tool['index'] = index
                     self.wfile.write(('data: ' + json.dumps({'id': 'port', 'object': 'chat.completion.chunk', 'model': 'port-fixture',
                         'created': 1, 'choices': [{'index': 0, 'delta': delta, 'finish_reason': reason}]}) + '\n\n').encode())
+                self.wfile.write(('data: '+json.dumps({'id':'port','choices':[],'usage':{'prompt_tokens':128,'completion_tokens':16,'total_tokens':144}})+'\n\n').encode())
                 self.wfile.write(b'data: [DONE]\n\n')
             else:
                 self.wfile.write(json.dumps({'id': 'port', 'object': 'chat.completion', 'model': 'port-fixture', 'created': 1,
-                    'choices': [{'index': 0, 'message': message, 'finish_reason': finish}]}).encode())
+                    'choices': [{'index': 0, 'message': message, 'finish_reason': finish}], 'usage': {'prompt_tokens':128,'completion_tokens':16,'total_tokens':144}}).encode())
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError): pass
 
 
@@ -116,6 +117,10 @@ class HermesPortTests(unittest.TestCase):
         result = self.wait_job()
         self.assertEqual(result['state'], 'complete', result.get('error'))
         self.assertTrue(result['text'].startswith('PORT_DONE'), result['text'])
+        self.assertGreater(result['metrics']['input_tokens'], 0)
+        self.assertGreater(result['metrics']['output_tokens'], 0)
+        self.assertGreater(result['metrics']['api_calls'], 0)
+        self.assertGreaterEqual(result['metrics']['elapsed_seconds'], 0)
         output = self.workspace / 'hermes_port_result.txt'
         self.assertTrue(output.is_file(), json.dumps(result, ensure_ascii=False))
         self.assertEqual(output.read_text(), 'copied engine executed this tool')
@@ -206,6 +211,19 @@ for line in sys.stdin:
         edited = content.replace('Read a local file', 'Summarize a local file')
         self.bridge.call('skill/save', {'name': 'port-check', 'content': edited})
         self.assertEqual(self.bridge.call('skill/content', {'name': 'port-check'})['content'], edited)
+
+    def test_08_platform_browser_tool_is_exposed_to_model(self):
+        prior = self.bridge.call('settings')['toolsets']
+        try:
+            self.bridge.call('settings/save', {'toolsets': ['file', 'computer_use']})
+            before = len(ModelFixture.calls)
+            self.bridge.call('chat', {'message': 'PORT_WRITE: write a local file.'})
+            result = self.wait_job()
+            self.assertEqual(result['state'], 'complete', result.get('error'))
+            names = {t.get('function', {}).get('name') for call in ModelFixture.calls[before:] for t in call.get('tools', [])}
+            self.assertIn('desktop_browser', names)
+        finally:
+            self.bridge.call('settings/save', {'toolsets': prior})
 
     def test_07_native_loop_stop_resume_and_session_reopen(self):
         status = self.bridge.call('chat', {'message': 'PORT_LOOP: report progress on each wakeup.',

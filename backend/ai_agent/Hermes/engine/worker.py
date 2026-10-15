@@ -108,11 +108,17 @@ class HermesWorker:
         with self.lock:
             item = {'name': name, 'detail': json.dumps(data, ensure_ascii=False, default=str)[:2400] if data is not None else '', 'time': time.time()}
             self.job['events'] = (self.job['events'] + [item])[-100:]
+            if name == 'tool_start':
+                self.job['live_text'] = ''
+                self.job['phase'] = 'tool'
+            elif name == 'tool_complete':self.job['phase'] = 'generating'
 
     def delta(self, text, *args, **kwargs):
         if isinstance(text, str):
             with self.lock:
                 self.job['text'] += text
+                self.job['live_text'] = self.job.get('live_text','') + text
+                self.job['phase'] = 'generating'
 
     def public_settings(self):
         cfg = load_settings()
@@ -236,6 +242,10 @@ class HermesWorker:
             os.environ['TERMINAL_CWD'] = cfg['workspace']
             self.event('starting', {'model': cfg['model'], 'workspace': cfg['workspace']})
             from tools.mcp_tool_discovery import get_registered_mcp_server_names
+            from ai_agent.Hermes.chat.desktop_browser import bind
+            bind(self)
+            from tools import tool_search
+            tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'computer_use'}
             toolsets = list(cfg['toolsets']) + ['mcp-' + name for name in get_registered_mcp_server_names()]
             self.agent = AIAgent(
                 model=cfg['model'], base_url=cfg['base_url'], api_key=cfg.get('api_key') or 'local',
@@ -251,7 +261,16 @@ class HermesWorker:
                     'Never invent or substitute another working directory. '
                     'Use tool_search then tool_describe to discover configured deferred tools '
                     'before claiming a browser, desktop, or MCP tool is unavailable. '
-                    'Report success only when tool results confirm it.'),
+                    'Report success only when tool results confirm it. '
+                    f'This host is Windows. Installed browser executable: {os.environ.get("AGENT_BROWSER_EXECUTABLE_PATH","not detected")}. '
+                    'The terminal shell may be Git Bash: ps/which cannot reliably detect Windows applications. '
+                    'When asked to open visible Chrome/Edge, your FIRST tool call MUST be desktop_browser, which launches detached without shell quoting. '
+                    'For other visible desktop apps, use PowerShell Start-Process with its exact executable path and return immediately. '
+                    'Do not launch GUI apps as blocking terminal commands or wrap them in timeout; terminal cleanup can close their windows. '
+                    'Use computer_use capture in ax mode to verify the visible window once. '
+                    'Once the requested app is open, leave it open and finish. Do not close, relaunch or keep polling it. '
+                    'If the user closes the app, do not reopen it without a new request. '
+                    'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'),
                 stream_delta_callback=self.delta, event_callback=self.event,
                 status_callback=lambda *args, **kw: self.event('status', args),
                 tool_start_callback=lambda *args, **kw: self.event('tool_start', args),
@@ -267,13 +286,17 @@ class HermesWorker:
             if result.get('error'):
                 raise RuntimeError(str(result['error']))
             autonomy = self.job.get('autonomy') or {}
-            state = 'stopped' if self.stopping else 'paused' if autonomy.get('status') == 'paused' else 'complete'
+            incomplete = result.get('failed') or not result.get('completed', True)
+            state = 'stopped' if self.stopping else 'paused' if autonomy.get('status') == 'paused' or incomplete else 'complete'
             completion = dict(state=state, text=result.get('final_response') or self.job['text'], finished_at=time.time())
+            if incomplete and not self.stopping:completion['error'] = '작업이 완료되지 않았습니다. '+str(result.get('turn_exit_reason') or '도구 실행 결과를 확인하세요.')
         except Exception as exc:
             traceback.print_exc(file=sys.stderr)
             completion = dict(state='stopped' if self.stopping else 'failed', error=str(exc), finished_at=time.time())
         finally:
             if self.agent:
+                from ai_agent.Hermes.chat.telemetry import update
+                with self.lock:self.job['metrics'] = update(self)
                 with contextlib.suppress(Exception): self.agent.close()
             self.agent = None
             self.stopping = False
@@ -283,6 +306,9 @@ class HermesWorker:
                 self.job.update(completion)
 
     def status(self):
+        from ai_agent.Hermes.chat.telemetry import update
+        with self.lock:
+            self.job['metrics'] = update(self)
         with self.lock:
             job = {**self.job, 'events': list(self.job['events'])}
         model = {'running': bool(self.model_process and self.model_process.poll() is None), 'base_url': self.model_base, 'state': 'idle'}

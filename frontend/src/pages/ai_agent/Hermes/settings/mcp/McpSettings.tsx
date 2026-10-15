@@ -1,8 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {Plug,Plus,Trash2,Upload,Search,Terminal,Globe,FileCode2,Monitor,CheckCircle2,ArrowUpRight,Pencil} from 'lucide-react';
-import {request} from '../../../../data/api';
-import {Button,ErrorMessage} from '../../../../ui/Primitives';
-import {prefix,failure,type Settings} from '../types';
+import {request} from '../../../../../data/api';
+import {Button,ErrorMessage} from '../../../../../ui/Primitives';
+import {prefix,failure,type Settings} from '../../types';
 type Server={command?:string;args?:string[];url?:string;[key:string]:unknown};
 interface McpState {servers:Record<string,Server>;status:Record<string,unknown>[]}
 const stateNames:Record<string,string>={connected:'연결됨',configured:'연결 대기',connecting:'연결 중',failed:'연결 실패',disabled:'사용 안 함',lazy:'필요할 때 연결'};

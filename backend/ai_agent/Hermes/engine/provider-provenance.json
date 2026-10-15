@@ -77,5 +77,12 @@
       "adapted_sha256": "581d7732b299c99d9e6283259abe48531c958c75dc0d761647d6e09fd9edda08",
       "reason": "Preserve bounded native AX text in capture notes so a text/tool model can read values and static results; original element indices and actions retained."
     }
+  ],
+  "platform_extensions": [
+    {
+      "file": "tools/platform_desktop_browser_tool.py",
+      "sha256": "c4f6181dead24879966c936b91018a8167c9836fd73aab50094dc5548b041ff3",
+      "reason": "Platform-owned detached Windows browser launcher adapter using native discovery, registry and direct computer_use toolset. Not original Hermes source."
+    }
   ]
 }

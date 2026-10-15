@@ -1,9 +1,9 @@
 import {useEffect,useState} from 'react';
 import {Download,Search,ExternalLink,CheckCircle2,Loader2} from 'lucide-react';
-import {request} from '../../../../data/api';
-import {Button,ErrorMessage} from '../../../../ui/Primitives';
-import {prefix,failure} from '../types';
-import {mcpDescriptions} from '../catalogLabels';
+import {request} from '../../../../../data/api';
+import {Button,ErrorMessage} from '../../../../../ui/Primitives';
+import {prefix,failure} from '../../types';
+import {mcpDescriptions} from '../../catalogLabels';
 interface Entry{name:string;description:string;source:string;installed:boolean;enabled:boolean;transport:{type:string;command?:string;args?:string[];url?:string};auth:{type:string;env:{name:string;prompt:string;required:boolean;secret:boolean;default?:string}[]};install?:{url:string;ref:string;bootstrap:string[]}|null;post_install:string}
 interface Install{state:string;name:string;error:string}
 export function McpCatalog({busy,onConnections}:{busy:boolean;onConnections:()=>void}){

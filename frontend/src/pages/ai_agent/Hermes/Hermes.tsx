@@ -1,15 +1,14 @@
 import {useEffect,useRef,useState} from 'react';
-import {Bot,MessageSquare,Settings2,Plug,BookOpen,RefreshCw} from 'lucide-react';
+import {Bot,MessageSquare,Settings2,RefreshCw} from 'lucide-react';
 import {request} from '../../../data/api';
 import {Button,ErrorMessage} from '../../../ui/Primitives';
 import {Chat} from './chat/Chat';
-import {ModelSettings} from './models/ModelSettings';
-import {McpPage} from './mcp/McpPage';
-import {Skills} from './skills/Skills';
+import {Settings} from './settings/Settings';
 import {prefix,failure,working,type AgentStatus} from './types';
 import './Hermes.css';
+import './Workspace.css';
 
-const tabs=[{id:'chat',name:'대화',icon:MessageSquare},{id:'models',name:'모델',icon:Settings2},{id:'mcp',name:'외부 도구',icon:Plug},{id:'skills',name:'스킬',icon:BookOpen}] as const;
+const tabs=[{id:'chat',name:'대화',icon:MessageSquare},{id:'settings',name:'설정',icon:Settings2}] as const;
 export function Hermes(){
  const [tab,setTab]=useState<string>('chat'),[status,setStatus]=useState<AgentStatus>(),[error,setError]=useState('');
  const [retry,setRetry]=useState(0),last=useRef('');
@@ -18,9 +17,8 @@ export function Hermes(){
   clearTimeout(timer);if(inFlight||disposed)return;inFlight=true;
   try{const next=await request<AgentStatus>(prefix+'status',{},'GET');if(!disposed){const key=JSON.stringify(next);if(key!==last.current){last.current=key;setStatus(next)}setError('');if(working(next)||next.local_model.state==='loading')timer=setTimeout(()=>void poll(),document.hidden?10000:1200)}}catch(e){if(!disposed){setError(failure(e));if(polling)timer=setTimeout(()=>void poll(),10000)}}finally{inFlight=false}
  };const resume=()=>{if(!document.hidden)void poll()};void poll();window.addEventListener('focus',resume);document.addEventListener('visibilitychange',resume);return()=>{disposed=true;clearTimeout(timer);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume)}},[retry,polling]);
- return <div className="hermes-workspace"><header className="hermes-intro"><span className="hermes-brand"><Bot size={22}/></span><div><h2>내 컴퓨터에서, 함께 작업하기</h2><p>모델을 선택하고 대화로 작업을 맡기세요.</p></div><span className={'hermes-state '+(working(status)?'active':'')}>{working(status)?'작업 중':status?.local_model.state==='ready'?'로컬 모델 준비됨':'작업 대기'}</span><Button aria-label="작업 상태 새로고침" title="작업 상태 새로고침" onClick={()=>setRetry(v=>v+1)}><RefreshCw size={15}/></Button></header>
- <nav className="hermes-tabs" aria-label="Hermes 기능">{tabs.map(({id,name,icon:Icon})=><Button key={id} aria-pressed={tab===id} onClick={()=>setTab(id)}><Icon size={16}/>{name}</Button>)}</nav>
+ return <div className={'hermes-workspace '+(tab==='chat'?'is-chat':'is-settings')}><header className="hermes-toolbar"><span className="hermes-brand"><Bot size={19}/></span><h2>헤르메스</h2><nav aria-label="Hermes 기능">{tabs.map(({id,name,icon:Icon})=><Button key={id} aria-pressed={tab===id} onClick={()=>setTab(id)}><Icon size={16}/>{name}</Button>)}</nav><span className={'hermes-state '+(working(status)?'active':'')}>{working(status)?'작업 중':status?.local_model.state==='ready'?'모델 준비됨':'작업 대기'}</span><Button aria-label="작업 상태 새로고침" title="작업 상태 새로고침" onClick={()=>setRetry(v=>v+1)}><RefreshCw size={15}/></Button></header>
  {error&&<div className="hermes-error"><ErrorMessage message={error}/><Button onClick={()=>setRetry(v=>v+1)}>다시 연결</Button></div>}
- {tab==='chat'&&<Chat status={status} onStatus={setStatus} onModels={()=>setTab('models')}/>}{tab==='models'&&<ModelSettings busy={working(status)} localModel={status?.local_model} onStatus={setStatus} onChat={()=>setTab('chat')}/>}{tab==='mcp'&&<McpPage busy={working(status)} onModels={()=>setTab('models')}/>}{tab==='skills'&&<Skills busy={working(status)}/>}
+ <div className="hermes-chat-mount" hidden={tab!=='chat'}><Chat status={status} onStatus={setStatus} onModels={()=>setTab('settings')}/></div>{tab==='settings'&&<Settings status={status} onStatus={setStatus} onChat={()=>setTab('chat')}/>}
  </div>;
 }

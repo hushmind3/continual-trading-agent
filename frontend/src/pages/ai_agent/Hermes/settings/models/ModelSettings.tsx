@@ -1,8 +1,8 @@
 import {useEffect,useState} from 'react';
 import {Cpu,FolderOpen,RefreshCw,ArrowRight,CheckCircle2,Plug} from 'lucide-react';
-import {request} from '../../../../data/api';
-import {Button,ErrorMessage} from '../../../../ui/Primitives';
-import {prefix,failure,type Settings,type AgentStatus} from '../types';
+import {request} from '../../../../../data/api';
+import {Button,ErrorMessage} from '../../../../../ui/Primitives';
+import {prefix,failure,type Settings,type AgentStatus} from '../../types';
 const tools:Record<string,string>={file:'파일·코드 수정',terminal:'명령 실행',todo:'작업 계획',skills:'스킬 활용',browser:'웹 브라우저',computer_use:'컴퓨터 조작',memory:'기억'};
 interface LocalModel {path:string;name:string;bytes:number}
 export function ModelSettings({busy,onStatus,localModel,onChat}:{busy:boolean;onStatus:(s:AgentStatus)=>void;localModel?:AgentStatus['local_model'];onChat:()=>void}){

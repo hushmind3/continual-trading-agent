@@ -136,8 +136,8 @@ export function Drawer({
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeHandler.current();
       if(e.key==='Tab'){
-        const controls=panel.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),summary,a[href],[tabindex="0"]');
-        if(controls?.length){const first=controls[0],last=controls[controls.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
+        const controls=Array.from(panel.current?.querySelectorAll<HTMLElement>('button,input:not([type="hidden"]),select,textarea,summary,a[href],[tabindex="0"]')??[]).filter(el=>!el.matches(':disabled')&&el.tabIndex>=0&&el.getClientRects().length>0);
+        if(controls?.length){const first=controls[0],last=controls[controls.length-1];if(e.shiftKey&&(document.activeElement===first||!panel.current?.contains(document.activeElement))){e.preventDefault();last.focus();}else if(!e.shiftKey&&(document.activeElement===last||!panel.current?.contains(document.activeElement))){e.preventDefault();first.focus();}}
       }
     };
     window.addEventListener("keydown", key);
@@ -159,6 +159,7 @@ export function Drawer({
     >
       <button
         aria-label="닫기"
+        tabIndex={-1}
         className="ui-drawer-backdrop absolute inset-0 z-0 bg-slate-950/30 backdrop-blur-sm"
         onClick={onClose}
       />

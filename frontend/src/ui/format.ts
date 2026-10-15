@@ -27,13 +27,15 @@ export function inspectionDetail(value:string){
   return value.includes('Traceback')?value.trim().split('\n').at(-1)??value:value;
 }
 export const bytes = (value: number | undefined) =>
-  value == null
+  value == null || !Number.isFinite(value) || value < 0
     ? "미측정"
     : value >= 2 ** 30
       ? `${number(value / 2 ** 30)} GiB`
       : value >= 2 ** 20
         ? `${number(value / 2 ** 20)} MiB`
-        : `${number(value / 1024)} KiB`;
+        : value >= 1024
+          ? `${number(value / 1024)} KiB`
+          : `${number(value, 0)} B`;
 export const date = (value: string | number | undefined | null) => {
   if (value == null) return "대기";
   const d = new Date(

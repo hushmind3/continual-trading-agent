@@ -1,0 +1,9 @@
+.backend-api-page {min-height:65vh;padding:24px;border:1px solid #e5eaf1;border-radius:18px;background:#fff;overflow:hidden}
+.backend-api-page .swagger-ui .wrapper {padding:0;max-width:none}
+.backend-api-page .swagger-ui .info {margin:8px 0 24px}
+.backend-api-page .swagger-ui .info .title {font-size:24px;letter-spacing:-.5px}
+.backend-api-page .swagger-ui .opblock {box-shadow:none;border-radius:12px;overflow:hidden}
+.backend-api-page .swagger-ui .opblock-tag {font-size:17px}
+.backend-api-page .swagger-ui .btn {border-radius:8px;box-shadow:none}
+.backend-api-page .swagger-ui textarea {border-radius:8px}
+@media(max-width:760px) {.backend-api-page {padding:16px}.backend-api-page .swagger-ui .opblock-summary {flex-wrap:wrap}.backend-api-page .swagger-ui .opblock-summary-description {flex-basis:100%;padding:8px}.backend-api-page .swagger-ui .opblock-body {overflow-x:auto}}

@@ -6,6 +6,7 @@
 | [rea/](rea/README.md) | 독립 REA 프로젝트: program_analysis/, project_explorer/ |
 | [menu_registry.py](menu_registry.py) | 금융·REA 두 대메뉴를 등록·취합하는 총괄 |
 | [web_api.py](web_api.py) | 단일 /api 진입점; 총괄만 통해 기능 등록 |
+| [api_docs.py](api_docs.py) | 등록된 명령의 입력 스키마를 단일 /api Swagger 문서로 제공; /openapi.json |
 | api_context.py, api_transport.py | 공유 HTTP 객체·요청 전달·React 제공 |
 | rea/project_explorer/saved_projects/ | 저장된 원본·추론 분석 결과; 실행 기능 등록 대상이 아니며 Git 제외 |
 

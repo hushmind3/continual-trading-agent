@@ -462,3 +462,11 @@
 
 .policy-selected-heading {display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .policy-selected-heading h3 {min-width:0;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+
+.workspace-connection-recovery:not([hidden]) {display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px;padding:20px;border:1px solid #eed5b6;border-radius:16px;background:#fff9ef;color:#76532e}
+.workspace-connection-recovery h2 {font-size:15px;font-weight:600}
+.workspace-connection-recovery p {margin-top:8px;font-size:12px;line-height:1.8;overflow-wrap:anywhere}
+.workspace-connection-recovery details {margin-top:12px;font-size:11px}
+.workspace-connection-recovery summary {cursor:pointer}
+.workspace-connection-recovery .ui-button {flex-shrink:0}
+@media(max-width:760px) {.workspace-connection-recovery:not([hidden]) {flex-direction:column;gap:16px}.workspace-connection-recovery .ui-button {width:100%}}

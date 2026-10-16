@@ -4,7 +4,7 @@ import shlex
 import re
 from fastapi import APIRouter, HTTPException
 from . import github, installer, runtime
-from .store import LOCK, ROOT, STATE, identifier, read, save
+from .store import LOCK, ROOT, STATE, identifier, read, save, discard_failed
 
 router = APIRouter(prefix='/api/projects')
 
@@ -85,7 +85,12 @@ def remove(request: dict):
         key = identifier(request.get('id', ''))
         with LOCK, runtime.LOCK:
             if installer.busy_reason(): raise ValueError('실행 중인 작업을 마친 뒤 분리하세요.')
-            record = read(key); module_id = identifier(record.get('module_id', ''))
+            record = read(key)
+            if not record.get('active_source') and record.get('stage') in ('failed', 'cancelled', 'needs_adapter'):
+                worker = runtime.WORKERS.pop(key, None)
+                if worker: worker.close()
+                return discard_failed(key)
+            module_id = identifier(record.get('module_id', ''))
             entry = next((entry for item, entry in MODULE_ENTRIES if item['id'] == module_id), None)
             if entry:
                 if callback := getattr(entry, 'busy_reason', None):

@@ -25,6 +25,10 @@ GitHub 검색은 30개씩 표시하며 더 보기·관련도/인기/최근 업�
 
 ## 실제 확인 — 2026-10-16
 
+설치 실패·취소·실행 연결 필요이며 활성 설치본 없는 항목은 제거 버튼으로 정리합니다. `backend/store.py`의 `discard_failed`가 소스와 등록 JSON을 루트 `휴지통/projects-<고유값>/` 아래 원래 상대 경로대로 이동합니다. 레지스트리 이동 실패 시 앞서 옮긴 소스도 복구하며, 활성 프로젝트는 이 경로로 제거하지 않습니다.
+
+제거 관련 검사 3개(모듈 없는 실패 설치의 API 제거·등록 파일 잠금 시 복구·활성 설치 보호), TypeScript·Vite 빌드가 통과했고 서버에 적용했습니다. 실제 브라우저에서 OpenTyping·syuilo/ai 항목의 제거 버튼 2개와 JavaScript 오류 0건을 확인했습니다. 사용자 항목을 임의로 제거하지는 않았습니다.
+
 `development/scripts/verify_project_install.cjs`로 공개 `mdn/beginner-html-site-styled`를 실제 검색하고 화면의 등록 버튼을 눌렀습니다. 다운로드·구조 분석·Chromium 원본 화면 검사·생성 어댑터의 전체 import/TypeScript/빌드 확인·새 대메뉴 활성화·자동 이동·플랫폼 내 원본 UI 표시가 통과했습니다. 분리 API 실행 후 소스와 환경 설정 이름·설치 기록이 유지됐습니다. 검사 프로젝트는 분리 상태로 남기며 사용자 금융·REA·Hermes 데이터를 삭제하지 않았습니다. 원시 결과와 스크린샷은 Git 제외 `runtime/projects/manage/verification/github-install.json`, `installed-project.png`에 있습니다.
 
 관련 Python 검사 24개가 통과했습니다. 실제 ASGI 작업 프로세스의 상태 유지와 작업 폴더, 원본 UI의 fetch→단일 API 연결, JavaScript 오류 시 설치 거부, 실패 업데이트의 기존 프로그램 복구, Windows 기록 잠금 재시도, 설치 리비전 적용 전 완료 표시 방지와 모듈 이름 충돌 거부를 포함합니다. 실제 `/assets/projects/<id>/` 마운트에서 원본 화면을 검사하며 잘못된 루트 자산 경로·빈 화면을 성공으로 표시하지 않습니다. 미지원 쿠키 인증은 어댑터가 필요하다고 거부하며 인증을 제거해 검사를 통과시키지 않습니다. 명령: `.venv/Scripts/python.exe -B -m unittest development.tests.test_project_installer development.tests.test_platform_modules development.tests.test_server_watchdog development.tests.test_hermes_execution -q`.

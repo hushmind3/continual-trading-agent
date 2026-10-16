@@ -92,9 +92,9 @@ test('MoE renders missing input metadata and ignores invalid saved UI state', as
     await route.fulfill({response, json: state});
   });
   await page.goto('/#finance/moe', {waitUntil: 'networkidle'});
-  await expect(page.getByRole('heading', {name: 'Expert 슬롯 관리'})).toBeVisible();
+  await expect(page.getByRole('heading', {name: /^내 모델/})).toBeVisible();
   await expect(page.getByRole('group', {name: 'Champion 조립용 모델 버전'}).first()).toBeVisible();
-  await expect(page.getByRole('button', {name: '금융 Expert 찾기', exact: true})).toBeVisible();
+  await expect(page.getByRole('button', {name: 'Expert 찾기', exact: true})).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -121,11 +121,11 @@ test('project explorer keeps the latest file when earlier responses arrive late'
     await route.continue();
   });
   await page.goto('/#rea/project_explorer?id='+id,{waitUntil:'networkidle'});
-  await expect(page.getByRole('button',{name:'📄old.js',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'old.js',exact:true})).toBeVisible();
   const oldRequest=page.waitForRequest(request=>request.url().includes('/api')&&JSON.parse(new URL(request.url()).searchParams.get('payload')??'{}').path==='old.js');
-  await page.getByRole('button',{name:'📄old.js',exact:true}).click();
+  await page.getByRole('button',{name:'old.js',exact:true}).click();
   await oldRequest;
-  await page.getByRole('button',{name:'📄new.js',exact:true}).click();
+  await page.getByRole('button',{name:'new.js',exact:true}).click();
   await expect(page.locator('main pre')).toHaveText('LATEST CONTENT');
   releaseOld();await oldFinished;
   await expect(page.locator('main pre')).toHaveText('LATEST CONTENT');

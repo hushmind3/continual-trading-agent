@@ -21,3 +21,5 @@ ChampionSpec은 선택 알고리즘과 실제 정책·Critic 또는 가치 출�
 2026-10-16: React·Vite·공통 tailwind.css를 사용하며 버튼·입력·선택 요소는 src/ui/Primitives.tsx를 재사용합니다. 화면의 API·데이터 처리 계약은 유지합니다.
 
 DocumentPreview.tsx는 공통 Drawer·Button·ErrorMessage를 사용해 비동기 로컬 문서를 표시합니다. 파일 로더는 소메뉴가 전달하고, 닫힌 뒤 도착한 응답은 무시합니다. Markdown의 원본 HTML은 실행하지 않으며 다른 텍스트 형식은 원문으로 표시합니다.
+
+Hermes 대화는 DocumentWorkspace·DocumentPanel을 사용해 문서를 대화 옆에 표시합니다. 문서를 보면서 입력할 수 있고 문서/소스를 전환합니다. 다른 화면의 DocumentPreview는 기존 Drawer 동작을 유지합니다.

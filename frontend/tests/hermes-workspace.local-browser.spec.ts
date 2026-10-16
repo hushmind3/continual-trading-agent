@@ -178,9 +178,13 @@ test('first chat persists its new session and restores it after reload',async({p
 test('local report links open readable documents inside the chat',async({page})=>{
  const {calls}=await fixture(page);
  await page.getByRole('button',{name:'오류 보고서',exact:true}).click();
- const dialog=page.getByRole('dialog');
+ const dialog=page.getByRole('complementary',{name:'결과 문서'});
  await expect(dialog.getByRole('heading',{name:'검사 보고서'})).toBeVisible();
  await expect(dialog).toContainText('재시작 보호 확인');
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toBeEditable();
+ await dialog.getByRole('button',{name:'소스 보기',exact:true}).click();
+ await expect(dialog.locator('pre')).toContainText('# 검사 보고서');
  expect(await page.evaluate(()=>Boolean((window as unknown as Record<string,unknown>).reportUnsafe))).toBe(false);
  expect(calls.some(call=>call.op==='artifact'&&call.payload.path==='development/docs/error_mining_report.md')).toBe(true);
  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);

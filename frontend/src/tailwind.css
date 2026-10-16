@@ -876,3 +876,6 @@
 
 .hermes-composer .ha-mode-select>svg{@apply hidden}
 .hermes-composer .ha-mode-select select{@apply text-gray-600;@apply text-label;@apply max-w-26.25}
+
+.hermes-document-panel{@apply flex min-w-0 w-1/2 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white}
+@media(max-width:760px){.hermes-document-panel{@apply absolute inset-0 z-20 w-full}}

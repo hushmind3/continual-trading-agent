@@ -1,3 +1,4 @@
+import {DocumentWorkspace,DocumentPanel,useDocumentWorkspace} from '../../../../ui/DocumentPreview';
 import {useEffect,useRef,useState} from 'react';
 import {ArrowDown} from 'lucide-react';
 import {request} from '../../../../data/api';
@@ -14,7 +15,9 @@ import {ChatWelcome} from './ChatWelcome';
 interface Props {status?:AgentStatus;modelName:string;focused:boolean;onFocus:()=>void;onStatus:(s:AgentStatus)=>void;onModels:()=>void;onSettings:()=>void;onRefresh:()=>void}
 const draftKey=(id:string)=>'hermes.draft.'+(id||'new');
 const mobile=()=>window.matchMedia('(max-width:760px)').matches;
-export function Chat({status,modelName,focused,onFocus,onStatus,onModels,onSettings,onRefresh}:Props){
+export function Chat(props:Props){return <DocumentWorkspace><ChatWorkspace {...props}/></DocumentWorkspace>;}
+function ChatWorkspace({status,modelName,focused,onFocus,onStatus,onModels,onSettings,onRefresh}:Props){
+ const documents=useDocumentWorkspace();
  const [sessions,setSessions]=useState<Session[]>([]),[selected,setSelected]=useState(''),[messages,setMessages]=useState<Message[]>([]),[text,setText]=useState(()=>localStorage.getItem(draftKey(''))||''),[error,setError]=useState(''),[pending,setPending]=useState(false),[optimistic,setOptimistic]=useState('');
  const [sessionsOpen,setSessionsOpen]=useState(()=>!mobile()&&localStorage.getItem('hermes.sessions.open')==='true'),[activityOpen,setActivityOpen]=useState(false),[query,setQuery]=useState(''),[showLatest,setShowLatest]=useState(false);
  const viewport=useRef<HTMLDivElement>(null),follow=useRef(true),selection=useRef(''),optimisticAfter=useRef(0),composer=useRef<HTMLTextAreaElement>(null);
@@ -52,7 +55,7 @@ export function Chat({status,modelName,focused,onFocus,onStatus,onModels,onSetti
  const empty=!messages.length&&!optimistic&&!(thisJob?.live_text&&active);
  return <div className={'hermes-chat-layout '+(sessionsOpen?'sessions-open':'sessions-closed')}>
  {sessionsOpen&&<><IconButton className="ha-panel-backdrop" aria-label="대화 목록 배경 닫기" tabIndex={-1} onClick={()=>setSessionsOpen(false)}/><SessionSidebar sessionPanel={sessionPanel} toggleSessions={toggleSessions} create={()=>void create()} pending={pending} query={query} setQuery={setQuery} visible={visible} selected={selected} choose={id=>void choose(id)} onSettings={onSettings}/></>}
- <section className="hermes-chat"><ChatHeader sessionsOpen={sessionsOpen} sessionButton={sessionButton} title={title} shownModel={shownModel} modelReady={status?.local_model.state==='ready'} metrics={thisJob?.metrics??{context_limit:status?.job.metrics?.context_limit}} pending={pending} create={()=>void create()} activityButton={activityButton} activityOpen={activityOpen} toggleActivity={()=>{setActivityOpen(v=>!v);if(mobile())setSessionsOpen(false)}} focused={focused} onFocus={onFocus} onModels={onModels} onSettings={onSettings} toggleSessions={toggleSessions}/>
+ <section className="hermes-chat"><ChatHeader sessionsOpen={sessionsOpen} sessionButton={sessionButton} title={title} shownModel={shownModel} modelReady={status?.local_model.state==='ready'} metrics={thisJob?.metrics??{context_limit:status?.job.metrics?.context_limit}} pending={pending} create={()=>void create()} activityButton={activityButton} activityOpen={activityOpen} toggleActivity={()=>{documents?.close();setActivityOpen(v=>!v);if(mobile())setSessionsOpen(false)}} focused={focused} onFocus={onFocus} onModels={onModels} onSettings={onSettings} toggleSessions={toggleSessions}/>
 
  <div className="hermes-chat-body"><div ref={viewport} className={'hermes-messages '+(empty?'is-empty':'')} onScroll={()=>{const el=viewport.current;if(el){follow.current=el.scrollHeight-el.scrollTop-el.clientHeight<90;setShowLatest(!follow.current)}}}><div className="ha-conversation" aria-live="polite">
  {empty&&<ChatWelcome onPick={value=>{draft(value);composer.current?.focus()}}/>}
@@ -60,7 +63,7 @@ export function Chat({status,modelName,focused,onFocus,onStatus,onModels,onSetti
  {optimistic&&!messages.slice(optimisticAfter.current).some(m=>m.role==='user'&&contentText(m.content)===optimistic)&&<article className="hermes-message user"><div className="ha-message-content"><MessageBody text={optimistic} user/></div></article>}
  {thisJob?.live_text&&active&&contentText(messages.at(-1)?.content)!==thisJob.live_text&&<article className="hermes-message assistant is-streaming"><div className="ha-assistant-mark">✳</div><div className="ha-message-content"><MessageBody text={thisJob.live_text}/><span className="ha-stream-dot" aria-label="답변 작성 중"/></div></article>}
  </div></div>{showLatest&&<IconButton className="ha-scroll-latest" type="button" aria-label="최신 메시지로 이동" onClick={()=>{follow.current=true;setShowLatest(false);viewport.current?.scrollTo({top:viewport.current.scrollHeight,behavior:'smooth'})}}><ArrowDown size={17}/>최신 메시지</IconButton>}
- {activityOpen&&<><IconButton className="ha-panel-backdrop ha-activity-backdrop" aria-label="작업 내역 배경 닫기" tabIndex={-1} onClick={()=>setActivityOpen(false)}/><ActivityPanel messages={messages} activityPanel={activityPanel} thisJob={thisJob} selected={selected} pending={pending} active={active} onClose={()=>setActivityOpen(false)} onRefresh={onRefresh} archive={()=>void archive()}/></>}</div>
+ {documents?.current?<DocumentPanel/>:activityOpen&&<><IconButton className="ha-panel-backdrop ha-activity-backdrop" aria-label="작업 내역 배경 닫기" tabIndex={-1} onClick={()=>setActivityOpen(false)}/><ActivityPanel messages={messages} activityPanel={activityPanel} thisJob={thisJob} selected={selected} pending={pending} active={active} onClose={()=>setActivityOpen(false)} onRefresh={onRefresh} archive={()=>void archive()}/></>}</div>
  <div className="ha-composer-dock">
  {thisJob?.approval&&<div className="hermes-approval"><b>{thisJob.approval.kind==='question'?'헤르메스의 질문':'작업 실행 확인'}</b><details><summary>요청 내용 보기</summary><pre>{thisJob.approval.detail}</pre></details>{thisJob.approval.kind==='question'?<><Textarea aria-label="헤르메스 질문에 답변" value={answer} onChange={e=>setAnswer(e.target.value)}/><Button disabled={pending||!answer.trim()} onClick={()=>void respond(true)}>답변 보내기</Button></>:<div className="hermes-actions"><Button tone="primary" disabled={pending} onClick={()=>void respond(true)}>허용</Button><Button disabled={pending} onClick={()=>void respond(false)}>거절</Button></div>}</div>}
  {active&&!thisJob?<div className="hermes-current-activity is-active"><span>다른 대화에서 작업 중입니다.</span><Button onClick={()=>void choose(status?.job.session_id??'')}>해당 대화로 이동</Button></div>:null}

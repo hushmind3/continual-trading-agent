@@ -438,3 +438,24 @@ test('document links resolve relative to the open report inside the same panel',
  await expect(panel).toBeVisible();
  await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toBeEditable();
 });
+
+test('activity panel can be dragged wider, resized with keys and remembers its width',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await fixture(page);
+ const open=page.getByRole('button',{name:'작업 내역 보기',exact:true});await open.click();
+ const panel=page.getByRole('complementary',{name:'작업 내역',exact:true});
+ const handle=page.getByRole('separator',{name:'작업 내역 너비 조절',exact:true});
+ const original=(await panel.boundingBox())!;
+ const grip=(await handle.boundingBox())!;
+ await page.mouse.move(grip.x+grip.width/2,grip.y+grip.height/2);await page.mouse.down();
+ await page.mouse.move(grip.x-180,grip.y+grip.height/2,{steps:8});await page.mouse.up();
+ await expect.poll(async()=>(await panel.boundingBox())!.width).toBeGreaterThan(original.width+100);
+ const dragged=(await panel.boundingBox())!.width;
+ await handle.focus();await page.keyboard.press('ArrowLeft');
+ await expect.poll(async()=>(await panel.boundingBox())!.width).toBeGreaterThan(dragged);
+ const remembered=(await panel.boundingBox())!.width;
+ await page.getByRole('button',{name:'작업 내역 닫기',exact:true}).click();await open.click();
+ await expect.poll(async()=>Math.abs((await panel.boundingBox())!.width-remembered)).toBeLessThan(2);
+ await handle.dblclick();
+ await expect.poll(async()=>Math.abs((await panel.boundingBox())!.width-original.width)).toBeLessThan(2);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});

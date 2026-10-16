@@ -880,8 +880,8 @@
 .hermes-composer .ha-mode-select>svg{@apply hidden}
 .hermes-composer .ha-mode-select select{@apply text-gray-600;@apply text-label;@apply max-w-26.25}
 
-.hermes-document-panel{@apply relative flex min-w-0 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white;width:var(--document-width,50%)}
-.hermes-document-panel.is-compact{width:var(--document-width,33.333%)}
+.hermes-document-panel{@apply relative flex min-w-0 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white;width:var(--side-panel-width,50%)}
+.hermes-document-panel.is-compact{width:var(--side-panel-width,33.333%)}
 .hermes-document-resizer{@apply absolute left-0 top-0 bottom-0 z-10 w-1 cursor-col-resize touch-none hover:bg-blue-200 focus-visible:bg-blue-300}
 .ha-chat-main{@apply flex min-w-0 min-h-0 flex-1 flex-col}
 .ha-transcript-viewport{@apply relative flex min-h-0 min-w-0 flex-1}
@@ -1046,3 +1046,11 @@
 .ui-toggle-switch[aria-checked=true] .ui-switch-track{@apply bg-blue-600}
 .ui-toggle-switch[aria-checked=true] .ui-switch-track>span{@apply translate-x-3}
 .ui-toggle-switch[aria-checked=true]{@apply text-blue-700}
+
+/* Shared side-panel geometry; values belong to the theme, user widths to storage. */
+:root{--panel-min-percent:20;--panel-max-percent:80;--panel-resize-step:2}
+.hermes-chat-body>.hermes-log{@apply relative;width:var(--side-panel-width,20rem)}
+.ui-panel-resizer{@apply absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none bg-transparent outline-none hover:bg-blue-100 focus-visible:bg-blue-100}
+.ui-panel-resizer::after{content:'';@apply absolute left-0 top-1/2 h-10 w-1 rounded-full bg-slate-300 transition-colors}
+.ui-panel-resizer:hover::after,.ui-panel-resizer:focus-visible::after{@apply bg-blue-500}
+@media(max-width:760px){.ui-panel-resizer{@apply hidden}.hermes-chat-body>.hermes-log{@apply absolute inset-0 z-20 w-full}.hermes-chat-body>.hermes-document-panel{@apply w-full}}

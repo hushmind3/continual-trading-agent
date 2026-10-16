@@ -8,7 +8,7 @@ export const agentSettingsSections = [
   {id:'mcp', name:'MCP', description:'서버 설치와 연결 관리', icon:Plug},
   {id:'skills', name:'스킬', description:'작업 지침과 사용 설정', icon:BookOpen},
 ];
-export const agentPages = [{id:'chat',name:'헤르메스 대화',icon:MessageSquare},...['models','workspace','mcp','skills','prompt'].map(id=>agentSettingsSections.find(section=>section.id===id)!)];
+export const agentPages = [{id:'chat',name:'대화',icon:MessageSquare},...['models','workspace','mcp','skills','prompt'].map(id=>agentSettingsSections.find(section=>section.id===id)!)];
 export const agentHref = (id:string) => '#'+hermesRoute+(id==='chat'?'':'/'+id);
 export function agentLocation() {
   const query = new URLSearchParams(location.hash.split('?')[1] || '');

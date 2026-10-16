@@ -1,6 +1,6 @@
 import {memo} from 'react';
 import {Check,ChevronDown,Loader2,Wrench,TriangleAlert,ArrowDownToLine} from 'lucide-react';
-import {contentText,type Message,type Job,type Metrics} from '../types';
+import {contentText,type Message,type Job} from '../types';
 import {toolLabel,eventSummary} from '../labels';
 import {MessageBody,CopyButton} from './MessageBody';
 import {GeneratedFiles} from './GeneratedFiles';
@@ -29,18 +29,6 @@ function stepInput(args:string){try{const value=JSON.parse(args);return String(v
 export function ToolHistory({messages}:{messages:Message[]}){
  const steps=blocks(messages).flatMap(block=>block.kind==='tools'?block.steps:[]);
  return <div className="ha-activity-timeline">{steps.map((step,index)=>{const error=step.result!==undefined&&failed(step.result);return <details className={'ha-activity-item '+(error?'error':'received')} key={step.id+'-'+index}><summary><span className="ha-step-dot">{error?<TriangleAlert size={13}/>:<Check size={13}/>}</span><span className="min-w-0"><b>{toolLabel(step.name)}</b><small className="block truncate" title={stepInput(step.args)}>{stepInput(step.args)||'입력 없음'}</small></span><ChevronDown size={13}/></summary><div><small>요청</small><pre>{step.args||'별도 입력 없음'}</pre>{step.result!==undefined&&<><small>{error?'오류 결과':'결과'}</small><pre>{contentText(step.result)}</pre></>}</div></details>})}</div>;
-}
-const number=(n?:number)=>n==null?'—':n.toLocaleString('ko-KR');
-export function RuntimeMetrics({metrics}:{metrics?:Metrics}){
- const m=metrics,percent=m?.context_limit&&m.context_tokens!=null?Math.min(100,m.context_tokens/m.context_limit*100):undefined;
- return <dl className="hermes-runtime-metrics" aria-label="모델 실행 정보">
- <div className="ha-context"><dt>컨텍스트</dt><dd>{number(m?.context_tokens)} <span>/ {number(m?.context_limit)}</span>{percent!=null&&<span> · {percent.toFixed(1)}%</span>}</dd></div>
- <div><dt>생성 속도</dt><dd>{m?.generation_tps==null?'—':m.generation_tps+' tok/s'}</dd></div>
- <div title="현재 작업의 누적 입력 토큰"><dt>입력 토큰</dt><dd>{number(m?.input_tokens)}</dd></div>
- <div title="현재 작업의 누적 출력 토큰"><dt>출력 토큰</dt><dd>{number(m?.output_tokens)}</dd></div>
- <div><dt>모델 요청</dt><dd>{m?.api_calls==null?'—':number(m.api_calls)+'회'}</dd></div>
- <div><dt>경과 시간</dt><dd>{m?.elapsed_seconds==null?'—':Math.round(m.elapsed_seconds)+'초'}</dd></div>
- </dl>;
 }
 export function CurrentActivity({job,active}:{job?:Job;active:boolean}){
  const event=[...(job?.events??[])].reverse().find(e=>['tool_start','tool_complete','starting','autonomy_decision'].includes(e.name));

@@ -8,7 +8,7 @@ import {useAgentSettings} from '../useAgentSettings';
 import {LocalModelPicker,type LocalModel} from './LocalModelPicker';
 import {ModelServerForm} from './ModelServerForm';
 export function ModelSettings({busy,onStatus,localModel,onChat}:{busy:boolean;onStatus:(status:AgentStatus)=>void;localModel?:AgentStatus['local_model'];onChat:()=>void}) {
- const {cfg,setCfg,error,setError,reload}=useAgentSettings();
+ const {cfg,setCfg,acceptCfg,error,setError,reload}=useAgentSettings();
  const [files,setFiles]=useState<LocalModel[]>([]),[models,setModels]=useState<string[]>([]),[selected,setSelected]=useState(''),[mode,setMode]=useState('local');
  const [pending,setPending]=useState(''),[notice,setNotice]=useState(''),[fileError,setFileError]=useState('');
  const refresh=async()=>{setFileError('');try{const response=await request<{models:LocalModel[]}>(prefix+'models/local',{},'GET');setFiles(response.models);setSelected(previous=>previous||response.models[0]?.path||'')}catch(error){setFileError(failure(error))}};
@@ -17,9 +17,9 @@ export function ModelSettings({busy,onStatus,localModel,onChat}:{busy:boolean;on
  const run=async(name:string,action:()=>Promise<void>)=>{setPending(name);setError('');setNotice('');try{await action()}catch(error){setError(failure(error))}finally{setPending('')}};
  if(!cfg)return <SettingsLoadState error={error} retry={reload}/>;
  const loading=localModel?.state==='loading',disabled=busy||!!pending||!!loading,ready=localModel?.state==='ready'&&cfg.local_model===selected;
- const load=()=>void run('load',async()=>{onStatus(await request<AgentStatus>(prefix+'model/load',{path:selected}));setCfg(await request<Settings>(prefix+'settings',{},'GET'));setNotice('모델 준비를 요청했습니다. 실행 상태가 준비됨으로 바뀌면 대화할 수 있습니다.')});
+ const load=()=>void run('load',async()=>{onStatus(await request<AgentStatus>(prefix+'model/load',{path:selected}));acceptCfg(await request<Settings>(prefix+'settings',{},'GET'));setNotice('모델 준비를 요청했습니다. 실행 상태가 준비됨으로 바뀌면 대화할 수 있습니다.')});
  const connect=()=>void run('models',async()=>{const response=await request<{models:{id:string}[]}>(prefix+'models',{base_url:cfg.base_url,api_key:cfg.api_key});setModels(response.models.map(model=>model.id));if(!cfg.model&&response.models.length)setCfg({...cfg,model:response.models[0].id});setNotice(response.models.length?'연결 확인 · 사용 가능한 모델 '+response.models.length+'개':'서버가 응답했지만 모델 목록은 비어 있습니다. 모델 이름을 직접 입력할 수 있습니다.')});
- const save=()=>void run('save',async()=>{setCfg(await request<Settings>(prefix+'settings',{base_url:cfg.base_url,api_key:cfg.api_key,model:cfg.model,local_model:''}));setNotice('모델 연결을 저장했습니다.')});
+ const save=()=>void run('save',async()=>{acceptCfg(await request<Settings>(prefix+'settings',{base_url:cfg.base_url,api_key:cfg.api_key,model:cfg.model,local_model:''}));setNotice('모델 연결을 저장했습니다.')});
  return <div className="agent-settings-stack">
    <Tabs items={[{id:'local',label:'내 컴퓨터에서 실행'},{id:'server',label:'모델 서버 연결'}]} value={mode} onChange={setMode}/>
    <SettingsSection title={mode==='local'?'로컬 모델':'모델 서버'} description={mode==='local'?'모델 폴더의 GGUF 파일을 선택해 사용합니다.':'이미 실행 중인 모델 서버에 연결합니다.'}

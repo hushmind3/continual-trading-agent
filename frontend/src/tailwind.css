@@ -1000,3 +1000,41 @@
 .ui-tabs .ui-button[role=tab][aria-selected=true]{@apply bg-white text-slate-900 shadow-sm}
 
 .ha-message-actions .ui-button.ha-copy{@apply h-7 min-h-0 min-w-0 rounded-md border-0 bg-transparent px-1 py-1 text-slate-400 shadow-none hover:bg-slate-100 hover:text-slate-700}
+
+.ui-document-source{@apply whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-slate-700}
+.ui-document-html{@apply block h-full min-h-96 w-full rounded-lg border-0 bg-white}
+.ha-session-row{@apply flex min-w-0 items-center gap-1 rounded-lg}
+.ha-session-row .ha-session-choice{@apply flex min-w-0 flex-1 justify-start gap-2 overflow-hidden border-0 bg-transparent px-3 py-3 text-left text-xs text-slate-700 shadow-none}
+.ha-session-row .ha-session-choice span{@apply truncate}
+.ha-session-row:has([aria-current=true]){@apply bg-blue-50}
+.ha-session-row:hover{@apply bg-slate-50}
+.ha-session-row .ha-session-rename-button{@apply shrink-0 border-0 bg-transparent p-2 text-slate-400 shadow-none hover:text-slate-800}
+.ha-session-rename{@apply flex min-w-0 flex-wrap items-center gap-1 p-1}
+.ha-session-rename>.ui-input{@apply min-w-0 flex-1 text-xs}
+.hermes-settings-mount{@apply min-h-0 flex-1 overflow-auto}
+.hermes-settings-mount[hidden],.hermes-settings-page [hidden]{display:none}
+
+/* Three-level navigation: engine identity above quiet, text-first leaf links. */
+.workspace-menu-section>summary{@apply flex cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100}
+.workspace-menu-section>summary::-webkit-details-marker{display:none}
+.workspace-menu-section>summary>span{@apply flex-1}
+.workspace-menu-section>summary>svg:last-child{@apply text-slate-400 transition-transform}
+.workspace-menu-section:not([open])>summary>svg:last-child{@apply -rotate-90}
+.workspace-menu-section>div{@apply ml-5 border-l border-slate-200 pl-2}
+.workspace-menu-section .workspace-menu-leaf{@apply my-0.5 min-h-9 rounded-lg py-2 text-sm font-normal}
+.workspace-layout-compact .workspace-menu-section>div{@apply ml-0 border-0 pl-0}
+
+/* Compact execution facts share the model header; unavailable values remain honest. */
+.hermes-chat-heading{@apply justify-start gap-2.5 px-4 py-2.5}
+.hermes-chat-heading .hermes-runtime-metrics{@apply ml-2 mr-2 flex-1 gap-x-4 gap-y-1 text-xs text-slate-500}
+.hermes-runtime-metrics>div{@apply flex-col items-start gap-0.5}
+.hermes-runtime-metrics dt{@apply text-caption leading-tight}
+.hermes-runtime-metrics dd{@apply text-xs leading-tight}
+.hermes-runtime-metrics .is-unmeasured dd{@apply font-normal text-slate-400}
+.ha-model-state{@apply shrink-0 text-caption font-normal text-slate-400}
+.hermes-chat-heading .ha-model-chip{@apply ml-1 max-w-64 gap-1.5}
+.hermes-chat-title{@apply max-w-36}
+.hermes-runtime-metrics dt{@apply font-normal text-slate-400}
+.hermes-runtime-metrics dd{@apply font-medium text-slate-600}
+.hermes-chat-heading .ha-heading-actions{@apply ml-auto gap-1}
+@media(max-width:760px){.hermes-chat-heading>.hermes-runtime-metrics{@apply ml-0 mr-0 border-0 pt-0.5}.hermes-chat-heading .ha-heading-actions{@apply gap-0}}

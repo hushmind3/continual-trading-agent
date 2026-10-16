@@ -10,6 +10,8 @@ export function Hermes(){
  const [tab,setTab]=useState(()=>agentLocation().view),[status,setStatus]=useState<AgentStatus>(),[error,setError]=useState('');
  const [modelName,setModelName]=useState(''),[focused,setFocused]=useState(()=>sessionStorage.getItem('hermes.focused')==='true');
  const [retry,setRetry]=useState(0),last=useRef('');
+ const [settingsVisited,setSettingsVisited]=useState(()=>tab==='settings');
+ useEffect(()=>{if(tab==='settings')setSettingsVisited(true)},[tab]);
  const polling=working(status)||status?.local_model.state==='loading';
  const refreshModel=()=>{void request<Settings>(prefix+'settings',{},'GET').then(s=>setModelName(s.model)).catch(()=>{})};
  useEffect(refreshModel,[]);
@@ -23,6 +25,6 @@ export function Hermes(){
  return <div className={'hermes-workspace '+(tab==='chat'?'is-chat':'is-settings')+(focused?' is-focused':'')}>
  {error&&<div className="ha-connection-error"><ErrorMessage message={error}/><Button onClick={()=>setRetry(v=>v+1)}>다시 연결</Button></div>}
  <div className="hermes-chat-mount" hidden={tab!=='chat'}><Chat status={status} modelName={modelName} focused={focused} onFocus={focus} onStatus={setStatus} onModels={models} onSettings={()=>navigateAgent('settings')} onRefresh={()=>setRetry(v=>v+1)}/></div>
- {tab==='settings'&&<AgentSettings status={status} onStatus={setStatus} onChat={()=>{navigateAgent('chat');refreshModel()}}/>}
+ {(settingsVisited||tab==='settings')&&<div className="hermes-settings-mount" hidden={tab!=='settings'}><AgentSettings status={status} onStatus={setStatus} onChat={()=>{navigateAgent('chat');refreshModel()}}/></div>}
  </div>;
 }

@@ -275,4 +275,19 @@ for line in sys.stdin:
         self.assertEqual(result['autonomy']['status'], 'done')
 
 
+    def test_09_session_rename_persists_without_replacing_history(self):
+        session=self.bridge.call('session/create',{'title':'이름 변경 전'})['session']
+        self.bridge.call('chat',{'session_id':session['id'],'message':'Create a greeting in the fixture workspace.'})
+        self.assertEqual(self.wait_job()['state'],'complete')
+        history=self.bridge.call('session',{'id':session['id']})['messages']
+        self.assertTrue(history)
+        self.bridge.call('session/rename',{'id':session['id'],'title':'  오류   점검 기록  '})
+        renamed=self.bridge.call('session',{'id':session['id']})
+        self.assertEqual(renamed['session']['title'],'오류 점검 기록')
+        self.assertEqual(renamed['messages'],history)
+        with self.assertRaises(RuntimeError):self.bridge.call('session/rename',{'id':session['id'],'title':' '})
+        with self.assertRaises(RuntimeError):self.bridge.call('session/rename',{'id':'missing-session','title':'제목'})
+        self.bridge.close()
+        self.assertEqual(self.bridge.call('session',{'id':session['id']})['session']['title'],'오류 점검 기록')
+
 if __name__ == '__main__': unittest.main()

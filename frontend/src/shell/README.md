@@ -17,4 +17,8 @@
 
 2026-10-16: React·Vite·공통 tailwind.css를 사용하며 버튼·입력·선택 요소는 src/ui/Primitives.tsx를 재사용합니다. 화면의 API·데이터 처리 계약은 유지합니다.
 
-AI 에이전트의 다섯 소메뉴는 ai_agent/submenu_manager.ts에서 등록합니다. 같은 지연 로딩 작업공간을 공유하고 주소로 화면을 구분하므로 이동 중 대화 상태를 중복 생성하지 않습니다.
+AI 에이전트의 여섯 소메뉴는 ai_agent/submenu_manager.ts에서 등록합니다. 같은 지연 로딩 작업공간을 공유하고 주소로 화면을 구분하므로 이동 중 대화 상태를 중복 생성하지 않습니다.
+
+메뉴가 mountKey를 지정하면 해당 작업공간 인스턴스를 공유합니다. AI 에이전트 소메뉴는 같은 mountKey를 사용해 주소 이동 때 작성 중인 화면을 새로 만들지 않습니다. 지정하지 않은 금융·REA 메뉴의 기존 전환 방식은 유지합니다.
+
+중메뉴가 있는 기능은 MenuItem.section을 지정합니다. navigation/NavigationTree.tsx가 계층·접힘을, MenuLink.tsx가 링크·현재 위치·축소 표시를 담당합니다. section 없는 금융·REA는 기존 메뉴를 유지합니다.

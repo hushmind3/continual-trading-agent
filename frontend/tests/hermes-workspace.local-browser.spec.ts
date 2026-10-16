@@ -9,6 +9,7 @@ const rich=[
  '\n\x60\x60\x60typescript\nconst longLine = "'+ 'x'.repeat(260)+'";\nconsole.log(longLine);\n\x60\x60\x60',
  '[공식 문서](https://example.com/docs)',
  '[오류 보고서](development/docs/error_mining_report.md)',
+ '[HTML 보고서](development/docs/result.html)',
  '<img src="invalid" onerror="window.hermesUnsafe=true">'
 ].join('\n\n');
 const messages:Record<string,unknown>[]=[{role:'user',content:'화면 구성과 확인 결과를 정리해 줘.'},{role:'assistant',content:rich}];
@@ -18,6 +19,8 @@ const settings={base_url:'http://127.0.0.1:1234/v1',model:'Ornith · 화면 확�
 
 async function fixture(page:Page,empty=false,history=false){
  const calls:{op:string;payload:Record<string,unknown>}[]=[];
+ const savedSettings={...settings} as typeof settings & Record<string,unknown>;
+ const titles:Record<string,string>={[id]:'대화 디자인 점검','another-session':'다른 프로젝트'};
  const state={job:{state:'complete',session_id:id,text:'',error:'',events:[{name:'tool_start',detail:JSON.stringify(['step-1','read_file',{path:'example.txt'}]),time:1},{name:'tool_complete',detail:JSON.stringify(['step-1','read_file',{path:'example.txt'},JSON.stringify({success:true,content:'확인된 내용'})]),time:2}],metrics:{context_limit:65536,context_tokens:24576,generation_tps:58.6,input_tokens:25000,output_tokens:720,api_calls:3,elapsed_seconds:18},approval:undefined as undefined|{kind:string;detail:string}}};
  await page.route('**/api**',async route=>{
   const r=route.request(),url=new URL(r.url());let op:string,payload:Record<string,unknown>;
@@ -27,13 +30,15 @@ async function fixture(page:Page,empty=false,history=false){
   const status=()=>({job:{...state.job},local_model:{running:true,state:'ready',base_url:settings.base_url}});
   if(history)state.job.events=[];
   if(op==='status')response=status();
-  else if(op==='settings')response={...settings,...(payload.system_prompt!==undefined?{system_prompt:payload.system_prompt}:{}),...(payload.read_only!==undefined?{read_only:payload.read_only}:{})};
+  else if(op==='settings'){Object.assign(savedSettings,payload);response={...savedSettings}}
   else if(op==='sessions'&&empty)response=state.job.state==='running'?[{id:'new-chat-session',title:'새 대화 검증',model:settings.model}]:[];
-  else if(op==='sessions')response=[{id,title:'대화 디자인 점검',model:settings.model},{id:'another-session',title:'다른 프로젝트',model:settings.model}];
-  else if(op==='session')response={session:{id:payload.id,title:payload.id===id?'대화 디자인 점검':'다른 프로젝트',model:settings.model},messages:payload.id===id?messages:[]};
+  else if(op==='sessions')response=[{id,title:titles[id],model:settings.model},{id:'another-session',title:titles['another-session'],model:settings.model}];
+  else if(op==='session/rename'){titles[String(payload.id)]=String(payload.title);response=Object.entries(titles).map(([id,title])=>({id,title,model:settings.model}))}
+  else if(op==='session')response={session:{id:payload.id,title:titles[String(payload.id)]||'새 대화 검증',model:settings.model},messages:payload.id===id?messages:[]};
   else if(op==='autonomy')response={goal:null,loop:null};
   else if(op==='artifact/upload')response={name:payload.name,path:'C:/workspace/runtime/ai_agent/Hermes/artifacts/uploads/test/'+payload.name,bytes:8};
   else if(op==='artifact'&&payload.path==='missing.md'){await route.fulfill({status:404,json:{detail:'문서 파일이 없습니다.'}});return}
+  else if(op==='artifact'&&String(payload.path).endsWith('.html'))response={name:'result.html',path:payload.path,format:'.html',bytes:200,truncated:false,content:'<h1>HTML 검사 결과</h1><p>완료된 보고서 내용입니다.</p><script>window.top.htmlPreviewUnsafe=true</script><img src="https://example.com/tracker">'};
   else if(op==='artifact')response={name:'error_mining_report.md',path:String(payload.path),format:'.md',bytes:90,content:'# 검사 보고서\n\n- 재시작 보호 확인\n\n<script>window.reportUnsafe=true</script>',truncated:false};
   else if(op==='models/local')response={models:[{path:'C:/models/ornith.gguf',name:'Ornith 9B.gguf',bytes:1024},{path:'C:/models/another.gguf',name:'두 번째 모델.gguf',bytes:2048}],root:'C:/models'};
   else if(op==='model/load')response=status();
@@ -97,7 +102,7 @@ test('session search, per-session drafts and settings preserve the conversation'
  await expect(editor).toHaveValue('작성 중인 메시지를 보존합니다.');
  await page.getByRole('button',{name:'대화 기록 열기',exact:true}).click();
  await page.getByLabel('대화 검색',{exact:true}).fill('다른');
- await expect(page.locator('.hermes-session-list>button')).toHaveCount(1);
+ await expect(page.locator('.hermes-session-list .ha-session-choice')).toHaveCount(1);
  await page.getByRole('button',{name:'다른 프로젝트',exact:true}).click();
  await expect(editor).toHaveValue('');
  await editor.fill('다른 세션의 초안');
@@ -267,10 +272,15 @@ test('engine compaction is preserved in activity instead of flooding the convers
  }finally{messages.shift()}
 });
 
-test('AI Agent main menu exposes six screens with refreshable routes and browser back',async({page})=>{
+test('AI Agent main menu groups six leaf screens under the Hermes engine',async({page})=>{
  await page.setViewportSize({width:1440,height:900});await fixture(page);
  const navigation=page.getByRole('navigation',{name:'AI 에이전트',exact:true});
  await expect(navigation.getByRole('link')).toHaveCount(6);
+ await expect(navigation.locator('.workspace-menu-section>summary')).toHaveText('헤르메스');
+ await expect(navigation.getByRole('link',{name:'대화',exact:true})).toBeVisible();
+ await navigation.locator('.workspace-menu-section>summary').click();
+ await expect(navigation.getByRole('link',{name:'MCP',exact:true})).toBeHidden();
+ await navigation.locator('.workspace-menu-section>summary').click();
  await page.getByLabel('헤르메스에게 보낼 메시지').fill('메뉴 이동 후에도 남을 초안');
  await navigation.getByRole('link',{name:'MCP',exact:true}).click();
  await expect(page).toHaveURL(/#ai_agent\/Hermes\/mcp$/);
@@ -348,4 +358,56 @@ test('history is a temporary chooser and never creates a fourth persistent colum
  await page.getByRole('button',{name:'다른 프로젝트',exact:true}).click();
  await expect(page.getByRole('complementary',{name:'대화 기록',exact:true})).toHaveCount(0);
  await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toBeEditable();
+});
+
+test('HTML reports render as documents while scripts and external images stay blocked',async({page})=>{
+ await fixture(page);let remote=0;
+ await page.route('https://example.com/tracker',async route=>{remote++;await route.abort()});
+ await page.getByRole('button',{name:'HTML 보고서',exact:true}).click();
+ const frame=page.frameLocator('iframe[title="HTML 문서 미리보기"]');
+ await expect(frame.getByRole('heading',{name:'HTML 검사 결과'})).toBeVisible();
+ await expect(frame.getByText('완료된 보고서 내용입니다.')).toBeVisible();
+ expect(await page.evaluate(()=>Boolean((window as unknown as Record<string,unknown>).htmlPreviewUnsafe))).toBe(false);
+ expect(remote).toBe(0);
+ await page.getByRole('complementary',{name:'결과 문서'}).getByRole('button',{name:'소스',exact:true}).click();
+ await expect(page.locator('.ui-document-source')).toContainText('<h1>HTML 검사 결과</h1>');
+});
+test('conversation names can be edited inline without changing session selection',async({page})=>{
+ const {calls}=await fixture(page);
+ await page.getByRole('button',{name:'대화 기록 열기',exact:true}).click();
+ await page.getByRole('button',{name:'대화 디자인 점검 이름 바꾸기',exact:true}).click();
+ await page.getByLabel('대화 제목',{exact:true}).fill('오류 점검');
+ await page.getByRole('button',{name:'대화 제목 저장',exact:true}).click();
+ await expect(page.getByRole('button',{name:'오류 점검',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'오류 점검',exact:true}).click();
+ await expect(page.locator('.hermes-chat-title p')).toHaveText('오류 점검');
+ expect(calls.find(call=>call.op==='session/rename')!.payload).toEqual({id,title:'오류 점검'});
+ expect(await page.evaluate(()=>sessionStorage.getItem('hermes.session'))).toBe(id);
+});
+test('unsaved settings survive switching menus and returning from chat',async({page})=>{
+ await fixture(page);
+ await page.getByRole('button',{name:'설정 열기',exact:true}).click();
+ await page.getByLabel('AI 에이전트 화면').selectOption('workspace');
+ await page.getByLabel('작업 폴더',{exact:true}).fill('C:/workspace/unsaved-draft');
+ await page.getByLabel('AI 에이전트 화면').selectOption('models');
+ await page.getByRole('button',{name:'대화로 돌아가기',exact:true}).click();
+ await page.getByRole('button',{name:'설정 열기',exact:true}).click();
+ await page.getByLabel('AI 에이전트 화면').selectOption('workspace');
+ await expect(page.getByLabel('작업 폴더',{exact:true})).toHaveValue('C:/workspace/unsaved-draft');
+});
+
+test('idle metrics preserve all six facts and show model execution state',async({page})=>{
+ await fixture(page,true);
+ await page.route('**/api**',async route=>{
+  const url=new URL(route.request().url());
+  if(url.searchParams.get('operation')?.endsWith('/status'))await route.fulfill({json:{job:{state:'idle',metrics:{}},local_model:{state:'stopped'}}});
+  else await route.fallback();
+ });
+ await page.reload();
+ const metrics=page.getByLabel('모델 실행 정보');
+ await expect(metrics.locator('dt')).toHaveCount(6);
+ await expect(metrics).toContainText('컨텍스트');
+ await expect(metrics).toContainText('생성 속도');
+ await expect(metrics).toContainText('—');
+ await expect(page.locator('.ha-model-state')).toHaveText('미실행');
 });

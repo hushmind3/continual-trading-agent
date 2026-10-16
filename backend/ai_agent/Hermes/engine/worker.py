@@ -267,6 +267,7 @@ class HermesWorker:
                     'before claiming a browser, desktop, or MCP tool is unavailable. '
                     'Report success only when tool results confirm it. '
                     'When reporting a document or code file, include a Markdown link to its exact local path so the user can open it in the platform. '
+                    'The platform displays Markdown links and captures write_file results as clickable documents. For HTML reports use self-contained static HTML with inline CSS; scripts and external resources are blocked. Do not open Notepad or a browser just to display a report in this chat. '
                     f'This host is Windows. Installed browser executable: {os.environ.get("AGENT_BROWSER_EXECUTABLE_PATH","not detected")}. '
                     'The terminal shell may be Git Bash: ps/which cannot reliably detect Windows applications. '
                     'When asked to open visible Chrome/Edge, your FIRST tool call MUST be desktop_browser, which launches detached without shell quoting. '
@@ -463,6 +464,14 @@ class HermesWorker:
         if operation == 'sessions': return self.sessions()
         if operation == 'session/create': return self.create_session(payload)
         if operation == 'session': return self.session(str(payload.get('id') or ''))
+        if operation == 'session/rename':
+            session_id = str(payload.get('id') or '')
+            title = ' '.join(str(payload.get('title') or '').split())
+            if not title or len(title) > 120 or any(ord(char) < 32 for char in title):
+                raise ValueError('대화 제목은 1~120자로 입력하세요.')
+            self.session(session_id)
+            self.db.set_session_title(session_id, title)
+            return self.sessions()
         if operation == 'session/archive':
             if self.thread and self.thread.is_alive() and self.job['session_id'] == payload.get('id'):
                 raise ValueError('작업 중인 세션은 보관할 수 없습니다.')

@@ -4,6 +4,7 @@ import {useOperations,useSystemState} from '../data/Operations';
 import {Button,Drawer,Empty,ErrorMessage,Status} from '../ui/Primitives';
 import {CollapsiblePanels} from '../ui/Panel';
 import {date} from '../ui/format';
+import {NavigationTree} from './navigation/NavigationTree';
 import type {BackendMenuCatalog} from '../data/menu_types';
 function useNavigation(){
  const catalog=useSystemState<BackendMenuCatalog>('menu_catalog');
@@ -29,12 +30,12 @@ function errorSection(name:string){
 export function Page({active}:{active:string}){
  const {state}=useOperations(),items=useNavigation(),page=destination(location.hash,items),Component=page.component;
  const missing=state?page.required.filter(key=>state[key as keyof typeof state]==null):[];
- return <>{missing.length?<ErrorMessage message={missing.map(key=>key+': '+(state?.module_errors?.[key]||'상태 조회 실패')).join(' · ')}/>:<Suspense fallback={<p className="text-xs text-slate-500">화면을 여는 중입니다.</p>}><Component key={active}/></Suspense>}</>;
+ return <>{missing.length?<ErrorMessage message={missing.map(key=>key+': '+(state?.module_errors?.[key]||'상태 조회 실패')).join(' · ')}/>:<Suspense fallback={<p className="text-xs text-slate-500">화면을 여는 중입니다.</p>}><Component key={page.mountKey??active}/></Suspense>}</>;
 }
 export function Shell({active,children}:{active:string;children:ReactNode}){
  const previousPage=useRef(active);
  useLayoutEffect(()=>{window.scrollTo(0,0);if(previousPage.current===active)return;previousPage.current=active;const frame=requestAnimationFrame(()=>document.getElementById('workspace-content')?.focus({preventScroll:true}));return()=>cancelAnimationFrame(frame)},[active]);
- const {state,error,refresh}=useOperations(),[alerts,setAlerts]=useState(false),[compact,setCompact]=useState(false),[mobileMenu,setMobileMenu]=useState(false),[closedGroups,setClosedGroups]=useState(new Set<string>()),close=useCallback(()=>setAlerts(false),[]);
+ const {state,error,refresh}=useOperations(),[alerts,setAlerts]=useState(false),[compact,setCompact]=useState(false),[mobileMenu,setMobileMenu]=useState(false),close=useCallback(()=>setAlerts(false),[]);
  const [refreshing,setRefreshing]=useState(false),refreshRequest=useRef(false);
  const retry=async()=>{if(refreshRequest.current)return;refreshRequest.current=true;setRefreshing(true);try{await refresh()}finally{refreshRequest.current=false;setRefreshing(false)}};
  const closeMobile=useCallback(()=>setMobileMenu(false),[]);
@@ -43,7 +44,7 @@ export function Shell({active,children}:{active:string;children:ReactNode}){
  const moduleErrors=Object.entries(state?.module_errors??{}),groupErrors=(group:string)=>moduleErrors.filter(([name])=>errorSection(name).group===group).length;
  const notice=(key:string,title:string,target:string,detail:string)=><article key={key} className="workspace-notice"><header><h3>{title}</h3><a href={'#'+target} onClick={close} aria-label={title+' 화면 열기'}>화면 열기 <span aria-hidden="true">↗</span></a></header><details><summary>오류 상세</summary><ErrorMessage message={detail}/></details></article>;
  const visibleErrors=moduleErrors.filter(([name])=>errorSection(name).target===active);
- const menu=(iconsOnly=false)=><>{[...new Set(items.map(item=>item.group))].map(group=><details key={group} open={iconsOnly||!closedGroups.has(group)} className="workspace-menu-group"><summary className={iconsOnly?'sr-only':''} onClick={event=>{event.preventDefault();setClosedGroups(old=>{const next=new Set(old);if(next.has(group))next.delete(group);else next.add(group);return next})}}>{group}{groupErrors(group)>0&&<span className="workspace-menu-error">{groupErrors(group)}</span>}</summary><nav aria-label={group}>{items.filter(item=>item.group===group).map(({hash,name,icon:Icon})=><a key={hash} href={'#'+hash} title={name} onClick={()=>setMobileMenu(false)} aria-current={active===hash?'page':undefined} className="workspace-menu-item"><Icon size={18} className="shrink-0"/><span className={iconsOnly?'sr-only':''}>{name}</span></a>)}</nav></details>)}</>;
+ const menu=(compact=false)=><NavigationTree items={items} active={active} compact={compact} onNavigate={closeMobile} errorCount={groupErrors}/>;
  return <div className="workspace-app min-h-dvh text-slate-900">
  <a className="workspace-skip-link" href="#workspace-content" onClick={event=>{event.preventDefault();document.getElementById('workspace-content')?.focus();}}>본문으로 이동</a>
  <header className="workspace-header"><div className="workspace-header-brand"><Button aria-label={compact?'메뉴 펼치기':'메뉴 접기'} aria-expanded={!compact} className="workspace-icon-button workspace-desktop-toggle" onClick={()=>setCompact(!compact)}>{compact?<Menu size={19}/>:<PanelLeftClose size={19}/>}</Button><Button aria-label="메뉴 열기" aria-expanded={mobileMenu} className="workspace-icon-button workspace-mobile-toggle" onClick={()=>setMobileMenu(true)}><Menu size={20}/></Button><a href="#finance/operation_control" className="workspace-brand"><span className="workspace-brand-mark"><Layers size={18}/></span>프로젝트 플랫폼</a></div><div className="workspace-header-actions"><Status tone={error?'bad':state?'good':'idle'}>{error?'연결 오류':state?'서버 연결':'연결 중'}</Status>{state?.job?.running&&<a href="#finance/policy_learning" className="workspace-job-link">작업 실행 중</a>}<span className="workspace-header-divider"/><Button aria-label={refreshing?'새로고침 중':'새로고침'} title="새로고침" aria-busy={refreshing} disabled={refreshing} onClick={()=>void retry()} className="workspace-icon-button"><RefreshCw size={18} className={refreshing?'animate-spin':undefined}/></Button><Button aria-label={'알림 '+(issues.length+moduleErrors.length)+'개'} title="현재 실행 · 알림" onClick={()=>setAlerts(true)} className="workspace-icon-button workspace-notifications"><Bell size={18}/>{issues.length+moduleErrors.length>0&&<span className="workspace-notification-dot"/>}</Button></div></header>

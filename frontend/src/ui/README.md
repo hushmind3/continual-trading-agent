@@ -20,7 +20,7 @@ ChampionSpec은 선택 알고리즘과 실제 정책·Critic 또는 가치 출�
 
 2026-10-16: React·Vite·공통 tailwind.css를 사용하며 버튼·입력·선택 요소는 src/ui/Primitives.tsx를 재사용합니다. 화면의 API·데이터 처리 계약은 유지합니다.
 
-DocumentPreview.tsx는 공통 Drawer·Button·ErrorMessage를 사용해 비동기 로컬 문서를 표시합니다. 파일 로더는 소메뉴가 전달하고, 닫힌 뒤 도착한 응답은 무시합니다. Markdown의 원본 HTML은 실행하지 않으며 다른 텍스트 형식은 원문으로 표시합니다.
+DocumentPreview.tsx는 공통 Drawer·Button·ErrorMessage를 사용해 비동기 로컬 문서를 표시합니다. 파일 로더는 소메뉴가 전달하고, 닫힌 뒤 도착한 응답은 무시합니다. Markdown의 원본 HTML은 실행하지 않습니다. DocumentContent는 HTML을 전체 sandbox와 CSP가 적용된 iframe에서 미리보고, 소스 전환은 원문을 표시합니다. 스크립트·외부 이미지/스타일·폼 전송은 허용하지 않습니다. 다른 텍스트 형식은 원문으로 표시합니다.
 
 Hermes 대화는 DocumentWorkspace·DocumentPanel을 사용해 문서를 대화 옆에 표시합니다. 문서를 보면서 입력할 수 있고 문서/소스를 전환합니다. 다른 화면의 DocumentPreview는 기존 Drawer 동작을 유지합니다.
 
@@ -31,3 +31,5 @@ ComposerFrame은 전체 폭 편집 영역·첨부·도구 모음·실행 옵션�
 SettingsSection은 설정 제목·설명·상태/액션·본문 경계를 공유합니다. SettingsLoadState는 설정 읽기 실패 시 원인과 다시 불러오기를 함께 표시합니다. ui-settings 계열 디자인은 tailwind.css에서 관리합니다.
 
 문서 참조는 ui-document-link 텍스트 링크로 표시해 본문을 버튼 모양으로 쪼개지 않습니다. Tabs는 선택된 항목만 강조하고 설정 화면에서 내용 폭만 사용합니다. 스킬·MCP 입력창도 별도 모달 구현 대신 공통 Drawer를 사용합니다.
+
+DocumentContent.tsx는 팝업과 나란히 보기에서 공통으로 사용하는 문서 본문입니다. HTML 미리보기와 원문 보기는 분리되며 기존 문서 읽기 API를 그대로 사용합니다.

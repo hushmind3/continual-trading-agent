@@ -14,7 +14,7 @@ Context, generation speed, input/output tokens, request count and elapsed time a
 
 ChatHeader, SessionSidebar, ActivityPanel, ChatComposer and ChatWelcome are controlled presentation components. Button/IconButton and Input/Select/Textarea come from the shared UI primitives. The composer reads its resize bounds from the common Tailwind stylesheet rather than duplicating design constants in JavaScript.
 
-동일한 문장을 다시 보내도 현재 전송 이후에 저장된 메시지만 대조합니다. 전송으로 새 세션이 생기면 sessionStorage에 즉시 기록합니다. 로컬 문서 링크·인라인 문서 경로는 공통 DocumentPreview로 열며 성공한 write_file/patch 결과 파일은 접힌 도구 기록 바깥에도 표시합니다. Markdown·텍스트 미리보기만 지원하며 파일 실행·HTML 실행은 하지 않습니다.
+동일한 문장을 다시 보내도 현재 전송 이후에 저장된 메시지만 대조합니다. 전송으로 새 세션이 생기면 sessionStorage에 즉시 기록합니다. 로컬 문서 링크·인라인 문서 경로는 공통 DocumentPreview로 열며 성공한 write_file/patch 결과 파일은 접힌 도구 기록 바깥에도 표시합니다. Markdown·텍스트와 샌드박스 HTML 미리보기를 지원합니다. HTML 스크립트·외부 리소스 요청·폼 전송은 차단합니다.
 
 대화 본문에는 사용자·에이전트 메시지와 결과 파일만 표시합니다. 도구 요청·결과·오류와 현재 실행 명령은 오른쪽 작업 내역에 모읍니다. 현재 이벤트가 없는 과거 세션은 저장된 도구 호출·결과를 작업 내역에서 확인합니다.
 
@@ -27,3 +27,7 @@ ChatHeader, SessionSidebar, ActivityPanel, ChatComposer and ChatWelcome are cont
 문서를 연 상태에서는 대화·입력창이 같은 왼쪽 열에 남고 문서가 오른쪽 높이를 모두 사용합니다. 화면 폭이 좁으면 실행 수치는 가로로 읽는 한 줄이며, 엔진 압축 요약·출력 한도 메모는 EngineNotes를 통해 작업 내역에서만 펼칩니다(원본 기록은 유지).
 
 대화 기록은 임시 선택 패널입니다. 대화 선택 후 닫히고, 열 때 작업 내역·문서와 동시에 본문 공간을 나누지 않습니다. 데스크톱에서도 Escape·키보드 초점 순환을 지원합니다. 대화 보관은 기록 패널에 두며 작업 중인 대화는 보관할 수 없습니다. 본문 문서 링크는 공통 텍스트 링크 스타일로 표시합니다.
+
+대화 기록의 이름 바꾸기는 해당 행에서 입력·저장·취소합니다. session/rename API가 성공하면 목록과 헤더 제목만 갱신하며 선택 대화·기록·초안은 유지합니다.
+
+실행 수치는 RuntimeMetrics.tsx, 실행 버튼은 HeaderActions.tsx로 분리했습니다. 모델 옆에 여섯 항목을 같은 크기의 작은 라벨·값으로 정렬하고 미수신 값은 —로 표시합니다. 모델명 옆의 실행 중·불러오는 중·미실행·연결 오류는 백엔드가 보고한 모델 상태입니다. 대화·작업 패널은 기본 닫힘이며 자료가 없는 수치를 임의 계산하지 않습니다.

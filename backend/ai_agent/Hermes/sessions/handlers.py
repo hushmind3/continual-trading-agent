@@ -14,3 +14,6 @@ def session(id: str): return invoke('session', {'id': id})
 
 @router.post('/session/archive')
 def archive(request: dict): return invoke('session/archive', request)
+
+@router.post('/session/rename')
+def rename(request: dict): return invoke('session/rename', request)

@@ -85,10 +85,10 @@ test('session search, per-session drafts and settings preserve the conversation'
  const editor=page.getByLabel('헤르메스에게 보낼 메시지');
  await editor.fill('작성 중인 메시지를 보존합니다.');
  await page.getByRole('button',{name:'설정 열기',exact:true}).click();
- await expect(page.getByRole('navigation',{name:'헤르메스 설정'})).toBeVisible();
- await page.getByRole('button',{name:'MCP',exact:true}).click();
+ await expect(page.getByLabel('AI 에이전트 화면')).toBeVisible();
+ await page.getByLabel('AI 에이전트 화면').selectOption('mcp');
  await expect(page.locator('.ha-settings-section-title h2')).toHaveText('MCP');
- await page.getByRole('button',{name:'스킬',exact:true}).click();
+ await page.getByLabel('AI 에이전트 화면').selectOption('skills');
  await expect(page.locator('.ha-settings-section-title h2')).toHaveText('스킬');
  await page.getByRole('button',{name:'대화로 돌아가기',exact:true}).click();
  await expect(editor).toHaveValue('작성 중인 메시지를 보존합니다.');
@@ -145,7 +145,7 @@ test('goal send, stop and approval controls use the existing API contract',async
 test('system prompt settings save only the prompt and preserve the chat',async({page})=>{
  const {calls}=await fixture(page);
  await page.getByRole('button',{name:'설정 열기',exact:true}).click();
- await page.getByRole('button',{name:'시스템 프롬프트',exact:true}).click();
+ await page.getByLabel('AI 에이전트 화면').selectOption('prompt');
  const editor=page.getByRole('textbox',{name:'시스템 프롬프트',exact:true});
  await expect(editor).toBeEnabled();
  await page.getByRole('checkbox',{name:'읽기 전용 분석'}).check();
@@ -232,4 +232,49 @@ test('missing document leaves the full conversation usable instead of opening an
  await expect(page.getByRole('alert')).toContainText('문서 파일이 없습니다.');
  await expect(page.getByRole('complementary',{name:'결과 문서'})).toHaveCount(0);
  await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toBeEditable();
+});
+
+test('mobile editor keeps the full writing width and a compact metric row',async({page})=>{
+ await page.setViewportSize({width:350,height:780});await fixture(page);
+ const editor=page.getByLabel('헤르메스에게 보낼 메시지');
+ await editor.fill('파일을 읽고 결과를 정리해 주세요.');
+ const writing=(await editor.boundingBox())!,frame=(await page.locator('.hermes-composer').boundingBox())!;
+ expect(writing.width/frame.width).toBeGreaterThan(.85);
+ expect((await page.locator('.hermes-runtime-metrics').boundingBox())!.height).toBeLessThan(45);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});
+test('document workspace keeps composer in the conversation column',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await fixture(page);
+ await page.getByRole('button',{name:'오류 보고서',exact:true}).click();
+ const document=page.getByRole('complementary',{name:'결과 문서'});
+ await expect(document).toBeVisible();
+ const panel=(await document.boundingBox())!,composer=(await page.locator('.hermes-composer').boundingBox())!;
+ expect(composer.x+composer.width).toBeLessThanOrEqual(panel.x+1);
+ expect(panel.y+panel.height).toBeGreaterThanOrEqual(composer.y+composer.height);
+});
+test('engine compaction is preserved in activity instead of flooding the conversation',async({page})=>{
+ messages.unshift({role:'assistant',content:'[CONTEXT COMPACTION — REFERENCE ONLY] Internal context summary fixture'});
+ try{
+  await fixture(page);
+  await expect(page.locator('.ha-conversation')).not.toContainText('Internal context summary fixture');
+  await page.getByRole('button',{name:'작업 내역 보기',exact:true}).click();
+  await page.getByText('대화 정리 기록 · 1개',{exact:true}).click();
+  await expect(page.locator('.ha-engine-notes')).toContainText('Internal context summary fixture');
+ }finally{messages.shift()}
+});
+
+test('AI Agent main menu exposes five screens with refreshable routes and browser back',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await fixture(page);
+ const navigation=page.getByRole('navigation',{name:'AI 에이전트',exact:true});
+ await expect(navigation.getByRole('link')).toHaveCount(5);
+ await page.getByLabel('헤르메스에게 보낼 메시지').fill('메뉴 이동 후에도 남을 초안');
+ await navigation.getByRole('link',{name:'MCP',exact:true}).click();
+ await expect(page).toHaveURL(/#ai_agent\/Hermes\/mcp$/);
+ await expect(page.locator('.ha-settings-section-title h2')).toHaveText('MCP');
+ await page.reload();await expect(page.locator('.ha-settings-section-title h2')).toHaveText('MCP');
+ await page.getByLabel('AI 에이전트 화면').selectOption('skills');
+ await expect(page).toHaveURL(/#ai_agent\/Hermes\/skills$/);
+ await page.goBack();await expect(page.locator('.ha-settings-section-title h2')).toHaveText('MCP');
+ await page.getByRole('button',{name:'대화로 돌아가기',exact:true}).click();
+ await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toHaveValue('메뉴 이동 후에도 남을 초안');
 });

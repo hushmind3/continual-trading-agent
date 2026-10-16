@@ -675,16 +675,19 @@
 .ha-tool-step small{@apply text-caption;@apply text-slate-400}
 .hermes-workspace .ha-tool-step pre{font:calc(var(--spacing) * 2.75)/1.7 ui-monospace,monospace;@apply p-2.5;@apply bg-white;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 1.75);@apply max-h-65;@apply overflow-auto;@apply mt-1.5 mr-0 mb-3 ml-0}
 .ha-composer-dock{@apply w-full;@apply max-w-composer;@apply mt-0 mr-auto mb-0 ml-auto;@apply pt-2 pr-3 pb-3 pl-3;@apply shrink-0}
-.hermes-composer{@apply flex;@apply flex-wrap;@apply items-end;gap:calc(var(--spacing) * 2) calc(var(--spacing) * 3);@apply m-0;@apply pt-2.25 pr-3 pb-2.25 pl-4.5;@apply border border-solid border-gray-200;@apply rounded-composer;@apply bg-white;box-shadow:0 calc(var(--spacing) * 0.75) calc(var(--spacing) * 4) color-mix(in srgb, var(--color-black) 3%, transparent)}
+.hermes-composer{@apply relative grid grid-cols-1 items-stretch;gap:calc(var(--spacing) * 2) calc(var(--spacing) * 3);@apply m-0;@apply pt-2.25 pr-3 pb-2.25 pl-4.5;@apply border border-solid border-gray-200;@apply rounded-composer;@apply bg-white;box-shadow:0 calc(var(--spacing) * 0.75) calc(var(--spacing) * 4) color-mix(in srgb, var(--color-black) 3%, transparent)}
 .hermes-composer:focus-within{@apply border-gray-400;box-shadow:0 calc(var(--spacing) * 0.75) calc(var(--spacing) * 4.5) color-mix(in srgb, var(--color-black) 5%, transparent)}
-.hermes-composer textarea{@apply block;@apply flex-1;@apply min-w-0;@apply w-0;@apply min-h-10;@apply max-h-40;@apply resize-none;@apply overflow-auto;@apply text-base;@apply leading-relaxed;@apply pt-1 pr-0.25 pb-1 pl-0.25;@apply text-slate-800}
+.hermes-composer textarea{@apply block w-full min-w-0;@apply min-h-10;@apply max-h-40;@apply resize-none;@apply overflow-auto;@apply text-base;@apply leading-relaxed;@apply pt-1 pr-0.25 pb-1 pl-0.25;@apply text-slate-800}
 .hermes-composer textarea::placeholder{@apply text-slate-500}
 .hermes-composer .ha-composer-bottom{@apply flex;@apply shrink-0;@apply items-center;@apply gap-2.5;@apply pt-0.75 pr-0 pb-0.75 pl-0}
 .ha-mode-select{@apply flex;@apply items-center;@apply gap-1.25;@apply text-slate-400}
 .ha-mode-select select{@apply border-0;@apply bg-transparent;@apply text-xs;@apply text-slate-500;@apply pt-1.25 pr-0.5 pb-1.25 pl-0.5;@apply max-w-36.25;@apply outline-blue-200}
 .hermes-composer .ha-enter-hint{@apply ml-auto;@apply text-caption;@apply text-gray-400}
-.hermes-composer .ui-button{@apply flex;@apply items-center;@apply justify-center;@apply min-w-8.5;@apply h-8.5;@apply p-1.75;@apply border-0;border-radius:calc(var(--spacing) * 2.5);@apply bg-gray-800;@apply text-white;@apply shadow-none}
-.hermes-composer .ui-button:disabled{@apply bg-slate-200;@apply text-slate-400}
+.hermes-composer .ui-button{@apply inline-flex items-center justify-center min-w-9 h-9 p-2 border-0 rounded-full bg-transparent text-slate-600 shadow-none}
+.hermes-composer .ui-button[data-composer-action=send]{@apply bg-slate-900 text-white}
+.hermes-composer .ui-button[data-composer-action=attach]:hover{@apply bg-slate-100}
+.hermes-composer .ui-button:disabled{@apply text-slate-400}
+.hermes-composer .ui-button[data-composer-action=send]:disabled{@apply bg-slate-100 text-slate-400}
 .hermes-composer .ui-button[data-tone=danger]{@apply bg-red-50;@apply text-red-500}
 .hermes-composer .ui-button span{@apply text-label}
 .hermes-run-options{@apply basis-full;@apply flex;@apply flex-wrap;@apply gap-2.5;@apply mt-2.25 mr-0 mb-0 ml-0;@apply pt-2.5 pr-0 pb-0 pl-0;@apply border-t border-solid border-slate-100}
@@ -804,10 +807,10 @@
  .ha-heading-actions{@apply gap-0}
  .hermes-chat-heading .ui-button{@apply h-8;@apply min-w-7;@apply p-1.25}
  .ha-heading-actions .ui-button:first-child{@apply hidden}
- .hermes-runtime-metrics{@apply grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:calc(var(--spacing) * 0.75) calc(var(--spacing) * 1.5);@apply p-0;@apply text-caption}
- .hermes-runtime-metrics>div{@apply block}
- .hermes-runtime-metrics .ha-context{@apply col-span-2}
- .hermes-runtime-metrics dd{@apply text-label;@apply wrap-anywhere;@apply whitespace-normal}
+ .hermes-runtime-metrics{@apply flex flex-nowrap overflow-x-auto gap-4 py-1 text-caption}
+ .hermes-runtime-metrics>div{@apply flex shrink-0 items-baseline}
+ .hermes-runtime-metrics .ha-context{@apply shrink-0}
+ .hermes-runtime-metrics dd{@apply text-label whitespace-nowrap}
  .hermes-messages{@apply pt-4 pr-3 pb-3 pl-3;scrollbar-gutter:auto}
  .hermes-message{@apply gap-2.5;@apply mb-4}
  .ha-assistant-mark{@apply w-5.75;@apply h-6.25;@apply text-2xl}
@@ -880,5 +883,40 @@
 .hermes-document-panel{@apply relative flex min-w-0 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white;width:var(--document-width,50%)}
 .hermes-document-panel.is-compact{width:var(--document-width,33.333%)}
 .hermes-document-resizer{@apply absolute left-0 top-0 bottom-0 z-10 w-1 cursor-col-resize touch-none hover:bg-blue-200 focus-visible:bg-blue-300}
-.hermes-chat-body:has(.hermes-document-panel)>.hermes-messages{@apply basis-0 w-0}
+.ha-chat-main{@apply flex min-w-0 min-h-0 flex-1 flex-col}
+.ha-transcript-viewport{@apply relative flex min-h-0 min-w-0 flex-1}
+.hermes-chat-body:has(.hermes-document-panel)>.ha-chat-main{@apply basis-0}
 @media(max-width:760px){.hermes-document-panel{@apply absolute inset-0 z-20 w-full}}
+
+/* Shared writing surface: full-width editor, predictable toolbar, real file chips. */
+.ui-composer-editor{@apply min-w-0 w-full}
+.ui-composer-toolbar{@apply flex w-full min-w-0 items-center gap-2}
+.ui-composer-toolbar>[data-composer-action=send]{@apply ml-auto shrink-0}
+.ui-composer-key-hint{@apply ml-auto truncate text-xs text-slate-400}
+.ui-file-chips{@apply flex min-w-0 gap-2 overflow-x-auto pb-1}
+.ui-file-chip{@apply flex max-w-full shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-3 pr-1 text-slate-500}
+.ui-file-chip>div{@apply min-w-0 max-w-48}
+.ui-file-chip strong{@apply block truncate text-xs font-medium text-slate-700}
+.ui-file-chip small{@apply block text-xs text-slate-500}
+.ui-composer-drop-hint{@apply pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-composer border-2 border-dashed border-blue-400 bg-blue-50 text-sm font-medium text-blue-700}
+.ha-engine-notes{@apply shrink-0 border-b border-slate-200 p-4 text-xs text-slate-500}
+.ha-engine-notes summary{@apply cursor-pointer font-medium}
+.ha-engine-notes p{@apply my-2 leading-relaxed}
+.ha-engine-notes pre{@apply max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-white p-3 text-xs}
+@media(max-width:760px){
+ .ui-composer-key-hint{@apply hidden}
+ .hermes-chat-heading{@apply gap-2}
+ .hermes-chat-title{@apply flex-1 max-w-none}
+ .hermes-chat-title p{@apply max-w-32}
+ .ha-model-chip{@apply ml-0 max-w-32}
+ .ha-heading-actions{@apply ml-0}
+ .hermes-chat-heading>.hermes-runtime-metrics{@apply flex-nowrap overflow-x-auto basis-full}
+ .ui-file-chip>div{@apply max-w-40}
+ .hermes-composer{@apply rounded-2xl}
+}
+
+.hermes-settings-page .ha-settings-layout{@apply block}
+.ha-agent-page-switch{@apply flex min-w-0 items-center gap-3 text-xs text-slate-500}
+.ha-agent-page-switch .ui-select{@apply min-w-0 max-w-52}
+
+.ha-agent-page-switch>span{@apply whitespace-nowrap}

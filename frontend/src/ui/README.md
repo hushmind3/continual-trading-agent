@@ -25,3 +25,5 @@ DocumentPreview.tsx는 공통 Drawer·Button·ErrorMessage를 사용해 비동�
 Hermes 대화는 DocumentWorkspace·DocumentPanel을 사용해 문서를 대화 옆에 표시합니다. 문서를 보면서 입력할 수 있고 문서/소스를 전환합니다. 다른 화면의 DocumentPreview는 기존 Drawer 동작을 유지합니다.
 
 문서 패널은 읽기 성공 후에만 열립니다. 실패는 링크 옆에 표시하고 기존 문서·대화 폭을 유지합니다. 축소·확대·닫기, 경계 드래그·방향키 너비 조절을 제공하며 디자인은 공통 Tailwind에서 관리합니다.
+
+ComposerFrame은 전체 폭 편집 영역·첨부·도구 모음·실행 옵션을 배치하는 공통 입력 폼입니다. FileChips는 파일 이름·크기·첨부 취소를 표시합니다. 디자인은 tailwind.css의 ui-composer·ui-file 클래스에 있습니다.

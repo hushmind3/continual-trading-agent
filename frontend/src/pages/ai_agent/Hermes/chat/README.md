@@ -6,7 +6,7 @@ The message area fills the remaining viewport. Latest Message restores scroll fo
 
 The conversation and composer share a centered 880px reading width on large screens. User bubbles align with that column rather than the monitor edge; the surrounding workspace and header still fill the available viewport. Smaller screens use the available width.
 
-The rounded composer starts as a single row with the run mode and send/stop control beside the text. Multiline input grows vertically and goal/loop options wrap below when selected. Decorative assistant marks are hidden; tool records align with the answer text.
+The composer uses a full-width writing row and a separate toolbar at all viewport widths. Multiline input grows vertically and goal/loop options wrap below when selected. ComposerFrame and FileChips are shared UI components; RunModeOptions owns the mode fields. Decorative assistant marks are hidden; tool records align with the answer text.
 
 Mobile sessions/activity use dismissible overlays with Escape, keyboard focus containment and focus restoration. The composer grows to 160px and then scrolls internally. No polling or navigation launches a model or task.
 
@@ -23,3 +23,5 @@ ChatHeader, SessionSidebar, ActivityPanel, ChatComposer and ChatWelcome are cont
 결과 문서는 데스크톱에서 대화 옆의 독립 패널로 열립니다. 대화 입력을 막지 않으며 문서·소스 전환과 Escape 닫기를 제공합니다. 모바일에서는 전체 폭 패널로 표시합니다. 작업 내역과 문서 패널은 같은 오른쪽 공간을 사용합니다.
 
 파일 첨부 버튼·클립보드 파일 붙여넣기를 지원합니다. 파일당 8 MiB·요청당 8개이며 runtime/ai_agent/Hermes/artifacts/uploads에 저장한 경로를 메시지와 함께 전달합니다. 파일 등록은 모델의 이미지 이해를 뜻하지 않습니다. 실행 중에도 다음 요청의 모드·횟수·첨부는 준비할 수 있고, 현재 실행은 중지 버튼으로 제어합니다.
+
+문서를 연 상태에서는 대화·입력창이 같은 왼쪽 열에 남고 문서가 오른쪽 높이를 모두 사용합니다. 화면 폭이 좁으면 실행 수치는 가로로 읽는 한 줄이며, 엔진 압축 요약·출력 한도 메모는 EngineNotes를 통해 작업 내역에서만 펼칩니다(원본 기록은 유지).

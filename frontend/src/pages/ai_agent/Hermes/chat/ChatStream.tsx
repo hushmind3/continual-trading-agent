@@ -4,6 +4,7 @@ import {contentText,type Message,type Job,type Metrics} from '../types';
 import {toolLabel,eventSummary} from '../labels';
 import {MessageBody,CopyButton} from './MessageBody';
 import {GeneratedFiles} from './GeneratedFiles';
+import {engineNote} from './EngineNotes';
 
 type Call={id?:string;function?:{name?:string;arguments?:string}};
 type Step={id:string;name:string;args:string;result?:unknown};
@@ -13,7 +14,7 @@ function blocks(messages:Message[]):Block[]{
  const output:Block[]=[];let steps:Step[]=[];let first=0;
  const flush=()=>{if(steps.length){output.push({kind:'tools',index:first,steps});steps=[]}};
  for(let i=0;i<messages.length;i++){
-  const m=messages[i],text=contentText(m.content),calls=(m.tool_calls??[]) as Call[];
+  const m=messages[i];if(engineNote(m))continue;const text=contentText(m.content),calls=(m.tool_calls??[]) as Call[];
   if(m.role==='tool'){if(!steps.length)first=i;steps.push({id:'orphan-'+i,name:m.name??'도구',args:'',result:m.content});continue}
   if(!['user','assistant'].includes(m.role))continue;
   if(text.trim()&&(m.role==='user'||!calls.length)){flush();output.push({kind:'message',index:i,message:m})}

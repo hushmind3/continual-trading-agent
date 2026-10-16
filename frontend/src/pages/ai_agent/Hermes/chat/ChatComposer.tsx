@@ -1,10 +1,45 @@
-import {useLayoutEffect,useRef,type RefObject} from 'react';
-import {Sparkles,Square,ArrowUp,Paperclip,X} from 'lucide-react';
-import {Button,Input,Select,Textarea} from '../../../../ui/Primitives';
-export interface Attachment{name:string;path:string;bytes:number}
-interface Props{attachments:Attachment[];uploading:boolean;upload:(files:File[])=>void;removeAttachment:(path:string)=>void;composer:RefObject<HTMLTextAreaElement|null>;text:string;draft:(value:string)=>void;send:()=>void;stop:()=>void;active:boolean;pending:boolean;stopping:boolean;mode:string;setMode:(value:string)=>void;turns:number;setTurns:(value:number)=>void;interval:number;setIntervalSeconds:(value:number)=>void;times:number;setTimes:(value:number)=>void}
-export function ChatComposer({attachments,uploading,upload,removeAttachment,composer,text,draft,send,stop,active,pending,stopping,mode,setMode,turns,setTurns,interval,setIntervalSeconds,times,setTimes}:Props){
- const fileInput=useRef<HTMLInputElement>(null);
- useLayoutEffect(()=>{const el=composer.current;if(!el)return;const style=getComputedStyle(el),min=parseFloat(style.minHeight),max=parseFloat(style.maxHeight);el.style.height='auto';el.style.height=Math.min(max,Math.max(min,el.scrollHeight))+'px'},[composer,text]);
- return <form className="hermes-composer" onSubmit={e=>{e.preventDefault();void send()}}><Input ref={fileInput} type="file" multiple className="hidden" aria-label="첨부 파일 선택" onChange={event=>{upload(Array.from(event.target.files??[]));event.target.value=''}}/><Textarea ref={composer} aria-label="헤르메스에게 보낼 메시지" placeholder="헤르메스에게 작업을 맡겨보세요…" value={text} onChange={e=>draft(e.target.value)} rows={1} onPaste={event=>{const files=Array.from(event.clipboardData.files);if(files.length){event.preventDefault();upload(files)}}} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();void send()}}}/>{attachments.length>0&&<div className="flex flex-wrap gap-2 p-2" aria-label="첨부 파일">{attachments.map(file=><span key={file.path} className="flex items-center gap-1 rounded-lg border px-2 py-1 text-sm">{file.name}<Button type="button" aria-label={file.name+' 첨부 취소'} onClick={()=>removeAttachment(file.path)}><X size={14}/></Button></span>)}</div>}<div className="ha-composer-bottom"><Button type="button" aria-label="파일 첨부" busy={uploading} disabled={uploading} onClick={()=>fileInput.current?.click()}><Paperclip size={17}/></Button><label className="ha-mode-select"><Sparkles size={15}/><Select aria-label="실행 방식" disabled={pending} value={mode} onChange={e=>setMode(e.target.value)}><option value="chat">한 번 실행</option><option value="goal">목표 달성까지</option><option value="loop">반복 실행</option></Select></label>{active?<Button tone="danger" aria-label="작업 중지" busy={pending} disabled={pending||stopping} onClick={()=>void stop()}><Square size={16}/><span>{stopping?'중지 중':'중지'}</span></Button>:<Button type="submit" aria-label="메시지 보내기" title="보내기" tone="primary" busy={pending} disabled={pending||uploading||(!text.trim()&&!attachments.length)}><ArrowUp size={19}/></Button>}</div>{mode!=='chat'&&<div className="hermes-run-options">{mode==='goal'?<label>최대 대화 <Input aria-label="목표 최대 대화 수" type="number" min={1} max={1000} value={turns} disabled={pending} onChange={e=>setTurns(Number(e.target.value))}/></label>:<><label>간격(초, 0은 자동) <Input aria-label="반복 간격" type="number" min={0} value={interval} disabled={pending} onChange={e=>setIntervalSeconds(Number(e.target.value))}/></label><label>횟수(0은 기본 한도) <Input aria-label="반복 횟수" type="number" min={0} value={times} disabled={pending} onChange={e=>setTimes(Number(e.target.value))}/></label></>}</div>}</form>;
+import {useLayoutEffect, useRef, useState, type RefObject} from 'react';
+import {Sparkles, Square, ArrowUp, Paperclip} from 'lucide-react';
+import {Button, Input, Select, Textarea} from '../../../../ui/Primitives';
+import {ComposerFrame} from '../../../../ui/ComposerFrame';
+import {FileChips, type AttachedFile} from '../../../../ui/FileChips';
+import {RunModeOptions} from './RunModeOptions';
+export type Attachment = AttachedFile;
+interface Props {
+ attachments: Attachment[]; uploading: boolean; upload: (files: File[]) => void; removeAttachment: (path: string) => void;
+ composer: RefObject<HTMLTextAreaElement|null>; text: string; draft: (value: string) => void; send: () => void; stop: () => void;
+ active: boolean; pending: boolean; stopping: boolean; mode: string; setMode: (value: string) => void;
+ turns: number; setTurns: (value: number) => void; interval: number; setIntervalSeconds: (value: number) => void;
+ times: number; setTimes: (value: number) => void;
+}
+export function ChatComposer(props: Props) {
+ const {attachments, uploading, upload, removeAttachment, composer, text, draft, send, stop, active, pending, stopping, mode, setMode} = props;
+ const fileInput = useRef<HTMLInputElement>(null), dragDepth = useRef(0);
+ const [dragging, setDragging] = useState(false);
+ useLayoutEffect(() => {
+  const element = composer.current;
+  if (!element) return;
+  const style = getComputedStyle(element);
+  element.style.height = 'auto';
+  element.style.height = Math.min(parseFloat(style.maxHeight), Math.max(parseFloat(style.minHeight), element.scrollHeight)) + 'px';
+ }, [composer, text]);
+ return <ComposerFrame dragging={dragging} onSubmit={event => {event.preventDefault(); send();}}
+  onDragOver={event => {if (event.dataTransfer.types.includes('Files')) {event.preventDefault(); event.dataTransfer.dropEffect='copy'; if (!dragDepth.current) {dragDepth.current=1; setDragging(true);}}}}
+  onDragLeave={event => {if (!event.currentTarget.contains(event.relatedTarget as Node)) {dragDepth.current=0; setDragging(false);}}}
+  onDrop={event => {event.preventDefault(); dragDepth.current=0; setDragging(false); const files=Array.from(event.dataTransfer.files); if(files.length)upload(files);}}
+  attachments={<FileChips files={attachments} remove={removeAttachment}/>}
+  toolbar={<>
+   <Button type="button" variant="ghost" data-composer-action="attach" aria-label="파일 첨부" title="파일 첨부 · 끌어놓기와 붙여넣기도 가능" busy={uploading} disabled={uploading} onClick={() => fileInput.current?.click()}><Paperclip size={18}/></Button>
+   <label className="ha-mode-select"><Sparkles size={14}/><Select aria-label="실행 방식" title={active?'다음 요청의 실행 방식':'실행 방식'} disabled={pending} value={mode} onChange={event => setMode(event.target.value)}><option value="chat">한 번 실행</option><option value="goal">목표 달성까지</option><option value="loop">반복 실행</option></Select></label>
+   <span className="ui-composer-key-hint">{active?'다음 요청을 작성할 수 있습니다':'Enter 전송 · Shift+Enter 줄바꿈'}</span>
+   {active ? <Button data-composer-action="send" tone="danger" aria-label="작업 중지" busy={pending} disabled={pending||stopping} onClick={stop}><Square size={16}/><span>{stopping?'중지 중':'중지'}</span></Button>
+    : <Button data-composer-action="send" type="submit" aria-label="메시지 보내기" title="보내기" tone="primary" busy={pending} disabled={pending||uploading||(!text.trim()&&!attachments.length)}><ArrowUp size={19}/></Button>}
+  </>}
+  options={<RunModeOptions {...props}/>}
+ >
+  <Input ref={fileInput} type="file" multiple className="hidden" aria-label="첨부 파일 선택" onChange={event => {upload(Array.from(event.target.files??[])); event.target.value='';}}/>
+  <Textarea ref={composer} aria-label="헤르메스에게 보낼 메시지" placeholder={active?'다음 작업을 작성하세요…':'무엇을 함께 해볼까요?'} value={text} onChange={event => draft(event.target.value)} rows={1}
+   onPaste={event => {const files=Array.from(event.clipboardData.files); if (files.length) {event.preventDefault(); upload(files);}}}
+   onKeyDown={event => {if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing) {event.preventDefault(); if(!active)send();}}}/>
+ </ComposerFrame>;
 }

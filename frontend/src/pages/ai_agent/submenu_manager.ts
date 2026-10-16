@@ -1,8 +1,9 @@
 import {lazy} from 'react';
-import {Bot} from 'lucide-react';
 import type {MenuItem} from '../../shell/menu_groups/menu_types';
-
-export const menus:MenuItem[]=[{
- hash:'ai_agent/Hermes',name:'헤르메스',group:'AI 에이전트',icon:Bot,
- component:lazy(()=>import('./Hermes/Hermes').then(m=>({default:m.Hermes}))),required:[],
-}];
+import {agentPages,agentHref} from './agent_navigation';
+const workspace=lazy(()=>import('./Hermes/Hermes').then(module=>({default:module.Hermes})));
+// Reuse one mounted engine workspace so changing menus preserves the conversation.
+export const menus:MenuItem[]=agentPages.map(page=>({
+ hash:agentHref(page.id).slice(1),name:page.name,group:'AI 에이전트',icon:page.icon,
+ component:workspace,required:[],
+}));

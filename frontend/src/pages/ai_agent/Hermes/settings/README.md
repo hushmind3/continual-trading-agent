@@ -1,5 +1,7 @@
-# Settings
+# AI 에이전트 설정 화면 연결
 
-Settings.tsx owns model/MCP/skills navigation: a descriptive sidebar on desktop and compact tabs on mobile. The last section persists for the browser session; the model chip explicitly opens Models. Child modules live in models/, mcp/ and skills/. Chat remains mounted behind settings, preserving draft and session. Navigation does not start a model or tool.
+모델·MCP·스킬·시스템 프롬프트의 기존 구현을 각 소메뉴에서 재사용합니다. `Settings.tsx`는 주소에 맞는 설정 기능만 표시하며, 중복 왼쪽 설정 메뉴를 만들지 않습니다. 상위 `../../agent_navigation.ts`가 화면 목록·이동을 관리합니다.
 
-prompt/SystemPrompt.tsx: 시스템 프롬프트를 설정 API에 저장합니다. 원본 AIAgent의 추가 시스템 지침 인자로 연결하며 새 대화·기존 대화의 다음 요청부터 적용합니다.
+상위 대메뉴 주소는 [../../README.md](../../README.md)에 있습니다. 대화로 돌아가기·화면 선택·브라우저 뒤로가기·새로고침을 지원합니다. 대화는 숨겨 둔 채 유지하며 메뉴 이동 자체가 모델이나 도구를 실행하지 않습니다.
+
+기능 코드: models/ModelSettings.tsx, mcp/McpPage.tsx, skills/Skills.tsx, prompt/SystemPrompt.tsx. 각 기능 API와 권한·저장 위치는 각 README를 따릅니다.

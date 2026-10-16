@@ -14,6 +14,7 @@ from platform_modules import ROOT
 from . import adapters, runtime
 from .github import repository
 from .store import LOCK, STATE, identifier, read, records, save
+from .requirements import RequirementError, check as check_requirements
 
 JOBS = {}
 RESTARTING = False
@@ -94,7 +95,7 @@ def installed():
     return result
 
 
-def start(url, source_override=None):
+def start(url, source_override=None, resume=False):
     global RESTARTING
     repo = repository(url)
     key = identifier('p_' + re.sub('[^a-z0-9_-]', '_', repo.lower())[:65] + '_' + hashlib.sha256(repo.lower().encode()).hexdigest()[:8])
@@ -103,6 +104,14 @@ def start(url, source_override=None):
         if JOBS: raise ValueError('진행 중인 설치가 있습니다. 완료하거나 취소한 뒤 등록하세요.')
         try: old = read(key)
         except ValueError: old = {}
+        resume_source = None
+        if resume:
+            resume_source = Path(old.get('source') or '').resolve()
+            expected = (STATE / 'projects' / key / 'versions').resolve()
+            if not resume_source.is_relative_to(expected) or not resume_source.is_dir():
+                raise ValueError('다시 사용할 소스가 없습니다. 주소로 다시 등록하세요.')
+            if str(resume_source) == old.get('active_source'):
+                raise ValueError('현재 사용 중인 설치본입니다. 업데이트로 새 버전을 준비하세요.')
         if old.get('stage') == 'awaiting_activation': raise ValueError('현재 설치본의 메뉴 연결을 기다리고 있습니다.')
         import psutil
         record = {**old, 'id': key, 'repository': repo, 'url': 'https://github.com/' + repo,
@@ -110,13 +119,13 @@ def start(url, source_override=None):
             'error': '', 'started_at': time.time(), 'environment': old.get('environment', {}),
             'install_pid': os.getpid(), 'install_process_created': psutil.Process().create_time()}
         save(record); cancelled = threading.Event(); JOBS[key] = cancelled
-        threading.Thread(target=install, args=(record, cancelled, source_override), daemon=True).start()
+        threading.Thread(target=install, args=(record, cancelled, source_override, resume_source), daemon=True).start()
     return public(record)
 
 
-def install(record, cancelled, source_override=None):
+def install(record, cancelled, source_override=None, resume_source=None):
     key = record['id']; version = STATE / 'projects' / key / 'versions' / uuid.uuid4().hex[:12]
-    source = version / 'source'
+    source = resume_source if resume_source is not None else version / 'source'
     log = version / 'install.log'; published = None; backup = None
     def progress(stage, detail, **extra):
         record.update(stage=stage, detail=detail, **extra); save(record)
@@ -125,8 +134,10 @@ def install(record, cancelled, source_override=None):
         run_command(command, folder, log, cancelled, timeout)
     try:
         version.mkdir(parents=True)
-        progress('download', 'GitHub에서 소스를 내려받습니다.', install_log=str(log), source=str(source))
-        if source_override is not None:
+        progress('analyze' if resume_source else 'download', '저장된 소스를 준비합니다.' if resume_source else 'GitHub에서 소스를 내려받습니다.', install_log=str(log), source=str(source))
+        if resume_source is not None:
+            progress('analyze', '이미 내려받은 소스에서 설치를 이어갑니다.')
+        elif source_override is not None:
             shutil.copytree(source_override, source)  # private local fixture entry; HTTP never accepts this argument
         else:
             run(['git', '-c', 'core.hooksPath=NUL', 'clone', '--depth', '1', '--', record['url'] + '.git', str(source)], version, 600)
@@ -136,6 +147,7 @@ def install(record, cancelled, source_override=None):
             try: spec = adapters.validate(source, record['adapter'])
             except ValueError: pass
         if spec is None:
+            check_requirements(source)
             spec = adapters.generate_with_hermes(source, '자동 탐지로 실행 진입점을 확인하지 못했습니다.', cancelled, progress, key)
         progress('dependencies', '설치된 실행 환경을 재사용하고 필요한 의존성과 화면을 준비합니다.', detected=spec['kind'])
         def prepare_and_verify():
@@ -146,7 +158,7 @@ def install(record, cancelled, source_override=None):
             return runtime.verify_ui(source, spec, record.get('environment', {}), run, key)
         try: ui_verified = prepare_and_verify()
         except Exception as original:
-            if cancelled.is_set() or spec['kind'] == 'native': raise
+            if cancelled.is_set() or spec['kind'] in ('native', 'node-mcp'): raise
             try:
                 spec = adapters.generate_with_hermes(source, str(original), cancelled, progress, key)
                 ui_verified = prepare_and_verify()
@@ -189,7 +201,7 @@ def install(record, cancelled, source_override=None):
         run([node, str(ROOT / 'node_modules/vite/bin/vite.js'), 'build', '--emptyOutDir', 'false'], ROOT / 'frontend', 180)
         # The common watcher performs guarded application after the install transaction releases its busy hook.
         record.update(active_source=str(source), adapter=spec, module_id=module_id, install_revision=version.name, menu='projects/app/' + key,
-            verification={'entry_executed': spec['kind'] in ('fastapi', 'python-cli'), 'original_ui_rendered': ui_verified},
+            verification={'entry_executed': spec['kind'] in ('fastapi', 'python-cli', 'node-mcp'), 'original_ui_rendered': ui_verified},
             stage='awaiting_activation', detail='실행 확인 완료 · 공통 실행기가 메뉴 연결을 적용합니다.', published_at=time.time())
         save(record)
     except Exception as exc:
@@ -197,7 +209,7 @@ def install(record, cancelled, source_override=None):
             trash = ROOT / '휴지통/modules' / (published.name + '-' + uuid.uuid4().hex[:8]); trash.parent.mkdir(parents=True, exist_ok=True)
             published.rename(trash)
         if backup and backup.exists(): backup.rename(ROOT / 'modules' / record['module_id'])
-        record.update(stage='cancelled' if cancelled.is_set() else 'failed', error=str(exc), detail='설치를 완료하지 못했습니다. 기존 사용 데이터와 설치본은 보존했습니다.', finished_at=time.time())
+        record.update(stage='cancelled' if cancelled.is_set() else exc.stage if isinstance(exc, RequirementError) else 'failed', error=str(exc), detail='설치를 완료하지 못했습니다. 기존 사용 데이터와 설치본은 보존했습니다.', finished_at=time.time())
         save(record)
     finally:
         with LOCK: JOBS.pop(key, None)

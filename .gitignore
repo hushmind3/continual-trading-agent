@@ -36,3 +36,5 @@ results/
 /backend/rea/node_modules/
 /node_modules/
 /.runtime/ui-preview/
+# Generated installation adapters; source/config/history live in ignored runtime/.
+/modules/external_*/

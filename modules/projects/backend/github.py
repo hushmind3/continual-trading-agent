@@ -34,12 +34,18 @@ def github(path):
         raise ValueError('GitHub에 연결하지 못했습니다. 인터넷 연결을 확인하세요.') from exc
 
 
-def search(query, page=1):
+def search(query, page=1, sort=''):
     query = str(query).strip()
     if not query or len(query) > 256:
         raise ValueError('검색어를 1~256자로 입력하세요.')
-    result = github('search/repositories?' + urlencode({'q': query, 'per_page': 12, 'page': max(1, min(10, int(page)))}))
+    page = max(1, min(33, int(page)))
+    if sort not in ('', 'stars', 'updated'): raise ValueError('검색 정렬을 확인하세요.')
+    parameters = {'q': query, 'per_page': 30, 'page': page}
+    if sort: parameters.update(sort=sort, order='desc')
+    result = github('search/repositories?' + urlencode(parameters))
+    total = min(result['total_count'], 1000)
     return {'total': result['total_count'], 'incomplete': result.get('incomplete_results', False),
+        'page': page, 'has_more': page < 33 and page * 30 < total,
         'items': [{'repository': item['full_name'], 'url': item['html_url'], 'description': item.get('description') or '',
                    'stars': item['stargazers_count'], 'language': item.get('language') or '',
                    'updated_at': item['updated_at']} for item in result['items']]}

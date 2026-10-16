@@ -15,7 +15,7 @@ def call(function, *args):
 
 
 @router.get('/search')
-def search(q: str, page: int = 1): return call(github.search, q, page)
+def search(q: str, page: int = 1, sort: str = ''): return call(github.search, q, page, sort)
 
 
 @router.get('/installed')
@@ -28,6 +28,12 @@ def install(request: dict): return call(installer.start, request.get('url', ''))
 
 @router.post('/cancel')
 def cancel(request: dict): return call(installer.cancel, request.get('id', ''))
+
+
+@router.post('/retry')
+def retry(request: dict):
+    record = call(read, request.get('id', ''))
+    return call(installer.start, record['url'], None, True)
 
 
 @router.get('/detail')

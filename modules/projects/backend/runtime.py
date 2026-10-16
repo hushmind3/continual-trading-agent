@@ -24,8 +24,15 @@ class AppWorker:
         folder = owned(source, spec.get('directory', '.'))
         log = source.parent / 'application.log'
         self.output = log.open('a', encoding='utf8')
-        self.process = subprocess.Popen([sys.executable, '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('app_worker.py')),
-            str(folder), spec['app']], cwd=folder, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.output,
+        if spec['kind'] == 'node-mcp':
+            from .node_mcp import command
+            from platform_modules import ROOT
+            python = ROOT / '.venv/hermes/Scripts/python.exe'
+            if not python.is_file(): raise ValueError('공유 MCP Python 실행 환경이 없습니다.')
+            arguments = [str(python), '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('mcp_worker.py')), json.dumps(command(source, spec))]
+        else:
+            arguments = [sys.executable, '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('app_worker.py')), str(folder), spec['app']]
+        self.process = subprocess.Popen(arguments, cwd=folder, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.output,
             text=True, encoding='utf8', bufsize=1, env={**os.environ, **environment, 'PYTHONUTF8': '1'})
         self.reader = threading.Thread(target=self._read, daemon=True); self.reader.start()
 
@@ -65,7 +72,7 @@ def busy_reason():
 def invoke(record, payload):
     global ACTIVE
     source = Path(record['active_source']); spec = record['adapter']
-    if spec['kind'] != 'fastapi': raise ValueError('이 프로젝트는 Python API 앱이 아닙니다.')
+    if spec['kind'] not in ('fastapi', 'node-mcp'): raise ValueError('이 프로젝트는 API/MCP 앱이 아닙니다.')
     with LOCK:
         if RESTARTING: raise ValueError('서버 적용 중입니다. 잠시 뒤 다시 실행하세요.')
         ACTIVE += 1
@@ -82,6 +89,12 @@ def invoke(record, payload):
 
 
 def verify(source, spec, environment=None):
+    if spec['kind'] == 'node-mcp':
+        worker = AppWorker(source, spec, environment or {})
+        try:
+            result = worker.call({'operation': 'list'})
+            if not result.get('tools'): raise ValueError('실제로 연결된 MCP 도구가 없습니다.')
+        finally: worker.close()
     if spec['kind'] == 'fastapi':
         worker = AppWorker(source, spec, environment or {})
         try:

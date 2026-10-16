@@ -6,7 +6,7 @@ import sys
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
@@ -16,6 +16,49 @@ from platform_plugins.projects import adapters, github, installer, runtime, stor
 
 
 class InstallerTests(unittest.TestCase):
+    def test_search_returns_more_pages_and_passes_sort(self):
+        with patch.object(github, 'github', return_value={'total_count': 89, 'items': []}) as fetch:
+            result = github.search('rea', 2, 'stars')
+        self.assertTrue(result['has_more'])
+        self.assertIn('per_page=30', fetch.call_args.args[0])
+        self.assertIn('page=2', fetch.call_args.args[0])
+        self.assertIn('sort=stars', fetch.call_args.args[0])
+        self.assertEqual(github.repository('https://github.com/morluto/rea.git'), 'morluto/rea')
+
+    def test_agent_model_preparation_waits_for_ready(self):
+        from platform_plugins.projects.agent_setup import ensure_ready
+        bridge = Mock()
+        bridge.call.side_effect = [
+            {'job': {'state': 'idle'}, 'local_model': {'state': 'idle'}},
+            {'local_model': 'C:/models/chosen.gguf'}, {},
+            {'local_model': {'state': 'ready'}}]
+        ensure_ready(bridge, threading.Event(), Mock())
+        self.assertIn(unittest.mock.call('model/load', {'path': 'C:/models/chosen.gguf'}), bridge.call.call_args_list)
+
+    def test_agent_model_preparation_leaves_active_work_alone(self):
+        from platform_plugins.projects.agent_setup import ensure_ready
+        bridge = Mock(); bridge.call.return_value = {'job': {'state': 'running'}}
+        with self.assertRaisesRegex(ValueError, '다른 작업'):
+            ensure_ready(bridge, threading.Event(), Mock())
+        bridge.call.assert_called_once_with('status')
+
+    def test_node_mcp_detects_repository_manifest_before_website(self):
+        (self.source / 'server.json').write_text(json.dumps({'repository': {'url': 'https://github.com/morluto/rea'},
+            'packages': [{'registryType': 'npm', 'identifier': 'rea-agents', 'version': '6.5.0',
+                'transport': {'type': 'stdio'}, 'packageArguments': [{'type': 'positional', 'value': 'mcp'}]}]}))
+        (self.source / 'package.json').write_text(json.dumps({'name': 'rea-agents', 'version': '6.5.0', 'bin': {'rea': 'scripts/rea.mjs'}}))
+        website = self.source / 'website'; website.mkdir(); (website / 'index.html').write_text('Marketing website')
+        spec = adapters.detect(self.source)
+        self.assertEqual(spec['kind'], 'node-mcp')
+        self.assertEqual(spec['arguments'], ['mcp'])
+        with self.assertRaises(ValueError): adapters.validate(self.source, {**spec, 'script': '../outside.js'})
+
+    def test_wpf_is_reported_as_missing_native_adapter(self):
+        from platform_plugins.projects.requirements import check, RequirementError
+        (self.source / 'app.sln').write_text('Project("guid") = "App", "App/App.csproj", "guid"')
+        (self.source / 'App').mkdir(); (self.source / 'App/App.csproj').write_text('<OutputType>WinExe</OutputType>')
+        with self.assertRaisesRegex(RequirementError, '.NET 데스크톱'): check(self.source)
+
     def setUp(self):
         verification = ROOT / 'runtime/projects/manage/verification'
         verification.mkdir(parents=True, exist_ok=True)

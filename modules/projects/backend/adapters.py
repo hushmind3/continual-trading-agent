@@ -15,6 +15,8 @@ def detect(source):
         return validate(source, json.loads(descriptor.read_text(encoding='utf8')))
     if (source / 'module.json').is_file():
         return {'kind': 'native', 'directory': '.'}
+    from . import node_mcp
+    if spec := node_mcp.detect(source): return spec
     candidates = [source, *(source / name for name in ('frontend', 'web', 'client', 'app', 'ui', 'site', 'public', 'docs'))]
     ui = None
     for folder in candidates:
@@ -53,6 +55,9 @@ def detect(source):
 
 
 def validate(source, spec):
+    if spec.get('kind') == 'node-mcp':
+        from .node_mcp import validate as validate_mcp
+        return validate_mcp(source, spec)
     if spec.get('kind') not in ('static', 'vite', 'fastapi', 'python-cli', 'native'):
         raise ValueError('생성된 실행 어댑터 종류를 지원하지 않습니다.')
     folder = owned(source, spec.get('directory', '.'))
@@ -69,7 +74,10 @@ def validate(source, spec):
 def prepare(source, spec, run):
     folder = owned(source, spec.get('directory', '.'))
     kind = spec['kind']
-    if kind == 'vite':
+    if kind == 'node-mcp':
+        from .node_mcp import prepare as prepare_mcp
+        prepare_mcp(source, spec, run)
+    elif kind == 'vite':
         node = shutil.which('node')
         npm = Path(node or '').parent / 'node_modules/npm/bin/npm-cli.js'
         if not node or not npm.is_file(): raise ValueError('설치된 Node.js/npm을 찾지 못했습니다.')
@@ -98,6 +106,8 @@ def prepare(source, spec, run):
 
 def generate_with_hermes(source, note, cancelled, progress, project_id='verification'):
     from ai_agent.Hermes.engine.bridge import bridge
+    from .agent_setup import ensure_ready
+    ensure_ready(bridge, cancelled, progress)
     prompt = (
         f'Install this project into the host: {source}. Read its README and actual entry points. '
         'Reuse its original UI and engine. Only modify files INSIDE this project. '

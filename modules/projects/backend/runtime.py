@@ -31,7 +31,8 @@ class AppWorker:
             if not python.is_file(): raise ValueError('공유 MCP Python 실행 환경이 없습니다.')
             arguments = [str(python), '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('mcp_worker.py')), json.dumps(command(source, spec))]
         else:
-            arguments = [sys.executable, '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('app_worker.py')), str(folder), spec['app']]
+            from .python_packages import folder as packages
+            arguments = [sys.executable, '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('app_worker.py')), str(folder), spec['app'], str(packages(source))]
         self.process = subprocess.Popen(arguments, cwd=folder, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.output,
             text=True, encoding='utf8', bufsize=1, env={**os.environ, **environment, 'PYTHONUTF8': '1'})
         self.reader = threading.Thread(target=self._read, daemon=True); self.reader.start()
@@ -125,7 +126,9 @@ def verify_ui(source, spec, environment, run, project_id='verification'):
     config = {'root': str(root), 'project_id': project_id,
         'python': sys.executable, 'environment': environment, 'screenshot': str(source.parent / 'ui-verification.png'),
         'index_html': render_html((root / 'index.html').read_text(encoding='utf8'), project_id, spec['kind'] == 'fastapi')}
-    if spec['kind'] == 'fastapi': config['app'] = {'folder': str(owned(source, spec.get('directory', '.'))), 'target': spec['app']}
+    if spec['kind'] == 'fastapi':
+        from .python_packages import folder as packages
+        config['app'] = {'folder': str(owned(source, spec.get('directory', '.'))), 'target': spec['app'], 'packages': str(packages(source))}
     file = source.parent / 'ui-verification.json'; file.write_text(json.dumps(config), encoding='utf8')
     try: run([shutil.which('node'), str(Path(__file__).with_name('verify_ui.cjs')), str(file)], source, 90)
     finally: file.unlink(missing_ok=True)
@@ -139,7 +142,8 @@ def run_cli(record, arguments):
     if spec['kind'] != 'python-cli': raise ValueError('명령 실행 프로젝트가 아닙니다.')
     if not isinstance(arguments, list) or not all(isinstance(value, str) for value in arguments) or len(arguments) > 64:
         raise ValueError('실행 인수를 문자열 목록으로 전달하세요.')
-    command = [sys.executable, '-c', 'import sys,importlib; m,n=sys.argv.pop(1).split(":"); sys.exit(getattr(importlib.import_module(m),n)())', spec['entry'], *arguments]
+    from .python_packages import cli_command
+    command = cli_command(source, spec, arguments)
     log = source.parent / 'last-run.log'
     with LOCK:
         if RESTARTING: raise ValueError('서버 적용 중입니다.')
@@ -159,6 +163,18 @@ def close():
 
 
 def register_host(app):
+    @app.get('/assets/project-packages/{key}/{name}', include_in_schema=False)
+    def package_download(key: str, name: str):
+        from .store import STATE, identifier
+        import re
+        try:
+            identifier(key); read(key)
+            if not re.fullmatch(re.escape(key) + r'-[a-f0-9]{12}\.zip', name): raise ValueError('앱 패키지 이름이 올바르지 않습니다.')
+            path = owned(STATE, 'projects/' + key + '/exports/' + name)
+            if not path.is_file(): raise ValueError('내보낸 앱 파일이 없습니다.')
+            return FileResponse(path, filename=name, media_type='application/zip', headers={'Cache-Control': 'no-store'})
+        except ValueError as exc: raise HTTPException(404, str(exc)) from exc
+
     @app.get('/assets/projects/{identifier}/{path:path}', include_in_schema=False)
     def asset(identifier: str, path: str):
         try:

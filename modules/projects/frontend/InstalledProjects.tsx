@@ -1,4 +1,4 @@
-import {Package,ExternalLink,RefreshCw,Unplug,Trash2,X} from 'lucide-react';
+import {Package,ExternalLink,RefreshCw,Unplug,Trash2,X,Download} from 'lucide-react';
 import {Button,Status,Empty} from '@platform/ui/Primitives';
 import {Panel} from '@platform/ui/Panel';
 import {stages,working,type Project} from './types';
@@ -11,6 +11,7 @@ export function InstalledProjects({items,busy,act,detail}:{items:Project[];busy:
  {!project.builtin&&<Button onClick={()=>detail(project)}>상태·설정</Button>}
  {!project.builtin&&(working(project.stage)&&project.stage!=='awaiting_activation'?<Button tone="danger" onClick={()=>act('cancel',project)}><X size={14}/>설치 취소</Button>:<Button disabled={busy} onClick={()=>act(project.stage==='removed'?'reconnect':['failed','needs_adapter','cancelled'].includes(project.stage)&&!project.active_source?'retry':'install',project)}><RefreshCw size={14}/>{['failed','needs_adapter','cancelled'].includes(project.stage)?'다시 시도':project.stage==='removed'?'다시 연결':'업데이트'}</Button>)}
  {!project.builtin&&project.active_source&&project.stage!=='removed'&&!working(project.stage)&&<Button variant="ghost" disabled={busy} title="파일·설정·기록을 보관하고 메뉴 연결만 해제합니다." onClick={()=>act('detach',project)}><Unplug size={14}/>분리</Button>}
+ {!project.builtin&&project.active_source&&project.adapter?.kind!=='native'&&!working(project.stage)&&<Button disabled={busy} title="플랫폼 없이 실행하거나 다른 곳에 다시 설치할 앱 소스를 저장합니다. 사용자 데이터·비밀 설정은 포함하지 않습니다." onClick={()=>act('export',project)}><Download size={14}/>내보내기</Button>}
  {!project.builtin&&!working(project.stage)&&<Button tone="danger" disabled={busy} title="설치 파일·설정·기록을 완전히 삭제합니다. 휴지통에 남기지 않습니다." onClick={()=>act('remove',project)}><Trash2 size={14}/>제거</Button>}
  </div></article>)}</div>}
  </Panel>;

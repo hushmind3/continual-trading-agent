@@ -45,6 +45,10 @@ async def request(app, message):
 
 async def main():
     folder, target = sys.argv[1:3]
+    if len(sys.argv) > 3:
+        import site
+        packages = sys.argv[3]
+        site.addsitedir(packages); sys.path.insert(0, packages)
     os.chdir(folder); sys.path.insert(0, folder)
     module, name = target.split(':')
     app = getattr(importlib.import_module(module), name)

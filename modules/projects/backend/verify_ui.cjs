@@ -4,7 +4,7 @@ const {chromium}=require('@playwright/test');
 async function main(){
  const cfg=JSON.parse(fs.readFileSync(process.argv[2],'utf8')),origin='http://project.invalid',errors=[],prefix='/assets/projects/'+cfg.project_id+'/';
  let worker,reader;const pending=[];
- if(cfg.app){worker=spawn(cfg.python,['-I','-X','utf8','-B',path.join(__dirname,'app_worker.py'),cfg.app.folder,cfg.app.target],{env:{...process.env,...cfg.environment,PYTHONUTF8:'1'},stdio:['pipe','pipe','inherit']});
+ if(cfg.app){worker=spawn(cfg.python,['-I','-X','utf8','-B',path.join(__dirname,'app_worker.py'),cfg.app.folder,cfg.app.target,...(cfg.app.packages?[cfg.app.packages]:[])],{env:{...process.env,...cfg.environment,PYTHONUTF8:'1'},stdio:['pipe','pipe','inherit']});
   reader=readline.createInterface({input:worker.stdout});reader.on('line',line=>{try{const next=pending.shift();if(next)next.resolve(JSON.parse(line))}catch(e){errors.push(e.message)}});
   worker.on('exit',()=>{for(const job of pending.splice(0))job.reject(Error('앱 실행기가 종료됐습니다.'))});
  }

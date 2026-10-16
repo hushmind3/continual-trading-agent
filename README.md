@@ -16,6 +16,8 @@
 `.git/`·`.github/`는 Git/CI, `.venv/`·`.venv/kiwoom/`은 기존 설치 환경입니다. 데이터·설정·실행 상태 경로는 유지합니다. 키움 환경은 .venv/kiwoom/으로 통합 관리합니다. `휴지통/`은 폐기 전용이며 열람·실행·Git 등록 대상으로 사용하지 않습니다.
 
 실행: **서버켜기.cmd**. 설치: **설치.cmd**.
+
+프로젝트 앱 설치·분리·제거·독립 실행 ZIP/가져오기는 [프로젝트 관리 안내](modules/projects/README.md)를 따릅니다. 지원 앱의 Python 의존성은 앱 폴더에 보관하며 제거 때 함께 정리합니다. 설치/번역 때문에 사용자 모델을 자동으로 불러오지 않습니다. 미지원 구조의 모델 변환은 사용자가 켠 경우에만 실행합니다.
 금융/REA 하위 기능 → 소메뉴 매니저 → 대메뉴 → backend/menu_registry.py → backend/web_api.py의 단일 /api로 연결합니다.
 
 변경 작업은 관련 작은 메뉴 README부터 읽습니다. 검사 명령은 [scripts 안내](development/scripts/README.md)에 있습니다.

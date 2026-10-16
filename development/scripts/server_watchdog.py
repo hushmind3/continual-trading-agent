@@ -47,7 +47,7 @@ def supervise():
         except OSError:return
         record={'pid':os.getpid(),'process_created':psutil.Process().create_time(),
             'status':'running','started_at':time.time(),'restarts':0,'last_error':'',
-            'module_watch_version':1,'modules_signature':signature()}
+            'module_watch_version':2,'modules_signature':signature()}
         atomic_json(record,STATUS)
         try:
             while not STOP.exists():

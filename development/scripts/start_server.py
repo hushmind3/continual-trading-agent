@@ -89,6 +89,10 @@ def startup_lock():
 def sources():
     names=set(subprocess.check_output(['git','ls-files','-co','--exclude-standard','-z'],cwd=ROOT).decode('utf8').split('\0'))
     groups={name:{} for name in ('frontend','backend','launcher','configuration')}
+    # Installed modules are intentionally Git-ignored. Their registration still changes the live API.
+    from platform_modules import signature
+    for target in ('frontend','backend'):
+        groups[target]['modules/.registration']=signature(ROOT/'modules')
     for name in sorted(names):
         if '/engine/upstream/' in name:continue
         if name.startswith('modules/'):
@@ -140,7 +144,7 @@ def ensure_watchdog():
     """Keep the API available independently of the launching console."""
     from server_watchdog import running
     if running():
-        if read_json(RUNTIME/'server-watchdog.json').get('module_watch_version')==1:return
+        if read_json(RUNTIME/'server-watchdog.json').get('module_watch_version')==2:return
         (RUNTIME/'server-watchdog.stop').write_text('',encoding='utf8')
         deadline=time.monotonic()+8
         while running() and time.monotonic()<deadline:time.sleep(.2)

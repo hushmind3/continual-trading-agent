@@ -85,19 +85,8 @@ def prepare(source, spec, run):
         run([node, str(npm), 'ci' if lock.is_file() else 'install', '--no-audit', '--no-fund'], folder, 900)
         run([node, str(npm), 'run', 'build', '--', '--base=./'], folder, 900)
     elif kind in ('fastapi', 'python-cli', 'native'):
-        # Pin every existing distribution so a project cannot upgrade the finance/Hermes environment.
-        from importlib.metadata import distributions
-        constraints = source.parent / 'existing-python.txt'
-        values = sorted({dist.metadata['Name'] + '==' + dist.version for dist in distributions() if dist.metadata['Name']})
-        constraints.write_text('\n'.join(values), encoding='utf8')
-        requirements = next((path for path in (folder / 'requirements.txt', source / 'requirements.txt') if path.is_file()), None)
-        if kind == 'native':
-            metadata = json.loads((source / 'module.json').read_text(encoding='utf8'))
-            if metadata.get('requirements'): requirements = owned(source, metadata['requirements'])
-        if requirements:
-            run([sys.executable, '-m', 'pip', 'install', '-c', str(constraints), '-r', str(requirements)], folder, 900)
-        if kind == 'python-cli' and spec.get('install'):
-            run([sys.executable, '-m', 'pip', 'install', '-c', str(constraints), '-e', str(folder)], folder, 900)
+        from .python_packages import prepare as prepare_python
+        prepare_python(source, spec, run)
     if kind in ('static', 'vite'):
         index = owned(owned(folder, spec.get('output', '.')), 'index.html')
         if not index.is_file(): raise ValueError('빌드 결과에 index.html이 없습니다.')

@@ -98,7 +98,7 @@ def installed():
     return result
 
 
-def start(url, source_override=None, resume=False):
+def start(url, source_override=None, resume=False, allow_agent=False, cleanup_import=False):
     global RESTARTING
     repo = repository(url)
     key = identifier('p_' + re.sub('[^a-z0-9_-]', '_', repo.lower())[:65] + '_' + hashlib.sha256(repo.lower().encode()).hexdigest()[:8])
@@ -120,13 +120,14 @@ def start(url, source_override=None, resume=False):
         record = {**old, 'id': key, 'repository': repo, 'url': 'https://github.com/' + repo,
             'title': repo.split('/')[-1], 'stage': 'queued', 'detail': '설치를 준비합니다.',
             'error': '', 'started_at': time.time(), 'environment': old.get('environment', {}),
+            'allow_agent': bool(allow_agent),
             'install_pid': os.getpid(), 'install_process_created': psutil.Process().create_time()}
         save(record); cancelled = threading.Event(); JOBS[key] = cancelled
-        threading.Thread(target=install, args=(record, cancelled, source_override, resume_source), daemon=True).start()
+        threading.Thread(target=install, args=(record, cancelled, source_override, resume_source, cleanup_import), daemon=True).start()
     return public(record)
 
 
-def install(record, cancelled, source_override=None, resume_source=None):
+def install(record, cancelled, source_override=None, resume_source=None, cleanup_import=False):
     key = record['id']; version = STATE / 'projects' / key / 'versions' / uuid.uuid4().hex[:12]
     source = resume_source if resume_source is not None else version / 'source'
     log = version / 'install.log'; published = None; backup = None
@@ -151,6 +152,8 @@ def install(record, cancelled, source_override=None, resume_source=None):
             except ValueError: pass
         if spec is None:
             check_requirements(source)
+            if not record.get('allow_agent'):
+                raise RequirementError('자동 탐지할 수 있는 실행 진입점이 없습니다. 모델을 임의로 실행하지 않았습니다. 실행 설명 파일을 제공하거나 모델 자동 변환을 켜고 다시 시도하세요.')
             spec = adapters.generate_with_hermes(source, '자동 탐지로 실행 진입점을 확인하지 못했습니다.', cancelled, progress, key)
         progress('dependencies', '설치된 실행 환경을 재사용하고 필요한 의존성과 화면을 준비합니다.', detected=spec['kind'])
         def prepare_and_verify():
@@ -161,7 +164,7 @@ def install(record, cancelled, source_override=None, resume_source=None):
             return runtime.verify_ui(source, spec, record.get('environment', {}), run, key)
         try: ui_verified = prepare_and_verify()
         except Exception as original:
-            if cancelled.is_set() or spec['kind'] in ('native', 'node-mcp'): raise
+            if cancelled.is_set() or spec['kind'] in ('native', 'node-mcp') or not record.get('allow_agent'): raise
             try:
                 spec = adapters.generate_with_hermes(source, str(original), cancelled, progress, key)
                 ui_verified = prepare_and_verify()
@@ -219,6 +222,11 @@ def install(record, cancelled, source_override=None, resume_source=None):
         record.update(stage='cancelled' if cancelled.is_set() else exc.stage if isinstance(exc, RequirementError) else 'failed', error=str(exc), detail='설치를 완료하지 못했습니다. 기존 사용 데이터와 설치본은 보존했습니다.', finished_at=time.time())
         save(record)
     finally:
+        if cleanup_import and source_override:
+            staging = Path(source_override).resolve().parent
+            imports = (STATE / 'imports').resolve()
+            if staging.parent == imports and re.fullmatch('[a-f0-9]{32}', staging.name):
+                shutil.rmtree(staging, ignore_errors=True)
         with LOCK: JOBS.pop(key, None)
 
 

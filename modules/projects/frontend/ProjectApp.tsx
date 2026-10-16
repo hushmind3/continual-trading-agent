@@ -8,7 +8,7 @@ import {ProjectTask} from './ProjectTask';
 import {AppWorkspace,AppFrame} from '@platform/ui/AppWorkspace';
 export function ProjectApp({projectId}:{projectId:string}){
  const [project,setProject]=useState<Project|null>(null),[error,setError]=useState(''),[args,setArgs]=useState(''),[text,setText]=useState(''),[busy,setBusy]=useState(false);
- useEffect(()=>{let active=true;request<Project>('projects/detail',{id:projectId},'GET').then(value=>{if(active)setProject(value)}).catch(e=>{if(active)setError(String(e))});return()=>{active=false}},[projectId]);
+ useEffect(()=>{let active=true;if(sessionStorage.getItem('projects.pending-install')===projectId)sessionStorage.removeItem('projects.pending-install');request<Project>('projects/detail',{id:projectId},'GET').then(value=>{if(active)setProject(value)}).catch(e=>{if(active)setError(String(e))});return()=>{active=false}},[projectId]);
  async function run(){setBusy(true);setError('');try{setText((await request<{text:string}>('projects/run',{id:projectId,arguments:args},'POST',130000)).text)}catch(e){setError(String(e))}finally{setBusy(false)}}
  const web=project&&(['static','vite'].includes(project.adapter?.kind||'')||!!project.adapter?.ui);
  return <AppWorkspace title={project?.title||'프로젝트'} subtitle={project?.repository} actions={<><Button onClick={()=>{location.hash='projects/manage/installed'}}>프로젝트 관리</Button>{web&&<Button onClick={()=>window.open('/assets/projects/'+projectId+'/index.html','_blank','noopener')}>원본 화면 열기</Button>}</>}><ErrorMessage message={error}/>

@@ -1,9 +1,11 @@
 # Execution and setup
 
 - start_server.py: 기존 소유 서버에 소스를 적용하고 단일 API를 실행합니다.
+- Git 제외 설치 모듈도 등록 서명으로 변경을 추적해 프론트와 API를 함께 갱신합니다. 감시기가 빌드만 하고 API를 유지해 새 메뉴 활성화가 대기하던 경로를 수정했습니다. 실행 중 작업 보호는 그대로 적용합니다.
 - server_watchdog.py: 실행 창과 분리된 단일 감시 프로세스. 서버 종료 시 기존 실행기로 API만 복구합니다.
 - verify_module_detach.py: 실제 Hermes 폴더를 잠시 분리·복원하고 자동 등록·프론트 빌드·API 복원·설정 보존·중앙 코드 무변경을 확인합니다. 실행 중 작업은 먼저 확인하며 실패해도 폴더를 복원합니다. 결과는 `runtime/platform/module-verification.json`입니다.
 - verify_module_registration.py: 새로운 대메뉴·API·React 화면을 가진 검사 모듈을 폴더 하나로 추가·분리합니다. 기존 메뉴·API 보존과 중앙 파일 수정 0건을 확인하며 검사 모듈은 runtime/platform에 보관합니다.
+- verify_project_portability.cjs: 모델을 사용하지 않고 화면에서 앱 ZIP 내보내기 → 파일 설치 → 원본 UI → 제거/소유 파일 삭제를 확인합니다. 검사 전용 앱만 만들고 성공·실패 모두 정리하며 기록은 `runtime/projects/manage/verification/`에 둡니다.
 - install_windows.py: 기존 주 환경·키움·REA 설치 진입점입니다.
 - requirements/: 기존 의존성과 고정 버전 명세. 파일 내용·버전은 변경하지 않았습니다.
 

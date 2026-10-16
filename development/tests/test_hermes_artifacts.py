@@ -29,4 +29,21 @@ class ArtifactTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):preview('missing.md',temporary)
 
 
+class UploadTests(unittest.TestCase):
+    def test_upload_preserves_bytes_and_cannot_escape_owned_folder(self):
+        import base64
+        from unittest.mock import patch
+        from ai_agent.Hermes.artifacts import handlers
+        with tempfile.TemporaryDirectory() as temporary,patch.object(handlers,'UPLOADS',Path(temporary)/'uploads'):
+            result=handlers.upload({'name':'../../보고서.md','content':base64.b64encode('내용'.encode()).decode()})
+            self.assertEqual(Path(result['path']).read_text(encoding='utf8'),'내용')
+            self.assertEqual(handlers.uploaded_paths([result['path']]),[result['path']])
+            self.assertTrue(Path(result['path']).is_relative_to(Path(temporary)/'uploads'))
+            with self.assertRaises(ValueError):handlers.uploaded_paths([str(Path(temporary)/'secret.md')])
+    def test_invalid_and_oversized_uploads_fail(self):
+        from fastapi import HTTPException
+        from ai_agent.Hermes.artifacts.handlers import upload,UPLOAD_LIMIT
+        for value in ({'name':'test.txt','content':'%%%bad'},{'name':'a:b.txt','content':''},{'name':'large.txt','content':'A'*((UPLOAD_LIMIT+2)//3*4+4)}):
+            with self.subTest(name=value['name']),self.assertRaises(HTTPException):upload(value)
+
 if __name__=='__main__':unittest.main()

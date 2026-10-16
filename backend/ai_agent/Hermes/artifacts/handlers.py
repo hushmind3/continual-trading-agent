@@ -42,3 +42,33 @@ def artifact(path:str):
         return preview(path,cfg.get('workspace') or ROOT)
     except FileNotFoundError as exc:raise HTTPException(404,str(exc)) from exc
     except (ValueError,OSError) as exc:raise HTTPException(400,str(exc)) from exc
+
+
+UPLOADS=HOME/'artifacts'/'uploads'
+UPLOAD_LIMIT=8*1024*1024
+
+def uploaded_paths(values):
+    if not isinstance(values,list) or len(values)>8:raise ValueError('첨부 파일은 최대 8개입니다.')
+    paths=[]
+    for value in values:
+        file=Path(str(value)).resolve()
+        if not file.is_relative_to(UPLOADS.resolve()) or not file.is_file():raise ValueError('등록되지 않았거나 없는 첨부 파일입니다.')
+        paths.append(str(file))
+    return paths
+
+@router.post('/artifact/upload')
+def upload(request:dict):
+    import base64,binascii,uuid
+    name=str(request.get('name') or '').replace('\\','/').rsplit('/',1)[-1]
+    if not name or name in ('.','..') or any(c in name for c in '<>:"|?*') or any(ord(c)<32 for c in name):raise HTTPException(400,'올바른 파일 이름을 선택하세요.')
+    content=request.get('content')
+    if not isinstance(content,str) or len(content)>((UPLOAD_LIMIT+2)//3)*4:raise HTTPException(413,'파일당 최대 8 MiB까지 첨부할 수 있습니다.')
+    try:data=base64.b64decode(content,validate=True)
+    except (ValueError,binascii.Error) as exc:raise HTTPException(400,'파일 데이터를 읽을 수 없습니다.') from exc
+    if len(data)>UPLOAD_LIMIT:raise HTTPException(413,'파일당 최대 8 MiB까지 첨부할 수 있습니다.')
+    folder=UPLOADS/uuid.uuid4().hex
+    folder.mkdir(parents=True)
+    file=folder/name
+    try:file.write_bytes(data)
+    except OSError as exc:raise HTTPException(400,'첨부 파일을 저장하지 못했습니다.') from exc
+    return {'name':name,'path':str(file.resolve()),'bytes':len(data)}

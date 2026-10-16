@@ -32,6 +32,8 @@ async function fixture(page:Page,empty=false,history=false){
   else if(op==='sessions')response=[{id,title:'대화 디자인 점검',model:settings.model},{id:'another-session',title:'다른 프로젝트',model:settings.model}];
   else if(op==='session')response={session:{id:payload.id,title:payload.id===id?'대화 디자인 점검':'다른 프로젝트',model:settings.model},messages:payload.id===id?messages:[]};
   else if(op==='autonomy')response={goal:null,loop:null};
+  else if(op==='artifact/upload')response={name:payload.name,path:'C:/workspace/runtime/ai_agent/Hermes/artifacts/uploads/test/'+payload.name,bytes:8};
+  else if(op==='artifact'&&payload.path==='missing.md'){await route.fulfill({status:404,json:{detail:'문서 파일이 없습니다.'}});return}
   else if(op==='artifact')response={name:'error_mining_report.md',path:String(payload.path),format:'.md',bytes:90,content:'# 검사 보고서\n\n- 재시작 보호 확인\n\n<script>window.reportUnsafe=true</script>',truncated:false};
   else if(op==='models/local')response={models:[],root:'C:/models'};
   else if(op==='models')response={models:[]};
@@ -176,14 +178,20 @@ test('first chat persists its new session and restores it after reload',async({p
 
 
 test('local report links open readable documents inside the chat',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});
  const {calls}=await fixture(page);
  await page.getByRole('button',{name:'오류 보고서',exact:true}).click();
  const dialog=page.getByRole('complementary',{name:'결과 문서'});
  await expect(dialog.getByRole('heading',{name:'검사 보고서'})).toBeVisible();
+ const before=(await dialog.boundingBox())!;
+ await dialog.getByRole('button',{name:'문서 패널 축소'}).click();
+ await expect.poll(async()=>(await dialog.boundingBox())!.width).toBeLessThan(before.width);
+ expect((await dialog.getByRole('button',{name:'문서 닫기'}).boundingBox())!.x).toBeLessThan(1440);
+ await dialog.getByRole('button',{name:'문서 패널 확대'}).click();
  await expect(dialog).toContainText('재시작 보호 확인');
  await expect(page.getByRole('dialog')).toHaveCount(0);
  await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toBeEditable();
- await dialog.getByRole('button',{name:'소스 보기',exact:true}).click();
+ await dialog.getByRole('button',{name:'소스',exact:true}).click();
  await expect(dialog.locator('pre')).toContainText('# 검사 보고서');
  expect(await page.evaluate(()=>Boolean((window as unknown as Record<string,unknown>).reportUnsafe))).toBe(false);
  expect(calls.some(call=>call.op==='artifact'&&call.payload.path==='development/docs/error_mining_report.md')).toBe(true);
@@ -200,4 +208,28 @@ test('historical tools use one flat activity list with visible file names',async
  await expect(page.locator('.hermes-log details details')).toHaveCount(0);
  await page.locator('.hermes-log .ha-activity-item>summary').first().click();
  await expect(page.locator('.hermes-log pre').filter({hasText:'확인된 파일 내용 0'})).toBeVisible();
+});
+
+test('upload attaches a real file reference and next run mode stays editable during work',async({page})=>{
+ const {calls}=await fixture(page);
+ await page.getByLabel('첨부 파일 선택',{exact:true}).setInputFiles({name:'요청.md',mimeType:'text/markdown',buffer:Buffer.from('# 요청')});
+ await expect(page.getByLabel('첨부 파일',{exact:true})).toContainText('요청.md');
+ await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
+ await expect.poll(()=>calls.filter(call=>call.op==='chat').length).toBe(1);
+ const sent=calls.find(call=>call.op==='chat')!;
+ expect(sent.payload.attachments).toEqual(['C:/workspace/runtime/ai_agent/Hermes/artifacts/uploads/test/요청.md']);
+ expect(sent.payload.message).toContain('[요청.md]');
+ await expect(page.getByLabel('실행 방식',{exact:true})).toBeEnabled();
+ await page.getByLabel('실행 방식',{exact:true}).selectOption('goal');
+ await expect(page.getByLabel('목표 최대 대화 수')).toBeEnabled();
+ expect(calls.filter(call=>call.op==='chat')).toHaveLength(1);
+});
+
+test('missing document leaves the full conversation usable instead of opening an empty pane',async({page})=>{
+ await fixture(page);
+ await page.route('**/api**',async(route)=>{const request=route.request();const op=request.method()==='POST'?request.postDataJSON()?.operation:new URL(request.url()).searchParams.get('operation');if(op==='ai_agent/Hermes/artifact')return route.fulfill({status:404,json:{detail:'문서 파일이 없습니다.'}});return route.fallback()});
+ await page.getByRole('button',{name:'오류 보고서',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('문서 파일이 없습니다.');
+ await expect(page.getByRole('complementary',{name:'결과 문서'})).toHaveCount(0);
+ await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toBeEditable();
 });

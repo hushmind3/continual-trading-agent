@@ -10,7 +10,12 @@ def autonomy(id: str): return invoke('autonomy', {'id':id})
 def status(): return invoke('status')
 
 @router.post('/chat')
-def chat(request: dict): return invoke('chat', request)
+def chat(request: dict):
+    from ai_agent.Hermes.artifacts.handlers import uploaded_paths
+    from fastapi import HTTPException
+    try:request['attachments']=uploaded_paths(request.get('attachments',[]))
+    except ValueError as exc:raise HTTPException(400,str(exc)) from exc
+    return invoke('chat', request)
 
 @router.post('/stop')
 def stop(): return invoke('stop')

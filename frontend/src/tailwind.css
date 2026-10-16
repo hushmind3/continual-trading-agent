@@ -877,5 +877,8 @@
 .hermes-composer .ha-mode-select>svg{@apply hidden}
 .hermes-composer .ha-mode-select select{@apply text-gray-600;@apply text-label;@apply max-w-26.25}
 
-.hermes-document-panel{@apply flex min-w-0 w-1/2 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white}
+.hermes-document-panel{@apply relative flex min-w-0 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white;width:var(--document-width,50%)}
+.hermes-document-panel.is-compact{width:var(--document-width,33.333%)}
+.hermes-document-resizer{@apply absolute left-0 top-0 bottom-0 z-10 w-1 cursor-col-resize touch-none hover:bg-blue-200 focus-visible:bg-blue-300}
+.hermes-chat-body:has(.hermes-document-panel)>.hermes-messages{@apply basis-0 w-0}
 @media(max-width:760px){.hermes-document-panel{@apply absolute inset-0 z-20 w-full}}

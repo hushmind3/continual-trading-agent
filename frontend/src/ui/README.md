@@ -23,3 +23,5 @@ ChampionSpec은 선택 알고리즘과 실제 정책·Critic 또는 가치 출�
 DocumentPreview.tsx는 공통 Drawer·Button·ErrorMessage를 사용해 비동기 로컬 문서를 표시합니다. 파일 로더는 소메뉴가 전달하고, 닫힌 뒤 도착한 응답은 무시합니다. Markdown의 원본 HTML은 실행하지 않으며 다른 텍스트 형식은 원문으로 표시합니다.
 
 Hermes 대화는 DocumentWorkspace·DocumentPanel을 사용해 문서를 대화 옆에 표시합니다. 문서를 보면서 입력할 수 있고 문서/소스를 전환합니다. 다른 화면의 DocumentPreview는 기존 Drawer 동작을 유지합니다.
+
+문서 패널은 읽기 성공 후에만 열립니다. 실패는 링크 옆에 표시하고 기존 문서·대화 폭을 유지합니다. 축소·확대·닫기, 경계 드래그·방향키 너비 조절을 제공하며 디자인은 공통 Tailwind에서 관리합니다.

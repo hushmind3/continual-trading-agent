@@ -4,8 +4,9 @@ from pathlib import Path
 ALLOWED=frozenset({'read_file','search_files'})
 
 
-def bind(agent,workspace,on_denied=None):
+def bind(agent,workspace,on_denied=None,attachments=()):
     root=Path(workspace).resolve()
+    attached={Path(path).resolve() for path in attachments}
     execute=agent._execute_tool_calls
     agent._read_only_denials=[]
     if isinstance(getattr(agent,'tools',None),list):
@@ -28,7 +29,7 @@ def bind(agent,workspace,on_denied=None):
             if not isinstance(values,dict):raise ValueError('올바르지 않은 읽기 전용 도구 입력입니다.')
             target=Path(values.get('path') or '.')
             target=(target if target.is_absolute() else root/target).resolve()
-            if not target.is_relative_to(root):deny('읽기 전용 작업 폴더 밖의 경로입니다.')
+            if not target.is_relative_to(root) and target not in attached:deny('읽기 전용 작업 폴더 밖의 경로입니다.')
         return execute(message,*args,**kwargs)
 
     agent._execute_tool_calls=guarded

@@ -286,7 +286,7 @@ class HermesWorker:
             )
             if cfg.get('read_only'):
                 from ai_agent.Hermes.chat.read_only import bind as bind_read_only
-                bind_read_only(self.agent,cfg['workspace'],lambda reason:self.event('permission_denied',{'message':reason}))
+                bind_read_only(self.agent,cfg['workspace'],lambda reason:self.event('permission_denied',{'message':reason}),(request or {}).get('attachments',[]))
             with self.lock:
                 self.job['state'] = 'running'
             if self.stopping:

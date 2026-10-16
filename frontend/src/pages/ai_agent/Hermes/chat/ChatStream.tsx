@@ -16,19 +16,19 @@ function blocks(messages:Message[]):Block[]{
   const m=messages[i],text=contentText(m.content),calls=(m.tool_calls??[]) as Call[];
   if(m.role==='tool'){if(!steps.length)first=i;steps.push({id:'orphan-'+i,name:m.name??'도구',args:'',result:m.content});continue}
   if(!['user','assistant'].includes(m.role))continue;
-  if(text.trim()){flush();output.push({kind:'message',index:i,message:m})}
+  if(text.trim()&&(m.role==='user'||!calls.length)){flush();output.push({kind:'message',index:i,message:m})}
   if(calls.length){if(!steps.length)first=i;const results:Message[]=[];let j=i+1;for(;j<messages.length&&messages[j].role==='tool';j++)results.push(messages[j]);for(let n=0;n<calls.length;n++){const c=calls[n],r=results.find(r=>r.tool_call_id&&r.tool_call_id===c.id)??results[n];steps.push({id:c.id??i+'-'+n,name:c.function?.name??'도구',args:c.function?.arguments??'',result:r?.content})}i=j-1}
  }
  flush();return output;
 }
-function ToolGroup({steps}:{steps:Step[]}){
- const errors=steps.filter(s=>s.result!==undefined&&failed(s.result)).length,names=[...new Set(steps.map(s=>toolLabel(s.name)))];
- return <details className={'ha-tool-group '+(errors?'has-errors':'')}><summary><Wrench size={15}/><span>작업 기록 <b>{steps.length}</b></span><small>{names.slice(0,2).join(' · ')}{names.length>2?' 외 '+(names.length-2)+'개':''}</small>{errors>0&&<em>오류 {errors}</em>}<ChevronDown size={14}/></summary><div className="ha-tool-steps">{steps.map(s=><details className="ha-tool-step" key={s.id}><summary>{s.result===undefined?<Wrench size={14}/>:failed(s.result)?<TriangleAlert size={14}/>:<Check size={14}/>}<b>{toolLabel(s.name)}</b><span>{s.result===undefined?'호출 기록':failed(s.result)?'오류 결과':'결과 수신'}</span><ChevronDown size={12}/></summary><div><small>요청</small><pre>{s.args||'별도 입력 없음'}</pre>{s.result!==undefined&&<><small>도구 결과</small><pre>{contentText(s.result)}</pre></>}</div></details>)}</div></details>;
-}
 export const Transcript=memo(function Transcript({messages}:{messages:Message[]}){
  return <>{blocks(messages).map(block=>block.kind==='tools'?<div key={'tools-'+block.index}><GeneratedFiles steps={block.steps}/></div>:<article key={'message-'+block.index} className={'hermes-message '+block.message.role}>{block.message.role==='assistant'&&<div className="ha-assistant-mark" aria-label="헤르메스">✳</div>}<div className="ha-message-content"><MessageBody text={contentText(block.message.content)} user={block.message.role==='user'}/>{block.message.role==='assistant'&&<div className="ha-message-actions"><CopyButton text={contentText(block.message.content)} label="답변 복사"/></div>}</div></article>)}</>;
 });
-export function ToolHistory({messages}:{messages:Message[]}){return <>{blocks(messages).filter(block=>block.kind==='tools').map(block=>block.kind==='tools'?<ToolGroup key={block.index} steps={block.steps}/>:null)}</>;}
+function stepInput(args:string){try{const value=JSON.parse(args);return String(value.command??value.path??value.url??value.action??'').split('\n')[0]}catch{return args.split('\n')[0]}}
+export function ToolHistory({messages}:{messages:Message[]}){
+ const steps=blocks(messages).flatMap(block=>block.kind==='tools'?block.steps:[]);
+ return <div className="ha-activity-timeline">{steps.map((step,index)=>{const error=step.result!==undefined&&failed(step.result);return <details className={'ha-activity-item '+(error?'error':'received')} key={step.id+'-'+index}><summary><span className="ha-step-dot">{error?<TriangleAlert size={13}/>:<Check size={13}/>}</span><span className="min-w-0"><b>{toolLabel(step.name)}</b><small className="block truncate" title={stepInput(step.args)}>{stepInput(step.args)||'입력 없음'}</small></span><ChevronDown size={13}/></summary><div><small>요청</small><pre>{step.args||'별도 입력 없음'}</pre>{step.result!==undefined&&<><small>{error?'오류 결과':'결과'}</small><pre>{contentText(step.result)}</pre></>}</div></details>})}</div>;
+}
 const number=(n?:number)=>n==null?'—':n.toLocaleString('ko-KR');
 export function RuntimeMetrics({metrics}:{metrics?:Metrics}){
  const m=metrics,percent=m?.context_limit&&m.context_tokens!=null?Math.min(100,m.context_tokens/m.context_limit*100):undefined;

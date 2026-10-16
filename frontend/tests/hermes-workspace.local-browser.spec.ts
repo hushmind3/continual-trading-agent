@@ -16,7 +16,7 @@ for(let i=0;i<3;i++){messages.push({role:'assistant',content:'',tool_calls:[{id:
 messages.push({role:'assistant',content:'모든 결과를 확인했습니다.'});
 const settings={base_url:'http://127.0.0.1:1234/v1',model:'Ornith · 화면 확인',api_key:'',has_api_key:false,workspace:'C:/workspace',max_iterations:20,toolsets:['file','computer_use'],local_model:'C:/models/ornith.gguf',python:'3.14',engine:'fixture',available_toolsets:['file','computer_use'],computer_driver_installed:true,browser_runtime_installed:true};
 
-async function fixture(page:Page,empty=false){
+async function fixture(page:Page,empty=false,history=false){
  const calls:{op:string;payload:Record<string,unknown>}[]=[];
  const state={job:{state:'complete',session_id:id,text:'',error:'',events:[{name:'tool_start',detail:JSON.stringify(['step-1','read_file',{path:'example.txt'}]),time:1},{name:'tool_complete',detail:JSON.stringify(['step-1','read_file',{path:'example.txt'},JSON.stringify({success:true,content:'확인된 내용'})]),time:2}],metrics:{context_limit:65536,context_tokens:24576,generation_tps:58.6,input_tokens:25000,output_tokens:720,api_calls:3,elapsed_seconds:18},approval:undefined as undefined|{kind:string;detail:string}}};
  await page.route('**/api**',async route=>{
@@ -25,6 +25,7 @@ async function fixture(page:Page,empty=false){
   if(!op.startsWith('ai_agent/Hermes/'))return route.continue();
   op=op.slice('ai_agent/Hermes/'.length);calls.push({op,payload});let response:unknown={};
   const status=()=>({job:{...state.job},local_model:{running:true,state:'ready',base_url:settings.base_url}});
+  if(history)state.job.events=[];
   if(op==='status')response=status();
   else if(op==='settings')response={...settings,...(payload.system_prompt!==undefined?{system_prompt:payload.system_prompt}:{}),...(payload.read_only!==undefined?{read_only:payload.read_only}:{})};
   else if(op==='sessions'&&empty)response=state.job.state==='running'?[{id:'new-chat-session',title:'새 대화 검증',model:settings.model}]:[];
@@ -184,4 +185,15 @@ test('local report links open readable documents inside the chat',async({page})=
  expect(calls.some(call=>call.op==='artifact'&&call.payload.path==='development/docs/error_mining_report.md')).toBe(true);
  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
  await expect(page.getByRole('button',{name:'오류 보고서',exact:true})).toBeFocused();
+});
+
+test('historical tools use one flat activity list with visible file names',async({page})=>{
+ await fixture(page,false,true);
+ await page.getByRole('button',{name:'작업 내역 보기',exact:true}).click();
+ await expect(page.locator('.hermes-log .ha-tool-group')).toHaveCount(0);
+ await expect(page.locator('.hermes-log .ha-activity-item')).toHaveCount(3);
+ await expect(page.locator('.hermes-log summary').filter({hasText:'example-0.txt'})).toBeVisible();
+ await expect(page.locator('.hermes-log details details')).toHaveCount(0);
+ await page.locator('.hermes-log .ha-activity-item>summary').first().click();
+ await expect(page.locator('.hermes-log pre').filter({hasText:'확인된 파일 내용 0'})).toBeVisible();
 });

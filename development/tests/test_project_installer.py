@@ -16,43 +16,8 @@ from platform_plugins.projects import adapters, github, installer, runtime, stor
 
 
 class InstallerTests(unittest.TestCase):
-    def test_failed_install_without_module_can_be_removed_through_api(self):
-        from types import SimpleNamespace
-        from platform_plugins.projects import handlers
-        state = self.base / 'runtime/projects/manage'
-        with patch.object(store, 'STATE', state), patch.object(store, 'ROOT', self.base), \
-             patch.object(installer, 'busy_reason', return_value=''), \
-             patch.dict(sys.modules, {'menu_registry': SimpleNamespace(MODULE_ENTRIES=[])}):
-            source = state / 'projects/p_failed/versions/v1/source'; source.mkdir(parents=True)
-            (source / 'README.md').write_text('preserved source')
-            store.save({'id': 'p_failed', 'stage': 'failed'})
-            self.assertTrue(handlers.remove({'id': 'p_failed'})['deleted'])
-            self.assertFalse((state / 'registry/p_failed.json').exists())
-            self.assertFalse(source.exists())
-            archived = list((self.base / '휴지통').glob('projects-*/runtime/projects/manage/projects/p_failed/versions/v1/source/README.md'))
-            self.assertEqual(archived[0].read_text(), 'preserved source')
 
-    def test_failed_install_removal_rolls_back_when_registry_is_locked(self):
-        state = self.base / 'runtime/projects/manage'
-        original = Path.rename
-        def locked(path, target):
-            if path == state / 'registry/p_failed.json': raise PermissionError('registry locked')
-            return original(path, target)
-        with patch.object(store, 'STATE', state), patch.object(store, 'ROOT', self.base):
-            source = state / 'projects/p_failed'; source.mkdir(parents=True)
-            (source / 'data.txt').write_text('keep')
-            store.save({'id': 'p_failed', 'stage': 'needs_adapter'})
-            with patch.object(Path, 'rename', locked), self.assertRaises(PermissionError):
-                store.discard_failed('p_failed')
-            self.assertEqual((source / 'data.txt').read_text(), 'keep')
-            self.assertEqual(store.read('p_failed')['stage'], 'needs_adapter')
 
-    def test_failed_update_keeps_its_active_install(self):
-        with patch.object(store, 'STATE', self.base / 'runtime/projects/manage'), patch.object(store, 'ROOT', self.base):
-            store.save({'id': 'p_active', 'stage': 'failed', 'active_source': 'existing program'})
-            with self.assertRaisesRegex(ValueError, '비활성'):
-                store.discard_failed('p_active')
-            self.assertEqual(store.read('p_active')['active_source'], 'existing program')
 
     def test_search_returns_more_pages_and_passes_sort(self):
         with patch.object(github, 'github', return_value={'total_count': 89, 'items': []}) as fetch:

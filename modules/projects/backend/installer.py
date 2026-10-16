@@ -18,7 +18,7 @@ from .requirements import RequirementError, check as check_requirements
 
 JOBS = {}
 RESTARTING = False
-ACTIVE_STAGES = {'queued', 'download', 'analyze', 'adapter', 'dependencies', 'verify', 'publish'}
+ACTIVE_STAGES = {'queued', 'download', 'analyze', 'adapter', 'dependencies', 'verify', 'publish', 'agent_link'}
 
 
 def run_command(command, folder, log, cancelled, timeout=180, environment=None):
@@ -46,6 +46,8 @@ def run_command(command, folder, log, cancelled, timeout=180, environment=None):
 
 
 def busy_reason():
+    from . import localization
+    if localization.BUSY: return '실행 중인 한국어 화면 번역'
     with LOCK:
         return '실행 중인 프로젝트 설치·변환' if JOBS else runtime.busy_reason()
 
@@ -65,7 +67,7 @@ def installed():
     loaded = {item['id']: item.get('install_revision') for item, _ in MODULE_ENTRIES}
     result = []
     for record in records():
-        record['can_open'] = record.get('module_id') in loaded and record['stage'] != 'removed'
+        record['can_open'] = record.get('module_id') in loaded and record['stage'] not in ('removed', 'removal_failed')
         if record['stage'] == 'awaiting_activation' and record.get('module_id') in loaded and loaded[record['module_id']] == record.get('install_revision'):
             record.update(stage='ready', detail='실행 확인과 메뉴 연결을 마쳤습니다.', finished_at=time.time())
             save(record)
@@ -87,6 +89,7 @@ def installed():
     managed = {item.get('module_id') for item in result}
     for metadata, entry in MODULE_ENTRIES:
         if metadata['id'] == 'projects' or metadata['id'] in managed: continue
+        if metadata.get('install_revision'): continue
         menus = getattr(entry, 'MENUS', None) or getattr(entry, 'GROUP', {}).get('menus') or (entry.MENU,)
         result.append({'id': metadata['id'], 'module_id': metadata['id'], 'title': getattr(entry, 'MENU', {}).get('title') or metadata['group']['title'],
             'repository': '플랫폼에 포함된 모듈', 'url': '', 'stage': 'ready', 'builtin': True, 'group_title': metadata['group']['title'],
@@ -199,6 +202,10 @@ def install(record, cancelled, source_override=None, resume_source=None):
         node = shutil.which('node')
         run([node, str(ROOT / 'node_modules/typescript/bin/tsc'), '--noEmit'], ROOT / 'frontend', 120)
         run([node, str(ROOT / 'node_modules/vite/bin/vite.js'), 'build', '--emptyOutDir', 'false'], ROOT / 'frontend', 180)
+        if spec['kind'] == 'node-mcp':
+            from .agent_tasks import link_when_idle
+            progress('agent_link', '설치된 도구와 한국어 작업 화면을 에이전트에 자동 연결합니다.')
+            record['agent_connection'] = link_when_idle({**record, 'active_source': str(source), 'adapter': spec}, cancelled, progress)
         # The common watcher performs guarded application after the install transaction releases its busy hook.
         record.update(active_source=str(source), adapter=spec, module_id=module_id, install_revision=version.name, menu='projects/app/' + key,
             verification={'entry_executed': spec['kind'] in ('fastapi', 'python-cli', 'node-mcp'), 'original_ui_rendered': ui_verified},

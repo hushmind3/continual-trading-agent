@@ -54,30 +54,3 @@ def owned(base, relative):
     if not path.is_relative_to(base):
         raise ValueError('프로젝트 폴더 밖의 경로입니다.')
     return path
-
-
-def discard_failed(key):
-    """Remove an inactive failed install, retaining recoverable files in the trash."""
-    with LOCK:
-        key = identifier(key)
-        record = read(key)
-        if record.get('active_source') or record.get('stage') not in ('failed', 'cancelled', 'needs_adapter'):
-            raise ValueError('실패·취소된 비활성 설치만 제거할 수 있습니다.')
-        root = ROOT.resolve()
-        paths = [owned(STATE, 'projects/' + key), owned(STATE, 'registry/' + key + '.json')]
-        if not STATE.resolve().is_relative_to(root) or any(not path.is_relative_to(root) for path in paths):
-            raise ValueError('프로젝트 작업 경계 밖의 파일은 이동하지 않습니다.')
-        trash = root / '휴지통' / ('projects-' + uuid.uuid4().hex[:12])
-        moved = []
-        try:
-            for source in paths:
-                if not source.exists(): continue
-                destination = trash / source.relative_to(root)
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                source.rename(destination)
-                moved.append((source, destination))
-        except OSError:
-            for source, destination in reversed(moved):
-                destination.rename(source)
-            raise
-        return {'id': key, 'deleted': True}

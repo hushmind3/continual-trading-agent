@@ -1,5 +1,6 @@
 // Original application fetch calls use the host's existing single API gateway.
 (()=>{const project=__PROJECT_ID__,original=window.fetch.bind(window);
+ window.__platformFetch=original;
  window.fetch=async(input,init={})=>{
   const request=new Request(input,init),url=new URL(request.url,location.href);
   if(url.origin!==location.origin||url.pathname.startsWith('/assets/'))return original(request);

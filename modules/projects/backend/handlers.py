@@ -3,8 +3,8 @@ from pathlib import Path
 import shlex
 import re
 from fastapi import APIRouter, HTTPException
-from . import github, installer, runtime
-from .store import LOCK, ROOT, STATE, identifier, read, save, discard_failed
+from . import github, installer, runtime, lifecycle, localization
+from .store import LOCK, STATE, identifier, read, save
 
 router = APIRouter(prefix='/api/projects')
 
@@ -79,31 +79,28 @@ def run(request: dict):
 
 @router.post('/remove')
 def remove(request: dict):
-    def detach():
-        import uuid
-        from menu_registry import MODULE_ENTRIES
-        key = identifier(request.get('id', ''))
-        with LOCK, runtime.LOCK:
-            if installer.busy_reason(): raise ValueError('실행 중인 작업을 마친 뒤 분리하세요.')
-            record = read(key)
-            if not record.get('active_source') and record.get('stage') in ('failed', 'cancelled', 'needs_adapter'):
-                worker = runtime.WORKERS.pop(key, None)
-                if worker: worker.close()
-                return discard_failed(key)
-            module_id = identifier(record.get('module_id', ''))
-            entry = next((entry for item, entry in MODULE_ENTRIES if item['id'] == module_id), None)
-            if entry:
-                if callback := getattr(entry, 'busy_reason', None):
-                    if reason := callback(): raise ValueError(reason)
-                if callback := getattr(entry, 'reserve_restart', None): callback()
-                if callback := getattr(entry, 'close', None): callback()
-            worker = runtime.WORKERS.pop(key, None)
-            if worker: worker.close()
-            folder = ROOT / 'modules' / module_id
-            if folder.exists():
-                trash = ROOT / '휴지통/modules' / (module_id + '-' + uuid.uuid4().hex[:8]); trash.parent.mkdir(parents=True, exist_ok=True)
-                folder.rename(trash)
-            record.update(stage='removed', detail='메뉴에서 분리했습니다. 소스·설정·설치 기록은 보존했습니다.')
-            save(record)
-        return installer.public(record)
-    return call(detach)
+    return call(lifecycle.remove, request.get('id', ''))
+
+
+@router.post('/detach')
+def detach(request: dict): return call(lifecycle.detach, request.get('id', ''))
+
+
+@router.post('/reconnect')
+def reconnect(request: dict): return call(lifecycle.reconnect, request.get('id', ''))
+
+
+@router.post('/localize')
+def localize(request: dict): return call(localization.localize, request.get('texts', []))
+
+
+@router.post('/agent/connect')
+def agent_connect(request: dict):
+    from .agent_tasks import link
+    return call(link, call(read, request.get('id', '')))
+
+
+@router.post('/agent/start')
+def agent_start(request: dict):
+    from .agent_tasks import start
+    return call(start, request)

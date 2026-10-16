@@ -397,7 +397,7 @@ class HermesWorker:
         self.model_log = (HOME / 'local-model.log').open('a', encoding='utf-8')
         self.model_process = subprocess.Popen(
             [str(executable), '--model', str(path), '--host', '127.0.0.1', '--port', str(port),
-             '--n-gpu-layers', '999', '--ctx-size', str(context_length or 0), '--parallel', '1',
+             '--n-gpu-layers', 'auto', '--ctx-size', str(context_length or 0), '--parallel', '1',
              '--threads', '2', '--threads-batch', '2',
              '-fa', 'on', '-ctk', 'q8_0', '-ctv', 'q8_0',
              '--jinja', '--alias', alias],
@@ -452,6 +452,9 @@ class HermesWorker:
             self.session(str(payload.get('id') or ''))
             running = self.thread and self.thread.is_alive() and self.job.get('session_id') == payload['id']
             return snapshot(str(payload['id']), recover=not running)
+        if operation == 'mcp/project':
+            from ai_agent.Hermes.mcp.project_links import synchronize
+            return synchronize(self, payload)
         if operation == 'mcp/catalog': return self.catalog.listing()
         if operation == 'mcp/catalog/install': return self.catalog.install(payload)
         if operation in {'skills','skill/toggle','skill/content','skill/save'}:

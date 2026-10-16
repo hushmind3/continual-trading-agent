@@ -11,7 +11,7 @@ async function main(){const report={checks:[],status:'running'},browser=await ch
   report.checks.push('Actual GitHub search result rendered');console.log(report.checks.at(-1));
   const existing=(await api('projects/installed')).items.find(item=>item.repository==='mdn/beginner-html-site-styled');
   if(existing&&existing.stage!=='removed'&&(existing.active_source||!['failed','cancelled'].includes(existing.stage)))throw Error('Existing sample installation: do not overwrite user changes');
-  await page.locator('article').filter({has:page.getByRole('link',{name:'mdn/beginner-html-site-styled',exact:true})}).getByRole('button',{name:'등록',exact:true}).click();
+  await page.locator('article').filter({has:page.getByRole('link',{name:'mdn/beginner-html-site-styled',exact:true})}).getByRole('button',{name:'설치',exact:true}).click();
   let item,last;const deadline=Date.now()+240000;
   while(Date.now()<deadline){try{item=(await api('projects/installed')).items.find(item=>item.repository==='mdn/beginner-html-site-styled');if(item&&item.stage!==last){last=item.stage;console.log('installation: '+item.stage);}
     if(item?.stage==='ready')break;if(['failed','cancelled'].includes(item?.stage))throw Error(item.error||item.detail);

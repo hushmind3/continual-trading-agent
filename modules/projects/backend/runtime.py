@@ -108,9 +108,10 @@ def verify(source, spec, environment=None):
         finally: worker.close()
 
 
-def render_html(text, identifier, has_api):
+def render_html(text, identifier, has_api, korean=False):
     import re
     base = '<base href="/assets/projects/' + identifier + '/">'
+    if korean: base += '<script defer src="/assets/projects/' + identifier + '/_platform-language.js"></script>'
     bridge = '<script>' + Path(__file__).with_name('assets_bridge.js').read_text(encoding='utf8').replace('__PROJECT_ID__', json.dumps(identifier)) + '</script>' if has_api else ''
     text = re.sub(r'<base\b[^>]*>', '', text, flags=re.I)
     return re.sub(r'(<head\b[^>]*>)', lambda match: match[1] + base + bridge, text, count=1, flags=re.I) if '<head' in text.lower() else base + bridge + text
@@ -165,6 +166,7 @@ def register_host(app):
             if not record.get('active_source'): raise ValueError('아직 실행 가능한 설치본이 없습니다.')
             spec = record['adapter']; ui = spec.get('ui') if spec['kind'] == 'fastapi' else spec
             if not ui or ui['kind'] not in ('static', 'vite'): raise ValueError('원본 웹 화면이 없습니다.')
+            if path == '_platform-language.js': return FileResponse(Path(__file__).with_name('project_language.js'), media_type='application/javascript')
             source = Path(record['active_source'])
             base = owned(owned(source, ui.get('directory', '.')), ui.get('output', '.'))
             file = owned(base, path or 'index.html')
@@ -173,7 +175,7 @@ def register_host(app):
             if not file.is_file() and '.' not in file.name: file = base / 'index.html'
             if not file.is_file(): raise HTTPException(404, '프로젝트 화면 파일이 없습니다.')
             if file.suffix.lower() == '.html':
-                text = render_html(file.read_text(encoding='utf8'), identifier, spec['kind'] == 'fastapi')
+                text = render_html(file.read_text(encoding='utf8'), identifier, spec['kind'] == 'fastapi', korean=True)
                 return HTMLResponse(text, headers={'Cache-Control': 'no-store'})
             return FileResponse(file)
         except ValueError as exc: raise HTTPException(404, str(exc)) from exc

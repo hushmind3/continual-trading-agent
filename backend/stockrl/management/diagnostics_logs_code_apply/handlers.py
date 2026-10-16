@@ -126,6 +126,23 @@ def state_stamp(*patterns):
     return tuple(values)
 
 
+def model_stamp():
+    from stockrl.expert_registry import read_catalog
+    root=MODEL_DIR/'experts'
+    resolved=root.resolve()
+    references=[MODEL_DIR,root,root/'expert_registry.json']
+    for item in read_catalog().get('experts',{}).values():
+        manifest=(root/item.get('package',{}).get('file','')).resolve()
+        if not manifest.is_relative_to(resolved):continue
+        references.extend((manifest,manifest.parent))
+        if manifest.suffix.lower()=='.json':
+            asset=read_json(manifest).get('weight_asset',{}).get('file')
+            if asset:
+                weight=(root/asset).resolve()
+                if weight.is_relative_to(resolved):references.append(weight)
+    return state_stamp(*references)
+
+
 def state_view(path):
     from stockrl.finrl.policy_learning.handlers import algorithms
     from stockrl.extensions.moe.handlers import champions
@@ -149,7 +166,7 @@ def state_view(path):
         'connections':(connections,None),
         'provider':(provider,None),
         'settings':(operational_settings,lambda:state_stamp(config/'local/operations.json')),
-        'models':(model_files,lambda:state_stamp(config/'experts.json',*MODEL_DIR.rglob('*'))),
+        'models':(model_files,model_stamp),
         'champions':(champions,lambda:state_stamp(*MODEL_DIR.glob('*_champion_*.pt'))),
         'logs':(logs,lambda:state_stamp(*((RUNTIME if name=='training.log' else SERVER_RUNTIME)/name for name in ('api.stderr.log','api.stdout.log','server.stderr.log','training.log')))),
     }
@@ -248,16 +265,23 @@ def apply_changes(request:dict):
 
 @router.get('/api/system/blockers')
 def restart_blockers():
-    return {'items':busy()}
+    return {'items':busy(),'covers_hermes':True}
 
 
 @router.post('/api/system/prepare-restart')
 def prepare_restart():
+    from ai_agent.Hermes.engine.bridge import bridge
     with system.job_lock:
         blockers=busy()
         if blockers:raise HTTPException(409,' · '.join(blockers))
-        system.restarting=True
-        runtime.close()
+        try:bridge.reserve_restart()
+        except RuntimeError as exc:raise HTTPException(409,str(exc)) from exc
+        try:
+            system.restarting=True
+            runtime.close()
+        except Exception:
+            system.restarting=False;bridge.cancel_restart()
+            raise
     return {'ready':True}
 
 

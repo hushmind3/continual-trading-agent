@@ -3,6 +3,7 @@ import {Check,ChevronDown,Loader2,Wrench,TriangleAlert,ArrowDownToLine} from 'lu
 import {contentText,type Message,type Job,type Metrics} from '../types';
 import {toolLabel,eventSummary} from '../labels';
 import {MessageBody,CopyButton} from './MessageBody';
+import {GeneratedFiles} from './GeneratedFiles';
 
 type Call={id?:string;function?:{name?:string;arguments?:string}};
 type Step={id:string;name:string;args:string;result?:unknown};
@@ -25,8 +26,9 @@ function ToolGroup({steps}:{steps:Step[]}){
  return <details className={'ha-tool-group '+(errors?'has-errors':'')}><summary><Wrench size={15}/><span>작업 기록 <b>{steps.length}</b></span><small>{names.slice(0,2).join(' · ')}{names.length>2?' 외 '+(names.length-2)+'개':''}</small>{errors>0&&<em>오류 {errors}</em>}<ChevronDown size={14}/></summary><div className="ha-tool-steps">{steps.map(s=><details className="ha-tool-step" key={s.id}><summary>{s.result===undefined?<Wrench size={14}/>:failed(s.result)?<TriangleAlert size={14}/>:<Check size={14}/>}<b>{toolLabel(s.name)}</b><span>{s.result===undefined?'호출 기록':failed(s.result)?'오류 결과':'결과 수신'}</span><ChevronDown size={12}/></summary><div><small>요청</small><pre>{s.args||'별도 입력 없음'}</pre>{s.result!==undefined&&<><small>도구 결과</small><pre>{contentText(s.result)}</pre></>}</div></details>)}</div></details>;
 }
 export const Transcript=memo(function Transcript({messages}:{messages:Message[]}){
- return <>{blocks(messages).map(block=>block.kind==='tools'?<ToolGroup key={'tools-'+block.index} steps={block.steps}/>:<article key={'message-'+block.index} className={'hermes-message '+block.message.role}>{block.message.role==='assistant'&&<div className="ha-assistant-mark" aria-label="헤르메스">✳</div>}<div className="ha-message-content"><MessageBody text={contentText(block.message.content)} user={block.message.role==='user'}/>{block.message.role==='assistant'&&<div className="ha-message-actions"><CopyButton text={contentText(block.message.content)} label="답변 복사"/></div>}</div></article>)}</>;
+ return <>{blocks(messages).map(block=>block.kind==='tools'?<div key={'tools-'+block.index}><GeneratedFiles steps={block.steps}/></div>:<article key={'message-'+block.index} className={'hermes-message '+block.message.role}>{block.message.role==='assistant'&&<div className="ha-assistant-mark" aria-label="헤르메스">✳</div>}<div className="ha-message-content"><MessageBody text={contentText(block.message.content)} user={block.message.role==='user'}/>{block.message.role==='assistant'&&<div className="ha-message-actions"><CopyButton text={contentText(block.message.content)} label="답변 복사"/></div>}</div></article>)}</>;
 });
+export function ToolHistory({messages}:{messages:Message[]}){return <>{blocks(messages).filter(block=>block.kind==='tools').map(block=>block.kind==='tools'?<ToolGroup key={block.index} steps={block.steps}/>:null)}</>;}
 const number=(n?:number)=>n==null?'—':n.toLocaleString('ko-KR');
 export function RuntimeMetrics({metrics}:{metrics?:Metrics}){
  const m=metrics,percent=m?.context_limit&&m.context_tokens!=null?Math.min(100,m.context_tokens/m.context_limit*100):undefined;

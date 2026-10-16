@@ -53,6 +53,10 @@ def run(worker,agent,cfg,session_id,prompt,history,request):
             result=agent.run_conversation(current,conversation_history=history,task_id=session_id)
             if result.get('error'):raise RuntimeError(str(result['error']))
             if worker.stopping:break
+            if result.get('failed') or not result.get('completed',True):
+                manager.pause(reason='작업 미완료: '+str(result.get('turn_exit_reason') or '실행 결과 확인 필요'))
+                publish()
+                return result
             response=result.get('final_response') or ''
             if mode=='goal':
                 decision=manager.evaluate_after_turn(response)

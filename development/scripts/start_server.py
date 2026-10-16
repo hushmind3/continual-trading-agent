@@ -114,7 +114,10 @@ def sources():
 
 
 def blockers():
-    try:return api('system/blockers',timeout=5)['items']
+    try:
+        value=api('system/blockers',timeout=5)
+        items=list(value['items'])
+        if value.get('covers_hermes'):return items
     except HTTPError as exc:
         if exc.code!=404:raise
         # Initial installation: reuse the pre-existing state endpoint before new routes exist.
@@ -122,7 +125,13 @@ def blockers():
         if value.get('job',{}).get('running'):items.append('실행 중인 SAC/평가/수집 작업')
         if any(value.get('operations',{}).get('controls',{}).values()):items.append('실행 중인 시세/추론/가상매매')
         if value.get('library',{}).get('job',{}).get('busy'):items.append('실행 중인 모델 작업')
-        return items
+    try:
+        state=api('ai_agent/Hermes/status',timeout=5)
+        if state.get('job',{}).get('state') in ('starting','running','stopping'):items.append('실행 중인 헤르메스 대화·자동 작업')
+    except HTTPError as exc:
+        if exc.code!=404:items.append('헤르메스 상태 확인 실패; 재시작 보류')
+    except (OSError,ValueError):items.append('헤르메스 상태 확인 실패; 재시작 보류')
+    return items
 
 
 def ensure_watchdog():

@@ -44,6 +44,7 @@ def start_apply(target='frontend'):
         return value
 
 def busy():
+    from ai_agent.Hermes.engine.bridge import bridge
     from stockrl.trading.operation_control.operations_runtime import runtime
     from .library_operations import library
     items=[]
@@ -54,6 +55,8 @@ def busy():
     if runtime.controls['learning']:items.append('활성 지속학습')
     if library.active:items.append('실행 중인 모델 작업')
     if system.active:items.append('전체 시스템 시작 절차')
+    hermes=bridge.busy_reason()
+    if hermes:items.append(hermes)
     return items
 
 def check_system():

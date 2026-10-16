@@ -20,6 +20,7 @@ from ai_agent.Hermes.engine.bridge import WorkerBridge
 class ModelFixture(http.server.BaseHTTPRequestHandler):
     slow = threading.Event()
     calls = []
+    forced_tools = []
 
     def log_message(self, *args): pass
 
@@ -45,7 +46,15 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
             mcp_echo = next((name for name in found if 'echo' in name and 'port_fixture' in name), mcp_echo)
         described = any(call.get('function', {}).get('name') == 'tool_describe'
                         for row in body.get('messages', []) for call in row.get('tool_calls', []))
-        if is_mcp and not mcp_echo and not tool_results and 'tool_search' in names:
+        if any('PORT_WRITE_ATTACK' in str(m.get('content')) for m in body.get('messages', [])):
+            self.forced_tools.append('write_file')
+            message={'role':'assistant','content':None,'tool_calls':[{'id':'blocked-write','type':'function','function':{'name':'write_file','arguments':json.dumps({'path':'hermes_port_result.txt','content':'changed'})}}]}
+            finish='tool_calls'
+        elif any('PORT_SHELL' in str(m.get('content')) for m in body.get('messages', [])):
+            self.forced_tools.append('terminal')
+            message={'role':'assistant','content':None,'tool_calls':[{'id':'blocked-shell','type':'function','function':{'name':'terminal','arguments':json.dumps({'command':'printf blocked > blocked_shell.txt'})}}]}
+            finish='tool_calls'
+        elif is_mcp and not mcp_echo and not tool_results and 'tool_search' in names:
             message = {'role': 'assistant', 'content': None, 'tool_calls': [{'id': 'port_search', 'type': 'function', 'function': {
                 'name': 'tool_search', 'arguments': json.dumps({'queries': ['port_fixture echo']})}}]}
             finish = 'tool_calls'
@@ -101,6 +110,21 @@ class HermesPortTests(unittest.TestCase):
         cls.base = f'http://127.0.0.1:{cls.server.server_port}/v1'
         cls.bridge.call('settings/save', {'base_url': cls.base, 'model': 'port-fixture',
             'workspace': str(cls.workspace), 'max_iterations': 5, 'toolsets': ['file', 'skills']})
+
+    def test_08_read_only_rejects_model_write_and_terminal_calls(self):
+        original=self.workspace/'hermes_port_result.txt'
+        original.write_text('keep',encoding='utf8')
+        self.bridge.call('settings/save',{'read_only':True})
+        try:
+            for prompt,tool in (('PORT_WRITE_ATTACK','write_file'),('PORT_SHELL','terminal')):
+                self.bridge.call('chat',{'message':prompt})
+                state=self.wait_job()
+                self.assertEqual(original.read_text(encoding='utf8'),'keep')
+                self.assertFalse((self.workspace/'blocked_shell.txt').exists())
+                self.assertIn(tool,ModelFixture.forced_tools)
+                self.assertNotIn(tool,[entry.get('function',{}).get('name') for entry in ModelFixture.calls[-1].get('tools',[])])
+                self.assertTrue(state.get('error') or any(event['name']=='permission_denied' for event in state['events']))
+        finally:self.bridge.call('settings/save',{'read_only':False})
 
     def wait_job(self, timeout=35):
         end = time.monotonic() + timeout

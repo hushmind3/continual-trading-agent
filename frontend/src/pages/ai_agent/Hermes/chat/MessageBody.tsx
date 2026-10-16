@@ -1,6 +1,7 @@
 import {Button} from '../../../../ui/Primitives';
 import {Children,isValidElement,memo,useState,type ReactNode} from 'react';
-import Markdown from 'react-markdown';
+import Markdown,{defaultUrlTransform} from 'react-markdown';
+import {DocumentLink,documentPath} from './DocumentLink';
 import remarkGfm from 'remark-gfm';
 import {Check,Copy,TriangleAlert} from 'lucide-react';
 
@@ -17,10 +18,11 @@ function CodeBlock({children}:{children?:ReactNode}){
 }
 export const MessageBody=memo(function MessageBody({text,user=false}:{text:string;user?:boolean}){
  if(user)return <div className="ha-user-text">{text}</div>;
- return <div className="ha-markdown"><Markdown remarkPlugins={[remarkGfm]} skipHtml components={{
+ return <div className="ha-markdown"><Markdown remarkPlugins={[remarkGfm]} skipHtml urlTransform={url=>documentPath(url)?url:defaultUrlTransform(url)} components={{
   pre:({children})=><CodeBlock>{children}</CodeBlock>,
   table:({children})=><div className="ha-table-scroll"><table>{children}</table></div>,
-  a:({children,href})=><a href={href} target="_blank" rel="noreferrer">{children}</a>,
+  a:({children,href})=>href&&documentPath(href)?<DocumentLink path={href}>{children}</DocumentLink>:<a href={href} target="_blank" rel="noreferrer">{children}</a>,
+  code:({children,className})=>!className&&typeof children==='string'&&documentPath(children)?<DocumentLink path={children}>{children}</DocumentLink>:<code className={className}>{children}</code>,
   img:({alt})=><span className="ha-image-reference">{alt||'이미지 참조'}</span>
  }}>{text}</Markdown></div>;
 });

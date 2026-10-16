@@ -24,6 +24,31 @@ class WorkerBridge:
         self.lock = threading.RLock()
         self.write_lock = threading.Lock()
         self.log = None
+        self.restarting = False
+
+    def busy_reason(self):
+        with self.lock:
+            if not self.process or self.process.poll() is not None:return ''
+        try:
+            state=self.call('status',timeout=3)
+            if state.get('job',{}).get('state') in ('starting','running','stopping'):
+                return '실행 중인 헤르메스 대화·자동 작업'
+            if state.get('mcp_installation',{}).get('state') in ('starting','running'):
+                return '실행 중인 헤르메스 MCP 설치'
+            if state.get('local_model',{}).get('state')=='loading':return '헤르메스 로컬 모델 불러오는 중'
+        except (RuntimeError,ValueError):return '헤르메스 실행 상태 확인 실패; 재시작 보류'
+        return ''
+
+    def reserve_restart(self):
+        with self.lock:
+            self.restarting=True
+        reason=self.busy_reason()
+        if reason:
+            with self.lock:self.restarting=False
+            raise RuntimeError(reason)
+
+    def cancel_restart(self):
+        with self.lock:self.restarting=False
 
     def _read(self, process):
         try:
@@ -68,10 +93,14 @@ class WorkerBridge:
         request_id = uuid.uuid4().hex
         waiter = queue.Queue()
         with self.lock:
+            if self.restarting and operation not in ('status','stop','answer','shutdown'):
+                raise RuntimeError('서버 변경 적용 준비 중입니다. 적용 후 다시 시도하세요.')
             process = self._start()
             self.pending[request_id] = waiter
         try:
-            with self.write_lock:
+            with self.lock,self.write_lock:
+                if self.restarting and operation not in ('status','stop','answer','shutdown'):
+                    raise RuntimeError('서버 변경 적용 준비 중입니다. 적용 후 다시 시도하세요.')
                 process.stdin.write(json.dumps({'id': request_id, 'operation': operation, 'payload': payload or {}}, ensure_ascii=False) + '\n')
                 process.stdin.flush()
             try:

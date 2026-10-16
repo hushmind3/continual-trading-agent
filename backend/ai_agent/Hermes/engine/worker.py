@@ -48,7 +48,7 @@ from ruamel.yaml import YAML
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
             'workspace': str(ROOT), 'max_iterations': 100,
-            'toolsets': ['terminal', 'file', 'todo', 'skills'], 'local_model': '', 'system_prompt': ''}
+            'toolsets': ['terminal', 'file', 'todo', 'skills'], 'local_model': '', 'system_prompt': '', 'read_only': False}
 
 
 def atomic_json(path, value):
@@ -141,6 +141,7 @@ class HermesWorker:
         cfg['base_url'] = cfg['base_url'].rstrip('/')
         if not isinstance(cfg['system_prompt'],str):
             raise ValueError('시스템 프롬프트는 문자열이어야 합니다.')
+        if not isinstance(cfg['read_only'],bool):raise ValueError('읽기 전용 설정은 참/거짓이어야 합니다.')
         workspace = Path(str(cfg['workspace'])).expanduser().resolve()
         if not workspace.is_dir():
             raise ValueError('작업 폴더가 존재하지 않습니다.')
@@ -249,6 +250,7 @@ class HermesWorker:
             from tools import tool_search
             tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'computer_use'}
             toolsets = list(cfg['toolsets']) + ['mcp-' + name for name in get_registered_mcp_server_names()]
+            if cfg.get('read_only'):toolsets=['file']
             self.agent = AIAgent(
                 model=cfg['model'], base_url=cfg['base_url'], api_key=cfg.get('api_key') or 'local',
                 provider='custom', api_mode='chat_completions', quiet_mode=True,
@@ -264,6 +266,7 @@ class HermesWorker:
                     'Use tool_search then tool_describe to discover configured deferred tools '
                     'before claiming a browser, desktop, or MCP tool is unavailable. '
                     'Report success only when tool results confirm it. '
+                    'When reporting a document or code file, include a Markdown link to its exact local path so the user can open it in the platform. '
                     f'This host is Windows. Installed browser executable: {os.environ.get("AGENT_BROWSER_EXECUTABLE_PATH","not detected")}. '
                     'The terminal shell may be Git Bash: ps/which cannot reliably detect Windows applications. '
                     'When asked to open visible Chrome/Edge, your FIRST tool call MUST be desktop_browser, which launches detached without shell quoting. '
@@ -273,6 +276,7 @@ class HermesWorker:
                     'Once the requested app is open, leave it open and finish. Do not close, relaunch or keep polling it. '
                     'If the user closes the app, do not reopen it without a new request. '
                     'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'
+                    + ('\nRead-only code analysis: only read_file and search_files inside the selected workspace are permitted. Do not request editing, terminal, code execution, MCP, delegation or desktop tools.' if cfg.get('read_only') else '')
                     + ('\n\nAdditional user-configured system instructions:\n'+cfg['system_prompt'] if cfg.get('system_prompt') else '')),
                 stream_delta_callback=self.delta, event_callback=self.event,
                 status_callback=lambda *args, **kw: self.event('status', args),
@@ -280,6 +284,9 @@ class HermesWorker:
                 tool_complete_callback=lambda *args, **kw: self.event('tool_complete', args),
                 clarify_callback=self.clarify,
             )
+            if cfg.get('read_only'):
+                from ai_agent.Hermes.chat.read_only import bind as bind_read_only
+                bind_read_only(self.agent,cfg['workspace'],lambda reason:self.event('permission_denied',{'message':reason}))
             with self.lock:
                 self.job['state'] = 'running'
             if self.stopping:
@@ -293,6 +300,8 @@ class HermesWorker:
             state = 'stopped' if self.stopping else 'paused' if autonomy.get('status') == 'paused' or incomplete else 'complete'
             completion = dict(state=state, text=result.get('final_response') or self.job['text'], finished_at=time.time())
             if incomplete and not self.stopping:completion['error'] = '작업이 완료되지 않았습니다. '+str(result.get('turn_exit_reason') or '도구 실행 결과를 확인하세요.')
+            if getattr(self.agent,'_read_only_denials',None):
+                completion['error']=(completion.get('error','')+' '+self.agent._read_only_denials[-1]).strip()
         except Exception as exc:
             traceback.print_exc(file=sys.stderr)
             completion = dict(state='stopped' if self.stopping else 'failed', error=str(exc), finished_at=time.time())
@@ -325,7 +334,9 @@ class HermesWorker:
         if self.model_process and self.model_process.poll() is not None:
             model['state'] = 'failed'
             model['error'] = '로컬 모델 프로세스가 종료됐습니다. local-model.log를 확인하세요.'
-        return {'job': job, 'local_model': model}
+        installing=getattr(getattr(self,'catalog',None),'thread',None)
+        return {'job': job, 'local_model': model,
+            'mcp_installation':{'state':'running' if installing and installing.is_alive() else 'idle'}}
 
     def stop(self):
         if self.thread and self.thread.is_alive():

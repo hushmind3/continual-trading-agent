@@ -920,3 +920,83 @@
 .ha-agent-page-switch .ui-select{@apply min-w-0 max-w-52}
 
 .ha-agent-page-switch>span{@apply whitespace-nowrap}
+
+/* Shared settings surfaces: one section boundary, readable labels, compact facts. */
+.agent-settings-stack{@apply grid gap-5}
+.ui-settings-section{@apply min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white}
+.ui-settings-section>header{@apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4}
+.ui-settings-section h3{@apply text-base font-semibold text-slate-900}
+.ui-settings-section header p{@apply mt-1 text-sm text-slate-500}
+.ui-settings-section-actions{@apply flex items-center gap-3}
+.ui-settings-section-body{@apply grid gap-4 p-5}
+.ui-settings-fields{@apply grid gap-5}
+.ui-settings-fields label,.agent-model-picker>label,.ui-settings-disclosure>label{@apply grid min-w-0 gap-2 text-sm text-slate-600}
+.ui-settings-fields fieldset{@apply min-w-0}
+.ui-settings-fields legend{@apply mb-3 text-sm text-slate-600}
+.ui-settings-actions{@apply flex flex-wrap items-center gap-2}
+.ui-settings-notice{@apply rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800}
+.ui-settings-load{@apply grid justify-items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500}
+.ui-field-hint{@apply text-sm leading-relaxed text-slate-500}
+.ui-search-field{@apply flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-400}
+.ui-search-field .ui-input{@apply min-w-0 border-0 bg-transparent shadow-none focus:ring-0}
+.ui-settings-disclosure{@apply border-t border-slate-100 pt-4 text-sm text-slate-500}
+.ui-settings-disclosure>summary{@apply cursor-pointer}
+.ui-settings-disclosure>label{@apply mt-4}
+.ui-setting-facts{@apply grid gap-3}
+.ui-setting-facts>div{@apply flex flex-wrap justify-between gap-3 text-sm}
+.ui-setting-facts dt{@apply text-slate-500}
+.ui-setting-facts dd{@apply text-slate-800}
+.agent-model-picker{@apply grid min-w-0 gap-4}
+.agent-selected-model{@apply flex min-w-0 items-start gap-3 rounded-xl bg-slate-50 p-4 text-slate-500}
+.agent-selected-model>div{@apply min-w-0}
+.agent-selected-model strong{@apply block break-words text-sm font-medium text-slate-800}
+.agent-selected-model span{@apply mt-1 block text-xs}
+.agent-selected-model small{@apply mt-2 block truncate text-xs text-slate-400}
+.agent-server-model-row{@apply flex items-end gap-3}
+.agent-server-model-row>label{@apply flex-1}
+.agent-tool-grid{@apply grid grid-cols-2 gap-2 md:grid-cols-3}
+.agent-tool-grid>label{@apply flex items-center gap-3 rounded-xl border border-slate-200 p-3}
+.agent-tool-grid>label:has(:checked){@apply border-blue-200 bg-blue-50 text-blue-800}
+.agent-tool-grid input{@apply h-4 w-4 shrink-0}
+@media(max-width:760px){.ui-settings-section>header,.ui-settings-section-body{@apply p-4}.agent-tool-grid{@apply grid-cols-1}.agent-server-model-row{@apply flex-col items-stretch}}
+
+/* Skill browsing shares one category strip and a stable list/detail split. */
+.hermes-skill-browser{@apply block min-w-0}
+.hermes-skill-categories{@apply mb-4 flex min-w-0 flex-row gap-2 overflow-x-auto border-0 p-0 pb-2}
+.hermes-skill-categories>.ui-button{@apply flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600}
+.hermes-skill-categories>.ui-button[aria-pressed=true]{@apply border-blue-200 bg-blue-50 text-blue-800}
+.hermes-skills-layout{@apply grid grid-cols-1 gap-4 lg:grid-cols-2}
+.hermes-skill-detail{@apply bg-white p-5}
+.ui-settings-empty{@apply grid justify-items-start gap-3 p-5 text-sm text-slate-500}
+.ui-results-summary{@apply my-3 text-xs tabular-nums text-slate-500}
+
+/* Conversation is the primary surface; history is a temporary chooser. */
+.hermes-chat-layout.sessions-open{grid-template-columns:minmax(0,1fr)}
+.hermes-chat-layout>.hermes-sessions{@apply absolute inset-y-0 left-0 z-20 w-72 border-r border-slate-200 bg-white shadow-xl}
+.ha-session-backdrop.ui-button{@apply absolute inset-0 z-10 block h-full w-full rounded-none border-0 bg-slate-900/10 p-0 shadow-none}
+.hermes-session-list>.ui-button{@apply justify-start border-0 bg-transparent text-left text-slate-700 shadow-none}
+.hermes-session-list>.ui-button:hover{@apply bg-slate-50}
+.hermes-session-list>.ui-button[aria-current=true]{@apply bg-blue-50 text-blue-800}
+.hermes-sidebar-heading{@apply text-slate-800}
+.ha-session-search{@apply my-3 py-0}
+.ha-session-search .ui-input{@apply h-10}
+.hermes-log{@apply bg-white}
+.hermes-log>header{@apply px-4 py-3}
+.hermes-log header h3{@apply text-sm text-slate-800}
+.hermes-log header h3 small{@apply ml-2 text-xs font-normal tabular-nums text-slate-500}
+.ha-activity-actions{@apply flex items-center gap-1}
+.ha-activity-timeline{@apply gap-0 p-3}
+.ha-activity-item{@apply mb-0 rounded-none border-0 border-b border-slate-100 bg-transparent}
+.ha-activity-item>summary{@apply gap-2 py-3}
+.ha-activity-item summary b{@apply text-xs font-medium text-slate-800}
+.ha-activity-item summary small{@apply mt-1 text-xs text-slate-500}
+.ha-step-dot{@apply h-5 w-5 shrink-0 border-0 bg-transparent text-emerald-600}
+.hermes-workspace .ui-document-link,.ui-document-link{@apply inline-flex h-auto min-h-0 max-w-full items-baseline justify-start rounded-md border-0 bg-transparent px-1 py-0 text-left text-sm font-medium leading-normal text-blue-700 shadow-none underline decoration-blue-200 underline-offset-4 hover:bg-blue-50}
+.workspace-menu-item{@apply text-slate-600}
+@media(max-width:760px){.hermes-chat-layout>.hermes-sessions{@apply max-w-full}}
+
+.agent-settings-stack>.ui-tabs{@apply justify-self-start max-w-full overflow-x-auto}
+.ui-tabs .ui-button[role=tab]{@apply shrink-0 border-0 bg-transparent text-slate-500 shadow-none}
+.ui-tabs .ui-button[role=tab][aria-selected=true]{@apply bg-white text-slate-900 shadow-sm}
+
+.ha-message-actions .ui-button.ha-copy{@apply h-7 min-h-0 min-w-0 rounded-md border-0 bg-transparent px-1 py-1 text-slate-400 shadow-none hover:bg-slate-100 hover:text-slate-700}

@@ -27,3 +27,7 @@ Hermes 대화는 DocumentWorkspace·DocumentPanel을 사용해 문서를 대화 
 문서 패널은 읽기 성공 후에만 열립니다. 실패는 링크 옆에 표시하고 기존 문서·대화 폭을 유지합니다. 축소·확대·닫기, 경계 드래그·방향키 너비 조절을 제공하며 디자인은 공통 Tailwind에서 관리합니다.
 
 ComposerFrame은 전체 폭 편집 영역·첨부·도구 모음·실행 옵션을 배치하는 공통 입력 폼입니다. FileChips는 파일 이름·크기·첨부 취소를 표시합니다. 디자인은 tailwind.css의 ui-composer·ui-file 클래스에 있습니다.
+
+SettingsSection은 설정 제목·설명·상태/액션·본문 경계를 공유합니다. SettingsLoadState는 설정 읽기 실패 시 원인과 다시 불러오기를 함께 표시합니다. ui-settings 계열 디자인은 tailwind.css에서 관리합니다.
+
+문서 참조는 ui-document-link 텍스트 링크로 표시해 본문을 버튼 모양으로 쪼개지 않습니다. Tabs는 선택된 항목만 강조하고 설정 화면에서 내용 폭만 사용합니다. 스킬·MCP 입력창도 별도 모달 구현 대신 공통 Drawer를 사용합니다.

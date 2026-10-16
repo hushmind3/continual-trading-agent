@@ -35,13 +35,16 @@ async function fixture(page:Page,empty=false,history=false){
   else if(op==='artifact/upload')response={name:payload.name,path:'C:/workspace/runtime/ai_agent/Hermes/artifacts/uploads/test/'+payload.name,bytes:8};
   else if(op==='artifact'&&payload.path==='missing.md'){await route.fulfill({status:404,json:{detail:'문서 파일이 없습니다.'}});return}
   else if(op==='artifact')response={name:'error_mining_report.md',path:String(payload.path),format:'.md',bytes:90,content:'# 검사 보고서\n\n- 재시작 보호 확인\n\n<script>window.reportUnsafe=true</script>',truncated:false};
-  else if(op==='models/local')response={models:[],root:'C:/models'};
+  else if(op==='models/local')response={models:[{path:'C:/models/ornith.gguf',name:'Ornith 9B.gguf',bytes:1024},{path:'C:/models/another.gguf',name:'두 번째 모델.gguf',bytes:2048}],root:'C:/models'};
+  else if(op==='model/load')response=status();
   else if(op==='models')response={models:[]};
   else if(op==='chat'){state.job={...state.job,state:'running',session_id:String(payload.session_id||(empty?'new-chat-session':id))};response=status()}
   else if(op==='stop'){state.job={...state.job,state:'stopped'};response=status()}
   else if(op==='answer'){delete state.job.approval;response=status()}
-  else if(op==='skills')response={skills:[]};
-  else if(op==='mcp/catalog')response={entries:[],installation:{state:'idle',name:'',error:''}};
+  else if(op==='skills')response={skills:[{name:'computer-use',description:'Computer operation',category:'autonomous-ai-agents',enabled:true,essential:false}]};
+  else if(op==='skill')response={success:true,content:'# 컴퓨터 조작 지침'};
+  else if(op==='skill/content')response={content:'# 컴퓨터 조작 지침'};
+  else if(op==='mcp/catalog')response={entries:[{name:'catalog-fixture',description:'연결 확인용 도구',source:'https://example.com/docs',installed:false,enabled:true,transport:{type:'http',url:'https://example.com/mcp'},auth:{type:'token',env:[{name:'API_KEY',prompt:'접속 키',required:true,secret:true}]}}],installation:{state:'idle',name:'',error:''}};
   else if(op==='mcp')response={servers:{},status:[]};
   await route.fulfill({json:response});
  });
@@ -98,6 +101,7 @@ test('session search, per-session drafts and settings preserve the conversation'
  await page.getByRole('button',{name:'다른 프로젝트',exact:true}).click();
  await expect(editor).toHaveValue('');
  await editor.fill('다른 세션의 초안');
+ await page.getByRole('button',{name:'대화 기록 열기',exact:true}).click();
  await page.getByLabel('대화 검색',{exact:true}).fill('디자인');
  await page.getByRole('button',{name:'대화 디자인 점검',exact:true}).click();
  await expect(editor).toHaveValue('작성 중인 메시지를 보존합니다.');
@@ -263,10 +267,10 @@ test('engine compaction is preserved in activity instead of flooding the convers
  }finally{messages.shift()}
 });
 
-test('AI Agent main menu exposes five screens with refreshable routes and browser back',async({page})=>{
+test('AI Agent main menu exposes six screens with refreshable routes and browser back',async({page})=>{
  await page.setViewportSize({width:1440,height:900});await fixture(page);
  const navigation=page.getByRole('navigation',{name:'AI 에이전트',exact:true});
- await expect(navigation.getByRole('link')).toHaveCount(5);
+ await expect(navigation.getByRole('link')).toHaveCount(6);
  await page.getByLabel('헤르메스에게 보낼 메시지').fill('메뉴 이동 후에도 남을 초안');
  await navigation.getByRole('link',{name:'MCP',exact:true}).click();
  await expect(page).toHaveURL(/#ai_agent\/Hermes\/mcp$/);
@@ -277,4 +281,71 @@ test('AI Agent main menu exposes five screens with refreshable routes and browse
  await page.goBack();await expect(page.locator('.ha-settings-section-title h2')).toHaveText('MCP');
  await page.getByRole('button',{name:'대화로 돌아가기',exact:true}).click();
  await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toHaveValue('메뉴 이동 후에도 남을 초안');
+});
+
+test('model screen finds a file without mixing workspace fields into model configuration',async({page})=>{
+ const {calls}=await fixture(page);
+ await page.getByRole('button',{name:'설정 열기',exact:true}).click();
+ await page.getByLabel('AI 에이전트 화면').selectOption('models');
+ await expect(page.getByLabel('작업 폴더',{exact:true})).toHaveCount(0);
+ await page.getByLabel('로컬 모델 검색').fill('두 번째');
+ await page.getByLabel('로컬 모델 선택').selectOption('C:/models/another.gguf');
+ await page.getByRole('button',{name:'선택한 모델 불러오기',exact:true}).click();
+ await expect.poll(()=>calls.filter(call=>call.op==='model/load').length).toBe(1);
+ expect(calls.find(call=>call.op==='model/load')!.payload).toEqual({path:'C:/models/another.gguf'});
+});
+test('workspace is a separate submenu and saves only its own fields',async({page})=>{
+ const {calls}=await fixture(page);
+ await page.getByRole('button',{name:'설정 열기',exact:true}).click();
+ await page.getByLabel('AI 에이전트 화면').selectOption('workspace');
+ await page.getByLabel('작업 폴더',{exact:true}).fill('C:/workspace/project');
+ await page.getByRole('button',{name:'작업 환경 저장',exact:true}).click();
+ await expect.poll(()=>calls.filter(call=>call.op==='settings'&&'workspace' in call.payload).length).toBe(1);
+ const saved=calls.find(call=>call.op==='settings'&&'workspace' in call.payload)!.payload;
+ expect(Object.keys(saved).sort()).toEqual(['max_iterations','toolsets','workspace']);
+ await expect(page.getByRole('status')).toContainText('작업 환경을 저장했습니다');
+});
+test('model configuration failure has an actionable retry',async({page})=>{
+ await fixture(page);let fail=true;
+ await page.route('**/api**',async route=>{const request=route.request();const op=request.method()==='GET'?new URL(request.url()).searchParams.get('operation'):request.postDataJSON()?.operation;if(op==='ai_agent/Hermes/settings'&&fail)return route.fulfill({status:503,json:{detail:'설정 연결 실패'}});return route.fallback()});
+ await page.getByRole('button',{name:'설정 열기',exact:true}).click();
+ await page.getByLabel('AI 에이전트 화면').selectOption('models');
+ await expect(page.getByRole('alert')).toContainText('설정 연결 실패');
+ fail=false;await page.getByRole('button',{name:'다시 불러오기',exact:true}).click();
+ await expect(page.getByLabel('로컬 모델 선택')).toBeVisible();
+});
+test('skill editor and MCP installer share Escape and focus restoration without executing actions',async({page})=>{
+ const {calls}=await fixture(page);
+ await page.getByRole('button',{name:'설정 열기',exact:true}).click();
+ await page.getByLabel('AI 에이전트 화면').selectOption('skills');
+ await page.getByLabel('스킬 검색').fill('일치하지않는검색어');
+ await page.getByRole('button',{name:'검색 초기화',exact:true}).click();
+ await expect(page.getByText('컴퓨터 조작',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'스킬 만들기',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'새 스킬 만들기'})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'스킬 만들기',exact:true})).toBeFocused();
+ await page.getByLabel('AI 에이전트 화면').selectOption('mcp');
+ await page.getByRole('button',{name:'설치',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'MCP 설치 설정'})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'설치',exact:true})).toBeFocused();
+ await page.getByRole('tab',{name:'내 연결',exact:true}).click();
+ await page.getByRole('tab',{name:'내 연결',exact:true}).press('ArrowLeft');
+ await expect(page.getByRole('tab',{name:'설치 카탈로그',exact:true})).toHaveAttribute('aria-selected','true');
+ expect(calls.some(call=>['skill/save','mcp/catalog/install'].includes(call.op))).toBe(false);
+});
+
+test('history is a temporary chooser and never creates a fourth persistent column',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await fixture(page);
+ await page.getByRole('button',{name:'작업 내역 보기',exact:true}).click();
+ await expect(page.getByRole('complementary',{name:'작업 내역',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'대화 기록 열기',exact:true}).click();
+ await expect(page.getByRole('complementary',{name:'작업 내역',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('complementary',{name:'대화 기록',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'다른 프로젝트',exact:true}).click();
+ await expect(page.getByRole('complementary',{name:'대화 기록',exact:true})).toHaveCount(0);
+ await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toBeEditable();
 });

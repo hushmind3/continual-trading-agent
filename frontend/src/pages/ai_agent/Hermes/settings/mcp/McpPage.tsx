@@ -1,6 +1,13 @@
 import {useState} from 'react';
-import {Plug,Download} from 'lucide-react';
-import {Button} from '../../../../../ui/Primitives';
+import {Tabs} from '../../../../../ui/Primitives';
 import {McpSettings} from './McpSettings';
 import {McpCatalog} from './McpCatalog';
-export function McpPage({busy,onModels}:{busy:boolean;onModels:()=>void}){const [view,setView]=useState('catalog');return <><div className="hermes-subtabs"><Button aria-pressed={view==='catalog'} onClick={()=>setView('catalog')}><Download size={15}/>설치 카탈로그</Button><Button aria-pressed={view==='connections'} onClick={()=>setView('connections')}><Plug size={15}/>내 연결</Button></div>{view==='catalog'?<McpCatalog busy={busy} onConnections={()=>setView('connections')}/>:<McpSettings busy={busy} onModels={onModels}/>}</>}
+export function McpPage({busy,onModels}:{busy:boolean;onModels:()=>void}) {
+ const [view,setView]=useState(()=>sessionStorage.getItem('hermes.mcp.view')==='connections'?'connections':'catalog');
+ const [connectionsVisited,setConnectionsVisited]=useState(view==='connections');
+ const select=(id:string)=>{setView(id);sessionStorage.setItem('hermes.mcp.view',id);if(id==='connections')setConnectionsVisited(true)};
+ return <div className="agent-settings-stack"><Tabs items={[{id:'catalog',label:'설치 카탈로그'},{id:'connections',label:'내 연결'}]} value={view} onChange={select}/>
+  <div hidden={view!=='catalog'}><McpCatalog busy={busy} onConnections={()=>select('connections')}/></div>
+  {connectionsVisited&&<div hidden={view!=='connections'}><McpSettings busy={busy} onModels={onModels}/></div>}
+ </div>;
+}

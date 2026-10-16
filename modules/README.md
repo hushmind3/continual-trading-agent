@@ -3,7 +3,7 @@
 `modules/<id>/module.json`과 그 안의 backend/frontend를 하나의 프로그램 단위로 취급합니다. 중앙 등록 파일에 기능별 import나 메뉴를 추가하지 않습니다.
 
 - `schema: 1`, 고유 `id`, `group: {id,title}`, 선택 `order`를 선언합니다.
-- `backend: {namespace, entry, path?}`: 기본 path는 backend. entry가 MENU+router 또는 GROUP+ROUTERS를 제공합니다. 선택 hooks는 busy_reason/reserve_restart/cancel_restart/close입니다.
+- `backend: {namespace, entry, path?}`: 기본 path는 backend. entry가 MENU+router 또는 GROUP+ROUTERS를 제공합니다. 선택 hooks는 busy_reason/reserve_restart/cancel_restart/close입니다. register_host(app)은 프로젝트 정적 화면 제공처럼 공통 호스트 연결이 필요할 때만 사용하며 기능 API는 기존 단일 /api로 등록합니다.
 - `frontend: {entry: "frontend/register.ts"}`: menus와 선택 registeredMenus(actions)를 export합니다. React/Vite/Tailwind 및 `@platform/ui` 공통 컴포넌트를 사용합니다.
 - `data`: 프로그램 밖의 영속 경로. `resources`: 기존 실행 환경·공통 실행기 경로. 모듈 탈착은 이 경로를 이동·삭제하지 않습니다.
 
@@ -19,4 +19,4 @@ Hermes 코드는 hermes/backend와 hermes/frontend에 들어 있습니다. 원�
 
 등록된 프로젝트는 메뉴 이동과 기능 호출로 연결되고, Hermes는 허용된 작업 범위 안에서 다른 프로젝트의 소스를 수정·검증할 수 있어야 합니다. 분리 배포에는 필요한 공통 코드·의존성을 포함하고 플랫폼이 없는 환경에서 실행 확인이 필요합니다. 모듈 폴더 분리만으로 독립 배포를 검증했다고 보고하지 않습니다. Expert 선택·조합·분리도 같은 소유권·의존성 확인 원칙을 따릅니다.
 
-현재 구현은 등록 규격, 자동 메뉴/API 연결, 작업 보호, 자동 빌드·적용과 Hermes 프로그램 폴더 탈착입니다. 외부 저장소 자동 변환기, 프로젝트 간 공통 협업 도구, 독립 배포 패키지 생성기와 Expert 공통 규격은 후속 구현 대상입니다.
+현재 구현은 등록 규격, 자동 메뉴/API 연결, 작업 보호, 자동 빌드·적용과 Hermes 프로그램 폴더 탈착입니다. [프로젝트 설치·관리](projects/README.md)는 공개 GitHub 검색·주소 등록, 지원 실행 구조의 자동 어댑터, 기존 Hermes를 통한 추가 변환 요청, 원본 UI 실행 확인·설정·업데이트·분리를 제공합니다. 임의의 모든 저장소가 자동 변환된다고 보장하지 않습니다. 프로젝트 간 공통 협업 도구, 독립 배포 패키지 생성기와 Expert 공통 규격은 후속 구현 대상입니다.

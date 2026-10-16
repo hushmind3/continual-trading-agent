@@ -49,5 +49,12 @@ class ModuleTests(unittest.TestCase):
             meta['backend']['path']='../../';(folder/'module.json').write_text(json.dumps(meta),encoding='utf8')
             with self.assertRaises(ValueError):discover(root)
 
+    def test_added_module_cannot_shadow_existing_namespace(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);folder,meta=self.fixture(root)
+            other=root/'other';(other/'backend').mkdir(parents=True)
+            (other/'module.json').write_text(json.dumps({**meta,'id':'other'}),encoding='utf8')
+            with self.assertRaisesRegex(ValueError,'namespace collision'):discover(root)
+
 
 if __name__=='__main__':unittest.main()

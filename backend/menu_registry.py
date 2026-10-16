@@ -90,6 +90,7 @@ def catalog(routes):
 def register_api(api,app):
     """Collect small-menu routers through the finance and REA coordinators."""
     for _,entry in MODULE_ENTRIES:
+        if mount:=getattr(entry,'register_host',None):mount(app)
         routers=getattr(entry,'ROUTERS',None) or (entry.router,)
         for router in routers:
             api.include_router(router)

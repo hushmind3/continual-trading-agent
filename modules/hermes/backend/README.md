@@ -27,6 +27,8 @@ Source selection excludes the standalone CLI, TUI gateway, messaging adapter ent
 
 시스템 프롬프트: 프론트 설정 → 시스템 프롬프트에서 저장합니다. `platform-settings.json`의 system_prompt를 원본 AIAgent의 ephemeral_system_prompt 인자에 추가하며, 기본 도구 안내는 유지합니다. 다음 대화 요청부터 적용하고 빈 문자열로 저장하면 사용자 추가 지침을 해제합니다.
 
+프로젝트 설치기의 자동 변환 요청은 실행별 workspace를 전달할 수 있습니다. worker는 실제 존재하는 폴더만 받아 해당 실행의 작업 경로에 적용합니다. 저장된 기본 작업 폴더는 바꾸지 않으며 모델 준비·승인·중지는 기존 엔진 경로를 유지합니다. 이번 설치기 변경에서 실제 모델을 통한 자동 변환까지 확인한 것은 아닙니다.
+
 artifacts/는 대화 결과 문서 미리보기를 단일 API에 등록합니다. Markdown 링크·인라인 문서 경로·성공한 파일 쓰기의 결과 파일을 프론트에서 열 수 있습니다. 읽기 전용 실행 권한은 시스템 프롬프트 문장과 별도 설정이며 대화 입력창의 읽기 모드 스위치로 다음 요청부터 적용됩니다.
 
 2026-10-16 확인: 금융·REA 회귀 110개, Hermes 권한·재시작·문서 검사 11개 통과. TypeScript·Vite 빌드 및 서버 적용 완료. 실제 오류 보고서 문서 API 응답 확인. 실제 GGUF 추론은 이번 검증에서 실행하지 않았습니다.

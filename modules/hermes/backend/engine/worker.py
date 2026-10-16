@@ -210,6 +210,10 @@ class HermesWorker:
             request.update(mode='loop',message=parsed.pop('prompt'), **parsed)
         self.idle_required()
         cfg = request_policy(load_settings(), request)
+        if request.get('workspace'):
+            selected = Path(str(request['workspace'])).expanduser().resolve()
+            if not selected.is_dir():raise ValueError('선택한 프로젝트 폴더가 없습니다.')
+            cfg['workspace'] = str(selected)
         if not cfg['model']:
             raise ValueError('모델 설정에서 모델을 선택하고 저장하세요.')
         if cfg.get('local_model') and self.status()['local_model']['state'] != 'ready':

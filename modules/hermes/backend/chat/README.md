@@ -2,6 +2,8 @@
 
 HTTP start/status/stop adapters call the original AIAgent in the isolated worker. Chat runs once. Goal and recurring modes use the original hermes_cli.goals.GoalManager and hermes_cli.loops.LoopManager; autonomy.py only drives these managers and forwards progress. The original auxiliary goal judge uses the selected model endpoint.
 
+프로젝트 설치기의 자동 변환 요청은 chat의 workspace 값으로 해당 내려받은 프로젝트를 작업 폴더로 지정합니다. 이 값은 해당 실행의 cfg에만 적용하고 저장된 기본 작업 환경을 바꾸지 않습니다. 모델 준비·도구 승인·중지 경로는 기존 대화 실행과 같습니다.
+
 Frontend modes: one turn, work toward a goal, recurring task. /goal <task>, /goal resume, /loop <interval> <task>, /loop resume and /stop also use the same paths. Tool approval and user-question callbacks remain interactive.
 
 Goals stop when judged done, blocked, interrupted or budget-limited. Loops stop on the native completion marker, requested count, until criterion or native backstop. Intervals are clamped to the original minimum (30 seconds by default); self-paced mode starts at 60 seconds and backs off on unchanged responses. A model can signal completion before the requested count. Zero count uses the native 100-tick backstop, rather than implying unlimited work.

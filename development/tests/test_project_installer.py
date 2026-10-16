@@ -1,0 +1,131 @@
+"""Installer contracts, real ASGI IPC/UI execution, and failed-update rollback."""
+import base64
+import json
+from pathlib import Path
+import sys
+import tempfile
+import threading
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'backend'))
+from platform_modules import mount_namespaces
+mount_namespaces()
+from platform_plugins.projects import adapters, github, installer, runtime, store
+
+
+class InstallerTests(unittest.TestCase):
+    def setUp(self):
+        verification = ROOT / 'runtime/projects/manage/verification'
+        verification.mkdir(parents=True, exist_ok=True)
+        self.temp = tempfile.TemporaryDirectory(dir=verification)
+        self.base = Path(self.temp.name); self.source = self.base / 'version/source'; self.source.mkdir(parents=True)
+
+    def tearDown(self):
+        runtime.close(); self.temp.cleanup()
+
+    def test_repository_is_public_github_only(self):
+        self.assertEqual(github.repository('https://github.com/mdn/beginner-html-site-styled.git'), 'mdn/beginner-html-site-styled')
+        for value in ('https://evil.test/a/b', '--upload-pack=evil', '../x', 'https://github.com/u/r/tree/main', 'https://user:secret@github.com/u/r'):
+            with self.subTest(value=value), self.assertRaises(ValueError): github.repository(value)
+
+    def test_vite_and_fastapi_are_detected_together(self):
+        ui = self.source / 'frontend'; ui.mkdir()
+        (ui / 'package.json').write_text(json.dumps({'devDependencies': {'vite': '*'}, 'scripts': {'build': 'vite build'}}))
+        backend = self.source / 'backend'; backend.mkdir()
+        (backend / 'main.py').write_text('from fastapi import FastAPI\napp=FastAPI()\n')
+        spec = adapters.detect(self.source)
+        self.assertEqual((spec['kind'], spec['app'], spec['ui']['kind']), ('fastapi', 'main:app', 'vite'))
+
+    def test_asgi_worker_preserves_state_and_actual_working_directory(self):
+        (self.source / 'main.py').write_text('from fastapi import FastAPI\nimport os\napp=FastAPI()\ncounter=0\n'
+            '@app.get("/counter")\ndef count():\n global counter\n counter+=1\n return {"count":counter,"cwd":os.getcwd()}\n')
+        spec = adapters.detect(self.source); runtime.verify(self.source, spec)
+        record = {'id': 'p_test', 'active_source': str(self.source), 'adapter': spec}
+        for count in (1, 2):
+            response = runtime.invoke(record, {'path': '/counter', 'method': 'GET'})
+            self.assertEqual(response['status'], 200)
+            data = json.loads(base64.b64decode(response['body']))
+            self.assertEqual(data['count'], count); self.assertEqual(Path(data['cwd']), self.source)
+
+    def test_ui_verifier_rejects_javascript_failures(self):
+        (self.source / 'index.html').write_text('<html><head></head><body>Working project</body></html>')
+        spec = adapters.detect(self.source)
+        log = self.base / 'verification.log'
+        def run(command, folder, timeout): installer.run_command(command, folder, log, threading.Event(), timeout)
+        self.assertTrue(runtime.verify_ui(self.source, spec, {}, run))
+        (self.source / 'index.html').write_text('<html><head></head><body><script>throw Error("ACTUAL_UI_FAILURE")</script></body></html>')
+        with self.assertRaisesRegex(ValueError, 'ACTUAL_UI_FAILURE'):
+            runtime.verify_ui(self.source, spec, {}, run)
+
+    def test_original_ui_fetch_uses_single_api_gateway(self):
+        (self.source / 'main.py').write_text('from fastapi import FastAPI\napp=FastAPI()\n@app.get("/result")\ndef result(): return {"connected":True}\n')
+        ui = self.source / 'frontend'; ui.mkdir()
+        (ui / 'index.html').write_text('<html><head></head><body>Loading<script>'
+            'fetch("/result").then(r=>r.json()).then(data=>{if(!data.connected)throw Error("API_BRIDGE_FAILED");document.body.textContent="Connected"})'
+            '</script></body></html>')
+        spec = adapters.detect(self.source); log = self.base / 'connected-ui.log'
+        def run(command, folder, timeout): installer.run_command(command, folder, log, threading.Event(), timeout)
+        self.assertTrue(runtime.verify_ui(self.source, spec, {}, run))
+
+    def test_root_absolute_asset_is_not_falsely_verified_at_platform_mount(self):
+        (self.source / 'index.html').write_text('<html><head><script src="/code.js"></script></head><body>App</body></html>')
+        (self.source / 'code.js').write_text('console.log("asset")')
+        log = self.base / 'mount.log'
+        def run(command, folder, timeout): installer.run_command(command, folder, log, threading.Event(), timeout)
+        with self.assertRaisesRegex(ValueError, '플랫폼 밖의 경로'):
+            runtime.verify_ui(self.source, adapters.detect(self.source), {}, run)
+
+    def test_cookie_auth_requires_adapter_instead_of_false_ready(self):
+        (self.source / 'main.py').write_text('from fastapi import FastAPI,Security\nfrom fastapi.security import APIKeyCookie\n'
+            'app=FastAPI()\ncookie=APIKeyCookie(name="session")\n@app.get("/")\ndef home(token=Security(cookie)):return {"ok":True}\n')
+        with self.assertRaisesRegex(ValueError, '인증 어댑터'):
+            runtime.verify(self.source, adapters.detect(self.source))
+
+    def test_failed_update_restores_existing_program_and_record(self):
+        root = self.base / 'host'; (root / 'modules/demo').mkdir(parents=True)
+        (root / 'modules/demo/old.txt').write_text('keep this program')
+        source = self.base / 'native'; (source / 'backend').mkdir(parents=True); (source / 'frontend').mkdir()
+        (source / 'module.json').write_text(json.dumps({'schema': 1, 'id': 'demo', 'group': {'id': 'demo', 'title': 'Demo'},
+            'backend': {'namespace': 'demo', 'entry': 'register'}, 'frontend': {'entry': 'frontend/register.ts'}}))
+        record = {'id': 'p_demo', 'module_id': 'demo', 'title': 'demo', 'repository': 'owner/demo',
+            'url': 'https://github.com/owner/demo', 'active_source': 'previous-source', 'environment': {}}
+        state = root / 'runtime/projects/manage'
+        with patch.object(installer, 'ROOT', root), patch.object(installer, 'STATE', state), patch.object(store, 'STATE', state), \
+             patch.object(installer, 'run_command', side_effect=ValueError('deliberate import failure')):
+            installer.install(record, threading.Event(), source)
+            restored = store.read('p_demo')
+            self.assertEqual(restored['stage'], 'failed'); self.assertEqual(restored['active_source'], 'previous-source')
+            self.assertEqual((root / 'modules/demo/old.txt').read_text(), 'keep this program')
+            self.assertTrue(list((root / '휴지통/modules').glob('demo-*')))
+
+    def test_adapter_cannot_escape_owned_project(self):
+        with self.assertRaises(ValueError): adapters.validate(self.source, {'kind': 'static', 'directory': '../..'})
+        value = installer.public({'environment': {'API_KEY': 'secret-value'}, 'error': 'failed secret-value'})
+        self.assertNotIn('secret-value', value['error']); self.assertNotIn('environment', value)
+
+    def test_record_replace_retries_windows_sharing_violation(self):
+        import os
+        original = os.replace; attempts = []
+        def replace(source, target):
+            attempts.append(1)
+            if len(attempts) == 1: raise PermissionError('Windows sharing violation')
+            return original(source, target)
+        with patch.object(store, 'STATE', self.base / 'state'), patch.object(store.os, 'replace', side_effect=replace):
+            store.save({'id': 'p_retry', 'stage': 'download'})
+            self.assertEqual(store.read('p_retry')['stage'], 'download')
+            self.assertEqual(len(attempts), 2)
+
+    def test_update_is_not_ready_until_its_revision_is_loaded(self):
+        from types import SimpleNamespace
+        state = self.base / 'state'
+        metadata = {'id': 'external_demo', 'install_revision': 'old'}
+        with patch.object(store, 'STATE', state), patch.dict(sys.modules, {'menu_registry': SimpleNamespace(MODULE_ENTRIES=[(metadata, object())])}):
+            store.save({'id': 'p_demo', 'module_id': 'external_demo', 'install_revision': 'new', 'stage': 'awaiting_activation'})
+            self.assertEqual(installer.installed()[0]['stage'], 'awaiting_activation')
+            metadata['install_revision'] = 'new'
+            self.assertEqual(installer.installed()[0]['stage'], 'ready')
+
+
+if __name__ == '__main__': unittest.main()

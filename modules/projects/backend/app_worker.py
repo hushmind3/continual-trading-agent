@@ -1,0 +1,61 @@
+"""One reusable ASGI worker per active imported app; no listening HTTP port."""
+import asyncio
+import base64
+import importlib
+import json
+import os
+import sys
+import traceback
+
+protocol = sys.stdout
+sys.stdout = sys.stderr
+
+
+async def request(app, message):
+    body = str(message.get('body') or '').encode()
+    path = message.get('path') or '/openapi.json'
+    if not path.startswith('/') or '?' in path: raise ValueError('Invalid application path')
+    headers = [(str(key).lower().encode(), str(value).encode()) for key, value in message.get('headers', {}).items()
+               if key.lower() not in ('host', 'content-length', 'connection')]
+    scope = {'type': 'http', 'asgi': {'version': '3.0'}, 'http_version': '1.1', 'method': message.get('method', 'GET'),
+        'scheme': 'http', 'path': path, 'raw_path': path.encode(), 'root_path': '',
+        'query_string': str(message.get('query', '')).encode(), 'headers': headers,
+        'client': ('127.0.0.1', 0), 'server': ('127.0.0.1', 8766)}
+    response = {'status': 500, 'headers': {}, 'body': ''}; parts = []; sent = False
+    async def receive():
+        nonlocal sent
+        if not sent:
+            sent = True
+            return {'type': 'http.request', 'body': body, 'more_body': False}
+        await asyncio.sleep(3600)
+        return {'type': 'http.disconnect'}
+    async def send(event):
+        if event['type'] == 'http.response.start':
+            response.update(status=event['status'], headers={k.decode(): v.decode() for k, v in event.get('headers', [])
+                if k.lower() not in (b'content-length', b'transfer-encoding', b'content-encoding')})
+        elif event['type'] == 'http.response.body':
+            parts.append(event.get('body', b''))
+            if sum(map(len, parts)) > 8 * 1024 * 1024: raise ValueError('Application response exceeds 8 MiB')
+    await asyncio.wait_for(app(scope, receive, send), timeout=60)
+    response['body'] = base64.b64encode(b''.join(parts)).decode()
+    if message.get('inspect'):
+        response['features'] = {'cookie_sessions': any(item.cls.__name__ == 'SessionMiddleware' for item in getattr(app, 'user_middleware', []))}
+    return response
+
+
+async def main():
+    folder, target = sys.argv[1:3]
+    os.chdir(folder); sys.path.insert(0, folder)
+    module, name = target.split(':')
+    app = getattr(importlib.import_module(module), name)
+    async with app.router.lifespan_context(app):
+        while line := await asyncio.to_thread(sys.stdin.readline):
+            try:
+                result = await request(app, json.loads(line))
+            except Exception as exc:
+                traceback.print_exc(file=sys.stderr); result = {'error': str(exc)}
+            protocol.write(json.dumps(result) + '\n'); protocol.flush()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

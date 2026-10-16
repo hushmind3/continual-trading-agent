@@ -5,6 +5,7 @@
 | [stockrl/](stockrl/README.md) | 금융 대메뉴: 사용자 화면 5개 및 숨김 관리 메뉴 |
 | [rea/](rea/README.md) | 독립 REA 프로젝트: program_analysis/, project_explorer/ |
 | [modules/hermes/](../modules/hermes/README.md) | Hermes 프로그램: 엔진·채팅·모델·세션·MCP·스킬. 데이터는 runtime에 보존 |
+| [modules/projects/](../modules/projects/README.md) | 공개 GitHub 검색·주소 등록·설치·실행 확인·원본 화면 연결·분리 |
 | [platform_modules.py](platform_modules.py) | modules/*/module.json 탐색·Python 등록·실행 보호 훅 |
 | [menu_registry.py](menu_registry.py) | 모듈 등록 정보를 취합하는 총괄 |
 | [web_api.py](web_api.py) | 단일 /api 진입점; 총괄만 통해 기능 등록 |

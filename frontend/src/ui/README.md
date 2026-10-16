@@ -1,5 +1,7 @@
 # 공통 UI
 
+- AppWorkspace.tsx: 설치된 앱의 공통 제목·액션과 원본 UI 프레임입니다. 중복 페이지 제목을 숨기고 화면 높이를 사용하며 디자인은 tailwind.css의 ui-app-workspace에 둡니다. 프로젝트별 별도 CSS를 만들지 않습니다.
+
 - Panel.tsx: 접이식 패널·키/값 표시.
 - 패널 설명은 제목 옆 안내 아이콘으로 분리합니다. 기본 화면은 제목·제어·상태·결과를 표시하며, 설명은 선택했을 때 펼칩니다.
 - Primitives.tsx: Button·IconButton·Input·Select·Textarea·상태·탭·Drawer·오류·빈 상태 등 재사용 요소. Button은 기존 기본 동작을 유지하며 아이콘 버튼은 같은 로딩·비활성화·ref 계약을 사용합니다.

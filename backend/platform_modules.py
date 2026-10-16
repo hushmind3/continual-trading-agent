@@ -17,6 +17,7 @@ MODULES = ROOT / 'modules'
 def discover(directory=None):
     records = []
     seen = set()
+    namespaces = set()
     for path in sorted(Path(directory or MODULES).glob('*/module.json')):
         data = json.loads(path.read_text(encoding='utf-8'))
         identifier = data.get('id', '')
@@ -30,6 +31,9 @@ def discover(directory=None):
         namespace = data['backend']['namespace']
         if not re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', namespace):
             raise ValueError(f'Invalid module namespace: {identifier}')
+        if any(namespace == used or namespace.startswith(used + '.') or used.startswith(namespace + '.') for used in namespaces):
+            raise ValueError(f'Module namespace collision: {identifier} ({namespace})')
+        namespaces.add(namespace)
         source = (path.parent / data['backend'].get('path', 'backend')).resolve()
         if not source.is_relative_to(path.parent.resolve()) or not source.is_dir():
             raise ValueError(f'Module backend is missing or outside its folder: {identifier}')

@@ -48,7 +48,7 @@ from ruamel.yaml import YAML
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
             'workspace': str(ROOT), 'max_iterations': 100,
-            'toolsets': ['terminal', 'file', 'todo', 'skills'], 'local_model': ''}
+            'toolsets': ['terminal', 'file', 'todo', 'skills'], 'local_model': '', 'system_prompt': ''}
 
 
 def atomic_json(path, value):
@@ -139,6 +139,8 @@ class HermesWorker:
         if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError('모델 주소는 인증정보를 제외한 http:// 또는 https:// 주소여야 합니다.')
         cfg['base_url'] = cfg['base_url'].rstrip('/')
+        if not isinstance(cfg['system_prompt'],str):
+            raise ValueError('시스템 프롬프트는 문자열이어야 합니다.')
         workspace = Path(str(cfg['workspace'])).expanduser().resolve()
         if not workspace.is_dir():
             raise ValueError('작업 폴더가 존재하지 않습니다.')
@@ -270,7 +272,8 @@ class HermesWorker:
                     'Use computer_use capture in ax mode to verify the visible window once. '
                     'Once the requested app is open, leave it open and finish. Do not close, relaunch or keep polling it. '
                     'If the user closes the app, do not reopen it without a new request. '
-                    'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'),
+                    'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'
+                    + ('\n\nAdditional user-configured system instructions:\n'+cfg['system_prompt'] if cfg.get('system_prompt') else '')),
                 stream_delta_callback=self.delta, event_callback=self.event,
                 status_callback=lambda *args, **kw: self.event('status', args),
                 tool_start_callback=lambda *args, **kw: self.event('tool_start', args),
@@ -361,7 +364,7 @@ class HermesWorker:
         path = Path(str(request.get('path') or '')).expanduser().resolve()
         if not path.is_file() or path.suffix.lower() != '.gguf':
             raise ValueError('존재하는 GGUF 모델 파일을 선택하세요. 다른 형식은 해당 모델 실행기의 API 주소를 연결하세요.')
-        executable = ROOT / 'runtime/experts/engines/llama.cpp/llama-server.exe'
+        executable = ROOT / 'runtime/shared/engines/llama.cpp/llama-server.exe'
         if not executable.is_file():
             raise ValueError('설치된 llama-server 실행기를 찾을 수 없습니다.')
         self.unload_model()

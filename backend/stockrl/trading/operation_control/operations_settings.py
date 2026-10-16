@@ -16,10 +16,10 @@ def settings():
     data=SimpleNamespace(**{'poll_seconds':15,'timeout_seconds':10,**values.get('data',{})})
     resources=SimpleNamespace(expert_devices=values.get('expert_devices',{}),
         ram_reserve_gib=0,vram_reserve_gib=0,disk_reserve_gib=0)
-    root=ROOT/'runtime/operations'
+    root=ROOT/'runtime/finance/operation_control'
     root.mkdir(parents=True,exist_ok=True)
     return SimpleNamespace(registry_file=model_dir/'expert_registry.json',model_dir=model_dir,
-        expert_checkpoint=str(model_dir/'champion.pt'),state_dir=root,
+        expert_checkpoint=str(model_dir/'champion.pt'),state_dir=root,account_dir=ROOT/'runtime/finance/virtual_account_orders',library_dir=ROOT/'runtime/finance/moe',
         resolve=lambda path:Path(path) if Path(path).is_absolute() else ROOT/path,
         resources=resources,risk=risk,data=data,symbols=values.get('symbols',[]))
 

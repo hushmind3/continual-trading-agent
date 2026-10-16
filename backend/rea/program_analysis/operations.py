@@ -5,7 +5,7 @@ from pathlib import Path
 import psutil
 from stockrl import ROOT
 BASE=Path(__file__).parent.parent
-WORK=ROOT/'runtime/rea'
+WORK=ROOT/'runtime/rea/program_analysis'
 SOURCE='https://github.com/morluto/rea'
 
 @lru_cache(maxsize=1)

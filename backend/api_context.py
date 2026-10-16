@@ -46,7 +46,8 @@ from stockrl.platform.library_operations import library as library_manager
 from stockrl.expert_registry_native import ExpertRegistry
 from finrl.agents.stablebaselines3.models import MODELS
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
-RUNTIME = ROOT / "runtime/official"
+RUNTIME = ROOT / "runtime/finance/policy_learning"
+SERVER_RUNTIME = ROOT / "runtime/platform"
 DB = ROOT / "data/market_prices.sqlite3"
 MODEL_DIR = Path.home() / "Desktop/모델"
 ENVIRONMENT = CASH_ENVIRONMENT

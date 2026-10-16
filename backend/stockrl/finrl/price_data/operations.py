@@ -8,7 +8,7 @@ _collection_lock=threading.Lock()
 
 def kiwoom_collection_state():
     from stockrl.state_io import read_json
-    state=read_json(ROOT/'runtime/operations/market_history/collection.json') or {'status':'idle','rows':0,'symbols':[],'errors':[]}
+    state=read_json(ROOT/'runtime/finance/operation_control/market_history/collection.json') or {'status':'idle','rows':0,'symbols':[],'errors':[]}
     if state.get('status')=='running' and not _collection_lock.locked():
         return {**state,'status':'interrupted','error':'이전 수집 작업의 완료 기록이 없습니다. 다시 수집하세요.'}
     return state
@@ -17,10 +17,10 @@ def kiwoom_collection_state():
 def start_kiwoom_collection():
     from stockrl.management.connection_settings.provider_credentials import public_status
     from stockrl.state_io import atomic_json
-    status=public_status(ROOT/'runtime/operations')
+    status=public_status(ROOT/'runtime/finance/operation_control')
     if status['provider']!='kiwoom' or not status['saved']:raise ValueError('키움 App Key·Secret 연결을 먼저 설정하세요.')
     if not _collection_lock.acquire(blocking=False):return kiwoom_collection_state()
-    path=ROOT/'runtime/operations/market_history/collection.json'
+    path=ROOT/'runtime/finance/operation_control/market_history/collection.json'
     try:
         atomic_json({'status':'running','source':'kiwoom','timeframe':'1d','rows':0,'symbols':[],'errors':[]},path)
         def run():
@@ -72,7 +72,7 @@ def collect_kiwoom_prices(symbols=None,*,currency='KRW'):
     import subprocess
     from stockrl.management.connection_settings.provider_credentials import read_settings
     from stockrl.state_io import atomic_json
-    cfg=read_settings(ROOT/'runtime/operations')
+    cfg=read_settings(ROOT/'runtime/finance/operation_control')
     if cfg.get('provider')!='kiwoom':raise ValueError('키움 시세 연결을 먼저 설정하세요.')
     instruments=json.loads((ROOT/'configs/instruments.json').read_text(encoding='utf-8'))['instruments']
     allowed={i['symbol'] for i in instruments if i.get('market') in ('KRX','KOSDAQ') and i.get('asset_class') in ('equity','etf')}
@@ -85,7 +85,7 @@ def collect_kiwoom_prices(symbols=None,*,currency='KRW'):
     python=ROOT/'.venv/kiwoom/Scripts/python.exe'
     if not python.is_file():raise RuntimeError('기존 키움 SDK 실행 환경을 확인하세요.')
     env={**os.environ,'PYTHONPATH':str(ROOT/'backend'),'PYTHONUTF8':'1'}
-    request={'operation':'daily_history','runtime_dir':str(ROOT/'runtime/operations'),'symbols':names,'currency':currency}
+    request={'operation':'daily_history','runtime_dir':str(ROOT/'runtime/finance/operation_control'),'symbols':names,'currency':currency}
     process=subprocess.run([str(python),'-B','-m','stockrl.platform.kiwoom_worker'],input=json.dumps(request)+'\n',
         text=True,encoding='utf-8',capture_output=True,env=env,cwd=ROOT,timeout=max(30,20*len(names)),
         creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
@@ -102,7 +102,7 @@ def collect_kiwoom_prices(symbols=None,*,currency='KRW'):
             summary['symbols'].append({'symbol':result['symbol'],'rows':saved,'start':frame.date.min(),'end':frame.date.max()});summary['rows']+=saved
         except (ValueError,KeyError) as error:summary['errors'].append({'symbol':result.get('symbol'),'error':str(error)})
     summary['status']='partial' if summary['errors'] else 'completed'
-    atomic_json(summary,ROOT/'runtime/operations/market_history/collection.json')
+    atomic_json(summary,ROOT/'runtime/finance/operation_control/market_history/collection.json')
     return summary
 
 
@@ -128,7 +128,7 @@ def prices(currency='USD',symbols=None,timeframe='1d'):
     names=symbols or [s for s in available if s in allowed]
     if start is None:return pd.DataFrame()
     from stockrl.management.connection_settings.provider_credentials import read_settings
-    provider=read_settings(ROOT/'runtime/operations').get('provider')
+    provider=read_settings(ROOT/'runtime/finance/operation_control').get('provider')
     kiwoom=currency=='KRW' and provider=='kiwoom'
     if timeframe=='1m':
         data=store.get_price_data(names,start,end,source=provider or 'unknown',timeframe='1m')
@@ -141,7 +141,7 @@ def prices(currency='USD',symbols=None,timeframe='1d'):
         data['date']=dates.dt.tz_localize(None)
         data=data.sort_values(['date','symbol']).reset_index(drop=True);data.attrs.update(timeframe=timeframe,source=provider or 'unknown')
         return data
-    feed=ROOT/'runtime/operations/live/timeframes.sqlite3'
+    feed=ROOT/'runtime/finance/operation_control/live/timeframes.sqlite3'
     if feed.is_file():
         with closing(sqlite3.connect('file:'+feed.as_posix()+'?mode=ro',uri=True)) as connection:
             tables={row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}

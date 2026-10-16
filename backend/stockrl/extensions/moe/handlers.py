@@ -43,7 +43,7 @@ def expert_state():
     model_dir=settings().model_dir
     model_root=model_dir.resolve()
     registry = read_catalog()
-    status = read_json(ROOT / "runtime/experts/status.json")
+    status = read_json(ROOT / "runtime/finance/moe/status.json")
     rows = []
     for key, item in registry.get("experts", {}).items():
         reference = item.get("package", {})
@@ -59,7 +59,7 @@ def expert_state():
                      "current_resources": system.expert_pool.metrics.get(key,{}) if system.expert_pool else {},
                      "loaded": bool(system.expert_pool and key in system.expert_pool.loaded)})
     return {"active": registry.get("active", []), "items": rows, "as_of": status.get("as_of"),
-            "reported": file_info(ROOT / "runtime/experts/status.json").get("modified")}
+            "reported": file_info(ROOT / "runtime/finance/moe/status.json").get("modified")}
 
 
 def champions():

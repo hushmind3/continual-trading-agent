@@ -9,16 +9,17 @@ from .. import ROOT
 from ..finrl.framework import policy_files
 from ..state_io import atomic_json,read_json,update_json
 
-RUNTIME=ROOT/'runtime/official'
+RUNTIME=ROOT/'runtime/finance/policy_learning'
+SERVER_RUNTIME=ROOT/'runtime/platform'
 
 def apply_state():
-    value=read_json(RUNTIME/'apply.json',{'status':'pending','stages':[]})
+    value=read_json(SERVER_RUNTIME/'apply.json',{'status':'pending','stages':[]})
     if value.get('status') in ('pending','running') and value.get('pid') and not apply_running(value):
         value={**value,'status':'failed','error':'변경 적용 프로세스가 종료됐습니다. 저장된 실패 단계와 로그를 확인하세요.'}
     return value
 
 def apply_running(value=None):
-    value=value or read_json(RUNTIME/'apply.json')
+    value=value or read_json(SERVER_RUNTIME/'apply.json')
     if value.get('status') not in ('pending','running'):return False
     try:
         process=psutil.Process(value['pid'])
@@ -30,8 +31,8 @@ def start_apply(target='frontend'):
     with system.job_lock:
         if apply_running():return apply_state()
         env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1')
-        RUNTIME.mkdir(parents=True,exist_ok=True)
-        with (RUNTIME/'apply-launch.log').open('ab') as output:
+        SERVER_RUNTIME.mkdir(parents=True,exist_ok=True)
+        with (SERVER_RUNTIME/'apply-launch.log').open('ab') as output:
             args=[sys.executable,str(ROOT/'development/scripts/start_server.py'),'--apply-only','--skip-checks']
             if target=='frontend':args.append('--frontend-only')
             elif target=='backend':args.append('--skip-build')
@@ -39,7 +40,7 @@ def start_apply(target='frontend'):
                 stdout=output,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         value={'status':'running','target':target,'pid':child.pid,'process_created':psutil.Process(child.pid).create_time(),
             'stages':[{'id':'queue','title':'변경 적용 요청','status':'pending','detail':'독립 런처에서 처리합니다.'}]}
-        atomic_json(value,RUNTIME/'apply.json')
+        atomic_json(value,SERVER_RUNTIME/'apply.json')
         return value
 
 def busy():
@@ -113,7 +114,7 @@ def check_system():
 
 class SystemOperations:
     def __init__(self):
-        self.path=ROOT/'runtime/operations/system.json';self.lock=threading.RLock()
+        self.path=ROOT/'runtime/finance/operation_control/system.json';self.lock=threading.RLock()
         self.job_lock=threading.RLock();self.job_process=None
         self.active=False;self.cancelled=threading.Event();self.restarting=False
         self.value=read_json(self.path,{'status':'pending','stages':[]})
@@ -276,7 +277,7 @@ class SystemOperations:
             entry['last_used']=time.monotonic()
             return entry['model']
     def selected_models(self):
-        return {str((RUNTIME/path).resolve()) for path in read_json(ROOT/'runtime/operations/policies.json').values()}
+        return {str((RUNTIME/path).resolve()) for path in read_json(ROOT/'runtime/finance/operation_control/policies.json').values()}
     def release_models(self,keep=(),force=False):
         # Retain approved policies and the currently requested model; release older transient uses.
         released=False
@@ -367,7 +368,7 @@ class SystemOperations:
             self.interrupted();key='experts';title='선택 Frozen Expert 적재';self.phase(key,title)
             if not cfg.model_dir.is_dir():raise ValueError('모델 폴더 없음: '+str(cfg.model_dir))
             catalog=read_catalog(cfg.registry_file)
-            selected_policies=read_json(ROOT/'runtime/operations/policies.json')
+            selected_policies=read_json(ROOT/'runtime/finance/operation_control/policies.json')
             identities=[read_json((RUNTIME/selected_policies.get(currency,'')).parent/'dataset.json') for currency in self.value['currencies']]
             expert_ids={expert for identity in identities for expert in identity.get('champion_experts',[])} or set(catalog.get('active',[]))
             required={symbol for expert in expert_ids for symbol in ((catalog['experts'].get(expert,{}).get('input') or {}).get('universe') or [])}
@@ -448,7 +449,7 @@ class SystemOperations:
             runtime.sac_decision()
             pending=[currency for currency in ready_policies if runtime.status.get('policy_inputs',{}).get(currency,{}).get('status')!='ready']
             if pending:raise ValueError('선택 종목의 실제 가격 행렬이 준비되지 않아 추론을 실행하지 않았습니다: '+', '.join(pending))
-            report=read_json(ROOT/'runtime/experts/status.json')
+            report=read_json(ROOT/'runtime/finance/moe/status.json')
             failures.extend(expert+': '+str(row.get('reason','Expert 추론 실패')) for expert,row in report.get('experts',{}).items() if expert in catalog.get('active',[]) and row.get('status')!='ready')
             self.phase(key,title,'complete',', '.join(ready_policies)+' 실제 가격·Expert 관측으로 SAC 판단 실행; 이후 완료 바에서 기존 가상체결. 실제 증권 주문 미전송')
             self.phase('learning','선택 정책 지속학습','complete','기존 모델·Replay로 새 완료 입력을 이어 학습; 원본 Expert는 동결 유지')

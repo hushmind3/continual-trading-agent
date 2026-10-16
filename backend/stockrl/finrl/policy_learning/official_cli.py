@@ -37,7 +37,7 @@ def main():
         if args.command=='experts':
             for key,item in registry.catalog()['experts'].items():print(key,item['name'],'active' if key in registry.catalog()['active'] else 'stored')
             return
-        (ROOT/'runtime/official').mkdir(parents=True,exist_ok=True)
+        (ROOT/'runtime/finance/policy_learning').mkdir(parents=True,exist_ok=True)
         timeframe=args.timeframe or '1d'
         if args.resume:
             from stockrl.finrl.framework import policy_files,policy_timeframe
@@ -48,7 +48,7 @@ def main():
         frame=prices(args.currency,args.symbols,timeframe=timeframe)
         if frame.empty:raise ValueError('공식 DataStore에 해당 시장의 실제 가격 데이터가 없습니다.')
         model=train(frame,registry,args.resume,args.output,args.champion_path,args.champion_output,args.algorithm,args.total_timesteps,champion=champion,source_checkpoint=args.checkpoint)
-        print('Saved FinRL policy:',(args.output or ROOT/'runtime/official')/(args.algorithm+'.zip'))
+        print('Saved FinRL policy:',(args.output or ROOT/'runtime/finance/policy_learning')/(args.algorithm+'.zip'))
 
     finally:
         registry.close(cleanup=True)

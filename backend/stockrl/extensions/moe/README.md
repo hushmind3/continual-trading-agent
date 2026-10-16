@@ -31,3 +31,5 @@ Expert 조회의 기준 폴더는 operations_settings.settings().model_dir(바�
 JSON Expert의 구성 확인·가져오기는 같은 JSON 읽기 경로를 사용합니다. 모델 폴더 안의 MODEL.json은 원래 가중치 참조를 유지한 채 등록하며 PT 변환·추가 저장 없이 동작합니다. 실행·가중치 검사는 별도입니다.
 
 2026-10-14 실제 실행: 사용자 지시로 가상계좌 원장을 휴지통에 보존한 뒤 체결·보유·대기를 초기화했습니다. CUDA 장치 전달은 cuda:0을 사용합니다. INT4 버전 15개를 실제 생성하고 기존 4비트 Qwen을 더한 16개로 sac_champion_007을 생성·CUDA 로드했습니다. 가중치 없는 yohou-nixtla 소스 저장소는 양자화 대상이 아닙니다. compare_after=false 요청에서는 개별 추론 검사·원본 출력 비교를 실행하지 않습니다. 새 중앙 정책은 생성 시 학습 0단계이며 수익 개선은 검증되지 않았습니다. 사용자는 종목 수 상한 없이 모델 판단을 선택했습니다.
+
+런타임: `runtime/finance/moe/`. 실행 상태·구성 작업을 보관합니다. 원본 Expert와 모델별 JSON은 바탕화면 모델 폴더, 공용 실행기는 runtime/shared/engines에 둡니다.

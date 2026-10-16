@@ -25,7 +25,7 @@ async function fixture(page:Page){
   op=op.slice('ai_agent/Hermes/'.length);calls.push({op,payload});let response:unknown={};
   const status=()=>({job:{...state.job},local_model:{running:true,state:'ready',base_url:settings.base_url}});
   if(op==='status')response=status();
-  else if(op==='settings')response=settings;
+  else if(op==='settings')response={...settings,...(payload.system_prompt!==undefined?{system_prompt:payload.system_prompt}:{})};
   else if(op==='sessions')response=[{id,title:'대화 디자인 점검',model:settings.model},{id:'another-session',title:'다른 프로젝트',model:settings.model}];
   else if(op==='session')response={session:{id:payload.id,title:payload.id===id?'대화 디자인 점검':'다른 프로젝트',model:settings.model},messages:payload.id===id?messages:[]};
   else if(op==='autonomy')response={goal:null,loop:null};
@@ -135,4 +135,19 @@ test('goal send, stop and approval controls use the existing API contract',async
  await page.getByRole('button',{name:'답변 보내기',exact:true}).click();
  await expect.poll(()=>calls.find(c=>c.op==='answer')?.payload.text).toBe('승인된 답변');
  expect(calls.find(c=>c.op==='answer')?.payload.allow).toBe(true);
+});
+
+
+test('system prompt settings save only the prompt and preserve the chat',async({page})=>{
+ const {calls}=await fixture(page);
+ await page.getByRole('button',{name:'설정 열기',exact:true}).click();
+ await page.getByRole('button',{name:'시스템 프롬프트',exact:true}).click();
+ const editor=page.getByRole('textbox',{name:'시스템 프롬프트',exact:true});
+ await expect(editor).toBeEnabled();
+ await editor.fill('한국어로 답하고 실제 도구 결과를 확인하세요.');
+ await page.getByRole('button',{name:'시스템 프롬프트 저장',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('다음 대화 요청부터 적용됩니다.');
+ expect(calls.filter(call=>call.op==='settings'&&Object.keys(call.payload).length).at(-1)?.payload).toEqual({system_prompt:'한국어로 답하고 실제 도구 결과를 확인하세요.'});
+ await page.getByRole('button',{name:'대화로 돌아가기',exact:true}).click();
+ await expect(page.locator('.ha-markdown h2')).toHaveText('작업 결과');
 });

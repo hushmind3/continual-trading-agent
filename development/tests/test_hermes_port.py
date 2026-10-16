@@ -85,23 +85,22 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
 class HermesPortTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp = tempfile.TemporaryDirectory(prefix='hermes-port-', dir=ROOT / 'runtime')
+        checks = ROOT / 'runtime/ai_agent/Hermes/verification/port'
+        checks.mkdir(parents=True, exist_ok=True)
+        cls.temp = tempfile.TemporaryDirectory(prefix='run-', dir=checks)
+        cls.addClassCleanup(cls.temp.cleanup)
         cls.folder = Path(cls.temp.name)
         cls.workspace = cls.folder / 'workspace'
         cls.workspace.mkdir()
         cls.bridge = WorkerBridge(cls.folder / 'state')
+        cls.addClassCleanup(cls.bridge.close)
         cls.server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), ModelFixture)
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
+        cls.addClassCleanup(cls.server.server_close)
+        cls.addClassCleanup(cls.server.shutdown)
         cls.base = f'http://127.0.0.1:{cls.server.server_port}/v1'
         cls.bridge.call('settings/save', {'base_url': cls.base, 'model': 'port-fixture',
             'workspace': str(cls.workspace), 'max_iterations': 5, 'toolsets': ['file', 'skills']})
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.bridge.close()
-        cls.server.shutdown()
-        cls.server.server_close()
-        cls.temp.cleanup()
 
     def wait_job(self, timeout=35):
         end = time.monotonic() + timeout
@@ -112,11 +111,15 @@ class HermesPortTests(unittest.TestCase):
         self.fail('Agent did not finish in the bounded fixture timeout')
 
     def test_01_native_chat_tool_and_persistent_session(self):
+        saved=self.bridge.call('settings/save',{'system_prompt':'PORT_SYSTEM_PROMPT: answer concisely in Korean.'})
+        self.assertIn('PORT_SYSTEM_PROMPT',saved['system_prompt'])
         status = self.bridge.call('chat', {'message': 'PORT_WRITE: write hermes_port_result.txt using write_file.'})
         session_id = status['job']['session_id']
         result = self.wait_job()
         self.assertEqual(result['state'], 'complete', result.get('error'))
         self.assertTrue(result['text'].startswith('PORT_DONE'), result['text'])
+        self.assertTrue(any('PORT_SYSTEM_PROMPT' in str(message.get('content')) for call in ModelFixture.calls for message in call.get('messages',[]) if message.get('role')=='system'))
+        self.bridge.call('settings/save',{'system_prompt':''})
         self.assertGreater(result['metrics']['input_tokens'], 0)
         self.assertGreater(result['metrics']['output_tokens'], 0)
         self.assertGreater(result['metrics']['api_calls'], 0)

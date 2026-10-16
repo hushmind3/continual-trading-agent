@@ -160,7 +160,7 @@ class IntegrityTests(unittest.TestCase):
    with closing(sqlite3.connect(dbpath)) as db,db:
     db.execute('CREATE TABLE price_data(ticker TEXT,date TEXT)')
     db.executemany('INSERT INTO price_data VALUES (?,?)',[('AAPL','2026-01-01'),('AAPL','2026-01-01T10:00:00')])
-   feed=root/'runtime/operations/live/timeframes.sqlite3';feed.parent.mkdir(parents=True)
+   feed=root/'runtime/finance/operation_control/live/timeframes.sqlite3';feed.parent.mkdir(parents=True)
    with closing(sqlite3.connect(feed)) as db,db:
     db.execute('CREATE TABLE received_bars(symbol TEXT,stamp_ns INTEGER)')
     db.execute('INSERT INTO received_bars VALUES (?,?)',('AAPL',pd.Timestamp('2026-01-01T10:00:00Z').value))
@@ -225,18 +225,18 @@ class REAProjectStorageTests(unittest.TestCase):
  def test_project_reader_cannot_leave_saved_folder(self):
   from rea.project_explorer.projects import _inside
   with self.assertRaisesRegex(ValueError,'프로젝트 내부'):
-   _inside(ROOT/'backend/rea/project_explorer/saved_projects/example','../../../configs/experts.json')
+   _inside(ROOT/'runtime/rea/project_explorer/projects/example','../../../configs/experts.json')
  def test_folder_snapshot_does_not_copy_generated_output_into_itself(self):
   import tempfile
   from unittest.mock import patch
   from rea.program_analysis import extract
   with tempfile.TemporaryDirectory() as temporary:
    source=Path(temporary);(source/'app.js').write_text('export const value=7;',encoding='utf8')
-   output=source/'backend/rea/project_explorer/saved_projects';destination=output/'test/original/source'
+   output=source/'runtime/rea/project_explorer/projects';destination=output/'test/original/source'
    with patch.object(extract,'OUTPUT',output):
     extract._copy_directory(source,destination)
    self.assertEqual((destination/'app.js').read_text(encoding='utf8'),'export const value=7;')
-   self.assertFalse((destination/'backend/rea/project_explorer/saved_projects').exists())
+   self.assertFalse((destination/'runtime/rea/project_explorer/projects').exists())
 
 class FrameworkFailureAttributionTests(unittest.TestCase):
  def test_failed_native_call_uses_requested_module_and_function(self):

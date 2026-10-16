@@ -385,7 +385,7 @@ def restore_checkpoint(request:dict):
             try:loaded=runtime.check_policy(path.parent,load=True)
             except (ValueError,RuntimeError,OSError,KeyError,MemoryError) as exc:raise HTTPException(400,str(exc)) from exc
             atomic_json({"path":path.relative_to(RUNTIME).as_posix()},RUNTIME/"active-checkpoint.json")
-            selection_path=ROOT/'runtime/operations/policies.json'
+            selection_path=ROOT/'runtime/finance/operation_control/policies.json'
             relative=path.relative_to(RUNTIME).as_posix()
             update_json(selection_path,lambda selected:{**{currency:value for currency,value in selected.items() if value!=relative or currency==identity['currency']},identity['currency']:relative})
             system.release_models(keep=system.selected_models())

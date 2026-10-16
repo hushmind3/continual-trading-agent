@@ -23,7 +23,7 @@ def framework_failure_record(job,error,previous=None):
 
 
 def main():
-    root = ROOT / "runtime/official"
+    root = ROOT / "runtime/finance/policy_learning"
     job_id = sys.argv[1]
     for _ in range(100):
         job = read_json(root / "job.json")

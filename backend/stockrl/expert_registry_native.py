@@ -19,10 +19,10 @@ class ExpertRegistry:
         self._embedded_temp=None;self.champion_catalog=None
         if champion is None:
             self.model_dir=Path.home()/'Desktop'/'모델'/'experts';self.registry_file=self.model_dir/'expert_registry.json'
-            self.state_dir=ROOT/'runtime/experts';self.state_dir.mkdir(parents=True,exist_ok=True)
+            self.state_dir=ROOT/'runtime/finance/moe';self.state_dir.mkdir(parents=True,exist_ok=True)
         else:
             import tempfile,torch
-            temporary_root=ROOT/'runtime/experts/embedded';temporary_root.mkdir(parents=True,exist_ok=True)
+            temporary_root=ROOT/'runtime/finance/moe/embedded';temporary_root.mkdir(parents=True,exist_ok=True)
             self._embedded_temp=tempfile.TemporaryDirectory(prefix='champion-',dir=temporary_root)
             root=Path(self._embedded_temp.name);self.model_dir=root/'models';self.model_dir.mkdir()
             self.registry_file=self.model_dir/'expert_registry.json'
@@ -39,7 +39,7 @@ class ExpertRegistry:
                     'package':{'file':package_path.name,'sha256':digest(package_path),'bytes':package_path.stat().st_size}}
             self.champion_catalog={'active':active,'experts':experts}
             self.registry_file.write_text(json.dumps(self.champion_catalog,ensure_ascii=False),encoding='utf8')
-            self.state_dir=ROOT/'runtime/experts'/'champions'/str(champion.get('version',0))
+            self.state_dir=ROOT/'runtime/finance/moe'/'champions'/str(champion.get('version',0))
             self.state_dir.mkdir(parents=True,exist_ok=True)
         resources=SimpleNamespace(expert_devices=read_json(ROOT/'configs/local/operations.json').get('expert_devices',{}))
         self.settings=SimpleNamespace(registry_file=self.registry_file,model_dir=self.model_dir,

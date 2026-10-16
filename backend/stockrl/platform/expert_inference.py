@@ -28,7 +28,7 @@ def prepare_inputs(entry, frame, account, context_frames=None):
             store=price_store()
             database=Path(store.db_path)
             version=tuple((p.stat().st_mtime_ns,p.stat().st_size) if p.exists() else None
-                for p in (database,Path(str(database)+'-wal'),ROOT/'runtime/operations/live/timeframes.sqlite3',ROOT/'runtime/operations/live/timeframes.sqlite3-wal'))
+                for p in (database,Path(str(database)+'-wal'),ROOT/'runtime/finance/operation_control/live/timeframes.sqlite3',ROOT/'runtime/finance/operation_control/live/timeframes.sqlite3-wal'))
             key=(tuple(spec['universe']),tuple(spec['indicators']))
             cached=context_frames.get(key) if context_frames is not None else None
             if cached is None or cached[0]!=version:

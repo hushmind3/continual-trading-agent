@@ -46,7 +46,7 @@ class LibraryOperations:
     def __init__(self):
         self.lock=threading.Lock();self.active=False
         self.cancelled=threading.Event()
-        self.status_path=settings().state_dir/'library-job.json'
+        cfg=settings();self.status_path=getattr(cfg,'library_dir',cfg.state_dir)/'library-job.json'
         self.catalog_path=settings().registry_file
 
     def snapshot(self):

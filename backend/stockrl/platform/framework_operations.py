@@ -398,7 +398,7 @@ def catalog():
             if current=='Platform:api_context':continue
             for target in edges.get(current,[]):
                 if target not in seen:seen.add(target);pending.append(target)
-    verified,failed,unattributed=execution_records(ROOT/'runtime/official/framework-jobs',by_id)
+    verified,failed,unattributed=execution_records(ROOT/'runtime/finance/all_backend_features/results',by_id)
     for item in items:
         item.setdefault('signatures',{})
         failure=failed.get(item['id'],{})

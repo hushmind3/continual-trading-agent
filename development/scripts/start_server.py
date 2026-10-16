@@ -7,7 +7,7 @@ from urllib.request import Request,urlopen
 from urllib.error import HTTPError
 import psutil
 ROOT=Path(__file__).resolve().parents[2]
-FRONTEND=ROOT/'frontend';RUNTIME=ROOT/'runtime/official';PORT=8766
+FRONTEND=ROOT/'frontend';RUNTIME=ROOT/'runtime/platform';PORT=8766
 sys.path.insert(0,str(ROOT/'backend'))
 from stockrl.state_io import read_json,atomic_json
 APPLY=RUNTIME/'apply.json';APPLIED=RUNTIME/'applied-sources.json'
@@ -94,7 +94,7 @@ def sources():
             for target in ('frontend','backend'):groups[target][name]=hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
             continue
         if name.startswith('frontend/src/') or name in ('frontend/index.html','frontend/package.json','frontend/tsconfig.json','frontend/vite.config.ts'):group='frontend'
-        elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('backend/rea/project_explorer/saved_projects/') or name.startswith('development/scripts/requirements/'):group='backend'
+        elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('runtime/rea/project_explorer/projects/') or name.startswith('development/scripts/requirements/'):group='backend'
         elif name.startswith('development/scripts/') and name.endswith('.py') or name=='서버켜기.cmd':group='launcher'
         elif name=='configs/instruments.json':group='configuration'
         else:continue
@@ -142,7 +142,7 @@ def ensure_watchdog():
     for _ in range(50):
         if running():return
         time.sleep(.1)
-    raise RuntimeError('서버 자동 복구 실행기를 시작하지 못했습니다: runtime/official/server-watchdog.log')
+    raise RuntimeError('서버 자동 복구 실행기를 시작하지 못했습니다: runtime/platform/server-watchdog.log')
 
 
 def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False,watchdog=True):
@@ -224,7 +224,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                 with (RUNTIME/'server.stdout.log').open('ab') as output,(RUNTIME/'server.stderr.log').open('ab') as errors:
                     child=subprocess.Popen([sys.executable,'-m','uvicorn','web_api:app','--host','127.0.0.1','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
                 for _ in range(100):
-                    if child.poll() is not None:raise RuntimeError('서버 시작 실패: runtime/official/server.stderr.log')
+                    if child.poll() is not None:raise RuntimeError('서버 시작 실패: runtime/platform/server.stderr.log')
                     if ready():break
                     time.sleep(.1)
                 else:raise RuntimeError('8766 서버 응답 대기 실패')

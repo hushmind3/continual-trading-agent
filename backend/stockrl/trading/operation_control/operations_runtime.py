@@ -60,7 +60,7 @@ class OperationsRuntime:
 
     def ledger(self):
         cfg=settings()
-        if self.account is None:self.account=PaperAccount(cfg.state_dir/'paper-account.json',cfg.risk.fee,cfg.risk.slippage)
+        if self.account is None:self.account=PaperAccount(getattr(cfg,'account_dir',cfg.state_dir)/'paper-account.json',cfg.risk.fee,cfg.risk.slippage)
         return self.account
 
     def snapshot(self):
@@ -73,20 +73,20 @@ class OperationsRuntime:
                 'pool':system.expert_pool.catalog() if system.expert_pool else [],
                 'learning':{'current':dict(self.learning_context) if self.learning_context else None,'pending':list(self.learning_pending),'versions':dict(self.learning_versions),'status':self.status.get('learning_status','지속학습 대기'),'error':self.status.get('learning_error'),'last_completed':self.status.get('learning_completed'),'last_applied':self.status.get('learning_applied')},
                 'settings':read_json(ROOT/'configs/local/operations.json'),
-                'policies':{currency:{'path':path,'loaded':self.policy_models.get(currency,{}).get('path')==path and str((ROOT/'runtime/official'/path).resolve()) in resident,
+                'policies':{currency:{'path':path,'loaded':self.policy_models.get(currency,{}).get('path')==path and str((ROOT/'runtime/finance/policy_learning'/path).resolve()) in resident,
                     **{key:value for key,value in self.policy_models.get(currency,{}).items() if key not in ('model','path','signature')}}
-                    for currency,path in read_json(ROOT/'runtime/operations/policies.json').items()}}
+                    for currency,path in read_json(ROOT/'runtime/finance/operation_control/policies.json').items()}}
 
     def command(self,name,enabled):
         if name=='engine' and not enabled:self.cancel_inference.set()
         with self.lock:
             if name not in self.controls:raise ValueError('feed / paper / engine 제어를 선택하세요.')
             if name in ('engine','learning') and enabled:
-                policies=read_json(ROOT/'runtime/operations/policies.json')
+                policies=read_json(ROOT/'runtime/finance/operation_control/policies.json')
                 if not policies:raise ValueError('운영 정책을 모델 선택 화면에서 직접 승인하세요.')
                 for currency,path in policies.items():
-                    checkpoint=(ROOT/'runtime/official'/path).resolve()
-                    if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('승인 정책 경로가 운영 폴더 밖입니다.')
+                    checkpoint=(ROOT/'runtime/finance/policy_learning'/path).resolve()
+                    if not checkpoint.is_relative_to((ROOT/'runtime/finance/policy_learning').resolve()):raise ValueError('승인 정책 경로가 운영 폴더 밖입니다.')
                     identity=read_json(checkpoint.parent/'dataset.json')
                     if identity.get('currency')!=currency:raise ValueError(f"{currency} 운영에 {identity.get('currency','통화 미기록')} 모델이 선택되어 있습니다. 정책 학습 화면에서 해당 모델을 다시 로드하세요.")
                     if policy_checkpoint(checkpoint.parent)!=checkpoint:raise ValueError('승인 정책 경로가 저장된 알고리즘과 다릅니다.')
@@ -208,8 +208,8 @@ class OperationsRuntime:
         if not context:return
         job=system.job_state()
         if job.get('id')!=context['id']:
-            record=(ROOT/'runtime/official/jobs'/(context['id']+'.json')).resolve()
-            job=read_json(record) if record.is_relative_to((ROOT/'runtime/official/jobs').resolve()) else {}
+            record=(ROOT/'runtime/finance/policy_learning/jobs'/(context['id']+'.json')).resolve()
+            job=read_json(record) if record.is_relative_to((ROOT/'runtime/finance/policy_learning/jobs').resolve()) else {}
         if not job or job.get('status') in ('starting','running') or job.get('running'):return
         self.learning_context=None;currency=context['currency']
         if job.get('status')!='succeeded' or job.get('exit_code')!=0:
@@ -217,7 +217,7 @@ class OperationsRuntime:
             return
         try:
             from stockrl.finrl.policy_learning import handlers as learning
-            root=(ROOT/'runtime/official').resolve();folder=(root/context['output']).resolve()
+            root=(ROOT/'runtime/finance/policy_learning').resolve();folder=(root/context['output']).resolve()
             if not folder.is_relative_to(root):raise ValueError('학습 결과 경로가 운영 폴더 밖입니다.')
             identity=read_json(folder/'dataset.json')
             if policy_timeframe(identity)!=policy_timeframe(context['identity']):raise ValueError('학습 결과의 가격 주기가 기준 정책과 다릅니다.')
@@ -244,7 +244,7 @@ class OperationsRuntime:
                 source=root/context['source']
                 if context.get('source_signature') and (source.stat().st_mtime_ns,source.stat().st_size)!=tuple(context['source_signature']):return None
                 applied=True;return {**current,currency:relative}
-            update_json(ROOT/'runtime/operations/policies.json',select)
+            update_json(ROOT/'runtime/finance/operation_control/policies.json',select)
             self.learning_version_sources[currency]=relative if applied else context['source']
             self.status.update(learning_status='학습 완료 · 구조 확인된 새 버전 운영 반영' if applied else '학습 완료 · 기준 정책 변경/학습 중지로 반영 보류')
             if applied:
@@ -262,13 +262,13 @@ class OperationsRuntime:
                 self.finish_learning()
                 if not self.controls['learning'] or self.learning_context:return
             from stockrl.finrl.policy_learning import handlers as learning
-            policies=read_json(ROOT/'runtime/operations/policies.json')
+            policies=read_json(ROOT/'runtime/finance/operation_control/policies.json')
             if not policies:
                 with self.lock:self.status['learning_error']='운영 모델을 선택·로드한 뒤 지속학습을 켜세요.'
                 return
             candidates={}
             for currency,path in policies.items():
-                identity=read_json((ROOT/'runtime/official'/path).parent/'dataset.json')
+                identity=read_json((ROOT/'runtime/finance/policy_learning'/path).parent/'dataset.json')
                 if not set(identity.get('symbols',[]))&set(symbols):continue
                 frame=prices(currency,identity['symbols'],timeframe=policy_timeframe(identity))
                 if frame.empty:continue
@@ -280,7 +280,7 @@ class OperationsRuntime:
                     'consumed_end':consumed,'pending_observations':pending})
             with self.lock,system.job_lock:
                 if not self.controls['learning'] or self.learning_context:return
-                current=read_json(ROOT/'runtime/operations/policies.json')
+                current=read_json(ROOT/'runtime/finance/operation_control/policies.json')
                 for currency,(path,identity,version,data) in candidates.items():
                     if current.get(currency)!=path:continue
                     if not data['pending_observations']:
@@ -293,8 +293,8 @@ class OperationsRuntime:
                 source,identity,version,data=candidates[currency]
                 if current.get(currency)!=source:return
                 try:
-                    checkpoint=(ROOT/'runtime/official'/source).resolve()
-                    if not checkpoint.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('기준 정책 경로가 운영 폴더 밖입니다.')
+                    checkpoint=(ROOT/'runtime/finance/policy_learning'/source).resolve()
+                    if not checkpoint.is_relative_to((ROOT/'runtime/finance/policy_learning').resolve()):raise ValueError('기준 정책 경로가 운영 폴더 밖입니다.')
                     stat=checkpoint.stat()
                     data.update(learning_budget(identity,data['pending_observations'],settings().data.poll_seconds))
                     request=learning.RunRequest(currency=currency,algorithm=identity.get('algorithm','sac'),resume=True,champion_path=identity.get('champion_file'),checkpoint=str(checkpoint),timeframe=policy_timeframe(identity),total_timesteps=data['requested_timesteps'])
@@ -352,7 +352,7 @@ class OperationsRuntime:
         if system.expert_pool and signature!=system.expert_pool_signature:
             system.expert_pool.refresh_catalog(catalog);system.expert_pool_signature=signature
         if system.expert_pool is None:
-            cfg=settings();cfg.state_dir=ROOT/'runtime/experts'
+            cfg=settings();cfg.state_dir=ROOT/'runtime/finance/moe'
             system.expert_pool=ExpertPool(cfg,keep_device=True,live=True);system.expert_pool_signature=signature
             system.expert_pool.cancelled=self.cancel_inference.is_set
         return system.expert_pool
@@ -394,11 +394,11 @@ class OperationsRuntime:
             packets=run_batches(pool,key,fixture['snapshot'],fixture.get('inputs',[fixture['input']]))
             values=np.concatenate([np.asarray(packet['native_output'],dtype=float).reshape(-1) for packet in packets])
             symbols_checked=sum(len(packet['symbols']) for packet in packets)
-            report=read_json(ROOT/'runtime/experts/status.json')
+            report=read_json(ROOT/'runtime/finance/moe/status.json')
             report.setdefault('experts',{})[key]={'status':'ready','as_of':fixture['snapshot']['as_of'],
                 'output':values.tolist(),'batches':len(packets),'symbols_checked':symbols_checked}
             report.update(as_of=fixture['snapshot']['as_of'],resources=pool.metrics)
-            atomic_json(report,ROOT/'runtime/experts/status.json')
+            atomic_json(report,ROOT/'runtime/finance/moe/status.json')
             return {'packet':packets[0],'packets':packets,'metrics':dict(pool.metrics.get(key,{})),
                 'batches':len(packets),'symbols_checked':symbols_checked}
 
@@ -408,11 +408,11 @@ class OperationsRuntime:
             if self.cancel_inference.is_set() or not self.controls['engine']:return
         self.inference_active+=1
         try:
-            selected=read_json(ROOT/'runtime/operations/policies.json')
+            selected=read_json(ROOT/'runtime/finance/operation_control/policies.json')
             if not selected:raise ValueError('운영 정책 미승인: 모델 선택 화면에서 직접 승인하세요.')
-            files=[(ROOT/'runtime/official'/path).resolve().parent for path in selected.values()]
+            files=[(ROOT/'runtime/finance/policy_learning'/path).resolve().parent for path in selected.values()]
             for folder in files:
-                if not folder.is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('운영 정책 경로가 runtime/official 밖에 있습니다.')
+                if not folder.is_relative_to((ROOT/'runtime/finance/policy_learning').resolve()):raise ValueError('운영 정책 경로가 runtime/finance/policy_learning 밖에 있습니다.')
                 if self.cancel_inference.is_set() or not self.controls['engine']:break
                 self._sac_decision(folder)
         finally:
@@ -433,7 +433,7 @@ class OperationsRuntime:
         env=champion_structure_environment(identity['currency'],identity['symbols'],registry,champion_ids)
         try:
             model=system.model(policy_checkpoint(files),identity.get('algorithm','sac'),env)
-            info={'path':policy_checkpoint(files).relative_to(ROOT/'runtime/official').as_posix(),'algorithm':identity.get('algorithm','sac'),'device':str(model.device),
+            info={'path':policy_checkpoint(files).relative_to(ROOT/'runtime/finance/policy_learning').as_posix(),'algorithm':identity.get('algorithm','sac'),'device':str(model.device),
                 'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),
                 'num_timesteps':int(model.num_timesteps),'updates':int(getattr(model,'_n_updates',0))}
             if load:
@@ -461,7 +461,7 @@ class OperationsRuntime:
         latest._state,latest._info=latest._get_state_and_info_from_time_index(latest._time_index)
         wrapped=prepared
         try:
-            file=policy_checkpoint(files);stat=file.stat();path=file.relative_to(ROOT/'runtime/official').as_posix()
+            file=policy_checkpoint(files);stat=file.stat();path=file.relative_to(ROOT/'runtime/finance/policy_learning').as_posix()
             model=system.model(file,identity.get('algorithm','sac'),wrapped)
             self.policy_models[currency]={'path':path,'algorithm':identity.get('algorithm','sac'),'signature':(stat.st_mtime_ns,stat.st_size),
                 'device':str(model.device),'observation_shape':list(model.observation_space.shape),'action_shape':list(model.action_space.shape),

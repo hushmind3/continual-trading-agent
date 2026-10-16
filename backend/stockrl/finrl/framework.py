@@ -133,8 +133,8 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
     champion_ids=list(registry.catalog().get('active',[])) if champion_ids is None else champion_ids
     consumed=read_json(saved/'dataset.json').get('training_input',{}).get('consumed_end') if resume else None
     env=training_environment(frame,registry,champion_ids=champion_ids,include_latest=resume,since=consumed)
-    root=Path(output) if output is not None else ROOT/'runtime/official'
-    if not root.resolve().is_relative_to((ROOT/'runtime/official').resolve()):raise ValueError('정책 출력은 기존 runtime/official 내부에 저장합니다.')
+    root=Path(output) if output is not None else ROOT/'runtime/finance/policy_learning'
+    if not root.resolve().is_relative_to((ROOT/'runtime/finance/policy_learning').resolve()):raise ValueError('정책 출력은 기존 runtime/finance/policy_learning 내부에 저장합니다.')
     root.mkdir(parents=True,exist_ok=True)
     saved=policy_files(env.currency,source_checkpoint)
     identity={'currency':env.currency,'symbols':env.symbols,'algorithm':algorithm,'sac_example':parameters,'environment':CASH_ENVIRONMENT,'rolling_days':[1095,365]}
@@ -159,7 +159,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
         print('FinRL DRLAgent ·',algorithm.upper(),parameters,'단계:',steps,flush=True)
         if champion:
             checkpoint=Path(source_checkpoint) if resume and source_checkpoint else Path(champion['checkpoint'])
-            if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/official'/checkpoint
+            if not checkpoint.is_absolute():checkpoint=ROOT/'runtime/finance/policy_learning'/checkpoint
             if (checkpoint.parent/'replay.pkl').is_file() and policy_timeframe(read_json(checkpoint.parent/'dataset.json'))!=identity['timeframe']:
                 raise ValueError('저장된 Replay와 입력 가격 주기가 다릅니다. 해당 주기의 새 정책을 생성하세요.')
             model=system.model(checkpoint,algorithm,env)
@@ -200,7 +200,7 @@ def train(frame,registry,resume=False,output=None,champion_path=None,champion_ou
 def policy_files(currency=None,checkpoint=None):
     """Select an existing native SB3 revision without modifying its weights."""
     from ..state_io import read_json
-    root=ROOT/'runtime/official'
+    root=ROOT/'runtime/finance/policy_learning'
     if checkpoint is not None:
         path=Path(checkpoint).expanduser();path=(path if path.is_absolute() else root/path).resolve()
         if not path.is_relative_to(root.resolve()) or path.suffix!='.zip' or not path.is_file():raise ValueError('운영 폴더의 실제 정책 ZIP을 선택하세요.')
@@ -208,7 +208,7 @@ def policy_files(currency=None,checkpoint=None):
         if currency and identity.get('currency')!=currency:raise ValueError('이어 학습 정책의 통화가 다릅니다.')
         if policy_checkpoint(path.parent)!=path:raise ValueError('이어 학습 정책 경로와 알고리즘이 다릅니다.')
         return path.parent
-    selected=read_json(ROOT/'runtime/operations/policies.json').get(currency) if currency else None
+    selected=read_json(ROOT/'runtime/finance/operation_control/policies.json').get(currency) if currency else None
     selection={'path':selected} if selected else read_json(root/'active-checkpoint.json')
     if not selection:return root
     path=(root/selection['path']).resolve()

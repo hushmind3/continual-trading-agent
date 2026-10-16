@@ -163,7 +163,7 @@ def _original_report():
 def _next_version(algorithm='sac'):
     number = 1
     while ((MODEL_DIR / f"{algorithm}_champion_{number:03d}.pt").exists() or
-           (ROOT / "runtime/official/champions" / f"{algorithm}_champion_{number:03d}").exists()):
+           (ROOT / "runtime/finance/policy_learning/champions" / f"{algorithm}_champion_{number:03d}").exists()):
         number += 1
     return number, MODEL_DIR / f"{algorithm}_champion_{number:03d}.pt"
 
@@ -243,7 +243,7 @@ def _counts(model, expert_counts):
 def _next_paths(version, stem=None):
     model_path = MODEL_DIR / f"sac_champion_{version:03d}.pt"
     run_id = model_path.stem
-    directory = ROOT / "runtime/official/champions" / run_id
+    directory = ROOT / "runtime/finance/policy_learning/champions" / run_id
     if model_path.exists() or directory.exists():
         raise FileExistsError(f"Champion 버전 충돌: {run_id}")
     return model_path, directory, run_id
@@ -257,7 +257,7 @@ def create(currency, symbols, active, env,algorithm='sac'):
     active = list(active)
     catalog, packages, expert_counts, roles = _expert_payload(active)
     number, model_path = _next_version(algorithm)
-    directory = ROOT / "runtime/official/champions" / model_path.stem
+    directory = ROOT / "runtime/finance/policy_learning/champions" / model_path.stem
     if directory.exists():
         raise FileExistsError(f"체크포인트 경로 충돌: {directory}")
     base_dim = int(np.prod(env.unwrapped.observation_space.shape))
@@ -374,8 +374,8 @@ def save_trained_champion(source_path, model, target_path, checkpoint_dir,spec=N
     data["policy_state"] = {key:value.detach().cpu() for key,value in model.policy.state_dict().items()}
     data["trained"] = True
     data["training"] = {"num_timesteps": int(model.num_timesteps), "updates": int(model._n_updates),
-        "checkpoint": str((checkpoint_dir / (data['identity']['algorithm']+'.zip')).relative_to(ROOT / "runtime/official").as_posix())}
-    if hasattr(model,'save_replay_buffer'):data['training']['replay_file']=str((checkpoint_dir/'replay.pkl').relative_to(ROOT/'runtime/official').as_posix())
+        "checkpoint": str((checkpoint_dir / (data['identity']['algorithm']+'.zip')).relative_to(ROOT / "runtime/finance/policy_learning").as_posix())}
+    if hasattr(model,'save_replay_buffer'):data['training']['replay_file']=str((checkpoint_dir/'replay.pkl').relative_to(ROOT/'runtime/finance/policy_learning').as_posix())
     data["checkpoint"] = data["training"]["checkpoint"]
     data["version"] = int(target_path.stem.rsplit("_", 1)[1])
     data["transfer"] = {"from": Path(source_path).name, "policy_tensors_updated": True,

@@ -25,7 +25,7 @@ class ContinuousLearningTests(unittest.TestCase):
                              environment='PortfolioOptimizationEnv', champion_experts=[])
         self.source = 'policies/source/sac.zip'
         self.write_policy('policies/source', self.identity)
-        self.selection = self.root / 'runtime/operations/policies.json'
+        self.selection = self.root / 'runtime/finance/operation_control/policies.json'
         self.selection.parent.mkdir(parents=True)
         self.selection.write_text(json.dumps({'USD': self.source, 'KRW': 'unchanged.zip'}))
         self.frame = pd.DataFrame([dict(date=pd.Timestamp('2026-01-01'), tic='AAPL', close=100)])
@@ -46,7 +46,7 @@ class ContinuousLearningTests(unittest.TestCase):
         self.stack.enter_context(patch.object(operations, 'policy_checkpoint', side_effect=lambda folder: folder/'sac.zip'))
 
     def write_policy(self, folder, identity):
-        path = self.root/'runtime/official'/folder
+        path = self.root/'runtime/finance/policy_learning'/folder
         path.mkdir(parents=True, exist_ok=True)
         (path/'sac.zip').write_bytes(b'checkpoint fixture')
         (path/'dataset.json').write_text(json.dumps(identity))
@@ -66,7 +66,7 @@ class ContinuousLearningTests(unittest.TestCase):
         self.assertEqual(len(self.requests), 1)
         request, flags = self.requests[0]
         self.assertTrue(request.resume)
-        self.assertEqual(Path(request.checkpoint), self.root/'runtime/official'/self.source)
+        self.assertEqual(Path(request.checkpoint), self.root/'runtime/finance/policy_learning'/self.source)
         self.assertTrue(flags['continuous'])
         self.assertEqual(self.runtime.learning_versions, {})
 
@@ -78,7 +78,7 @@ class ContinuousLearningTests(unittest.TestCase):
         self.runtime.queue_learning(['AAPL'])
         self.assertEqual(len(self.requests),2)
         self.assertEqual(self.runtime.learning_context['input']['pending_observations'],1)
-        self.assertEqual(Path(self.requests[-1][0].checkpoint),self.root/'runtime/official/policies/result1/sac.zip')
+        self.assertEqual(Path(self.requests[-1][0].checkpoint),self.root/'runtime/finance/policy_learning/policies/result1/sac.zip')
 
     def test_no_consumption_record_is_not_applied_to_operation(self):
         self.runtime.queue_learning(['AAPL'])
@@ -108,7 +108,7 @@ class ContinuousLearningTests(unittest.TestCase):
         self.prices.return_value = pd.concat([self.frame,pd.DataFrame([dict(date=pd.Timestamp('2026-01-02'),tic='AAPL',close=101)])],ignore_index=True)
         self.runtime.queue_learning(['AAPL'])
         self.assertEqual(len(self.requests), 2)
-        self.assertEqual(Path(self.requests[-1][0].checkpoint), self.root/'runtime/official/policies/result1/sac.zip')
+        self.assertEqual(Path(self.requests[-1][0].checkpoint), self.root/'runtime/finance/policy_learning/policies/result1/sac.zip')
 
     def test_user_selection_changed_during_training_is_preserved(self):
         self.runtime.queue_learning(['AAPL'])
@@ -137,7 +137,7 @@ class ContinuousLearningTests(unittest.TestCase):
     def test_terminal_sidecar_survives_another_global_job(self):
         self.runtime.queue_learning(['AAPL'])
         self.succeed()
-        record = self.root/'runtime/official/jobs'/(self.job['id']+'.json')
+        record = self.root/'runtime/finance/policy_learning/jobs'/(self.job['id']+'.json')
         record.parent.mkdir()
         record.write_text(json.dumps(self.job))
         self.job = {'id': 'other', 'running': True, 'status': 'running'}
@@ -210,9 +210,9 @@ class ResumeCounterTests(unittest.TestCase):
             loader = stack.enter_context(patch.object(operations.system, 'model', return_value=model))
             registry = SimpleNamespace(catalog=lambda: {'active': [], 'experts': {}})
             frame = pd.DataFrame([dict(symbol='AAPL', date=pd.Timestamp('2026-01-01'), close=100)])
-            original = root/'runtime/official/policies/source'
+            original = root/'runtime/finance/policy_learning/policies/source'
             framework.train(frame, registry, output=original)
-            output = root/'runtime/official/policies/resumed'
+            output = root/'runtime/finance/policy_learning/policies/resumed'
             framework.train(frame, registry, resume=True, output=output,
                             source_checkpoint=original/'sac.zip', total_timesteps=7)
             self.assertEqual(loader.call_args.args[0], original/'sac.zip')

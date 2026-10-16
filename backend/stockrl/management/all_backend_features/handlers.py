@@ -5,7 +5,8 @@ from api_context import FileResponse
 from api_context import FiniteJSONResponse
 from api_context import HTTPException
 from api_context import Literal
-from api_context import RUNTIME
+from api_context import ROOT
+RUNTIME=ROOT/'runtime/finance/all_backend_features'
 from api_context import re
 from api_context import read_json
 from api_context import system
@@ -44,14 +45,14 @@ def framework_task(action:str,parameters:dict):
         job_id=uuid.uuid4().hex
         job=system.start_job({'id':job_id,'command':'framework','action':action,'parameters':parameters,
             'currency':parameters.get('currency','USD'),'symbols':parameters.get('symbols',[]),'resume':False,
-            'status':'starting','started_at':now(),'log':f'jobs/{job_id}.log','output':'framework-jobs/'+job_id})
+            'status':'starting','started_at':now(),'log':f'jobs/{job_id}.log','output':str(RUNTIME/'results'/job_id)})
     return {'message':ACTIONS[action][0]+' 실행을 시작했습니다.','job':job}
 
 
 @router.get('/api/framework/result/{job_id}')
 def framework_result(job_id:str,kind:Literal['json','csv']='json'):
     if not re.fullmatch('[0-9a-f]{32}',job_id):raise HTTPException(400,'작업 ID가 유효하지 않습니다.')
-    path=RUNTIME/'framework-jobs'/job_id/('result.'+kind)
+    path=RUNTIME/'results'/job_id/('result.'+kind)
     if not path.is_file():raise HTTPException(404,'해당 작업의 결과 파일이 없습니다.')
     return FileResponse(path,filename=path.name)
 
@@ -59,7 +60,7 @@ def framework_result(job_id:str,kind:Literal['json','csv']='json'):
 @router.get('/api/framework/artifact/{job_id}/{filename:path}')
 def framework_artifact(job_id:str,filename:str):
     if not re.fullmatch('[0-9a-f]{32}',job_id):raise HTTPException(400,'결과 경로가 유효하지 않습니다.')
-    folder=(RUNTIME/'framework-jobs'/job_id).resolve();path=(folder/filename).resolve()
+    folder=(RUNTIME/'results'/job_id).resolve();path=(folder/filename).resolve()
     recorded=read_json(folder/'result.json').get('files',[])
     if not path.is_relative_to(folder) or (filename not in recorded and not re.fullmatch(r'figure_[0-9]+\.png',filename)):raise HTTPException(400,'기록된 결과 파일만 열 수 있습니다.')
     if not path.is_file():raise HTTPException(404,'실제 생성된 그림 파일이 없습니다.')

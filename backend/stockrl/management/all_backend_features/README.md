@@ -13,3 +13,5 @@
 모듈·도구 소메뉴를 흡수했습니다. 원본 모듈·함수 탭의 목록(FrameworkWorkspace/ModuleCatalog), 입력(NativeParameterFields), 실행(NativeModuleRunner), 결과(FrameworkResult)는 같은 프론트 폴더에 있습니다. 별도 modules_tools 메뉴·폴더는 없습니다.
 
 2026-10-14: 원본 함수 요청의 dict/set 비교 오류와 공급원 이름 덮어쓰기를 수정했습니다. 정상 요청이 단일 /api를 통해 작업으로 전달되는지 가짜 작업 실행기로 확인했습니다. 모든 등록 명령의 메뉴 ID가 현재 9개 메뉴에 속합니다. 실제 공식 FinRL data_split은 임시 CSV로 호출했습니다.
+
+런타임: `runtime/finance/all_backend_features/results/`. 원본 모듈 수동 실행 결과·그림을 이 소메뉴에 저장합니다. 실행 요청은 기존 공통 작업 실행기를 사용하며 별도 API 서버는 만들지 않습니다.

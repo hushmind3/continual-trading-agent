@@ -9,6 +9,7 @@ from api_context import MODEL_DIR
 from api_context import Path
 from api_context import ROOT
 from api_context import RUNTIME
+from api_context import SERVER_RUNTIME
 from api_context import app
 from api_context import apply_state
 from api_context import busy
@@ -139,7 +140,7 @@ def state_view(path):
     if parsed.scheme or parsed.netloc:raise ValueError('통합 상태 항목을 선택하세요.')
     currency=query.get('currency',[None])[0]
     if currency not in (None,'USD','KRW'):raise ValueError('USD/KRW 상태를 선택하세요.')
-    config=ROOT/'configs';official=ROOT/'runtime/official'
+    config=ROOT/'configs';official=ROOT/'runtime/finance/policy_learning'
     providers={
         'menu_catalog':(menu_catalog,lambda:()),
         'algorithms':(algorithms,lambda:()),
@@ -150,7 +151,7 @@ def state_view(path):
         'settings':(operational_settings,lambda:state_stamp(config/'local/operations.json')),
         'models':(model_files,lambda:state_stamp(config/'experts.json',*MODEL_DIR.rglob('*'))),
         'champions':(champions,lambda:state_stamp(*MODEL_DIR.glob('*_champion_*.pt'))),
-        'logs':(logs,lambda:state_stamp(*(official/name for name in ('api.stderr.log','api.stdout.log','server.stderr.log','training.log')))),
+        'logs':(logs,lambda:state_stamp(*((RUNTIME if name=='training.log' else SERVER_RUNTIME)/name for name in ('api.stderr.log','api.stdout.log','server.stderr.log','training.log')))),
     }
     if key not in providers:raise ValueError('등록되지 않은 통합 상태 항목입니다: '+key)
     loader,signature=providers[key];name='view:'+path
@@ -185,7 +186,7 @@ def state(views:str='[]',refresh_views:bool=False):
         value=model_state(settings,folder);value['replay_state']=saved_replay();return value
     def model_signature():
         folder=policy_files()
-        return state_stamp(RUNTIME/'active-checkpoint.json',ROOT/'runtime/operations/policies.json',policy_checkpoint(folder),folder/'dataset.json',folder/'replay.pkl')
+        return state_stamp(RUNTIME/'active-checkpoint.json',ROOT/'runtime/finance/operation_control/policies.json',policy_checkpoint(folder),folder/'dataset.json',folder/'replay.pkl')
     model=system.state_value('model',saved_model,model_signature)
     def connected_experts():
         experts=expert_state()
@@ -194,7 +195,7 @@ def state(views:str='[]',refresh_views:bool=False):
     experts=system.state_value('experts',connected_experts)
     def currency_signature():
         currencies=[policy_files(currency) for currency in ('KRW','USD')]
-        return state_stamp(ROOT/'runtime/operations/policies.json',RUNTIME/'active-checkpoint.json',*(file for root in currencies for file in (policy_checkpoint(root),root/'dataset.json',root/'replay.pkl')))
+        return state_stamp(ROOT/'runtime/finance/operation_control/policies.json',RUNTIME/'active-checkpoint.json',*(file for root in currencies for file in (policy_checkpoint(root),root/'dataset.json',root/'replay.pkl')))
     models=system.state_value('models_by_currency',lambda:currency_models(settings),currency_signature)
     def checkpoint_signature():
         files=[*RUNTIME.glob('*.zip'),*(RUNTIME/'policies').glob('*/*.zip'),*(RUNTIME/'champions').glob('*/*.zip'),*(RUNTIME/'archives').glob('*/*.zip')]
@@ -218,14 +219,14 @@ def state(views:str='[]',refresh_views:bool=False):
         'models_by_currency':models,'checkpoints':revisions,'capabilities':system.state_value('capabilities',capabilities,()),
         'operations':operations_state,'library':library,'automation':automation,'resources':resources,'views':selected,
         'state_revision':system.state_revision,'module_errors':dict(system.state_errors),'module_updated_at':dict(system.state_updates),'resident_models':system.resident_models(),'imports':imports,
-        'commands':system.commands(),'frontend_revision':system.state_value('frontend_revision',lambda:read_json(RUNTIME/'applied-sources.json').get('dist_sha256'),lambda:state_stamp(RUNTIME/'applied-sources.json'))}
+        'commands':system.commands(),'frontend_revision':system.state_value('frontend_revision',lambda:read_json(SERVER_RUNTIME/'applied-sources.json').get('dist_sha256'),lambda:state_stamp(SERVER_RUNTIME/'applied-sources.json'))}
 
 
 def logs():
     names=("api.stderr.log","api.stdout.log","server.stderr.log","training.log")
     result=[]
     for name in names:
-        path=RUNTIME/name
+        path=(RUNTIME if name=='training.log' else SERVER_RUNTIME)/name
         if path.exists():
             with path.open("rb") as stream:
                 stream.seek(max(0,path.stat().st_size-12000))

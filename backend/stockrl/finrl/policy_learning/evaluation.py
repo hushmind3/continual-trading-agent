@@ -14,7 +14,7 @@ def evaluate_pair(checkpoint,baseline_checkpoint):
     paths=[]
     for value in (baseline_checkpoint,checkpoint):
         path=Path(value).expanduser()
-        if not path.is_absolute():path=(ROOT/path) if path.parts[:2]==('runtime','official') else (ROOT/'runtime/official'/path)
+        if not path.is_absolute():path=(ROOT/path) if path.parts[:3]==('runtime','finance','policy_learning') else (ROOT/'runtime/finance/policy_learning'/path)
         paths.append(path.resolve())
     identities=[read_json(policy_files(checkpoint=path)/'dataset.json') for path in paths]
     for key in ('currency','symbols','environment'):

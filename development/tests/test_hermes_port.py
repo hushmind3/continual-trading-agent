@@ -114,10 +114,10 @@ class HermesPortTests(unittest.TestCase):
     def test_08_read_only_rejects_model_write_and_terminal_calls(self):
         original=self.workspace/'hermes_port_result.txt'
         original.write_text('keep',encoding='utf8')
-        self.bridge.call('settings/save',{'read_only':True})
+        self.bridge.call('settings/save',{'read_only':False})
         try:
             for prompt,tool in (('PORT_WRITE_ATTACK','write_file'),('PORT_SHELL','terminal')):
-                self.bridge.call('chat',{'message':prompt})
+                self.bridge.call('chat',{'message':prompt,'read_only':True})
                 state=self.wait_job()
                 self.assertEqual(original.read_text(encoding='utf8'),'keep')
                 self.assertFalse((self.workspace/'blocked_shell.txt').exists())
@@ -171,6 +171,35 @@ class HermesPortTests(unittest.TestCase):
         view = self.bridge.call('skill', {'name': 'computer-use'})
         self.assertTrue(view['success'])
         self.assertIn('computer', view['content'].lower())
+
+    def test_10_native_context_and_unrestricted_local_request(self):
+        marker = self.workspace / 'AGENTS.md'
+        marker.write_text('NATIVE_CONTEXT_INJECTION_MARKER: use the fixture workspace only.', encoding='utf-8')
+        start = len(ModelFixture.calls)
+        try:
+            self.bridge.call('chat', {'message': 'Create a greeting in the fixture workspace.'})
+            job = self.wait_job()
+            self.assertEqual(job['state'], 'complete', job.get('error'))
+            calls = ModelFixture.calls[start:]
+            self.assertTrue(calls)
+            self.assertTrue(any('NATIVE_CONTEXT_INJECTION_MARKER' in json.dumps(call.get('messages'), ensure_ascii=False) for call in calls))
+            self.assertTrue(all(call.get('max_tokens') != 2048 for call in calls))
+            self.assertTrue(all(call.get('reasoning') != {'enabled': False} for call in calls))
+        finally:
+            marker.unlink(missing_ok=True)
+
+    def test_11_original_review_finishes_before_worker_releases_agent(self):
+        config = self.folder / 'state' / 'config.yaml'
+        original = config.read_text(encoding='utf-8')
+        self.assertNotIn('skills:', original)
+        config.write_text(original + '\nskills:\n  creation_nudge_interval: 1\n', encoding='utf-8')
+        try:
+            self.bridge.call('chat', {'message': 'Create a greeting in the fixture workspace.'})
+            job = self.wait_job()
+            self.assertEqual(job['state'], 'complete', job.get('error'))
+            self.assertTrue(any(event['name'] == 'status' and '검토 중' in event['detail'] for event in job['events']))
+        finally:
+            config.write_text(original, encoding='utf-8')
 
     def test_03_settings_validation_and_model_discovery(self):
         self.assertEqual(self.bridge.call('models')['models'], [{'id': 'port-fixture'}])

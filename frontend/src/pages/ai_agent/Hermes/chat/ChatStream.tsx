@@ -34,7 +34,7 @@ export function CurrentActivity({job,active}:{job?:Job;active:boolean}){
  const event=[...(job?.events??[])].reverse().find(e=>['tool_start','tool_complete','starting','autonomy_decision'].includes(e.name));
  let detail='';try{const d=JSON.parse(event?.detail??'null');if(Array.isArray(d)){const a=d.find(v=>v&&typeof v==='object'&&!Array.isArray(v));detail=String(a?.command??a?.url??a?.action??a?.path??'')}}catch{}
  if(!active&&!['failed','stopped','paused'].includes(job?.state??''))return null;
- return <div className={'hermes-current-activity '+(active?'is-active':'')} role="status">{active?<Loader2 size={14} className="hermes-spin"/>:<TriangleAlert size={14}/>}<b>{active?(job?.phase==='tool'?'도구 실행 중':'응답 생성 중'):job?.state==='failed'?'작업 실패':job?.state==='stopped'?'중지됨':'일시정지'}</b>{event&&<span>{eventSummary(event.name,event.detail)}{detail?' · '+detail:''}</span>}</div>;
+ return <div className={'hermes-current-activity '+(active?'is-active':'')} role="status">{active?<Loader2 size={14} className="hermes-spin"/>:<TriangleAlert size={14}/>}<b>{active?(job?.phase==='reviewing'?'경험 정리 중':job?.phase==='tool'?'도구 실행 중':'응답 생성 중'):job?.state==='failed'?'작업 실패':job?.state==='stopped'?'중지됨':'일시정지'}</b>{event&&<span>{eventSummary(event.name,event.detail)}{detail?' · '+detail:''}</span>}</div>;
 }
 export function ActivityTimeline({job}:{job?:Job}){
  const rows:{id:string;name:string;time:number;detail:string;result?:string;state:string}[]=[];

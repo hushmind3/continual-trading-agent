@@ -44,6 +44,7 @@ sys.stdout = sys.stderr
 from run_agent import AIAgent
 from hermes_state import SessionDB
 from ruamel.yaml import YAML
+from ai_agent.Hermes.engine.execution import bind_model, context_window, request_policy, settle_review
 
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
@@ -208,7 +209,7 @@ class HermesWorker:
             if parsed.pop('error',None):raise ValueError('반복 명령을 확인하세요. 예: /loop 5m 작업내용')
             request.update(mode='loop',message=parsed.pop('prompt'), **parsed)
         self.idle_required()
-        cfg = load_settings()
+        cfg = request_policy(load_settings(), request)
         if not cfg['model']:
             raise ValueError('모델 설정에서 모델을 선택하고 저장하세요.')
         if cfg.get('local_model') and self.status()['local_model']['state'] != 'ready':
@@ -256,9 +257,8 @@ class HermesWorker:
                 provider='custom', api_mode='chat_completions', quiet_mode=True,
                 session_id=session_id, session_db=self.db, platform='platform',
                 enabled_toolsets=toolsets, max_iterations=cfg['max_iterations'], cwd=cfg['workspace'],
-                skip_background_review=True, skip_context_files=True,
-                max_tokens=2048 if cfg.get('local_model') else None,
-                reasoning_config={'enabled': False} if cfg.get('local_model') else None,
+                # Only read-only mode suppresses review writes; normal runs use upstream defaults.
+                skip_background_review=bool(cfg.get('read_only')),
                 ephemeral_system_prompt=(
                     f'The selected working directory is {cfg["workspace"]}. '
                     'Resolve relative file paths against this exact directory. '
@@ -308,10 +308,14 @@ class HermesWorker:
             completion = dict(state='stopped' if self.stopping else 'failed', error=str(exc), finished_at=time.time())
         finally:
             if self.agent:
+                settle_review(self)
                 from ai_agent.Hermes.chat.telemetry import update
                 with self.lock:self.job['metrics'] = update(self)
                 with contextlib.suppress(Exception): self.agent.close()
             self.agent = None
+            if self.stopping:
+                completion['state'] = 'stopped'
+            completion['finished_at'] = time.time()
             self.stopping = False
             reset_hermes_interactive_context(interactive_token)
             os.chdir(ROOT)
@@ -379,21 +383,24 @@ class HermesWorker:
         executable = ROOT / 'runtime/shared/engines/llama.cpp/llama-server.exe'
         if not executable.is_file():
             raise ValueError('설치된 llama-server 실행기를 찾을 수 없습니다.')
+        alias = path.parent.name if path.stem.upper() in {'GGUF', 'MODEL'} else path.stem
+        native = self.native_config()
+        context_length = context_window(native, alias)
         self.unload_model()
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
         self.model_log = (HOME / 'local-model.log').open('a', encoding='utf-8')
-        alias = path.parent.name if path.stem.upper() in {'GGUF', 'MODEL'} else path.stem
         self.model_process = subprocess.Popen(
             [str(executable), '--model', str(path), '--host', '127.0.0.1', '--port', str(port),
-             '--n-gpu-layers', '999', '--ctx-size', '65536', '--parallel', '1',
+             '--n-gpu-layers', '999', '--ctx-size', str(context_length or 0), '--parallel', '1',
              '--threads', '2', '--threads-batch', '2',
              '-fa', 'on', '-ctk', 'q8_0', '-ctv', 'q8_0',
              '--jinja', '--alias', alias],
             cwd=path.parent, stdout=self.model_log, stderr=self.model_log,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
         self.model_base = f'http://127.0.0.1:{port}/v1'
+        self.write_config(bind_model(native, alias, self.model_base, context_length))
         self.save_settings({'base_url': self.model_base, 'model': alias, 'local_model': str(path)})
         return self.status()
 

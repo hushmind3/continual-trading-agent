@@ -125,7 +125,27 @@ def blockers():
         return items
 
 
-def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False):
+def ensure_watchdog():
+    """Keep the API available independently of the launching console."""
+    from server_watchdog import running
+    if running():return
+    (RUNTIME/'server-watchdog.stop').unlink(missing_ok=True)
+    command=[sys.executable,'-X','utf8','-B',str(ROOT/'development/scripts/server_watchdog.py')]
+    flags=getattr(subprocess,'DETACHED_PROCESS',0)|getattr(subprocess,'CREATE_NEW_PROCESS_GROUP',0)
+    with (RUNTIME/'server-watchdog.log').open('ab') as output:
+        try:
+            subprocess.Popen(command,cwd=ROOT,stdin=subprocess.DEVNULL,stdout=output,stderr=output,
+                creationflags=flags|getattr(subprocess,'CREATE_BREAKAWAY_FROM_JOB',0))
+        except OSError as exc:
+            if getattr(exc,'winerror',None)!=5:raise
+            subprocess.Popen(command,cwd=ROOT,stdin=subprocess.DEVNULL,stdout=output,stderr=output,creationflags=flags)
+    for _ in range(50):
+        if running():return
+        time.sleep(.1)
+    raise RuntimeError('서버 자동 복구 실행기를 시작하지 못했습니다: runtime/official/server-watchdog.log')
+
+
+def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False,watchdog=True):
     with startup_lock():
         operation={'id':uuid.uuid4().hex,'pid':os.getpid(),'process_created':psutil.Process().create_time(),
             'status':'running','target':'frontend' if frontend_only else 'backend' if skip_build else 'all','started_at':time.time(),'stages':[]}
@@ -247,6 +267,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
             phase(stage, next((row['title'] for row in operation['stages'] if row['id']==stage),stage),'failed',detail,log_path=str(log))
             operation.update(status='failed',finished_at=time.time());atomic_json(operation,APPLY)
             raise
+    if watchdog:ensure_watchdog()
     if not apply_only:
         result=api('system/start',{})
         print('전체 시스템 시작 요청: '+result.get('status',''),flush=True)

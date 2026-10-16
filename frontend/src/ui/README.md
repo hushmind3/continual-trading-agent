@@ -33,3 +33,5 @@ SettingsSection은 설정 제목·설명·상태/액션·본문 경계를 공유
 문서 참조는 ui-document-link 텍스트 링크로 표시해 본문을 버튼 모양으로 쪼개지 않습니다. Tabs는 선택된 항목만 강조하고 설정 화면에서 내용 폭만 사용합니다. 스킬·MCP 입력창도 별도 모달 구현 대신 공통 Drawer를 사용합니다.
 
 DocumentContent.tsx는 팝업과 나란히 보기에서 공통으로 사용하는 문서 본문입니다. HTML 미리보기와 원문 보기는 분리되며 기존 문서 읽기 API를 그대로 사용합니다.
+
+ToggleSwitch는 공통 버튼을 사용하는 키보드 접근 가능한 on/off 스위치입니다. role=switch·aria-checked를 제공하고 공통 tailwind.css로 표시합니다.

@@ -12,7 +12,6 @@ export function WorkspaceSettings({busy}:{busy:boolean}) {
   const save=async()=>{setPending(true);setError('');setNotice('');try{acceptCfg(await request<Settings>(prefix+'settings',{workspace:cfg.workspace,toolsets:cfg.toolsets,max_iterations:cfg.max_iterations}));setNotice('작업 환경을 저장했습니다. 다음 작업부터 적용됩니다.')}catch(error){setError(failure(error))}finally{setPending(false)}};
   return <div className="agent-settings-stack"><SettingsSection title="작업 폴더와 도구" description="에이전트가 작업할 위치와 사용할 기능을 정합니다.">
     {busy&&<p className="ui-field-hint" role="status">작업 중에는 설정을 저장할 수 없습니다. 현재 작업이 끝난 뒤 저장하세요.</p>}
-    {cfg.read_only&&<p className="ui-field-hint">읽기 전용 분석이 켜져 있어 아래 선택과 별개로 코드 읽기·검색만 실행됩니다.</p>}
     <form className="ui-settings-fields" onSubmit={event=>{event.preventDefault();void save()}}>
       <label>작업 폴더<Input required value={cfg.workspace} disabled={pending} onChange={event=>setCfg({...cfg,workspace:event.target.value})}/></label>
       <fieldset disabled={pending}><legend>사용할 기능</legend><div className="agent-tool-grid">{Object.entries(tools).map(([id,label])=><label key={id}><Input type="checkbox" checked={cfg.toolsets.includes(id)} onChange={event=>setCfg({...cfg,toolsets:event.target.checked?[...cfg.toolsets,id]:cfg.toolsets.filter(tool=>tool!==id)})}/><span>{label}</span></label>)}</div></fieldset>

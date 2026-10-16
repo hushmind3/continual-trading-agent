@@ -157,11 +157,10 @@ test('system prompt settings save only the prompt and preserve the chat',async({
  await page.getByLabel('AI 에이전트 화면').selectOption('prompt');
  const editor=page.getByRole('textbox',{name:'시스템 프롬프트',exact:true});
  await expect(editor).toBeEnabled();
- await page.getByRole('checkbox',{name:'읽기 전용 분석'}).check();
  await editor.fill('한국어로 답하고 실제 도구 결과를 확인하세요.');
  await page.getByRole('button',{name:'시스템 프롬프트 저장',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('다음 대화 요청부터 적용됩니다.');
- expect(calls.filter(call=>call.op==='settings'&&Object.keys(call.payload).length).at(-1)?.payload).toEqual({system_prompt:'한국어로 답하고 실제 도구 결과를 확인하세요.',read_only:true});
+ expect(calls.filter(call=>call.op==='settings'&&Object.keys(call.payload).length).at(-1)?.payload).toEqual({system_prompt:'한국어로 답하고 실제 도구 결과를 확인하세요.'});
  await page.getByRole('button',{name:'대화로 돌아가기',exact:true}).click();
  await expect(page.locator('.ha-markdown h2')).toHaveText('작업 결과');
 });
@@ -410,4 +409,22 @@ test('idle metrics preserve all six facts and show model execution state',async(
  await expect(metrics).toContainText('생성 속도');
  await expect(metrics).toContainText('—');
  await expect(page.locator('.ha-model-state')).toHaveText('미실행');
+});
+
+test('read mode is a chat switch that can be changed during work for the next request',async({page})=>{
+ const {calls}=await fixture(page);
+ const control=page.getByRole('switch',{name:'읽기 모드',exact:true});
+ await expect(control).toHaveAttribute('aria-checked','false');
+ await control.click();
+ await page.getByLabel('헤르메스에게 보낼 메시지').fill('파일을 읽어 주세요');
+ await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
+ await expect.poll(()=>calls.find(call=>call.op==='chat')?.payload.read_only).toBe(true);
+ await expect(control).toBeEnabled();
+ await control.click();
+ await expect(control).toHaveAttribute('aria-checked','false');
+ await page.getByRole('button',{name:'작업 중지',exact:true}).click();
+ await expect(page.getByRole('button',{name:'메시지 보내기',exact:true})).toBeVisible();
+ await page.getByLabel('헤르메스에게 보낼 메시지').fill('이번에는 수정해 주세요');
+ await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
+ await expect.poll(()=>calls.filter(call=>call.op==='chat').at(-1)?.payload.read_only).toBe(false);
 });

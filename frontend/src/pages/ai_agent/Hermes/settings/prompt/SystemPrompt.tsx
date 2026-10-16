@@ -1,12 +1,23 @@
 import {useEffect,useState} from 'react';
 import {request} from '../../../../../data/api';
-import {Button,ErrorMessage,Textarea,Input} from '../../../../../ui/Primitives';
+import {Button,ErrorMessage,Textarea} from '../../../../../ui/Primitives';
 import {failure,prefix,type Settings} from '../../types';
 
 export function SystemPrompt({busy}:{busy:boolean}){
- const [readOnly,setReadOnly]=useState(false),[savedReadOnly,setSavedReadOnly]=useState(false);
- const [text,setText]=useState(''),[saved,setSaved]=useState(''),[loaded,setLoaded]=useState(false),[pending,setPending]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
- useEffect(()=>{let live=true;void request<Settings>(prefix+'settings',{},'GET').then(cfg=>{if(live){setText(cfg.system_prompt||'');setSaved(cfg.system_prompt||'');setReadOnly(Boolean(cfg.read_only));setSavedReadOnly(Boolean(cfg.read_only));setLoaded(true)}}).catch(e=>{if(live)setError(failure(e))});return()=>{live=false}},[]);
- const save=async()=>{setPending(true);setError('');setNotice('');try{const cfg=await request<Settings>(prefix+'settings',{system_prompt:text,read_only:readOnly});if(cfg.read_only!==readOnly)throw new Error('서버가 실행 권한을 저장하지 못했습니다. 서버 적용 상태를 확인하세요.');setText(cfg.system_prompt||'');setSaved(cfg.system_prompt||'');setSavedReadOnly(Boolean(cfg.read_only));setNotice('저장했습니다. 다음 대화 요청부터 적용됩니다.')}catch(e){setError(failure(e))}finally{setPending(false)}};
- return <section className="hermes-settings"><p className="hermes-muted">모델의 역할·말투·작업 방식·도구 사용 규칙을 작성하세요. Hermes 원본의 기본 시스템 안내 뒤에 추가됩니다. 빈 내용으로 저장하면 추가 지침을 사용하지 않습니다.</p><label><Input type="checkbox" checked={readOnly} disabled={!loaded||busy||pending} onChange={e=>{setReadOnly(e.target.checked);setNotice('')}}/>읽기 전용 분석</label><p className="hermes-muted">켜면 작업 폴더 안의 파일 읽기·검색만 허용합니다. 명령 실행·파일 수정·MCP·컴퓨터 조작은 차단합니다. 대화 기록과 실행 로그는 계속 저장됩니다.</p><label htmlFor="hermes-system-prompt">시스템 프롬프트<Textarea id="hermes-system-prompt" aria-label="시스템 프롬프트" rows={14} value={text} disabled={!loaded||busy||pending} onChange={e=>{setText(e.target.value);setNotice('')}} placeholder="예: 한국어로 답하고, 작업 전에 관련 코드를 확인하세요. 실제 도구 결과가 확인된 경우에만 완료라고 설명하세요."/></label><div className="hermes-actions"><Button tone="primary" disabled={!loaded||busy||pending||(text===saved&&readOnly===savedReadOnly)} busy={pending} onClick={()=>void save()}>시스템 프롬프트 저장</Button><span className="hermes-muted" role="status">{notice||(!loaded&&!error?'설정을 불러오는 중입니다…':busy?'작업을 중지하거나 완료한 뒤 변경할 수 있습니다.':(text!==saved||readOnly!==savedReadOnly)?'저장하지 않은 변경이 있습니다.':'')}</span></div><ErrorMessage message={error}/></section>;
+ const [text,setText]=useState(''),[saved,setSaved]=useState('');
+ const [loaded,setLoaded]=useState(false),[pending,setPending]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ useEffect(()=>{let live=true;
+  void request<Settings>(prefix+'settings',{},'GET').then(cfg=>{if(live){setText(cfg.system_prompt||'');setSaved(cfg.system_prompt||'');setLoaded(true)}}).catch(e=>{if(live)setError(failure(e))});
+  return()=>{live=false};
+ },[]);
+ const save=async()=>{setPending(true);setError('');setNotice('');
+  try{const cfg=await request<Settings>(prefix+'settings',{system_prompt:text});setText(cfg.system_prompt||'');setSaved(cfg.system_prompt||'');setNotice('저장했습니다. 다음 대화 요청부터 적용됩니다.')}
+  catch(e){setError(failure(e))}finally{setPending(false)}
+ };
+ return <section className="hermes-settings">
+  <div className="hermes-section-heading"><div><h3>시스템 프롬프트</h3><p className="hermes-muted">역할·작업 방식·응답 규칙을 추가합니다.</p></div></div>
+  <label>시스템 프롬프트<Textarea aria-label="시스템 프롬프트" rows={14} value={text} disabled={!loaded||busy||pending} onChange={e=>{setText(e.target.value);setNotice('')}} placeholder="예: 한국어로 답하고, 실제 도구 결과가 확인된 경우에만 완료라고 설명하세요."/></label>
+  <div className="hermes-actions"><Button tone="primary" disabled={!loaded||busy||pending||text===saved} busy={pending} onClick={()=>void save()}>시스템 프롬프트 저장</Button><span className="hermes-muted" role="status">{notice||(!loaded&&!error?'설정을 불러오는 중입니다…':busy?'작업을 중지하거나 완료한 뒤 변경할 수 있습니다.':text!==saved?'저장하지 않은 변경이 있습니다.':'')}</span></div>
+  <ErrorMessage message={error}/>
+ </section>;
 }

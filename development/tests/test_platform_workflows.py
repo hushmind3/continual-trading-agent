@@ -13,6 +13,11 @@ from rea.project_explorer import projects
 
 
 class REAWorkflowTests(unittest.TestCase):
+ def setUp(self):
+  self.cancel_patch=patch.object(extract,'_cancel',threading.Event())
+  self.cancel_patch.start()
+  self.addCleanup(self.cancel_patch.stop)
+
  def test_status_restores_latest_saved_result_without_starting_analysis(self):
   from web_api import app
   with tempfile.TemporaryDirectory() as temporary:

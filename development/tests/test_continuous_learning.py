@@ -97,7 +97,7 @@ class ContinuousLearningTests(unittest.TestCase):
         self.runtime.queue_learning(['AAPL'])
         self.assertEqual(len(self.requests), 2)
 
-    def test_success_applies_once_and_changed_data_resumes_new_checkpoint(self):
+    def test_success_applies_once_and_new_observation_resumes_new_checkpoint(self):
         self.runtime.queue_learning(['AAPL'])
         self.succeed()
         self.runtime.queue_learning(['AAPL'])
@@ -105,7 +105,7 @@ class ContinuousLearningTests(unittest.TestCase):
         selected = read_json(self.selection)
         self.assertEqual(selected['USD'], 'policies/result1/sac.zip')
         self.assertEqual(selected['KRW'], 'unchanged.zip')
-        self.prices.return_value = self.frame.assign(close=101)
+        self.prices.return_value = pd.concat([self.frame,pd.DataFrame([dict(date=pd.Timestamp('2026-01-02'),tic='AAPL',close=101)])],ignore_index=True)
         self.runtime.queue_learning(['AAPL'])
         self.assertEqual(len(self.requests), 2)
         self.assertEqual(Path(self.requests[-1][0].checkpoint), self.root/'runtime/official/policies/result1/sac.zip')

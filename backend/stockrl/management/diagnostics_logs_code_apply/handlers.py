@@ -158,7 +158,10 @@ def state_view(path):
     return {'data':data,'error':system.state_errors.get(name,''),'updated_at':system.state_updates.get(name)}
 
 
+from stockrl.expert_registry import catalog_read_scope
+
 @router.get('/api/state')
+@catalog_read_scope()
 def state(views:str='[]',refresh_views:bool=False):
     from stockrl.finrl.policy_learning.handlers import checkpoints
     from stockrl.finrl.policy_learning.handlers import currency_models

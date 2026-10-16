@@ -201,7 +201,7 @@ class IntegrityTests(unittest.TestCase):
   from menu_registry import GROUPS
   from stockrl.platform.framework_operations import ACTIONS
   self.assertEqual(set(ACTIONS),{'native_call'})
-  self.assertEqual([group['id'] for group in GROUPS],['finance','rea'])
+  self.assertEqual([group['id'] for group in GROUPS],['finance','rea','ai_agent'])
  def test_rea_refuses_project_trash_inputs(self):
   from rea.program_analysis.operations import validate_arguments
   with self.assertRaisesRegex(ValueError,'휴지통'):
@@ -217,6 +217,11 @@ class IntegrityTests(unittest.TestCase):
    close.assert_called_once()
 
 class REAProjectStorageTests(unittest.TestCase):
+ def setUp(self):
+  from rea.program_analysis import extract
+  self.cancel_patch=patch.object(extract,'_cancel',threading.Event())
+  self.cancel_patch.start();self.addCleanup(self.cancel_patch.stop)
+
  def test_project_reader_cannot_leave_saved_folder(self):
   from rea.project_explorer.projects import _inside
   with self.assertRaisesRegex(ValueError,'프로젝트 내부'):

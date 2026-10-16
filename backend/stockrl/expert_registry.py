@@ -5,13 +5,30 @@ from .state_io import read_json
 from pathlib import Path
 import copy
 import json
+from contextlib import contextmanager
+from contextvars import ContextVar
+
+_catalog_reads=ContextVar('expert_catalog_reads',default=None)
+
+@contextmanager
+def catalog_read_scope():
+    """Share one validated registry snapshot within a single read-only response."""
+    token=_catalog_reads.set({})
+    try:yield
+    finally:_catalog_reads.reset(token)
+
+def read_catalog(path=None):
+    if path is None:path=Path.home()/'Desktop'/'모델'/'experts'/'expert_registry.json'
+    cache=_catalog_reads.get();key=str(Path(path).absolute())
+    if cache is None:return _load_catalog(path)
+    if key not in cache:cache[key]=_load_catalog(path)
+    return cache[key]
 
 def utc_now():return datetime.now(timezone.utc).isoformat()
 def atomic_json(path,value):_write(value,path)
 
 
-def read_catalog(path=None):
-    if path is None:path=Path.home()/'Desktop'/'모델'/'experts'/'expert_registry.json'
+def _load_catalog(path):
     path=Path(path)
     try:index=json.loads(path.read_text(encoding='utf-8'))
     except FileNotFoundError:index={}

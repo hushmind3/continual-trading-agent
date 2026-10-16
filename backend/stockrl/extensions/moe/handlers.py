@@ -41,13 +41,14 @@ def expert_state():
     from stockrl.management.diagnostics_logs_code_apply.handlers import file_info
     from stockrl.trading.operation_control.operations_settings import settings
     model_dir=settings().model_dir
+    model_root=model_dir.resolve()
     registry = read_catalog()
     status = read_json(ROOT / "runtime/experts/status.json")
     rows = []
     for key, item in registry.get("experts", {}).items():
         reference = item.get("package", {})
         path = (model_dir / reference.get("file", "")).resolve()
-        available = path.is_relative_to(model_dir.resolve()) and path.is_file()
+        available = path.is_relative_to(model_root) and path.is_file()
         if available and reference.get("bytes") is not None:
             available = path.stat().st_size == reference["bytes"]
         detail=dict(item)

@@ -71,3 +71,32 @@ class JsonExpertImportTests(unittest.TestCase):
             self.assertEqual(item['id'],'chosen');self.assertEqual(item['package']['file'],'market/model/MODEL.json')
             self.assertTrue(item['input']['supported']);self.assertEqual(source.read_bytes(),before)
             self.assertEqual(list(root.rglob('*.pt')),[])
+
+
+class CatalogReadScopeTests(unittest.TestCase):
+ def test_one_response_reuses_reads_but_next_response_observes_json_edits(self):
+  import json
+  from stockrl import expert_registry as registry
+  with tempfile.TemporaryDirectory() as temporary:
+   path=Path(temporary)/'registry.json'
+   path.write_text(json.dumps({'experts':{'first':{}},'active':[]}))
+   with patch.object(registry,'_load_catalog',wraps=registry._load_catalog) as load:
+    with registry.catalog_read_scope():
+     self.assertIn('first',registry.read_catalog(path)['experts'])
+     self.assertIn('first',registry.read_catalog(path)['experts'])
+    self.assertEqual(load.call_count,1)
+    path.write_text(json.dumps({'experts':{'second':{}},'active':[]}))
+    with registry.catalog_read_scope():
+     self.assertEqual(list(registry.read_catalog(path)['experts']),['second'])
+    self.assertEqual(load.call_count,2)
+ def test_failed_response_cannot_leave_a_registry_snapshot_cached(self):
+  import json
+  from stockrl import expert_registry as registry
+  with tempfile.TemporaryDirectory() as temporary:
+   path=Path(temporary)/'registry.json';path.write_text(json.dumps({'experts':{},'active':[]}))
+   with self.assertRaises(RuntimeError):
+    with registry.catalog_read_scope():
+     registry.read_catalog(path)
+     raise RuntimeError('response failed')
+   path.write_text('invalid json')
+   with self.assertRaises(ValueError):registry.read_catalog(path)

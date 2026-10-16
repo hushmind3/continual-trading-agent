@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "hermes",
+  "group": {
+    "id": "ai_agent",
+    "title": "AI 에이전트"
+  },
+  "backend": {
+    "namespace": "ai_agent.Hermes",
+    "entry": "manager"
+  },
+  "frontend": {
+    "entry": "frontend/register.ts"
+  },
+  "data": [
+    "runtime/ai_agent/Hermes"
+  ],
+  "resources": {
+    "python": ".venv/hermes/Scripts/python.exe",
+    "model_runner": "runtime/shared/engines/llama.cpp/llama-server.exe"
+  },
+  "requirements": "backend/engine/requirements.txt",
+  "order": 30
+}

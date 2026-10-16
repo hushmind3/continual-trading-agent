@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "id": "rea",
+  "group": {
+    "id": "rea",
+    "title": "REA 역공학"
+  },
+  "backend": {
+    "namespace": "platform_plugins.rea",
+    "entry": "register"
+  },
+  "frontend": {
+    "entry": "frontend/register.ts"
+  },
+  "legacy_shared_code": true,
+  "order": 20
+}

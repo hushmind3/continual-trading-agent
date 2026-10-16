@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "id": "finance",
+  "group": {
+    "id": "finance",
+    "title": "금융"
+  },
+  "backend": {
+    "namespace": "platform_plugins.finance",
+    "entry": "register"
+  },
+  "frontend": {
+    "entry": "frontend/register.ts"
+  },
+  "legacy_shared_code": true,
+  "order": 10
+}

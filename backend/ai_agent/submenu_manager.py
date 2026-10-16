@@ -1,5 +1,4 @@
-"""Collect agent submenus without importing their execution engines."""
-from ai_agent.Hermes.manager import MENU, router
-
-MENUS = (MENU,)
-ROUTERS = (router,)
+from platform_modules import registrations
+_entries=[entry for item,entry in registrations() if item['group']['id']=='ai_agent']
+MENUS=tuple(entry.MENU for entry in _entries)
+ROUTERS=tuple(entry.router for entry in _entries)

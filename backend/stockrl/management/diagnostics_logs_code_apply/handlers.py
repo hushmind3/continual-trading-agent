@@ -265,22 +265,22 @@ def apply_changes(request:dict):
 
 @router.get('/api/system/blockers')
 def restart_blockers():
-    return {'items':busy(),'covers_hermes':True}
+    return {'items':busy(),'covers_modules':True}
 
 
 @router.post('/api/system/prepare-restart')
 def prepare_restart():
-    from ai_agent.Hermes.engine.bridge import bridge
+    from platform_modules import lifecycle
     with system.job_lock:
         blockers=busy()
         if blockers:raise HTTPException(409,' · '.join(blockers))
-        try:bridge.reserve_restart()
+        try:lifecycle('reserve_restart')
         except RuntimeError as exc:raise HTTPException(409,str(exc)) from exc
         try:
             system.restarting=True
             runtime.close()
         except Exception:
-            system.restarting=False;bridge.cancel_restart()
+            system.restarting=False;lifecycle('cancel_restart')
             raise
     return {'ready':True}
 

@@ -1,9 +1,14 @@
 """Import large-menu managers; expose their existing backend connections."""
-from stockrl.finance_menu_manager import GROUP as FINANCE,ROUTERS as FINANCE_ROUTERS
-from rea.rea_menu_manager import GROUP as REA,ROUTERS as REA_ROUTERS
-from ai_agent.ai_agent_menu_manager import GROUP as AI_AGENT,ROUTERS as AI_AGENT_ROUTERS
+from platform_modules import registrations, ROOT
 
-GROUPS=(FINANCE,REA,AI_AGENT)
+MODULE_ENTRIES=registrations()
+_group_map={}
+for metadata,entry in sorted(MODULE_ENTRIES,key=lambda pair:pair[0].get('order',100)):
+    group=metadata['group']
+    menus=getattr(entry,'MENUS',None) or getattr(entry,'GROUP',{}).get('menus') or (entry.MENU,)
+    target=_group_map.setdefault(group['id'],{'id':group['id'],'title':group['title'],'menus':[]})
+    target['menus'].extend(menus)
+GROUPS=tuple(_group_map.values())
 _routes_by_menu={}
 
 def owner(operation):
@@ -11,7 +16,7 @@ def owner(operation):
         for menu in group['menus']:
             if any(operation==pattern or pattern.endswith('/') and operation.startswith(pattern) for pattern in menu['operations']):
                 return group['id'],menu['id']
-    return 'finance','system'
+    return 'platform','system'
 
 def bind(routes):
     """Bind existing handlers once without moving state/model ownership."""
@@ -36,8 +41,7 @@ def dispatch(scope,parameters):
 
 def catalog(routes):
     from pydantic import TypeAdapter
-    from stockrl.platform.framework_operations import action_list
-    actions=action_list()
+    actions=[action for _,entry in MODULE_ENTRIES for action in (entry.actions() if hasattr(entry,'actions') else [])]
     for action in actions:
         action['group'],action['menu_id']=owner('framework/'+action['id'])
     def fields(values):
@@ -85,9 +89,29 @@ def catalog(routes):
 
 def register_api(api,app):
     """Collect small-menu routers through the finance and REA coordinators."""
-    for routers in (FINANCE_ROUTERS,REA_ROUTERS,AI_AGENT_ROUTERS):
+    for _,entry in MODULE_ENTRIES:
+        routers=getattr(entry,'ROUTERS',None) or (entry.router,)
         for router in routers:
             api.include_router(router)
             app.router.on_startup.extend(router.on_startup)
             app.router.on_shutdown.extend(router.on_shutdown)
+
+    @api.get('/api/platform/modules')
+    def modules():
+        return {'items':[{'id':item['id'],'group':item['group'],'program':str(item['folder']),
+            'data':[str(ROOT/path) for path in item.get('data',[])],
+            'legacy_shared_code':item.get('legacy_shared_code',False),
+            'resources':{name:(ROOT/path).is_file() for name,path in item.get('resources',{}).items()}}
+            for item,_ in MODULE_ENTRIES]}
+
+    @api.post('/api/platform/modules/prepare-detach')
+    def prepare_detach(request:dict):
+        from fastapi import HTTPException
+        found=next((entry for item,entry in MODULE_ENTRIES if item['id']==request.get('id')),None)
+        if found is None:raise HTTPException(404,'등록된 모듈이 없습니다.')
+        if callback:=getattr(found,'busy_reason',None):
+            if reason:=callback():raise HTTPException(409,reason)
+        if callback:=getattr(found,'reserve_restart',None):callback()
+        if callback:=getattr(found,'close',None):callback()
+        return {'ready':True}
     bind(api.routes)

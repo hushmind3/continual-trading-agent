@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINE = ROOT / 'backend/ai_agent/Hermes/engine'
+ENGINE = ROOT / 'modules/hermes/backend/engine'
 spec = importlib.util.spec_from_file_location('hermes_execution', ENGINE / 'execution.py')
 execution = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(execution)

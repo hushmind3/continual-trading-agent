@@ -90,6 +90,14 @@ def sources():
     names=set(subprocess.check_output(['git','ls-files','-co','--exclude-standard','-z'],cwd=ROOT).decode('utf8').split('\0'))
     groups={name:{} for name in ('frontend','backend','launcher','configuration')}
     for name in sorted(names):
+        if '/engine/upstream/' in name:continue
+        if name.startswith('modules/'):
+            if name.endswith('/module.json'):
+                for target in ('frontend','backend'):groups[target][name]=hashlib.sha256((ROOT/name).read_bytes()).hexdigest() if (ROOT/name).is_file() else 'missing'
+                continue
+            target='frontend' if '/frontend/' in name else 'backend'
+            if name.endswith(('.py','.ts','.tsx','.json','.txt')):groups[target][name]=hashlib.sha256((ROOT/name).read_bytes()).hexdigest() if (ROOT/name).is_file() else 'missing'
+            continue
         if name in ('package.json','package-lock.json'):
             for target in ('frontend','backend'):groups[target][name]=hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
             continue
@@ -117,7 +125,7 @@ def blockers():
     try:
         value=api('system/blockers',timeout=5)
         items=list(value['items'])
-        if value.get('covers_hermes'):return items
+        if value.get('covers_modules') or value.get('covers_hermes'):return items
     except HTTPError as exc:
         if exc.code!=404:raise
         # Initial installation: reuse the pre-existing state endpoint before new routes exist.
@@ -125,19 +133,18 @@ def blockers():
         if value.get('job',{}).get('running'):items.append('실행 중인 SAC/평가/수집 작업')
         if any(value.get('operations',{}).get('controls',{}).values()):items.append('실행 중인 시세/추론/가상매매')
         if value.get('library',{}).get('job',{}).get('busy'):items.append('실행 중인 모델 작업')
-    try:
-        state=api('ai_agent/Hermes/status',timeout=5)
-        if state.get('job',{}).get('state') in ('starting','running','stopping'):items.append('실행 중인 헤르메스 대화·자동 작업')
-    except HTTPError as exc:
-        if exc.code!=404:items.append('헤르메스 상태 확인 실패; 재시작 보류')
-    except (OSError,ValueError):items.append('헤르메스 상태 확인 실패; 재시작 보류')
     return items
 
 
 def ensure_watchdog():
     """Keep the API available independently of the launching console."""
     from server_watchdog import running
-    if running():return
+    if running():
+        if read_json(RUNTIME/'server-watchdog.json').get('module_watch_version')==1:return
+        (RUNTIME/'server-watchdog.stop').write_text('',encoding='utf8')
+        deadline=time.monotonic()+8
+        while running() and time.monotonic()<deadline:time.sleep(.2)
+        if running():raise RuntimeError('기존 감시기 종료 대기 중입니다. 다시 적용하세요.')
     (RUNTIME/'server-watchdog.stop').unlink(missing_ok=True)
     command=[sys.executable,'-X','utf8','-B',str(ROOT/'development/scripts/server_watchdog.py')]
     flags=getattr(subprocess,'DETACHED_PROCESS',0)|getattr(subprocess,'CREATE_NEW_PROCESS_GROUP',0)

@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 
 import psutil
 
-from start_server import ROOT,RUNTIME,PORT,ready,listeners,main
+from start_server import ROOT,RUNTIME,PORT,ready,listeners,main,blockers
+from platform_modules import signature
 from stockrl.state_io import read_json,atomic_json
 
 STATUS=RUNTIME/'server-watchdog.json'
@@ -43,7 +46,8 @@ def supervise():
         try:msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
         except OSError:return
         record={'pid':os.getpid(),'process_created':psutil.Process().create_time(),
-            'status':'running','started_at':time.time(),'restarts':0,'last_error':''}
+            'status':'running','started_at':time.time(),'restarts':0,'last_error':'',
+            'module_watch_version':1,'modules_signature':signature()}
         atomic_json(record,STATUS)
         try:
             while not STOP.exists():
@@ -52,6 +56,20 @@ def supervise():
                     if recover():
                         record.update(restarts=record['restarts']+1,last_restart_at=time.time(),last_error='')
                         atomic_json(record,STATUS)
+                    elif (desired:=signature())!=record['modules_signature']:
+                        active=blockers()
+                        if active:
+                            record.update(modules_pending=desired,modules_blockers=active)
+                            atomic_json(record,STATUS)
+                        else:
+                            # Import preflight precedes build/restart; a bad plugin leaves the live host intact.
+                            with (RUNTIME/'module-preflight.log').open('w',encoding='utf8') as output:
+                                env=os.environ.copy();env['PYTHONPATH']=str(ROOT/'backend')
+                                subprocess.run([sys.executable,'-X','utf8','-B','-c','import web_api'],cwd=ROOT/'backend',env=env,stdout=output,stderr=subprocess.STDOUT,check=True,timeout=90)
+                            main(apply_only=True,skip_build=False,skip_checks=True,watchdog=False)
+                            if not ready():raise RuntimeError('모듈 적용 후 API 응답 없음')
+                            record.update(modules_signature=desired,modules_applied_at=time.time(),modules_pending='',modules_blockers=[],last_error='')
+                            atomic_json(record,STATUS)
                     elif record['last_error']:
                         record['last_error']='';atomic_json(record,STATUS)
                 except Exception as exc:

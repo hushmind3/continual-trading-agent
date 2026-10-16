@@ -39,7 +39,7 @@ async function fixture(page:Page,empty=false,history=false){
   else if(op==='artifact/upload')response={name:payload.name,path:'C:/workspace/runtime/ai_agent/Hermes/artifacts/uploads/test/'+payload.name,bytes:8};
   else if(op==='artifact'&&payload.path==='missing.md'){await route.fulfill({status:404,json:{detail:'문서 파일이 없습니다.'}});return}
   else if(op==='artifact'&&String(payload.path).endsWith('.html'))response={name:'result.html',path:payload.path,format:'.html',bytes:200,truncated:false,content:'<h1>HTML 검사 결과</h1><p>완료된 보고서 내용입니다.</p><script>window.top.htmlPreviewUnsafe=true</script><img src="https://example.com/tracker">'};
-  else if(op==='artifact')response={name:'error_mining_report.md',path:String(payload.path),format:'.md',bytes:90,content:'# 검사 보고서\n\n- 재시작 보호 확인\n\n<script>window.reportUnsafe=true</script>',truncated:false};
+  else if(op==='artifact')response={name:'error_mining_report.md',path:String(payload.path),format:'.md',bytes:90,content:'# 검사 보고서\n\n- 재시작 보호 확인\n\n[근거 문서](./evidence.md)\n\n<script>window.reportUnsafe=true</script>',truncated:false};
   else if(op==='models/local')response={models:[{path:'C:/models/ornith.gguf',name:'Ornith 9B.gguf',bytes:1024},{path:'C:/models/another.gguf',name:'두 번째 모델.gguf',bytes:2048}],root:'C:/models'};
   else if(op==='model/load')response=status();
   else if(op==='models')response={models:[]};
@@ -427,4 +427,14 @@ test('read mode is a chat switch that can be changed during work for the next re
  await page.getByLabel('헤르메스에게 보낼 메시지').fill('이번에는 수정해 주세요');
  await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
  await expect.poll(()=>calls.filter(call=>call.op==='chat').at(-1)?.payload.read_only).toBe(false);
+});
+
+test('document links resolve relative to the open report inside the same panel',async({page})=>{
+ const {calls}=await fixture(page);
+ await page.getByRole('button',{name:'오류 보고서',exact:true}).click();
+ const panel=page.getByRole('complementary',{name:'결과 문서'});
+ await panel.getByRole('button',{name:'근거 문서',exact:true}).click();
+ await expect.poll(()=>calls.some(call=>call.op==='artifact'&&call.payload.path==='development/docs/./evidence.md')).toBe(true);
+ await expect(panel).toBeVisible();
+ await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toBeEditable();
 });

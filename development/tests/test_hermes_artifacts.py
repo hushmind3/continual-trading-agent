@@ -24,6 +24,15 @@ class ArtifactTests(unittest.TestCase):
             for name in ('../secret.md','configs/local/secret.json','platform-settings.json','.venv/report.md','program.exe'):
                 with self.subTest(path=name),self.assertRaises(ValueError):preview(name,root)
 
+    def test_git_status_and_line_references_resolve_actual_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'AGENTS.md').write_text('actual project instructions', encoding='utf8')
+            for reference in ('M AGENTS.md', '?? AGENTS.md', 'AGENTS.md:4:2', 'AGENTS.md#L4-L7'):
+                self.assertEqual(preview(reference, root)['name'], 'AGENTS.md')
+            (root/'M AGENTS.md').write_text('literal filename', encoding='utf8')
+            self.assertEqual(preview('M AGENTS.md', root)['content'], 'literal filename')
+
     def test_missing_documents_are_not_reported_as_success(self):
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaises(FileNotFoundError):preview('missing.md',temporary)

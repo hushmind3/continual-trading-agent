@@ -35,3 +35,5 @@ SettingsSection은 설정 제목·설명·상태/액션·본문 경계를 공유
 DocumentContent.tsx는 팝업과 나란히 보기에서 공통으로 사용하는 문서 본문입니다. HTML 미리보기와 원문 보기는 분리되며 기존 문서 읽기 API를 그대로 사용합니다.
 
 ToggleSwitch는 공통 버튼을 사용하는 키보드 접근 가능한 on/off 스위치입니다. role=switch·aria-checked를 제공하고 공통 tailwind.css로 표시합니다.
+
+documentPaths는 로컬 문서 경로와 문서 기준 상대 링크를 해석합니다. 열린 Markdown 안의 로컬 링크도 같은 문서 패널에서 읽으며 외부 URL은 외부 링크로 유지합니다.

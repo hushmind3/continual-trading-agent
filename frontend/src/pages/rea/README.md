@@ -1,10 +1,3 @@
-# REA 역공학
+# 이전 소스 위치
 
-취합: `rea_menu_manager.ts`. 이 파일만 상위 menu_registry가 import합니다.
-
-- [프로그램 분석](program_analysis/README.md): program_analysis/
-- [프로젝트 탐색](project_explorer/README.md): project_explorer/
-
-취합: submenu_manager.ts → rea_menu_manager.ts(대메뉴 등록) → 전체 menu_registry → API. 새 기능 구현은 소속 하위 폴더에 추가하고 소메뉴 매니저에 등록합니다.
-
-메뉴·폴더·화면 주소 대응: 프로그램 분석 = program_analysis/ = #rea/program_analysis; 프로젝트 탐색 = project_explorer/ = #rea/project_explorer.
+실제 구현은 [모듈](../../../../modules/rea/README.md)에 있습니다. 소스 import를 남기지 않아 해당 모듈 폴더를 분리해도 호스트 타입 검사·빌드에 남은 참조가 없습니다.

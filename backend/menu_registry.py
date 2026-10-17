@@ -12,6 +12,8 @@ GROUPS=tuple(_group_map.values())
 _routes_by_menu={}
 
 def owner(operation):
+    if operation in {'health','state','system/blockers','system/prepare-restart'} or operation.startswith('platform/'):
+        return 'platform','system'
     for group in GROUPS:
         for menu in group['menus']:
             if any(operation==pattern or pattern.endswith('/') and operation.startswith(pattern) for pattern in menu['operations']):
@@ -68,6 +70,7 @@ def catalog(routes):
             'group':group,'menu':menu,'description':route.description or '',
             'path_schema':fields(route.dependant.path_params),
             'query_schema':fields(route.dependant.query_params),'body_schema':body}
+        command.update((route.openapi_extra or {}).get('module_schemas', {}))
         commands.append(command)
         if operation=='framework/{action}':
             for action in actions:
@@ -100,10 +103,11 @@ def register_api(api,app):
     @api.get('/api/platform/modules')
     def modules():
         return {'items':[{'id':item['id'],'group':item['group'],'program':str(item['folder']),
+            'available':not bool(getattr(entry,'load_error',None)),'error':getattr(entry,'load_error',None),
             'data':[str(ROOT/path) for path in item.get('data',[])],
             'legacy_shared_code':item.get('legacy_shared_code',False),
             'resources':{name:(ROOT/path).is_file() for name,path in item.get('resources',{}).items()}}
-            for item,_ in MODULE_ENTRIES]}
+            for item,entry in MODULE_ENTRIES]}
 
     @api.post('/api/platform/modules/prepare-detach')
     def prepare_detach(request:dict):

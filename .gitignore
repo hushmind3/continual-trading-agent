@@ -38,3 +38,11 @@ results/
 /.runtime/ui-preview/
 # Generated installation adapters; source/config/history live in ignored runtime/.
 /modules/external_*/
+
+/modules/*/.venv/
+/modules/*/node_modules/
+/modules/*/configs/local/
+/modules/rea/configs/rea.json
+
+# Every module owns its installed Node packages; never publish installation output.
+node_modules/

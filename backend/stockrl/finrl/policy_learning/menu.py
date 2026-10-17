@@ -1,2 +1,0 @@
-"""정책 학습의 기존 기능 연결."""
-MENU={'id': 'finance/policy_learning', 'title': '정책 학습', 'operations': ['price/history', 'train', 'algorithms', 'model', 'models_by_currency', 'checkpoints', 'checkpoint', 'checkpoints/restore', 'preflight/train'], 'views': ['settings', 'model', 'data', 'experts', 'job', 'checkpoints', 'resources'], 'frontend': 'pages/finance/finrl/policy_learning/PolicyLearning.tsx', 'manager': 'stockrl.finrl.policy_learning.menu'}

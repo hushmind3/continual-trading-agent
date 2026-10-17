@@ -1,19 +1,2 @@
-certifi==2026.7.22
-charset-normalizer==3.5.2
-idna==3.20
-jaraco.classes==3.4.0
-jaraco.context==6.1.2
-jaraco.functools==4.6.0
-keyring==25.7.0
-kwcli==1.0.2
-more-itertools==11.1.0
-numpy==2.5.4
-pandas==3.0.6
-platformdirs==4.13.0
-python-dateutil==2.9.0.post0
-pywin32-ctypes==0.2.3
-requests==2.34.2
-six==1.17.0
-tzdata==2026.5
-urllib3==2.8.0
-websockets==15.0.1
+# Compatibility entry; finance owns the authoritative dependency declaration.
+-c ../../../modules/finance/dependencies/kiwoom.lock.txt

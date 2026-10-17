@@ -9,8 +9,10 @@ import psutil
 ROOT=Path(__file__).resolve().parents[2]
 FRONTEND=ROOT/'frontend';RUNTIME=ROOT/'runtime/platform';PORT=8766
 sys.path.insert(0,str(ROOT/'backend'))
-from stockrl.state_io import read_json,atomic_json
+sys.path.insert(1,str(Path(__file__).resolve().parent))
+from platform_state_io import read_json,atomic_json
 APPLY=RUNTIME/'apply.json';APPLIED=RUNTIME/'applied-sources.json'
+HOST_PYTHON=str(ROOT/'.venv/platform/Scripts/python.exe')
 
 
 def same_path(left,right):
@@ -150,7 +152,7 @@ def ensure_watchdog():
         while running() and time.monotonic()<deadline:time.sleep(.2)
         if running():raise RuntimeError('기존 감시기 종료 대기 중입니다. 다시 적용하세요.')
     (RUNTIME/'server-watchdog.stop').unlink(missing_ok=True)
-    command=[sys.executable,'-X','utf8','-B',str(ROOT/'development/scripts/server_watchdog.py')]
+    command=[HOST_PYTHON,'-X','utf8','-B',str(ROOT/'development/scripts/server_watchdog.py')]
     flags=getattr(subprocess,'DETACHED_PROCESS',0)|getattr(subprocess,'CREATE_NEW_PROCESS_GROUP',0)
     with (RUNTIME/'server-watchdog.log').open('ab') as output:
         try:
@@ -233,7 +235,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                     operation.update(status='blocked',applied=False,
                         detail='프론트 변경 적용 완료; 백엔드 변경은 실행 중 작업 종료 후 적용 필요' if frontend_changed else '백엔드 변경 적용 보류')
                     atomic_json(operation,APPLY);return
-                if any(name.endswith('/stockrl/platform/system_operations.py') for name in old.get('backend',{})):
+                if current:
                     # Persist server approval waiting separately from running application work.
                     operation['status']='pending';phase(stage,'8766 서버 갱신','pending','서버 재시작 준비 승인 대기')
                     api('system/prepare-restart',{})
@@ -242,7 +244,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                 for record in current:stop_verified(record)
                 env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_APPLY_ID=operation['id'])
                 with (RUNTIME/'server.stdout.log').open('ab') as output,(RUNTIME/'server.stderr.log').open('ab') as errors:
-                    child=subprocess.Popen([sys.executable,'-m','uvicorn','web_api:app','--host','127.0.0.1','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+                    child=subprocess.Popen([HOST_PYTHON,'-m','uvicorn','web_api:app','--host','127.0.0.1','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
                 for _ in range(100):
                     if child.poll() is not None:raise RuntimeError('서버 시작 실패: runtime/platform/server.stderr.log')
                     if ready():break

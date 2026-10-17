@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from fastapi import APIRouter,HTTPException
-from platform_modules import ROOT
+from ..engine.locations import ROOT
 from .document_paths import document_file
 
 router=APIRouter(prefix='/api/ai_agent/Hermes')

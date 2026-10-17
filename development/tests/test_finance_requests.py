@@ -1,4 +1,8 @@
-"""Finance request boundaries with isolated accounts; no broker/model execution."""
+"""Finance worker-router boundaries with in-process mocks and isolated accounts.
+
+The host forwards over IPC, so patching its process cannot mock the worker.
+Valid write requests are tested only against the module router in this process.
+"""
 import copy
 import sys
 import tempfile
@@ -8,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock,patch
 
 import pandas as pd
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from stockrl.trading.operation_control import operations_runtime
 from stockrl.trading.operation_control import handlers as control_handlers
@@ -51,38 +56,38 @@ class ManualQuoteValidationTests(unittest.TestCase):
 
 class UnifiedOrderRequestTests(unittest.TestCase):
  def test_invalid_quantity_never_reaches_runtime(self):
-  from web_api import app
+  app=FastAPI();app.include_router(handlers.router)
   runtime=SimpleNamespace(manual_order=Mock(return_value={'fill':{'quantity':1},'price_source':'live'}))
   with patch.object(handlers,'runtime',runtime),TestClient(app) as client:
    for quantity in (True,False,0,-1,1.5,'1'):
     with self.subTest(quantity=quantity):
-     response=client.post('/api',json={'operation':'orders','payload':{'currency':'USD','symbol':'AAPL','action':'BUY','quantity':quantity}})
+     response=client.post('/api/orders',json={'currency':'USD','symbol':'AAPL','action':'BUY','quantity':quantity})
      self.assertEqual(response.status_code,422)
    runtime.manual_order.assert_not_called()
-   response=client.post('/api',json={'operation':'orders','payload':{'currency':'USD','symbol':'AAPL','action':'BUY','quantity':1}})
+   response=client.post('/api/orders',json={'currency':'USD','symbol':'AAPL','action':'BUY','quantity':1})
    self.assertEqual(response.status_code,200)
    runtime.manual_order.assert_called_once_with('AAPL','USD','BUY',1)
 
  def test_invalid_quote_reason_remains_a_command_error(self):
-  from web_api import app
+  app=FastAPI();app.include_router(handlers.router)
   runtime=SimpleNamespace(manual_order=Mock(side_effect=ValueError('유효한 시세 가격이 없습니다.')))
   with patch.object(handlers,'runtime',runtime),TestClient(app) as client:
-   response=client.post('/api',json={'operation':'orders','payload':{'currency':'USD','symbol':'AAPL','action':'BUY','quantity':1}})
+   response=client.post('/api/orders',json={'currency':'USD','symbol':'AAPL','action':'BUY','quantity':1})
    self.assertEqual(response.status_code,400)
    self.assertEqual(response.json()['detail'],'유효한 시세 가격이 없습니다.')
 
 
 class OperationInputTests(unittest.TestCase):
  def test_invalid_currency_inputs_cannot_launch_the_system(self):
-  from web_api import app
+  app=FastAPI();app.include_router(control_handlers.router)
   system=SimpleNamespace(start=Mock(return_value={'status':'pending'}))
   with patch.object(control_handlers,'system',system),TestClient(app) as client:
    for currencies in (1,True,['USD',{}],['EUR'],[],None,'USD'):
     with self.subTest(currencies=currencies):
-     response=client.post('/api',json={'operation':'system/start','payload':{'currencies':currencies}})
+     response=client.post('/api/system/start',json={'currencies':currencies})
      self.assertEqual(response.status_code,400)
    system.start.assert_not_called()
-   response=client.post('/api',json={'operation':'system/start','payload':{'currencies':['USD','KRW','USD']}})
+   response=client.post('/api/system/start',json={'currencies':['USD','KRW','USD']})
    self.assertEqual(response.status_code,200)
    system.start.assert_called_once_with(['USD','KRW'])
 

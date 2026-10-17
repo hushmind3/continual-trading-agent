@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock,patch
 from fastapi.testclient import TestClient
+from fastapi import FastAPI
 from stockrl.platform import framework_operations as framework
 from stockrl.finrl.provider_settings import operations as providers
 from stockrl.management.all_backend_features import handlers
@@ -53,22 +54,22 @@ class NativeExecutionTests(unittest.TestCase):
     framework.native_call({'module':item['id'],'callable':'combine','kwargs':{'value':'x'},'argv':[7]},framework.ROOT/'runtime')
    load.assert_not_called()
 
- def test_single_api_queues_valid_native_request_and_keeps_invalid_one_out(self):
-  from web_api import app
+ def test_module_router_queues_valid_native_request_and_keeps_invalid_one_out(self):
+  app=FastAPI();app.include_router(handlers.router)
   item=fixture();start=Mock(return_value={'id':'fixture','running':False})
   with patch.object(framework,'source_catalog',return_value=[item]),patch.object(handlers.system,'start_job',start),patch.object(handlers.system,'job_state',return_value={'running':False}),TestClient(app) as client:
    payload={'module':item['id'],'callable':'combine','kwargs':{'value':'fixture'}}
-   rejected=client.post('/api',json={'operation':'framework/native_call','payload':{**payload,'argv':[7]}})
+   rejected=client.post('/api/framework/native_call',json={**payload,'argv':[7]})
    self.assertEqual(rejected.status_code,400);start.assert_not_called()
-   accepted=client.post('/api',json={'operation':'framework/native_call','payload':payload})
+   accepted=client.post('/api/framework/native_call',json=payload)
    self.assertEqual(accepted.status_code,200);start.assert_called_once()
 
 
 class ProviderSaveTests(unittest.TestCase):
- def test_provider_name_survives_single_api_dispatch(self):
-  from web_api import app
+ def test_provider_name_survives_module_dispatch(self):
+  app=FastAPI();app.include_router(handlers.router)
   with patch.object(providers,'save_provider',return_value={'items':[]}) as save,TestClient(app) as client:
-   response=client.post('/api',json={'operation':'framework/providers/FMP','payload':{'FMP_API_KEY':'fake-not-saved'}})
+   response=client.post('/api/framework/providers/FMP',json={'FMP_API_KEY':'fake-not-saved'})
    self.assertEqual(response.status_code,200)
    save.assert_called_once_with('FMP',{'FMP_API_KEY':'fake-not-saved'})
 

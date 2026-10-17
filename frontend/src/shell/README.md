@@ -23,3 +23,5 @@ AI 에이전트의 여섯 소메뉴는 ai_agent/submenu_manager.ts에서 등록�
 메뉴가 mountKey를 지정하면 해당 작업공간 인스턴스를 공유합니다. AI 에이전트 소메뉴는 같은 mountKey를 사용해 주소 이동 때 작성 중인 화면을 새로 만들지 않습니다. 지정하지 않은 금융·REA 메뉴의 기존 전환 방식은 유지합니다.
 
 중메뉴가 있는 기능은 MenuItem.section을 지정합니다. navigation/NavigationTree.tsx가 계층·접힘을, MenuLink.tsx가 링크·현재 위치·축소 표시를 담당합니다. section 없는 금융·REA는 기존 메뉴를 유지합니다.
+
+모듈 소유/탈착: 화면 구현은 `modules/<id>/frontend/`에 있고 공통 Shell은 등록 정보만 읽습니다. menu_catalog는 금융 작업기가 아니라 호스트가 제공하므로 금융 폴더가 없어도 남은 메뉴가 연결됩니다. 플랫폼의 React/Vite/Tailwind/UI는 공통 렌더링 계약입니다. 실제 금융·REA·Hermes 폴더 탈착과 남은 GitHub 화면 렌더링은 2026-10-18 확인했습니다.

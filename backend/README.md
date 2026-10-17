@@ -2,8 +2,8 @@
 
 | 위치 | 역할 |
 | --- | --- |
-| [stockrl/](stockrl/README.md) | 금융 대메뉴: 사용자 화면 5개 및 숨김 관리 메뉴 |
-| [rea/](rea/README.md) | 독립 REA 프로젝트: program_analysis/, project_explorer/ |
+| [modules/finance/](../modules/finance/README.md) | 금융 대메뉴: 사용자 화면 5개 및 숨김 관리 메뉴 |
+| [modules/rea/](../modules/rea/README.md) | 독립 REA 프로젝트: program_analysis/, project_explorer/ |
 | [modules/hermes/](../modules/hermes/README.md) | Hermes 프로그램: 엔진·채팅·모델·세션·MCP·스킬. 데이터는 runtime에 보존 |
 | [modules/projects/](../modules/projects/README.md) | 공개 GitHub 검색·주소 등록·설치·실행 확인·원본 화면 연결·분리 |
 | [platform_modules.py](platform_modules.py) | modules/*/module.json 탐색·Python 등록·실행 보호 훅 |
@@ -35,3 +35,5 @@ Python 설치 메타데이터는 .venv/Lib/site-packages/continual_trading_agent
 | runtime/shared/engines/ | 여러 메뉴가 공유하는 실행기 |
 
 별도 생성 파일이 없는 메뉴는 빈 런타임 폴더를 만들지 않습니다. 원본 모델과 모델별 JSON은 바탕화면 모델 폴더를 계속 사용합니다. 기존 런타임 이동은 development/scripts/runtime_layout.py가 담당하며 서버·감시기·작업 프로세스를 중지한 상태에서만 사용합니다. 같은 이름의 목적지가 있으면 덮어쓰지 않습니다. 원본 모델을 역직렬화하거나 변환하지 않습니다.
+
+호스트 API 컨텍스트는 금융 라이브러리를 import하지 않습니다. module_runtime.py가 모듈별 실행 명령을 선택하고 JSON-line IPC/ASGI 응답만 연결합니다. Python 금융·REA와 Node 어댑터는 같은 규격을 사용합니다. platform_state_io.py는 호스트 자체 상태 입출력입니다. stockrl/·rea/에는 이전 import를 위한 연결만 남았습니다.

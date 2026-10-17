@@ -11,7 +11,8 @@ import urllib.request
 import zipfile
 
 ENGINE = Path(__file__).resolve().parent
-ROOT = ENGINE.parents[3]
+sys.path.insert(0,str(ENGINE))
+from locations import ROOT, MODULE_ROOT, PYTHON
 
 
 def install_driver():
@@ -46,12 +47,12 @@ def install_driver():
 
 def main():
     if os.name != 'nt': raise RuntimeError('이 설치 진입점은 Windows용입니다.')
-    interpreter = ROOT / '.venv/hermes/Scripts/python.exe'
+    interpreter = PYTHON
     uv = shutil.which('uv')
     if not uv: raise RuntimeError('설치된 uv 실행기를 찾을 수 없습니다.')
     if not interpreter.exists():
         python = subprocess.check_output(['py', '-3.14', '-c', 'import sys;print(sys.executable)'], text=True).strip()
-        subprocess.run([uv, 'venv', '--python', python, str(ROOT / '.venv/hermes')], check=True)
+        subprocess.run([uv, 'venv', '--seed', '--python', python, str(MODULE_ROOT / '.venv')], check=True)
     command = [uv, 'pip', 'install', '--python', str(interpreter), '-r', str(ENGINE / 'requirements.txt')]
     if (ENGINE / 'requirements.lock.txt').is_file():
         command += ['-c', str(ENGINE / 'requirements.lock.txt')]

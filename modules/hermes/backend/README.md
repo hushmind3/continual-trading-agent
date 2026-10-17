@@ -17,13 +17,13 @@ Platform submenu: `AI Agent / Hermes`, frontend `#ai_agent/Hermes`.
 
 The original checkout is not a runtime dependency. Upstream Python sources are under `engine/upstream/`; source hashes and deliberate bootstrap changes are recorded in `engine/provenance.json`. The original MIT license is retained. CLI/package-update launchers are not executed. Configuration, credentials, sessions and logs live under project `runtime/ai_agent/Hermes/` and are excluded from Git.
 
-Python: use the already installed Python 3.14 through `.venv/hermes/`; do not change the finance Python environment. Install selected dependencies with `uv pip install --python .venv/hermes/Scripts/python.exe -r modules/hermes/backend/engine/requirements.txt`. No model is downloaded or loaded automatically.
+Python: use the already installed Python 3.14 through `modules/hermes/.venv/`; do not change the finance Python environment. Install selected dependencies with `uv pip install --python modules/hermes/.venv/Scripts/python.exe -r modules/hermes/backend/engine/requirements.txt`. No model is downloaded or loaded automatically.
 
 Complete dependency/desktop-driver setup: `.venv\Scripts\python.exe -I -X utf8 modules/hermes/backend/engine/setup.py`. This reuses installed Python 3.14, and verifies the desktop driver's archive against the SHA-256 in the copied upstream PM lock. The original source folder is never consulted by setup or execution.
 
 Source selection excludes the standalone CLI, TUI gateway, messaging adapter entrypoints and upstream tests/evaluations. Common config/session/approval/PM metadata helpers still required by selected tools remain. The ACP edit-approval middleware is retained because the engine requires it even outside ACP sessions; no ACP client is launched. The system does not run the upstream package updater. Imported skills may describe optional tools that need separate credentials or software; merely listing or reading them does not execute them.
 
-컴퓨터·브라우저: 모델 탭에서 사용할 기능을 선택한 뒤 대화에서 요청합니다. 클릭·입력 승인 요청은 대화 화면에서 허용/거절합니다. 로컬 텍스트 GGUF는 AX 접근성 텍스트로 작업하며, 화면 이미지 이해가 필요한 앱은 별도 비전 모델/프로젝터가 필요합니다. 설치 시 루트 npm ci로 공유 브라우저 의존성도 설치합니다. 실제 동작 검사는 development/tests/test_hermes_live_tools.py에 있으며 HERMES_LIVE_TOOLS=1일 때만 모델·검사 창을 실행합니다.
+컴퓨터·브라우저: 모델 탭에서 사용할 기능을 선택한 뒤 대화에서 요청합니다. 클릭·입력 승인 요청은 대화 화면에서 허용/거절합니다. 로컬 텍스트 GGUF는 AX 접근성 텍스트로 작업하며, 화면 이미지 이해가 필요한 앱은 별도 비전 모델/프로젝터가 필요합니다. 브라우저 Node 패키지는 modules/hermes/backend/engine/browser/node_modules에 설치합니다. 루트 node_modules를 참조하지 않습니다. 실제 동작 검사는 development/tests/test_hermes_live_tools.py에 있으며 HERMES_LIVE_TOOLS=1일 때만 모델·검사 창을 실행합니다.
 
 시스템 프롬프트: 프론트 설정 → 시스템 프롬프트에서 저장합니다. `platform-settings.json`의 system_prompt를 원본 AIAgent의 ephemeral_system_prompt 인자에 추가하며, 기본 도구 안내는 유지합니다. 다음 대화 요청부터 적용하고 빈 문자열로 저장하면 사용자 추가 지침을 해제합니다.
 

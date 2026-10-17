@@ -12,6 +12,29 @@
   "frontend": {
     "entry": "frontend/register.ts"
   },
-  "legacy_shared_code": true,
-  "order": 10
+  "legacy_shared_code": false,
+  "order": 10,
+  "runtime": {
+    "language": "python",
+    "protocol": "module-jsonl-v1",
+    "package": "stockrl",
+    "entry": "finance_menu_manager",
+    "command": [
+      ".venv/Scripts/python.exe",
+      "-I",
+      "-X",
+      "utf8",
+      "-B",
+      "{module}/backend/worker.py"
+    ],
+    "state": "runtime/finance/operation_control"
+  },
+  "dependencies": {
+    "python": "dependencies/operations.txt"
+  },
+  "data": [
+    "runtime/finance",
+    "data/market_prices.sqlite3"
+  ],
+  "settings": "configs"
 }

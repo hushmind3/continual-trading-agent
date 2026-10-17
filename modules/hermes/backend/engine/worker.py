@@ -16,7 +16,8 @@ import traceback
 import uuid
 
 ENGINE = Path(__file__).resolve().parent
-ROOT = ENGINE.parents[3]
+sys.path.insert(0,str(ENGINE))
+from locations import ROOT, MODULE_ROOT, NODE_BIN, PYTHON
 UPSTREAM = ENGINE / 'upstream'
 HOME = Path(os.environ.get('HERMES_HOME') or ROOT / 'runtime/ai_agent/Hermes').resolve()
 HOME.mkdir(parents=True, exist_ok=True)
@@ -27,7 +28,7 @@ os.environ['TERMINAL_ENV'] = 'local'
 os.environ['CUA_DRIVER_RS_TELEMETRY_ENABLED'] = '0'
 os.environ['HERMES_SKIP_UPDATE_CHECK'] = '1'
 os.environ['HERMES_DISABLE_LAZY_INSTALLS'] = '1'
-os.environ['PATH'] = str(ROOT / 'node_modules/.bin') + os.pathsep + os.environ.get('PATH', '')
+os.environ['PATH'] = str(NODE_BIN) + os.pathsep + str(PYTHON.parent) + os.pathsep + os.environ.get('PATH', '')
 for _browser in (Path('C:/Program Files/Google/Chrome/Application/chrome.exe'),
                  Path('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe')):
     if _browser.is_file():
@@ -37,7 +38,13 @@ _driver = ROOT / 'runtime/ai_agent/Hermes/tools/cua-driver/cua-driver.exe'
 if _driver.is_file():
     os.environ['HERMES_CUA_DRIVER_CMD'] = str(_driver)
 sys.path.insert(0, str(UPSTREAM))
-sys.path.insert(1, str(ROOT / 'backend'))
+import types
+for _name in ('ai_agent','ai_agent.Hermes'):
+    if _name not in sys.modules:
+        _package=types.ModuleType(_name);_package.__path__=[str(ENGINE.parent)] if _name.endswith('.Hermes') else []
+        _package.__package__=_name;sys.modules[_name]=_package
+sys.modules['ai_agent'].Hermes=sys.modules['ai_agent.Hermes']
+
 OUTPUT = sys.stdout
 sys.stdout = sys.stderr
 

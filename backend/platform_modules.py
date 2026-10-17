@@ -4,6 +4,7 @@ import hashlib
 import importlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -11,7 +12,7 @@ import types
 from functools import lru_cache
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULES = ROOT / 'modules'
+MODULES = Path(os.environ.get('PLATFORM_MODULES_DIR') or ROOT / 'modules').resolve()
 
 
 def discover(directory=None):
@@ -65,7 +66,15 @@ def mount_namespaces(records=None):
 def registrations():
     records = discover()
     mount_namespaces(records)
-    return [(item, importlib.import_module(item['backend']['namespace']+'.'+item['backend'].get('entry', 'register'))) for item in records]
+    result=[]
+    for item in records:
+        try:entry=importlib.import_module(item['backend']['namespace']+'.'+item['backend'].get('entry', 'register'))
+        except Exception as exc:
+            from fastapi import APIRouter
+            entry=types.SimpleNamespace(router=APIRouter(),load_error=str(exc),
+                MENU={'id':item['id'],'title':item['group']['title'],'operations':[]})
+        result.append((item,entry))
+    return result
 
 
 def busy_reasons():

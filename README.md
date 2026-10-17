@@ -1,6 +1,6 @@
 # Project platform
 
-대메뉴는 **금융과 REA**입니다. 구조 이름은 영문, 기능 설명은 각 폴더 README에 있습니다.
+대메뉴는 **금융·REA 역공학·AI 에이전트·GitHub**입니다. 구조 이름은 영문, 기능 설명은 각 폴더 README에 있습니다.
 
 | 위치 | 역할 |
 | --- | --- |
@@ -23,8 +23,10 @@
 변경 작업은 관련 작은 메뉴 README부터 읽습니다. 검사 명령은 [scripts 안내](development/scripts/README.md)에 있습니다.
 
 
-npm 의존성: 루트 package.json·package-lock.json·node_modules/에서 통합 관리합니다. frontend/와 backend/rea/는 package.json을 갖는 npm workspaces입니다. 설치는 루트 npm ci, 프론트 실행·빌드는 npm run dev/build --workspace frontend입니다.
+npm 설치: 루트는 frontend workspace만 관리합니다. REA는 modules/rea의 package-lock.json·node_modules, Hermes 브라우저는 modules/hermes/backend/engine/browser의 package-lock.json·node_modules를 별도로 사용합니다.
 
 현재 가격 DB는 data/market_prices.sqlite3입니다. FinRL-X와 Streamlit은 설치·실행 연결에서 제거했습니다. Expert 원본·패키지는 바탕화면 모델/experts/market(시장·시계열) 및 action(행동·정책)에 분류합니다. 최신 검증·정리 결과는 development/docs/finrl_x_removal.md를 읽습니다.
 
 Expert 설정은 바탕화면 모델/experts/expert_registry.json(경로·선택 취합)과 각 원본 모델 폴더의 expert.json(모델 등록·설정·기록)에 있습니다. 프로젝트 configs/experts.json은 모델 폴더로 이동했습니다. 가중치와 원본 config 파일은 변경하지 않았습니다.
+
+모듈 소스·실제 패키지·설정 분리는 [modules/README.md](modules/README.md)를 따릅니다. 운영 API는 최소 .venv/platform에서 실행하며 금융·REA·Hermes는 각 전용 환경을 사용합니다. Node 백엔드도 동일한 연결 규격으로 독립 실행할 수 있습니다. OpenClaw 자체 설치는 아직 하지 않았습니다.

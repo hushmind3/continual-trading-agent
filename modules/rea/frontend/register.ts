@@ -1,1 +1,1 @@
-export * from '@platform/pages/rea/rea_menu_manager';
+export * from './rea_menu_manager';

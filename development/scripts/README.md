@@ -6,14 +6,14 @@
 - verify_module_detach.py: 실제 Hermes 폴더를 잠시 분리·복원하고 자동 등록·프론트 빌드·API 복원·설정 보존·중앙 코드 무변경을 확인합니다. 실행 중 작업은 먼저 확인하며 실패해도 폴더를 복원합니다. 결과는 `runtime/platform/module-verification.json`입니다.
 - verify_module_registration.py: 새로운 대메뉴·API·React 화면을 가진 검사 모듈을 폴더 하나로 추가·분리합니다. 기존 메뉴·API 보존과 중앙 파일 수정 0건을 확인하며 검사 모듈은 runtime/platform에 보관합니다.
 - verify_project_portability.cjs: 모델을 사용하지 않고 화면에서 앱 ZIP 내보내기 → 파일 설치 → 원본 UI → 제거/소유 파일 삭제를 확인합니다. 검사 전용 앱만 만들고 성공·실패 모두 정리하며 기록은 `runtime/projects/manage/verification/`에 둡니다.
-- install_windows.py: 기존 주 환경·키움·REA 설치 진입점입니다.
-- requirements/: 기존 의존성과 고정 버전 명세. 파일 내용·버전은 변경하지 않았습니다.
+- install_windows.py: 최소 호스트와 각 모듈의 전용 Python/Node 패키지를 설치합니다. 없는 모듈은 건너뜁니다.
+- requirements/: 호스트 명세와 개발 검사 패키지, 금융 소유 명세를 연결하는 호환 파일입니다.
 
-루트 `서버켜기.cmd`·`설치.cmd`에서 호출합니다. `.venv/`·`.venv/kiwoom/` 경로는 유지합니다. FinRL-X 외부 원본과 설치 연결은 제거했습니다. 금융 데이터 코드는 backend/stockrl/finrl/price_data/와 provider_settings/에 있습니다.
+루트 `서버켜기.cmd`·`설치.cmd`에서 호출합니다. 운영 호스트는 `.venv/platform/`, 금융·SDK·REA·Hermes는 각 모듈의 전용 환경을 사용합니다. FinRL-X 외부 원본과 설치 연결은 제거했습니다. 금융 데이터 코드는 modules/finance/backend/finrl/price_data/와 provider_settings/에 있습니다.
 
 사용자 검사: 루트에서 `.venv\Scripts\python.exe -m unittest discover -s development/tests`, frontend 폴더에서 `npm run typecheck`, `npm run test:api`, `npm run test:browser`. 요청 없는 자동 검사·백그라운드 검사는 실행하지 않습니다.
 
-npm은 루트 workspace 설치를 사용합니다. REA install()은 루트 npm ci로 프론트와 REA의 고정 버전을 함께 설치합니다. 검사 명령은 루트 npm run typecheck/test:api/test:browser로도 실행할 수 있습니다.
+npm은 루트 workspace 설치를 사용합니다. REA install()은 modules/rea에서 자체 잠금으로 npm ci를 수행합니다. 루트 workspace는 플랫폼 frontend만 포함합니다. 검사 명령은 루트 npm run typecheck/test:api/test:browser로도 실행할 수 있습니다.
 
 모듈 참조 조사: .venv\Scripts\python.exe -B development/scripts\audit_module_usage.py. AST·import 경로만 읽어 운영 참조·검사 전용·참조 없음 후보를 출력합니다. 플랫폼 코드 import·함수 실행·삭제는 수행하지 않습니다.
 
@@ -30,3 +30,7 @@ npm은 루트 workspace 설치를 사용합니다. REA install()은 루트 npm c
 런타임 이관은 대상 충돌을 먼저 확인하고 경로 이동 후 실제 제어 JSON만 갱신합니다. 복사된 모델 소스·추출된 original 트리는 검색하지 않습니다. 경로 참조 갱신은 한도 내 제어 파일에 한정하며 원본 모델·토크나이저를 검사하지 않습니다.
 
 모듈의 실행 중 작업은 등록된 busy_reason 훅을 통해 공통 재시작 차단 목록에 포함합니다. 모듈 폴더·등록 정보 변경 시 import 사전 확인, 프론트 빌드, 서버 적용을 자동 처리합니다. 작업 중이거나 차단 상태를 확인할 수 없으면 적용을 보류합니다. 프론트 독립 적용은 기존 작업을 중지하지 않습니다.
+
+모듈 환경 분리: isolate_module_environment.py는 기존 설치본의 선언된 의존성만 모듈 전용 가상환경에 복사하고 console 실행기·상대 소스 훅을 구성합니다. module_sources.py는 폴더 위치에서 모듈 소스를 찾는 전용 환경의 훅입니다. 새 PC 설치는 install_windows.py가 플랫폼·금융·SDK·REA·Hermes 환경과 각 Node 패키지를 별도로 설치합니다. 운영 서버는 .venv/platform을 사용합니다.
+
+실제 탈착 검사: `verify_builtin_module_isolation.py`는 작업 보호 후 금융·REA·Hermes의 소스와 전용 환경 폴더를 잠시 옮기고, 남은 GitHub 화면/호스트와 이동된 각 모듈의 실행을 확인합니다. 성공·실패 모두 원래 폴더를 복원하며 데이터·모델은 이동하지 않습니다. 결과는 `runtime/platform/module-verification/builtin-isolation.json`. 이 검사는 빌드·재시작을 수행하므로 운영 작업이 없는 때 실행합니다. `module_sources.py`는 이동한 전용 환경의 소스 검색과 console 실행기 경로를 복구합니다. 다른 PC의 Python/Node/CUDA까지 포함한 포터블 배포 검사는 아닙니다.

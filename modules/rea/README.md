@@ -1,0 +1,15 @@
+# REA 역공학 모듈
+
+용도: 기존 REA 대메뉴의 소스·Python/Node 패키지·설정을 자체 소유합니다. GitHub에서 별도로 설치한 morluto/rea 앱과 구분합니다.
+
+- `backend/`: `rea` 패키지·분석/탐색·자체 경로/JSON 처리·worker.py. 금융 `stockrl`을 import하지 않습니다.
+- `frontend/`: REA 화면·소메뉴 매니저. 호스트의 React/Vite/Tailwind·UI 등록 규격을 사용합니다.
+- `.venv/`, `requirements.txt`: Python 실행 환경·의존성.
+- `node_modules/`, `package.json`, `package-lock.json`: 원본 REA 6.4.0과 Node MCP 클라이언트의 독립 설치 위치. 루트 node_modules를 참조하지 않습니다.
+- `configs/rea.json`: 도구 경로 설정, Git 제외. 분석 작업과 저장 결과는 기존 `runtime/rea/`에 유지합니다.
+
+연결: 소메뉴 → rea_menu_manager → worker.py → backend/register.py → 전체 메뉴 → 단일 `/api`. Python 작업은 자체 가상환경에서 수행하고 원본 Node MCP는 자체 패키지로 실행합니다. 별도 HTTP 서버는 없습니다. 원본 Node 코드를 Python으로 변환하지 않습니다.
+
+설치: 루트 `설치.cmd`, 또는 해당 폴더에서 `npm ci --workspaces=false`. Python은 `requirements.txt`로 `.venv`에 설치합니다. 기존 환경을 재사용하는 분리는 루트 `.venv/Scripts/python.exe -B development/scripts/isolate_module_environment.py rea`입니다. old `backend/rea` 경로는 import 호환 연결만 남습니다.
+
+현재 확인과 미확인은 [모듈 안내](../README.md)에 구분합니다. 원본 분석 모델이나 로그인 사이트·네이티브 앱 전체 실행 검증은 이번 환경 분리의 확인 범위가 아닙니다.

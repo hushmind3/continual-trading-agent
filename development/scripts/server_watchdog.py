@@ -11,7 +11,7 @@ import psutil
 
 from start_server import ROOT,RUNTIME,PORT,ready,listeners,main,blockers
 from platform_modules import signature
-from stockrl.state_io import read_json,atomic_json
+from platform_state_io import read_json,atomic_json
 
 STATUS=RUNTIME/'server-watchdog.json'
 STOP=RUNTIME/'server-watchdog.stop'

@@ -10,9 +10,9 @@ import subprocess
 import threading
 import uuid
 
-ROOT = Path(__file__).resolve().parents[4]
+from .locations import ROOT, PYTHON, NODE_BIN
 STATE = ROOT / 'runtime/ai_agent/Hermes'
-PYTHON = ROOT / '.venv/hermes/Scripts/python.exe'
+
 WORKER = Path(__file__).with_name('worker.py')
 
 
@@ -79,6 +79,7 @@ class WorkerBridge:
         env = {**os.environ, 'PYTHONUTF8': '1', 'PYTHONIOENCODING': 'utf-8',
                'HERMES_HOME': str(self.state_dir), 'HERMES_RUNTIME_DIR': str(self.state_dir / 'runtime')}
         env.pop('PYTHONPATH', None)
+        env['PATH']=os.pathsep.join((str(PYTHON.parent),str(NODE_BIN),env.get('PATH','')))
         self.process = subprocess.Popen(
             [str(PYTHON), '-I', '-X', 'utf8', '-B', str(WORKER)], cwd=ROOT, env=env,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log,

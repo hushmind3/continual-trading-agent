@@ -7,9 +7,14 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 from fastapi.testclient import TestClient
+from fastapi import FastAPI
 
 from rea.program_analysis import extract
 from rea.project_explorer import projects
+from rea.program_analysis.handlers import router
+
+def module_app():
+ app=FastAPI();app.include_router(router);return app
 
 
 class REAWorkflowTests(unittest.TestCase):
@@ -19,13 +24,13 @@ class REAWorkflowTests(unittest.TestCase):
   self.addCleanup(self.cancel_patch.stop)
 
  def test_status_restores_latest_saved_result_without_starting_analysis(self):
-  from web_api import app
+  app=module_app()
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);source=root/'README.md';source.write_text('# saved result')
    with patch.object(extract,'OUTPUT',root/'saved'),patch.object(projects,'OUTPUT',root/'saved'):
     saved=extract.analyze('file',str(source))
     with patch.object(extract,'_state',{'stage':'idle','detail':'','project':None}),TestClient(app) as client:
-     response=client.get('/api',params={'operation':'rea/status'})
+     response=client.get('/api/rea/status')
      self.assertEqual(response.status_code,200)
      self.assertFalse(response.json()['active'])
      self.assertEqual(response.json()['project']['id'],saved['id'])
@@ -42,12 +47,12 @@ class REAWorkflowTests(unittest.TestCase):
    self.assertEqual((Path(result['folder'])/'original/fixture.exe').read_bytes(),source.read_bytes())
    self.assertTrue((Path(result['folder'])/'inferred/decompiled.c').is_file())
 
- def test_corrupt_archive_is_a_user_error_through_single_api(self):
-  from web_api import app
+ def test_corrupt_archive_is_a_user_error_through_module_router(self):
+  app=module_app()
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);archive=root/'broken.zip';archive.write_bytes(b'not a zip')
    with patch.object(extract,'OUTPUT',root/'saved'),TestClient(app) as client:
-    response=client.post('/api',json={'operation':'rea/analyze','payload':{'kind':'file','target':str(archive)}})
+    response=client.post('/api/rea/analyze',json={'kind':'file','target':str(archive)})
     self.assertEqual(response.status_code,400)
     self.assertIn('ZIP/APK/IPA',response.json()['detail'])
    self.assertFalse(extract._gate.locked())

@@ -12,6 +12,29 @@
   "frontend": {
     "entry": "frontend/register.ts"
   },
-  "legacy_shared_code": true,
-  "order": 20
+  "legacy_shared_code": false,
+  "order": 20,
+  "runtime": {
+    "language": "python",
+    "protocol": "module-jsonl-v1",
+    "package": "rea",
+    "entry": "rea_menu_manager",
+    "command": [
+      ".venv/Scripts/python.exe",
+      "-I",
+      "-X",
+      "utf8",
+      "-B",
+      "{module}/backend/worker.py"
+    ],
+    "state": "runtime/rea/program_analysis"
+  },
+  "dependencies": {
+    "python": "requirements.txt",
+    "node": "package.json"
+  },
+  "data": [
+    "runtime/rea"
+  ],
+  "settings": "configs/rea.json"
 }

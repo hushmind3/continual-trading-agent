@@ -1,1 +1,1 @@
-export * from '@platform/pages/finance/finance_menu_manager';
+export * from './finance_menu_manager';

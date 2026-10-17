@@ -2,6 +2,8 @@
 
 React/Vite/Tailwind 공통 UI로 검색·설치·설치된 프로젝트·자동 작업 화면을 표시합니다. `Projects.tsx`는 단일 `/api`의 `projects/` 소메뉴를 사용합니다.
 
+사용자 메뉴는 GitHub → 프로젝트 관리입니다. 설치된 앱의 등록은 공통 `frontend/src/shell/installed_navigation.ts`에서 GitHub → 앱별 중메뉴로 정규화합니다. 기존 설치본과 native 모듈도 적용하며 앱별 주소·컴포넌트·실행 기능은 보존합니다. Hermes의 MCP 소메뉴는 변경하지 않습니다.
+
 - `RepositorySearch.tsx`: 설치 버튼·검색 30개/더 보기·정렬·한국어 설명 전환. 설치와 번역은 독립합니다.
 - `InstalledProjects.tsx`: 분리(파일 보관), 재연결(저장본 재사용), 제거(프로젝트 파일·설정·기록 영구 삭제)를 구분합니다.
 - `ProjectSettings.tsx`: 공통 Drawer를 즉시 열어 상태·환경 설정·로그를 표시합니다.

@@ -100,6 +100,9 @@ class LifecycleTests(unittest.TestCase):
         saved = store.read('p_automatic')
         self.assertEqual(saved['stage'], 'awaiting_activation')
         self.assertTrue(saved['agent_connection']['connected'])
+        metadata = json.loads((self.root / 'modules' / saved['module_id'] / 'module.json').read_text(encoding='utf8'))
+        self.assertEqual(metadata['group'], {'id': 'projects', 'title': 'GitHub'})
+        self.assertEqual(metadata['app_title'], 'Automatic')
         generated = self.root / 'modules' / saved['module_id'] / 'frontend/register.ts'
         self.assertIn('ProjectApp', generated.read_text())
 

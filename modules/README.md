@@ -5,6 +5,7 @@
 - `schema: 1`, 고유 `id`, `group: {id,title}`, 선택 `order`를 선언합니다.
 - `backend: {namespace, entry, path?}`: 기본 path는 backend. entry가 MENU+router 또는 GROUP+ROUTERS를 제공합니다. 선택 hooks는 busy_reason/reserve_restart/cancel_restart/close입니다. register_host(app)은 프로젝트 정적 화면 제공처럼 공통 호스트 연결이 필요할 때만 사용하며 기능 API는 기존 단일 /api로 등록합니다.
 - `frontend: {entry: "frontend/register.ts"}`: menus와 선택 registeredMenus(actions)를 export합니다. React/Vite/Tailwind 및 `@platform/ui` 공통 컴포넌트를 사용합니다.
+- 외부 설치기의 `install_revision`이 있는 앱은 GitHub 대메뉴 아래 앱별 중메뉴로 취합합니다. 선택 `app_title`은 중메뉴 이름이며 이전 설치본은 기존 group 제목을 사용합니다. 프론트/백엔드 공통 등록 시 적용하므로 기존 소스·데이터·주소를 옮기거나 생성 파일을 수동 수정하지 않습니다. 플랫폼 포함 AI 에이전트/Hermes/MCP는 이 규칙의 대상이 아닙니다.
 - `data`: 프로그램 밖의 영속 경로. `resources`: 기존 실행 환경·공통 실행기 경로. 모듈 탈착은 이 경로를 이동·삭제하지 않습니다.
 
 공통 감시기가 등록 정보 변경을 감지해 실행 중 작업을 확인하고, import 사전 확인·타입 검사·빌드·서버 적용을 처리합니다. 작업 중에는 적용을 보류합니다. 설치 실패는 runtime/platform 로그에 남기며 사전 확인 실패 시 기존 서버를 종료하지 않습니다.

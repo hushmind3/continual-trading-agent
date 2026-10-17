@@ -49,6 +49,21 @@ class ModuleTests(unittest.TestCase):
             meta['backend']['path']='../../';(folder/'module.json').write_text(json.dumps(meta),encoding='utf8')
             with self.assertRaises(ValueError):discover(root)
 
+    def test_installed_apps_share_github_without_rewriting_manifests_or_data(self):
+        verification=Path(__file__).resolve().parents[2]/'runtime/projects/manage/verification'
+        verification.mkdir(parents=True,exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=verification) as temp:
+            root=Path(temp);folder,meta=self.fixture(root)
+            self.assertEqual(discover(root)[0]['group'],meta['group'])
+            meta.update(install_revision='v1',data=['runtime/projects/manage/projects/p_example'])
+            manifest=folder/'module.json';manifest.write_text(json.dumps(meta),encoding='utf8')
+            before=manifest.read_bytes()
+            record=discover(root)[0]
+            self.assertEqual(record['group'],{'id':'projects','title':'GitHub'})
+            self.assertEqual(record['data'],meta['data'])
+            self.assertEqual(manifest.read_bytes(),before)
+            self.assertFalse((root/'runtime').exists())
+
     def test_added_module_cannot_shadow_existing_namespace(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);folder,meta=self.fixture(root)

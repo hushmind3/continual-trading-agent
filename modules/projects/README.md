@@ -19,7 +19,7 @@
 
 ## 사용과 데이터
 
-메뉴: 프로젝트 → 프로젝트 관리 → GitHub에서 추가/설치된 프로젝트. API: `projects/install`, `retry`, `detach`, `reconnect`, `remove`, `export`, `import`, `detail`, `settings`, `agent/connect`, `agent/start`, `localize`. 검색은 30개씩 더 보기·정렬을 제공합니다.
+메뉴: GitHub → 프로젝트 관리 → GitHub에서 추가/설치된 프로젝트. 설치 앱은 GitHub → 앱 이름(중메뉴) → 실행/앱 기능으로 등록합니다. 기존 설치본도 등록 시 같은 규칙을 적용하며 주소·API·런타임은 `projects/`로 유지합니다. Hermes의 MCP 검색·설치는 AI 에이전트 → 헤르메스 → MCP에 속합니다. API: `projects/install`, `retry`, `detach`, `reconnect`, `remove`, `export`, `import`, `detail`, `settings`, `agent/connect`, `agent/start`, `localize`. 검색은 30개씩 더 보기·정렬을 제공합니다.
 
 - **분리:** 연결 모듈을 해당 프로젝트 런타임의 `detached/`에 보관하고 메뉴·MCP 연결을 해제합니다. 소스·설정·기록은 유지합니다.
 - **다시 연결:** 저장된 모듈을 재사용합니다. 다운로드·AI 변환을 다시 실행하지 않습니다. 예전 휴지통 방식의 분리본도 찾습니다.
@@ -31,6 +31,8 @@
 소스·기록·설정·번역 캐시: `runtime/projects/manage/`. 생성 모듈: Git 제외 `modules/external_*/`. 공통 Python/Node/추론 실행기를 재사용하며 Codex 개인 `.codex/skills`는 실행 의존성이 아닙니다. 내보내기는 위 실행 유형의 외부 앱을 대상으로 합니다. 금융·REA·Hermes 등 플랫폼 포함 모듈의 완전 독립 배포, 모든 외부 저장소의 자동 변환은 미완료입니다. 미지원 WPF·Misskey 봇을 성공 설치로 표시하지 않습니다.
 
 ## 확인
+
+2026-10-18 메뉴 분류 변경: 백엔드/설치 회귀 검사 28개, 기존·신규 설치 앱/기본 엔진의 메뉴 분류 검사 3개, TypeScript·Vite 빌드 통과. 현재 8766의 GitHub 대메뉴·관리 링크와 AI 에이전트의 MCP 링크를 브라우저에서 확인했고 JavaScript 오류는 0건입니다. 이번 확인에서 새 외부 저장소 다운로드·설치나 모델 실행은 하지 않았습니다.
 
 명령: `.venv/Scripts/python.exe -B -m unittest development.tests.test_project_packages development.tests.test_project_installer development.tests.test_project_lifecycle -q`, TypeScript, Vite. 개발 검사에서 사용자 모델을 임의로 실행하지 않습니다. `development/scripts/verify_project_agent.py --allow-local-model`은 사용자가 실제 모델 검사를 명시적으로 요청할 때만 수동 실행하는 별도 검사입니다.
 

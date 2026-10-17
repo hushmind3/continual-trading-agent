@@ -177,7 +177,7 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
             candidate = source
         else:
             candidate = version / 'module'; (candidate / 'backend').mkdir(parents=True); (candidate / 'frontend').mkdir()
-            metadata = {'schema': 1, 'id': module_id, 'group': {'id': module_id, 'title': record['title']},
+            metadata = {'schema': 1, 'id': module_id, 'app_title': record['title'], 'group': {'id': 'projects', 'title': 'GitHub'},
                 'backend': {'namespace': 'platform_plugins.' + module_id.replace('-', '_'), 'entry': 'register'},
                 'frontend': {'entry': 'frontend/register.ts'}, 'data': ['runtime/projects/manage/projects/' + key], 'order': 60}
             (candidate / 'module.json').write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf8')
@@ -198,6 +198,7 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
             backup = version / 'previous-module'; destination.rename(backup)
         published = destination
         shutil.copytree(candidate, destination, ignore=shutil.ignore_patterns('.git', '__pycache__', '.venv'))
+        metadata['app_title'] = record['title']
         metadata['install_revision'] = version.name
         (destination / 'module.json').write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf8')
         progress('publish', '전체 연결을 사전 확인하고 새 메뉴를 준비합니다.')

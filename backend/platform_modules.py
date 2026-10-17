@@ -37,6 +37,8 @@ def discover(directory=None):
         source = (path.parent / data['backend'].get('path', 'backend')).resolve()
         if not source.is_relative_to(path.parent.resolve()) or not source.is_dir():
             raise ValueError(f'Module backend is missing or outside its folder: {identifier}')
+        if data.get('install_revision'):
+            data = {**data, 'group': {'id': 'projects', 'title': 'GitHub'}}
         records.append({**data, 'folder': path.parent.resolve(), 'source': source})
     return records
 

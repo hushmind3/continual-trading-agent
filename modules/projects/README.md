@@ -63,3 +63,7 @@
 Windows 원본 설치기: windows/install*.ps1·scripts/install*.ps1·install.ps1의 단일 진입점을 탐지하면 PowerShell AST로 문법·필수 값·기본 값·선택 값·스위치를 읽고 한글 설치 화면을 자동 연결합니다. 탐지/화면 등록에서는 원본을 실행하지 않습니다. 설치 화면에서 사용자가 실행해야 다운로드·대상 폴더 변경이 시작되며 실행 로그·중지·실패를 같은 화면에 표시합니다. 문서와 분석 도구가 함께 있는 저장소를 문서만 있는 저장소로 오분류하지 않습니다. 원본 웹 UI가 없는 Windows 설치기는 웹 UI 연결이 아니라 공통 설치 화면을 사용하는 유형입니다. API는 projects/setup(GET/POST), setup/status, setup/stop이며 분리 ZIP은 원본 Windows 설치 스크립트와 실행 진입점을 포함합니다. 분리 후에는 원본 PowerShell 옵션으로 실행하며 플랫폼 설치 폼까지 별도 웹앱으로 복제하지 않습니다.
 
 2026-10-18 Windows 설치기 확인: 관련 회귀 검사 32개·TypeScript·Vite 통과. 기존 pluto-re를 모델 없이 원본 powershell 설치기 유형으로 재등록하고 PC/390px 설치 옵션 UI를 확인했습니다. 실제 원본 스크립트를 빈 검사 폴더 대상으로 호출해 StarCraft.exe 사전 조건 실패와 로그 표시를 확인했으며 다운로드/게임 설치는 시작하지 않았습니다. 정상 실행은 별도 무해한 PowerShell 검사 설치기로 옵션·선택·스위치와 문자열 인수 전달을 확인했습니다. 실제 브루드워 1.16.1 경로의 전체 다운로드·Pluto 실행은 미확인입니다. 결과는 runtime/projects/manage/verification/windows-installer-ui.json, 실행기는 development/scripts/verify_windows_installer.cjs입니다.
+
+설치 폴더 규칙: 모든 GitHub 앱은 프로젝트 관리 소속 runtime/projects/manage/projects/<ID>/ 아래에 소스 버전·전용 패키지·실행 자료를 둡니다. 이 부모 폴더를 project_folder로 공통 제공하고 폴더 열기도 해당 위치를 엽니다. Windows 설치기의 InstallDir/InstallPath/Destination/TargetDir 등 설치 대상 옵션은 이 앱의 application/으로 자동 지정해 입력칸을 숨깁니다. 기존 게임처럼 원본이 이미 있어야 하는 StarCraftDir 등은 설치 대상과 구분하며 빈 자동 생성 폴더로 대체하지 않습니다.
+
+폴더 자동 관리 확인(2026-10-18): 관련 회귀 검사 40개·TypeScript/Vite 통과. 원본 검사 설치기에 설치 경로를 입력하지 않고 앱의 application/ 내부 파일 생성까지 확인했습니다. 기존 게임 입력을 설치 대상과 구분하는 검사도 포함합니다. 실제 pluto-re의 앱 소유 폴더 표시와 PC/390px 화면·오류 표시를 확인했고 JavaScript 오류/가로 넘침은 없었습니다. 기존 게임 파일 없이 Pluto 전체를 설치한 것은 아닙니다.

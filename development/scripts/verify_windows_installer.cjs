@@ -19,6 +19,8 @@ async function until(callback,seconds=240){const end=Date.now()+seconds*1000;whi
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:8766/#'+record.menu);
   await page.getByText('Windows 프로그램 설치',{exact:true}).waitFor();
+  await page.getByText('프로젝트 관리 · 앱 전용 폴더',{exact:true}).waitFor();
+  await page.getByText(record.project_folder,{exact:true}).waitFor();
   await page.getByRole('button',{name:'폴더 선택',exact:true}).waitFor();
   await page.getByLabel('StarCraft 폴더',{exact:true}).fill(target);
   const [started]=await Promise.all([page.waitForResponse(response=>response.url().endsWith('/api')&&JSON.parse(response.request().postData()||'{}').operation==='projects/setup'),page.getByRole('button',{name:'원본 프로그램 설치',exact:true}).click()]);
@@ -38,7 +40,7 @@ async function until(callback,seconds=240){const end=Date.now()+seconds*1000;whi
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw new Error('horizontal overflow');
   await page.screenshot({path:path.join(base,'windows-installer-mobile.png'),fullPage:true});
   if(errors.length)throw new Error(JSON.stringify(errors));
-  const report={original_script_detected:true,typed_controls:true,folder_button_visible:true,native_folder_dialog_tested:false,required_folder:true,original_prerequisite_check:true,downloads_started:false,game_installed:false,mobile_overflow:false,javascript_errors:errors,model_used:false};
+  const report={original_script_detected:true,typed_controls:true,managed_project_folder:true,folder_button_visible:true,native_folder_dialog_tested:false,required_folder:true,original_prerequisite_check:true,downloads_started:false,game_installed:false,mobile_overflow:false,javascript_errors:errors,model_used:false};
   await fs.writeFile(path.join(base,'windows-installer-ui.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
  }finally{await browser.close();await fs.rmdir(target).catch(()=>{});await fs.rmdir(path.join(record.active_source,'../setup-cache')).catch(()=>{});}
 })().catch(e=>{console.error(e);process.exitCode=1});

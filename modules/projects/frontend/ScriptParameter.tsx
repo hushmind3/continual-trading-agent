@@ -1,5 +1,5 @@
 import {Button,Input,Select} from '@platform/ui/Primitives';
-export interface ScriptOption {name:string;kind:'text'|'number'|'switch';required:boolean;choices:string[];default:string|number|boolean|null}
+export interface ScriptOption {name:string;kind:'text'|'number'|'switch';required:boolean;managed?:boolean;choices:string[];default:string|number|boolean|null}
 const labels:Record<string,string>={Race:'플레이어 종족',EnemyRace:'상대 종족',Map:'맵 경로',AutoStart:'설치 후 게임 자동 시작',Windowed:'창 모드',Bench:'추론 성능 측정'};
 const choices:Record<string,string>={Zerg:'저그',Terran:'테란',Protoss:'프로토스',Random:'무작위',Default:'기본값'};
 export function ScriptParameter({option,value,onChange,disabled,onBrowse}:{option:ScriptOption;value:string|number|boolean;onChange:(value:string|boolean)=>void;disabled:boolean;onBrowse?:()=>void}){

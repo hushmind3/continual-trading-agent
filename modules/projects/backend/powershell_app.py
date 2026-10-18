@@ -50,7 +50,13 @@ def state(record):
 
 def describe(record):
     if record.get('adapter',{}).get('kind')!='powershell':raise ValueError('Windows 설치 프로그램이 아닙니다.')
-    return {**inspect(Path(record['active_source']),record['adapter']),'result':state(record)}
+    metadata=inspect(Path(record['active_source']),record['adapter'])
+    destination=str(store.install_folder(record))
+    targets={'installdir','installpath','installationdir','destination','destinationdir','destinationpath','targetdir','targetpath','prefix'}
+    for parameter in metadata['parameters']:
+        parameter['managed']=parameter['kind']=='text' and parameter['name'].lower() in targets
+        if parameter['managed']:parameter['default']=destination
+    return {**metadata,'project_folder':str(store.project_folder(record)),'install_folder':destination,'result':state(record)}
 
 
 def start(record,values):
@@ -59,7 +65,7 @@ def start(record,values):
     if set(values)-{item['name'] for item in parameters}:raise ValueError('원본에 없는 설치 옵션입니다.')
     source=Path(record['active_source']);command=[executable(),'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(store.owned(source,record['adapter']['script']))]
     for parameter in parameters:
-        name=parameter['name'];value=values.get(name,parameter.get('default'))
+        name=parameter['name'];value=parameter['default'] if parameter.get('managed') else values.get(name,parameter.get('default'))
         if parameter['kind']=='switch':
             if value not in (None,False,True):raise ValueError(name+' 옵션은 켜기/끄기입니다.')
             if value:command+=['-'+name]
@@ -86,6 +92,7 @@ def start(record,values):
             from .installer import run_command
             log.write_text('',encoding='utf8')
             cache=source.parent/'setup-cache';cache.mkdir(exist_ok=True)
+            if any(item.get('managed') for item in parameters):store.install_folder(record).mkdir(parents=True,exist_ok=True)
             run_command(command,source,log,cancelled,timeout=1800,environment={**record.get('environment',{}),'TEMP':str(cache),'TMP':str(cache)})
             result.update(state='complete',error='')
         except Exception as exc:result.update(state='failed',error=str(exc)[-2500:])

@@ -54,6 +54,9 @@ def busy_reason():
 
 def public(record):
     value = {key: item for key, item in record.items() if key != 'environment'}
+    if record.get('id') and not record.get('builtin'):
+        from .store import project_folder
+        value['project_folder']=str(project_folder(record))
     value['environment_keys'] = sorted(record.get('environment', {}))
     for secret in record.get('environment', {}).values():
         if secret:

@@ -54,3 +54,12 @@ def owned(base, relative):
     if not path.is_relative_to(base):
         raise ValueError('프로젝트 폴더 밖의 경로입니다.')
     return path
+
+
+def project_folder(record):
+    """One existing management-owned parent for every imported app."""
+    return owned(STATE,'projects/'+identifier(record['id']))
+
+
+def install_folder(record):
+    return owned(project_folder(record),'application')

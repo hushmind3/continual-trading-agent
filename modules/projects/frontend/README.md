@@ -19,3 +19,5 @@ React/Vite/Tailwind 공통 UI로 검색·설치·설치된 프로젝트·자동 
 Projects.tsx는 폴더 열기·잔재 정리와 비동기 분리 상태를 관리합니다. 주 동작은 실행/분리/다시 연결이며 ZIP 다운로드가 분리의 필수 단계가 아닙니다. 기본 앱도 같은 목록에서 분리합니다. 화면의 main 영역은 공통 Shell이 소유하고 이 기능은 section으로 렌더링합니다. 한국어 자동 번역은 명시적 선택 때만 활성화해 화면 열기만으로 로컬 추론을 요청하지 않습니다.
 
 InstallerApp.tsx·ScriptParameter.tsx: powershell 원본 설치기의 필수 경로·Windows 폴더 선택·선택 값·스위치를 공통 Input/Select/Button/Panel로 자동 표시합니다. ProjectApp.tsx가 유형에 따라 선택하며 설치 진행·중지·결과를 제공합니다. ProjectCard의 설치 화면 준비됨은 실제 프로그램 설치 완료를 뜻하지 않습니다. 원본 UI가 있는 앱은 기존 AppFrame을 계속 사용합니다.
+
+InstallerApp은 프로젝트 관리의 앱별 폴더와 자동 설치 위치를 표시합니다. managed 설치 대상은 사용자 입력에서 제외하며 기존 프로그램을 읽는 경로만 선택하도록 구분합니다. 설치 정보의 폴더 열기도 특정 버전 source 대신 앱 소유 부모를 엽니다.

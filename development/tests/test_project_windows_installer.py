@@ -9,7 +9,7 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
-from platform_plugins.projects import adapters,powershell_app,runtime,installer,requirements
+from platform_plugins.projects import adapters,powershell_app,runtime,installer,requirements,store
 
 class WindowsInstallerTests(TestCase):
  def setUp(self):
@@ -18,7 +18,7 @@ class WindowsInstallerTests(TestCase):
   self.script=self.source/'windows/install-example.ps1'
   self.script.write_text("param([Parameter(Mandatory)][string]$Output,[ValidateSet('Fast','Full')][string]$Mode='Fast',[switch]$Windowed,[string]$Text='original')\n@{mode=$Mode;windowed=[bool]$Windowed;text=$Text}|ConvertTo-Json|Set-Content -LiteralPath $Output -Encoding utf8\nWrite-Output 'original installer result'\n",encoding='utf8')
   self.record={'id':'test_setup','active_source':str(self.source),'adapter':{'kind':'powershell','directory':'.','script':'windows/install-example.ps1'}}
-  self.patches=[patch.object(runtime,'ACTIVE',0),patch.object(runtime,'RESTARTING',False),patch.object(installer,'RESTARTING',False),patch.object(installer,'JOBS',{})]
+  self.patches=[patch.object(store,'STATE',self.source.parent/'runtime/projects/manage'),patch.object(runtime,'ACTIVE',0),patch.object(runtime,'RESTARTING',False),patch.object(installer,'RESTARTING',False),patch.object(installer,'JOBS',{})]
   for item in self.patches:item.start()
  def tearDown(self):
   deadline=time.monotonic()+30
@@ -46,6 +46,21 @@ class WindowsInstallerTests(TestCase):
   for values in ({},{'Output':'file','Mode':'invalid'},{'Output':'file','Unknown':'x'}):
    with self.subTest(values=values),self.assertRaises(ValueError):powershell_app.start(self.record,values)
   self.assertEqual(runtime.ACTIVE,0)
+ def test_install_destination_is_automatic_and_existing_program_input_is_separate(self):
+  self.script.write_text("param([Parameter(Mandatory)][string]$InstallDir,[Parameter(Mandatory)][string]$StarCraftDir)\n",encoding='utf8')
+  metadata=powershell_app.describe(self.record)
+  destination,prerequisite=metadata['parameters']
+  self.assertTrue(destination['managed'])
+  self.assertEqual(Path(destination['default']),store.project_folder(self.record)/'application')
+  self.assertFalse(prerequisite['managed']);self.assertIsNone(prerequisite['default'])
+  self.assertFalse(store.project_folder(self.record).exists())
+ def test_original_installer_writes_inside_its_managed_folder_without_path_input(self):
+  self.script.write_text("param([Parameter(Mandatory)][string]$InstallDir)\nSet-Content -LiteralPath (Join-Path $InstallDir 'installed.txt') -Value 'real install'\n",encoding='utf8')
+  powershell_app.start(self.record,{})
+  deadline=time.monotonic()+25
+  while runtime.ACTIVE and time.monotonic()<deadline:time.sleep(.05)
+  self.assertEqual(powershell_app.state(self.record)['state'],'complete')
+  self.assertEqual((store.install_folder(self.record)/'installed.txt').read_text().strip(),'real install')
  def test_analysis_tool_repository_is_not_classified_as_documentation_only(self):
   (self.source/'docs').mkdir();(self.source/'docs/notes.md').write_text('notes')
   requirements.check(self.source)

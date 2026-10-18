@@ -39,7 +39,7 @@ class HostSystem:
         for metadata,entry in registrations():
             if callback:=getattr(entry,method,None):
                 try:callback()
-                except (OSError,RuntimeError) as exc:
+                except Exception as exc:
                     __import__('logging').getLogger(__name__).warning('%s %s: %s',metadata['id'],method,exc)
     def cancel(self):self.notify('cancel_operations')
     def invalidate_states(self):self.notify('invalidate_states')
@@ -61,7 +61,11 @@ def register_controls(router):
         try:lifecycle('reserve_restart')
         except Exception as exc:raise HTTPException(409,str(exc)) from exc
         system.restarting=True
-        lifecycle('close')
+        try:lifecycle('close')
+        except Exception as exc:
+            system.restarting=False
+            system.notify('cancel_restart')
+            raise HTTPException(409,'모듈 종료 실패로 서버 적용을 취소했습니다: '+str(exc)) from exc
         return {'prepared':True,'items':[]}
     @router.get('/api/health')
     def health():return {'ok':True,'service':'project-platform','project':str(ROOT),'status':'ok',
@@ -80,15 +84,21 @@ def register_controls(router):
             if callback:=getattr(entry,'snapshot',None):
                 try:
                     snapshot=callback([value for value in wanted if value!='menu_catalog'],refresh_views)
+                    if not isinstance(snapshot,dict) or any(not isinstance(snapshot.get(key,{}),dict) for key in ('views','module_errors')):
+                        raise TypeError('모듈 상태 응답 형식이 올바르지 않습니다.')
                     system.snapshot_cache[metadata['id']]=snapshot
-                except (OSError,RuntimeError) as exc:
+                except Exception as exc:
                     errors[metadata['id']]=str(exc);snapshot=system.snapshot_cache.get(metadata['id'],{})
-                result.update(snapshot)
+                result['views'].update(snapshot.get('views',{}))
+                result.setdefault('module_errors',{}).update(snapshot.get('module_errors',{}))
+                result.update({key:value for key,value in snapshot.items() if key not in ('views','module_errors')})
         result['views']={**result.get('views',{})}
         result['module_errors']={**result.get('module_errors',{}),**errors}
         if 'menu_catalog' in wanted:
             from menu_registry import catalog
-            result['views']['menu_catalog']={'data':catalog(router.routes),'error':None}
+            data=catalog(router.routes)
+            result['module_errors'].update(data.get('module_errors',{}))
+            result['views']['menu_catalog']={'data':data,'error':None}
         index=ROOT/'frontend/dist/index.html'
         if index.is_file():result['frontend_revision']=hashlib.sha256(index.read_bytes()).hexdigest()
         return result

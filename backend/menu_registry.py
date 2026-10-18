@@ -43,9 +43,17 @@ def dispatch(scope,parameters):
 
 def catalog(routes):
     from pydantic import TypeAdapter
-    actions=[action for _,entry in MODULE_ENTRIES for action in (entry.actions() if hasattr(entry,'actions') else [])]
-    for action in actions:
-        action['group'],action['menu_id']=owner('framework/'+action['id'])
+    actions=[];errors={}
+    for metadata,entry in MODULE_ENTRIES:
+        try:
+            rows=[]
+            for item in (entry.actions() or []) if hasattr(entry,'actions') else []:
+                action=dict(item)
+                action['group'],action['menu_id']=owner('framework/'+action['id'])
+                rows.append(action)
+            actions.extend(rows)
+        except Exception as exc:
+            errors[metadata['id']]=str(exc)
     def fields(values):
         properties={};required=[]
         for field in values:
@@ -87,7 +95,7 @@ def catalog(routes):
                     'path_schema':{'type':'object','properties':{}},
                     'body_schema':{**body,'properties':properties}})
     return {'groups':[{'id':g['id'],'title':g['title'],'menus':list(g['menus'])} for g in GROUPS],
-        'actions':actions,'commands':commands}
+        'actions':actions,'commands':commands,'module_errors':errors}
 
 
 def register_api(api,app):

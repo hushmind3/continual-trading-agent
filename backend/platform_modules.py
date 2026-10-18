@@ -4,6 +4,7 @@ import hashlib
 import importlib
 import importlib.util
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -81,8 +82,11 @@ def busy_reasons():
     result = []
     for item, entry in registrations():
         callback = getattr(entry, 'busy_reason', None)
-        if callback and (reason := callback()):
-            result.append(reason)
+        if callback:
+            try:
+                if reason := callback():result.append(reason)
+            except Exception as exc:
+                result.append(f"{item['id']} 작업 상태 확인 실패: {exc}")
     return result
 
 
@@ -99,7 +103,8 @@ def lifecycle(method):
             for entry in reversed(completed):
                 cancel = getattr(entry, 'cancel_restart', None)
                 if cancel:
-                    cancel()
+                    try:cancel()
+                    except Exception as exc:logging.getLogger(__name__).warning('Restart reservation rollback failed: %s',exc)
         raise
 
 

@@ -47,3 +47,13 @@
 확인: development/tests/test_module_runtime.py에서 두 결함을 수정 전 실패로 재현했습니다. 수정 후에는 실제 Node IPC의 예약·거절·취소·응답·종료, Python 환경 이동 후 명령 실행, 업무 모듈 없는 호스트, 의존성 실패 격리와 큰 파일 전달을 검사합니다. 모듈 등록/탈착·상태 보존은 test_platform_modules.py를 따릅니다. 검사 명령은 `.venv/Scripts/python.exe -X utf8 -B -m unittest discover -s development/tests -p test_module_runtime.py -q`이며 `test_platform_modules.py`도 같은 방식으로 실행합니다. 테스트 임시 소스·로그는 runtime/platform/module-verification 아래 각 임시 폴더에서 생성하고 정리합니다. 완전 독립 배포·다른 PC 실행은 이 검사로 확인하지 않습니다.
 
 등록 상태: health의 module_signature는 호스트 시작 시 로드한 모듈 서명입니다. 감시기는 디스크뿐 아니라 실제 API·프론트/백엔드 적용 기록도 비교해 빠른 제거 후의 메뉴 잔재를 정리합니다. 실제 분리/복원 결과는 projects README를 따릅니다.
+
+## 공통 백엔드 오류 격리
+
+menu_registry.catalog는 한 모듈의 actions 조회 실패를 module_errors에 기록하고 정상 메뉴/명령을 유지합니다. platform_context의 상태 API는 모듈별 views/module_errors를 병합하며 잘못된 응답/예외가 있으면 마지막 정상 상태와 모듈 오류를 함께 반환합니다. 실패를 정상 검증으로 바꾸지는 않습니다.
+
+작업 상태 확인 훅이 실패하면 해당 모듈 이름과 오류를 재시작 차단 사유로 반환합니다. 재시작 예약 중 실패해도 이미 예약한 다른 모듈의 취소를 모두 시도하고 최초 오류를 보존합니다. 종료 실패 시 호스트 재시작 상태를 해제하고 각 모듈 예약 취소를 시도한 뒤 HTTP 409를 반환합니다. 취소 훅 자체의 실패는 로그에 남깁니다.
+
+재현/회귀: development/tests/test_host_resilience.py. 실제 운영 로그에서 메뉴 조회의 RuntimeError가 전체 상태 API까지 전파되던 경로를 확인했고, 나머지 오류·복구 조건은 업무 모듈 대신 검사 훅/임시 폴더로 재현합니다. 검사에서 사용자 모델·시세·학습·매매는 실행하지 않습니다.
+
+2026-10-18 확인: 신규 오류 재현 8개는 수정 전 모두 실패했고 수정 후 관련 호스트/프로세스/등록/감시/프로젝트 수명주기 검사 총 35개가 통과했습니다. 8766에 적용한 뒤 health·등록 모듈 5개 available·상태/카탈로그 오류 없음·실행 차단 작업 없음까지 확인했습니다. 실제 금융 시세·학습·추론·주문 전체 회귀는 이번 점검에서 실행하지 않았습니다. 현재 서버 확인 자료는 runtime/platform/verification/host-resilience.json입니다.

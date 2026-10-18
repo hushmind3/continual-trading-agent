@@ -13,3 +13,5 @@
 설치: 루트 `설치.cmd`, 또는 해당 폴더에서 `npm ci --workspaces=false`. Python은 `requirements.txt`로 `.venv`에 설치합니다. 기존 환경을 재사용하는 분리는 루트 `.venv/Scripts/python.exe -B development/scripts/isolate_module_environment.py rea`입니다. old `backend/rea` 경로는 import 호환 연결만 남습니다.
 
 현재 확인과 미확인은 [모듈 안내](../README.md)에 구분합니다. 원본 분석 모델이나 로그인 사이트·네이티브 앱 전체 실행 검증은 이번 환경 분리의 확인 범위가 아닙니다.
+
+독립 실행 소스: GitHub → 프로젝트 관리 → 설치된 프로젝트의 이 모듈에서 내보냅니다. 압축을 푼 뒤 `python run.py setup`, `check`, `run --port 8080`으로 설치·검사·실행합니다. 필요한 공통 API/UI는 ZIP 안의 복사본을 사용합니다. 기존 데이터·비밀 설정·모델은 자동 포함하지 않습니다. 형식·실제 확인 범위는 [프로젝트 관리](../projects/README.md)를 따릅니다.

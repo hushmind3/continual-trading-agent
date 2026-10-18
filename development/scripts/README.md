@@ -34,3 +34,5 @@ npm은 루트 workspace 설치를 사용합니다. REA install()은 modules/rea�
 모듈 환경 분리: isolate_module_environment.py는 기존 설치본의 선언된 의존성만 모듈 전용 가상환경에 복사하고 console 실행기·상대 소스 훅을 구성합니다. module_sources.py는 폴더 위치에서 모듈 소스를 찾는 전용 환경의 훅입니다. 새 PC 설치는 install_windows.py가 플랫폼·금융·SDK·REA·Hermes 환경과 각 Node 패키지를 별도로 설치합니다. 운영 서버는 .venv/platform을 사용합니다.
 
 실제 탈착 검사: `verify_builtin_module_isolation.py`는 작업 보호 후 금융·REA·Hermes의 소스와 전용 환경 폴더를 잠시 옮기고, 남은 GitHub 화면/호스트와 이동된 각 모듈의 실행을 확인합니다. 성공·실패 모두 원래 폴더를 복원하며 데이터·모델은 이동하지 않습니다. 결과는 `runtime/platform/module-verification/builtin-isolation.json`. 이 검사는 빌드·재시작을 수행하므로 운영 작업이 없는 때 실행합니다. `module_sources.py`는 이동한 전용 환경의 소스 검색과 console 실행기 경로를 복구합니다. 다른 PC의 Python/Node/CUDA까지 포함한 포터블 배포 검사는 아닙니다.
+
+독립 소스 검증: verify_standalone_modules.py는 기본 모듈 ZIP을 각각 추출하고, 설치된 의존성의 전용 경로 복사본에서 타입·화면 빌드·API/카탈로그·브라우저 표시를 확인합니다. 원래 프로젝트 소스 import를 차단하고 사용자 데이터/모델을 복사하거나 추론하지 않습니다. 불변 패키지 파일은 NTFS 하드 링크로 저장 공간을 재사용하며 경로·실행기·쓰기 파일은 독립 사본입니다. 새 PC에서 pip/npm 다운로드 설치를 재현한 검사는 아닙니다. 모든 임시 폴더/검사 서버는 종료·정리하며 결과/화면은 runtime/projects/manage/verification/standalone-modules.json 및 <모듈>-standalone.png입니다.

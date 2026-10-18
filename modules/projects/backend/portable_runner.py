@@ -66,6 +66,8 @@ def node_command(source, spec):
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'): stream.reconfigure(encoding='utf8')
     parser = argparse.ArgumentParser(description='플랫폼 없이 원본 앱을 실행합니다.')
     parser.add_argument('command', choices=['setup', 'run', 'check', 'mcp-config'], nargs='?', default='run')
     parser.add_argument('--port', type=int, default=8080)

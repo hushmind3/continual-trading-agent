@@ -15,6 +15,10 @@ SKIP = {'.git', '.venv', 'venv', 'node_modules', '.platform-runtime', '__pycache
 
 
 def export(key):
+    from . import builtin_packages
+    if key in builtin_packages.SUPPORTED:
+        with store.LOCK:
+            return builtin_packages.export(key)
     with store.LOCK, runtime.LOCK:
         record = store.read(key)
         if installer.JOBS or runtime.busy_reason() or installer.RESTARTING:

@@ -168,7 +168,9 @@ def register_host(app):
         from .store import STATE, identifier
         import re
         try:
-            identifier(key); read(key)
+            from .builtin_packages import SUPPORTED
+            identifier(key)
+            if key not in SUPPORTED: read(key)
             if not re.fullmatch(re.escape(key) + r'-[a-f0-9]{12}\.zip', name): raise ValueError('앱 패키지 이름이 올바르지 않습니다.')
             path = owned(STATE, 'projects/' + key + '/exports/' + name)
             if not path.is_file(): raise ValueError('내보낸 앱 파일이 없습니다.')

@@ -1,0 +1,22 @@
+import {useEffect,useState} from 'react';
+import {Download,Square,CheckCircle2} from 'lucide-react';
+import {request} from '@platform/data/api';
+import {Button,ErrorMessage} from '@platform/ui/Primitives';
+import {Panel} from '@platform/ui/Panel';
+import {ScriptParameter,type ScriptOption} from './ScriptParameter';
+interface SetupResult {state:string;error?:string;log?:string}
+interface Setup {parameters:ScriptOption[];synopsis?:string;description?:string;result:SetupResult}
+export function InstallerApp({projectId}:{projectId:string}){
+ const [setup,setSetup]=useState<Setup|null>(null),[values,setValues]=useState<Record<string,string|number|boolean>>({}),[result,setResult]=useState<SetupResult>({state:'idle'}),[error,setError]=useState(''),[sending,setSending]=useState(false);
+ useEffect(()=>{let live=true;request<Setup>('projects/setup',{id:projectId},'GET').then(value=>{if(!live)return;setSetup(value);setResult(value.result);setValues(Object.fromEntries(value.parameters.map(item=>[item.name,item.default??(item.kind==='switch'?false:'')])))}).catch(e=>{if(live)setError(String(e))});return()=>{live=false}},[projectId]);
+ useEffect(()=>{if(result.state!=='running')return;let live=true;const timer=setInterval(()=>{request<SetupResult>('projects/setup/status',{id:projectId},'GET').then(value=>{if(live)setResult(value)}).catch(e=>{if(live)setError(String(e))})},1500);return()=>{live=false;clearInterval(timer)}},[projectId,result.state]);
+ const running=result.state==='running',disabled=running||sending;
+ async function start(){setSending(true);setError('');try{setResult(await request<SetupResult>('projects/setup',{id:projectId,values}))}catch(e){setError(String(e))}finally{setSending(false)}}
+ async function browse(name:string){setSending(true);try{const selected=await request<{path:string}>('projects/setup/folder',{id:projectId},'POST',185000);if(selected.path)setValues(previous=>({...previous,[name]:selected.path}))}catch(e){setError(String(e))}finally{setSending(false)}}
+ async function stop(){try{await request('projects/setup/stop',{id:projectId})}catch(e){setError(String(e))}}
+ return <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6"><div className="mx-auto grid w-full max-w-screen-lg gap-5"><ErrorMessage message={error}/><Panel title="Windows 프로그램 설치"><p className="text-sm leading-6 text-slate-600">원본 설치 프로그램의 옵션을 불러왔습니다. 필수 경로를 지정하면 필요한 파일의 다운로드와 설정은 원본 설치기가 처리합니다.</p><p role="status" className="mt-3 text-sm text-slate-500">{running?'원본 설치 프로그램 실행 중':result.state==='complete'?'원본 설치 프로그램 종료 확인':result.state==='failed'?'설치 실패 · 아래 결과를 확인하세요.':result.state==='interrupted'?'설치 확인이 중단됐습니다.':'설치 준비 · 아직 원본 프로그램을 설치하지 않았습니다.'}</p>
+ {setup&&<form className="mt-5 space-y-5" onSubmit={event=>{event.preventDefault();void start()}}><div className="grid gap-5 sm:grid-cols-2">{setup.parameters.filter(item=>item.required||item.choices.length).map(option=><ScriptParameter key={option.name} onBrowse={()=>void browse(option.name)} option={option} value={values[option.name]??''} disabled={disabled} onChange={value=>setValues(previous=>({...previous,[option.name]:value}))}/>)}</div><details className="space-y-4"><summary className="cursor-pointer text-sm font-medium">추가 설치 옵션</summary>{setup.parameters.filter(item=>!item.required&&!item.choices.length).map(option=><ScriptParameter key={option.name} onBrowse={()=>void browse(option.name)} option={option} value={values[option.name]??''} disabled={disabled} onChange={value=>setValues(previous=>({...previous,[option.name]:value}))}/>)}</details><div className="flex flex-wrap gap-2">{running?<Button tone="danger" onClick={()=>void stop()}><Square size={15}/>설치 중지</Button>:<Button type="submit" tone="primary" busy={sending}><Download size={16}/>{result.state==='complete'?'설치 다시 실행':'원본 프로그램 설치'}</Button>}</div></form>}
+ </Panel>{(result.log||result.error)&&<Panel title="설치 결과"><ErrorMessage message={result.error||''}/>{result.state==='complete'&&<p className="mb-3 flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={16}/>원본 설치기가 정상 종료했습니다. 실행 경로와 안내는 아래 결과에서 확인하세요.</p>}<pre aria-label="설치 실행 결과" className="max-h-96 overflow-auto whitespace-pre-wrap break-words text-xs leading-6">{result.log}</pre></Panel>}
+ {setup&&<details className="space-y-3 rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer text-sm font-medium">원본 설치 안내</summary><p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{setup.synopsis}{setup.description}</p></details>}
+ </div></div>;
+}

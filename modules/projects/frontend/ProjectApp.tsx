@@ -5,6 +5,7 @@ import {Panel} from '@platform/ui/Panel';
 import type {Project} from './types';
 import {ApiControls} from './ApiControls';
 import {ProjectTask} from './ProjectTask';
+import {InstallerApp} from './InstallerApp';
 import {AppWorkspace,AppFrame} from '@platform/ui/AppWorkspace';
 export function ProjectApp({projectId}:{projectId:string}){
  const [project,setProject]=useState<Project|null>(null),[error,setError]=useState(''),[args,setArgs]=useState(''),[text,setText]=useState(''),[busy,setBusy]=useState(false);
@@ -16,5 +17,6 @@ export function ProjectApp({projectId}:{projectId:string}){
  {project?.adapter?.kind==='python-cli'&&<div className="min-h-0 flex-1 overflow-auto p-4"><Panel title="프로젝트 실행"><div className="flex gap-2"><Input aria-label="실행 인수" placeholder="실행 옵션이나 파일 경로를 입력하세요. 도움말: --help" value={args} onChange={e=>setArgs(e.target.value)}/><Button tone="primary" busy={busy} onClick={()=>void run()}>실행</Button></div><pre className="mt-4 whitespace-pre-wrap break-words text-sm">{text}</pre></Panel></div>}
  {project?.adapter?.kind==='fastapi'&&!web&&<div className="min-h-0 flex-1 overflow-auto p-4"><Panel title="프로젝트 기능"><ApiControls projectId={projectId}/></Panel></div>}
  {project?.adapter?.kind==='node-mcp'&&<ProjectTask projectId={projectId}/>}
+ {project?.adapter?.kind==='powershell'&&<InstallerApp projectId={projectId}/>}
  </AppWorkspace>;
 }

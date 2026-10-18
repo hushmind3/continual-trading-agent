@@ -16,7 +16,8 @@ def check(source):
     manifests=('package.json','pyproject.toml','Cargo.toml','go.mod','CMakeLists.txt','Makefile')
     folders=('src','app','backend','frontend','bin')
     code=('*.py','*.js','*.ts','*.cpp','*.c','*.cs','*.rs','*.exe','*.sln','*.html')
-    if (source/'docs').is_dir() and any((source/'docs').glob('*.md')) and not any((source/name).exists() for name in (*manifests,*folders)) and not any(any(source.glob(pattern)) for pattern in code):
+    has_tools=any(any((source/folder).glob(pattern)) for folder in ('scripts','analysis','windows','tools','ghidra_scripts') for pattern in ('*.py','*.ps1','*.sh','*.java'))
+    if not has_tools and (source/'docs').is_dir() and any((source/'docs').glob('*.md')) and not any((source/name).exists() for name in (*manifests,*folders)) and not any(any(source.glob(pattern)) for pattern in code):
         raise RequirementError('실행 프로그램이 포함되지 않은 문서·분석 자료 저장소입니다. 설치할 앱·화면·모델 파일은 없으며 내려받은 자료는 폴더 열기로 읽을 수 있습니다.',stage='not_app')
     for solution in source.glob('*.sln'):
         for relative in re.findall(r'"([^"\r\n]+\.csproj)"', solution.read_text(encoding='utf-8-sig')):

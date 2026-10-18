@@ -110,6 +110,38 @@ def run(request: dict):
     return call(runtime.run_cli, call(read, request.get('id', '')), arguments)
 
 
+@router.get('/setup')
+def setup_details(id:str):
+    from .powershell_app import describe
+    return call(describe,call(read,id))
+
+
+@router.post('/setup')
+def setup_start(request:dict):
+    from .powershell_app import start
+    return call(start,call(read,request.get('id','')),request.get('values',{}))
+
+
+@router.get('/setup/status')
+def setup_status(id:str):
+    from .powershell_app import state
+    return call(state,call(read,id))
+
+
+@router.post('/setup/stop')
+def setup_stop(request:dict):
+    from .powershell_app import stop
+    return call(stop,request.get('id',''))
+
+
+@router.post('/setup/folder')
+def setup_folder(request:dict):
+    from .powershell_app import choose_folder
+    record=call(read,request.get('id',''))
+    if record.get('adapter',{}).get('kind')!='powershell':raise HTTPException(400,'Windows 설치 프로그램이 아닙니다.')
+    return call(choose_folder)
+
+
 @router.post('/remove')
 def remove(request: dict):
     return call(lifecycle.remove, request.get('id', ''))

@@ -77,7 +77,7 @@ def installed():
         record['connection_error']=errors.get(record.get('module_id'),'')
         record['can_open'] = record.get('module_id') in loaded and record['stage'] not in ('removed', 'removal_failed')
         if activated and record['stage'] == 'awaiting_activation' and record.get('module_id') in loaded and loaded[record['module_id']] == record.get('install_revision'):
-            record.update(stage='ready', detail='실행 확인과 메뉴 연결을 마쳤습니다.', finished_at=time.time())
+            record.update(stage='ready', detail='설치 화면이 준비됐습니다. 원본이 요구하는 경로와 옵션을 확인하고 설치하세요.' if record.get('adapter',{}).get('kind')=='powershell' else '실행 확인과 메뉴 연결을 마쳤습니다.', finished_at=time.time())
             save(record)
         elif record['stage'] in ACTIVE_STAGES and record['id'] not in JOBS:
             import psutil
@@ -222,7 +222,7 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
             record['agent_connection'] = link_when_idle({**record, 'active_source': str(source), 'adapter': spec}, cancelled, progress)
         # The common watcher performs guarded application after the install transaction releases its busy hook.
         record.update(active_source=str(source), adapter=spec, module_id=module_id, install_revision=version.name, menu='projects/app/' + key,
-            verification={'entry_executed': spec['kind'] in ('fastapi', 'python-cli', 'node-mcp'), 'original_ui_rendered': ui_verified},
+            verification={'entry_executed': spec['kind'] in ('fastapi', 'python-cli', 'node-mcp'), 'original_ui_rendered': ui_verified,'installer_syntax_checked':spec['kind']=='powershell'},
             stage='awaiting_activation', detail='실행 확인 완료 · 공통 실행기가 메뉴 연결을 적용합니다.', published_at=time.time())
         save(record)
     except Exception as exc:

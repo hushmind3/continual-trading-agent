@@ -90,6 +90,9 @@ def invoke(record, payload):
 
 
 def verify(source, spec, environment=None):
+    if spec['kind']=='powershell':
+        from .powershell_app import inspect
+        inspect(source,spec)
     if spec['kind'] == 'node-mcp':
         worker = AppWorker(source, spec, environment or {})
         try:

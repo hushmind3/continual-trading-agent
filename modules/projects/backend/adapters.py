@@ -45,6 +45,8 @@ def detect(source):
                         return validate(source, result)
     if ui:
         return validate(source, ui)
+    from . import powershell_app
+    if spec := powershell_app.detect(source): return spec
     project = source / 'pyproject.toml'
     if project.is_file():
         data = tomllib.loads(project.read_text(encoding='utf8'))
@@ -58,10 +60,13 @@ def validate(source, spec):
     if spec.get('kind') == 'node-mcp':
         from .node_mcp import validate as validate_mcp
         return validate_mcp(source, spec)
-    if spec.get('kind') not in ('static', 'vite', 'fastapi', 'python-cli', 'native'):
+    if spec.get('kind') not in ('static', 'vite', 'fastapi', 'python-cli', 'native','powershell'):
         raise ValueError('생성된 실행 어댑터 종류를 지원하지 않습니다.')
     folder = owned(source, spec.get('directory', '.'))
     if not folder.is_dir(): raise ValueError('실행 폴더가 없습니다.')
+    if spec['kind']=='powershell':
+        script=owned(source,spec.get('script',''))
+        if not script.is_file() or script.suffix.lower()!='.ps1':raise ValueError('원본 설치 스크립트가 없습니다.')
     if spec['kind'] in ('static', 'vite'):
         owned(folder, spec.get('output', 'dist' if spec['kind'] == 'vite' else '.'))
     if spec['kind'] in ('fastapi', 'python-cli'):
@@ -74,6 +79,9 @@ def validate(source, spec):
 def prepare(source, spec, run):
     folder = owned(source, spec.get('directory', '.'))
     kind = spec['kind']
+    if kind=='powershell':
+        from .powershell_app import inspect
+        inspect(source,spec)
     if kind == 'node-mcp':
         from .node_mcp import prepare as prepare_mcp
         prepare_mcp(source, spec, run)

@@ -7,7 +7,7 @@ import uuid
 import zipfile
 from . import adapters, installer, runtime, store
 
-KINDS = {'static', 'vite', 'fastapi', 'python-cli', 'node-mcp'}
+KINDS = {'static', 'vite', 'fastapi', 'python-cli', 'node-mcp','powershell'}
 MAX_EXPANDED = 128 * 1024 * 1024
 MAX_ARCHIVE = 32 * 1024 * 1024
 SKIP = {'.git', '.venv', 'venv', 'node_modules', '.platform-runtime', '__pycache__',

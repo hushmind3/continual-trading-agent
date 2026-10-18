@@ -21,3 +21,5 @@ API: `projects/install`, `retry`, `settings`, `detach`, `reconnect`, `remove`, `
 현재 분리 경로: projects/detach는 detachment.start의 비동기 작업으로 실행합니다. 현재 패키지·독립 실행 진입점·필요한 UI를 준비한 뒤 원래 프로그램과 해당 모듈 data 항목을 이동합니다. builtin_record는 기본 모듈을 같은 작업 목록에 등록하고 reconnect_builtin은 원래 위치로 되돌립니다. 롤백 실패 시 파일을 보존하고 오류를 표시합니다.
 
 cleanup.py는 이전 ZIP/가져오기 잔재를 휴지통으로 이동합니다. projects/cleanup·projects/folder/open은 각각 정리와 실제 앱 폴더 열기입니다. requirements.py는 문서 저장소를 실행 앱과 구분합니다. 검증 파일은 development/tests/test_project_detachment.py 및 development/scripts/verify_project_detachment.cjs입니다. Node MCP 연결은 이전 .venv/hermes 대신 modules/hermes/.venv를 사용합니다.
+
+Windows 설치기: powershell_app.py·powershell_metadata.ps1은 원본 PS AST만 읽어 옵션을 탐지합니다. adapters.py의 powershell 유형은 runtime.verify에서 문법만 확인하며 entry_executed로 표시하지 않습니다. 원본 실행은 projects/setup 사용자 요청에서만 별도 프로세스로 시작하며 runtime.ACTIVE로 서버 적용·제거를 보호합니다. setup/folder는 사용자 클릭 시에만 Windows 폴더 선택 창을 엽니다. setup/status는 JSON과 최근 로그만 읽고 매번 PowerShell을 띄우지 않습니다. 임시 다운로드는 해당 설치 버전의 setup-cache에 격리합니다. 원본 설치기가 지정 대상 폴더에 만든 파일은 저장소 제거로 자동 복원/제거되는 대상이 아닙니다. 회귀 명령: .venv/Scripts/python.exe -X utf8 -B -m unittest development.tests.test_project_windows_installer -q.

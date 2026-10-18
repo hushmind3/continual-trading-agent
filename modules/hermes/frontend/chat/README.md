@@ -1,5 +1,7 @@
 # Conversation workspace
 
+용도: Hermes 대화 소메뉴의 화면 구성·설정 전달·검사 인수인계입니다.
+
 Chat.tsx owns sessions, search, per-session drafts, send/stop/approval/resume, panel controls and scroll following. ChatStream.tsx groups adjacent tool-only turns and matches results by ID; ActivityTimeline pairs real start/complete events and retains errors. MessageBody.tsx renders Markdown/GFM with raw HTML disabled and provides copy controls.
 
 The message area fills the remaining viewport. Latest Message restores scroll following. Selected active sessions refresh every 2.5 seconds, retaining unchanged message arrays to avoid reparsing Markdown for metrics-only updates. Opening settings keeps chat mounted. Drafts survive settings navigation and page reload.
@@ -35,3 +37,7 @@ ChatHeader, SessionSidebar, ActivityPanel, ChatComposer and ChatWelcome are cont
 읽기 모드는 입력창의 스위치로 켜고 끕니다. 전송·재개 요청의 read_only 값이 해당 작업에 적용되며, 기존 작업 환경의 권한 기본값보다 우선합니다. 작업 중에도 다음 요청의 스위치는 바꿀 수 있습니다. 선택은 브라우저에 기억하고 시스템 프롬프트 저장과 분리합니다.
 
 데스크톱 작업 내역·문서는 왼쪽 경계를 드래그해 폭을 조절합니다. 방향키 조절·더블클릭 기본 폭 복원·각 패널의 폭 기억을 지원합니다. 모바일에서는 전체 폭으로 표시하며 크기 조절 손잡이를 숨깁니다.
+
+ThinkingControl.tsx·useThinking.ts는 읽기 모드 옆에서 Thinking 자동/켜기/끄기를 선택합니다. 로컬 모델에만 표시하고 모델별 선택을 브라우저에 기억합니다. 전송·재개 직전에 기존 /api/ai_agent/Hermes/settings에 thinking_mode를 저장한 뒤 chat을 호출합니다. 실행 중 선택은 다음 요청에 적용하며 진행 중 작업과 모델 적재 상태는 변경하지 않습니다. 원본 request_overrides 연결은 [백엔드 모델 안내](../../backend/models/README.md)를 따릅니다.
+
+2026-10-18 확인: TypeScript·Vite 빌드, 모의 API 브라우저 검사 29개 통과. Thinking 선택 후 전송·작업 중 다음 값 변경·새로고침 복원·390px 가로 넘침 없음을 검사했습니다. 실제 1440px 화면에서 읽기 모드 옆 Thinking 끄기와 JavaScript 오류 0건을 확인했고 390px도 표시·넘침 없음을 확인했습니다. 이번 UI 이동은 백엔드·모델 재시작 없이 프론트만 적용했으며 실제 추론 비교 검사는 추가 실행하지 않았습니다.

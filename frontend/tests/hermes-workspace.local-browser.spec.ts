@@ -464,10 +464,33 @@ test('model runtime options are saved and applied through the existing API',asyn
  const {calls}=await fixture(page);
  await page.goto('/#ai_agent/Hermes/models');
  await page.getByLabel('문맥 한도',{exact:true}).fill('32768');
- await page.getByLabel('Thinking',{exact:true}).selectOption('off');
  await page.getByLabel('도구 설명 불러오기',{exact:true}).selectOption('lazy');
  await page.getByRole('button',{name:'실행 설정 저장·적용',exact:true}).click();
- await expect.poll(()=>calls.some(call=>call.op==='settings'&&call.payload.context_length===32768&&call.payload.thinking_mode==='off'&&call.payload.tool_loading==='lazy')).toBe(true);
+ await expect.poll(()=>calls.some(call=>call.op==='settings'&&call.payload.context_length===32768&&call.payload.tool_loading==='lazy')).toBe(true);
  await expect.poll(()=>calls.filter(call=>call.op==='model/load').length).toBe(1);
  await expect(page.getByLabel('문맥 한도',{exact:true})).toHaveValue('32768');
+});
+
+
+test('Thinking stays beside read mode and applies automatically to the next chat',async({page})=>{
+ const {calls}=await fixture(page);
+ const control=page.getByLabel('Thinking',{exact:true});
+ await expect(control).toBeVisible();
+ await control.selectOption('off');
+ await page.getByLabel('헤르메스에게 보낼 메시지').fill('짧게 답해 줘');
+ await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
+ await expect.poll(()=>calls.some(call=>call.op==='settings'&&call.payload.thinking_mode==='off')).toBe(true);
+ await expect.poll(()=>calls.filter(call=>call.op==='chat').length).toBe(1);
+ await expect(control).toBeEnabled();
+ await control.selectOption('on');
+ expect(calls.filter(call=>call.op==='settings'&&call.payload.thinking_mode==='on')).toHaveLength(0);
+ await page.getByRole('button',{name:'작업 중지',exact:true}).click();
+ await page.getByLabel('헤르메스에게 보낼 메시지').fill('다음 답변');
+ await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
+ await expect.poll(()=>calls.some(call=>call.op==='settings'&&call.payload.thinking_mode==='on')).toBe(true);
+ await page.reload();
+ await expect(control).toHaveValue('on');
+ await page.setViewportSize({width:390,height:844});
+ await expect(control).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });

@@ -66,7 +66,7 @@ Thinking 제어층은 원본 agent/reasoning_params.py·reasoning_effort.py에 �
 
 - runtime_policy.py가 모델별 context_length·thinking_mode(auto/on/off)를 검증·보존합니다. settings API로 저장하며 다른 모델에 해당 값이 전파되지 않습니다. 로컬 로더는 선택 모델의 문맥을 사용하고 원본 config.yaml과 일치시킵니다. 0은 모델 기본값입니다.
 - 어댑터가 강제로 넣던 defer: []를 제거했습니다. tool_loading은 native(원본 기본값)·lazy(필요한 설명 검색)·eager(처음부터 모두 제공)를 지원합니다. lazy는 원본 registry와 tool_search/tool_describe/tool_call을 사용하며 사용 가능한 도구를 삭제하지 않습니다. 읽기 모드는 기존 허용 목록의 두 읽기 도구를 직접 제공하고 원본 권한 차단을 유지합니다.
-- 모델 화면의 ModelRuntimeControls.tsx에서 문맥·Thinking·도구 설명 전달 방식을 바꾸고 저장·적용합니다. 문맥/Thinking은 현재 모델별, 도구 전달은 작업 환경 공통 설정입니다. 실행 중 변경은 기존 idle 보호로 거절합니다. 로컬 모델이 적재 중이면 저장 후 다시 불러오며, 모델 변경 없이 도구 전달만 바꾸는 API 저장도 가능합니다.
+- 모델 화면의 ModelRuntimeControls.tsx에서 문맥·도구 설명 전달 방식을 저장·적용합니다. Thinking은 대화 입력창의 읽기 모드 옆에서 선택하고 다음 전송·재개 직전에 기존 settings API로 저장합니다. 문맥/Thinking은 현재 모델별, 도구 전달은 작업 환경 공통 설정입니다. 실행 중 API 저장은 기존 idle 보호로 거절하며, 채팅의 다음 Thinking 선택은 브라우저에만 보관합니다. 문맥 적용은 로컬 모델 재적재가 필요하지만 Thinking 선택은 모델을 다시 불러오지 않습니다.
 - Thinking은 로컬 서버의 chat_template_kwargs.enable_thinking에 원본 request_overrides로 연결하며 기존 다른 요청값을 보존합니다. auto는 덮어쓰지 않습니다. 외부 제공자의 thinking 설정을 이 로컬 전용 필드로 강제하지 않습니다.
 
 적용 당시 이 PC의 Ornith에 65,536 문맥·Thinking auto·도구 전달 lazy를 저장했습니다. 이후 사용자가 화면에서 변경할 수 있습니다. 직접 생성 59.77 tok/s, 실제 플랫폼 채팅 60.5 tok/s, 실제 파일 작업 60.7 tok/s를 확인했습니다. 새 작업 요청을 실제 tokenizer로 다시 센 값은 사용자/형식 15토큰 → 시스템 포함 3,411토큰 → 도구 포함 4,549토큰입니다. 모델에 처음 제공하는 도구 스키마는 검색·설명·호출의 3개이며 나머지는 검색 가능합니다. 원본 지침·스킬 기능을 강제로 끄지 않았습니다.
@@ -76,3 +76,5 @@ Thinking 제어층은 원본 agent/reasoning_params.py·reasoning_effort.py에 �
 확인 자료: runtime/ai_agent/Hermes/verification/performance/agent-after-fix.json, direct-generation.json, hermes-request-policy.json. verification/verify_agent_runtime.py는 생성한 검사 대화를 보관 처리하고 임시 파일을 정리합니다. 사용자 대화·원본 모델·금융 작업은 변경하지 않았습니다. 모델별 옵션·thinking 요청 병합·도구 제공·권한/재시작·원본 엔진 회귀 26개와 TypeScript·Vite 빌드가 통과했습니다. 브라우저 확인 결과는 프론트 모델 README에 기록합니다.
 
 마지막 추가 단문 검사는 사용자 작업이 실행 중이어서 중단 전송 없이 보류했습니다. 위 채팅/파일 실측은 앞서 완료한 독립 검사 결과이며 현재 사용자의 작업 결과를 가져다 쓴 것이 아닙니다.
+
+추가 로그 확인(동일 날짜): 실제 문맥 한도가 65,536인 요청도 입력 24,520토큰 처리에 12,847ms, 출력 50토큰 생성에 860ms가 걸렸습니다. 문맥을 줄여도 긴 입력 처리·캐시 미적중·Thinking 출력 때문에 전체 대기 시간이 길 수 있습니다. Thinking 끄기는 생각 출력량과 응답 대기에 영향을 줄 수 있으나 동일 조건의 켜기/끄기 생성 속도 비교는 실행하지 않았습니다. GPU 적재 병목과 이 지연을 같은 원인으로 단정하지 않습니다.

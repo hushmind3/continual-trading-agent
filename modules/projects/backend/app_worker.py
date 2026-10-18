@@ -6,6 +6,9 @@ import json
 import os
 import sys
 import traceback
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from harness_hook import ProviderHook
 
 protocol = sys.stdout
 sys.stdout = sys.stderr
@@ -52,13 +55,21 @@ async def main():
     os.chdir(folder); sys.path.insert(0, folder)
     module, name = target.split(':')
     app = getattr(importlib.import_module(module), name)
+    hook = ProviderHook(sys.argv[4], protocol) if len(sys.argv) > 4 and sys.argv[4] else None
+    tasks = set()
+    async def handle(message):
+        try: result = await request(app, message)
+        except Exception as exc:
+            traceback.print_exc(file=sys.stderr); result = {'error': str(exc)}
+        protocol.write(json.dumps(result) + '\n'); protocol.flush()
     async with app.router.lifespan_context(app):
         while line := await asyncio.to_thread(sys.stdin.readline):
-            try:
-                result = await request(app, json.loads(line))
-            except Exception as exc:
-                traceback.print_exc(file=sys.stderr); result = {'error': str(exc)}
-            protocol.write(json.dumps(result) + '\n'); protocol.flush()
+            message = json.loads(line)
+            if hook and message.get('harness_result'):
+                hook.receive(message); continue
+            task = asyncio.create_task(handle(message)); tasks.add(task); task.add_done_callback(tasks.discard)
+        for task in tasks: task.cancel()
+        if tasks: await asyncio.gather(*tasks, return_exceptions=True)
 
 
 if __name__ == '__main__':

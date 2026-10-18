@@ -1,0 +1,13 @@
+import {useEffect,useState} from 'react';
+import {request} from '@platform/data/api';
+import {Button,Drawer,ErrorMessage,Input} from '@platform/ui/Primitives';
+interface Job {events:{name:string;detail:string}[];approval?:{kind:string;detail:string}}
+interface State {state?:string;error?:string;job?:Job}
+const labels:Record<string,string>={starting:'작업 준비',tool_start:'도구 실행',tool_complete:'도구 결과',tool_end:'도구 결과',step:'다음 단계',error:'오류',approval:'승인 요청',permission_denied:'권한 차단'};
+export function ProjectHarness({projectId}:{projectId:string}){
+ const [state,setState]=useState<State>({}),[open,setOpen]=useState(false),[error,setError]=useState(''),[text,setText]=useState('');
+ useEffect(()=>{let live=true;const refresh=()=>request<State>('projects/harness',{id:projectId},'GET').then(v=>{if(live){setState(v);if(v.job?.approval)setOpen(true)}}).catch(e=>{if(live)setError(String(e))});void refresh();const timer=setInterval(()=>{if(!document.hidden)void refresh()},2000);return()=>{live=false;clearInterval(timer)}},[projectId]);
+ async function control(action:string,allow?:boolean){try{await request('projects/harness',{id:projectId,action,allow,text});setText('');setError('')}catch(e){setError(String(e))}}
+ const active=['running','waiting'].includes(state.state||'');
+ return <><Button variant="ghost" onClick={()=>setOpen(true)}>{active?'Hermes 작업 중':'Hermes 하네스'}{state.job?.approval?' · 응답 필요':''}</Button><Drawer title="Hermes · 작업 내역" open={open} onClose={()=>setOpen(false)}><div className="space-y-4"><ErrorMessage message={error||state.error||''}/><p className="text-sm text-slate-600">원본 대화·승인·업무 기록은 앱에 유지됩니다. 현재 Hermes 모델과 도구 설정으로 처리합니다.</p>{active&&<Button tone="danger" onClick={()=>void control('stop')}>이 앱의 작업 중지</Button>}{state.job?.approval&&<section className="space-y-3"><pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words text-xs">{state.job.approval.detail}</pre>{state.job.approval.kind==='question'?<><Input aria-label="에이전트 질문 답변" value={text} onChange={e=>setText(e.target.value)}/><Button onClick={()=>void control('answer')}>답변 보내기</Button></>:<><Button onClick={()=>void control('answer',true)}>이번 실행 허용</Button><Button onClick={()=>void control('answer',false)}>거절</Button></>}</section>}{!state.job&&<p className="text-sm text-slate-500">앱에서 대화하면 실행한 도구와 결과가 표시됩니다.</p>}{state.job?.events.map((event,index)=><details key={index} className="border-b border-slate-100 py-2"><summary className="cursor-pointer text-sm">{labels[event.name]||'실행 정보'}</summary><pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words text-xs">{event.detail}</pre></details>)}</div></Drawer></>;
+}

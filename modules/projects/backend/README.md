@@ -29,3 +29,15 @@ store.project_folder/install_folder가 프로젝트 관리 앱별 부모/applica
 cli_schema.py: 원본 Python argparse의 정적 실행 명세를 읽고 입력 검증/실행 인수로 변환합니다. 모듈/스크립트를 분석 시 실행하지 않습니다. projects/interface·action은 handlers에서 등록하며 실제 실행은 runtime.run_cli → python_packages.cli_command를 사용합니다. 일반 main.py와 README 참조 도구를 탐지하고 pyproject 함수 진입점을 보존합니다. 동일 앱의 중복 실행을 거절하고 실행 로그를 요청마다 초기화해 이전 도움말/결과가 섞이지 않게 합니다. 검사: development/tests/test_project_automatic_ui.py, development/scripts/verify_automatic_ui.cjs.
 
 현재 업데이트 경로: server.py의 FastAPI와 HTML 첫 화면을 정적으로 발견하면 ui.kind=asgi로 연결합니다. runtime은 원본 ASGI 응답을 제공하고 원래 인증을 유지합니다. 앱 업데이트 때 기존 일반 연결 모듈은 재사용하여 호스트 빌드/재시작을 유발하지 않으며 실제 Git source_commit을 기록합니다. frontend/ProjectApp은 설치 revision 변경 시 iframe을 새로 열고 변경 가능한 화면/자산은 no-store로 제공합니다. data/.gitkeep 같은 추적 파일 유무로 폴더 전체를 제외하지 않고, data 안의 파일별로 Git 추적 여부를 비교해 사용자 DB/인증/설정을 새 버전으로 보존합니다. Git이 관리하는 data 소스는 임의 복사하지 않습니다. 임의 외부 저장소의 모든 데이터 위치까지 자동 추적하는 기능은 아닙니다.
+
+## 원본 앱 대화의 Hermes 하네스 연결
+
+용도: 원본 FastAPI 앱의 async ai_provider.compose(system,user,...) 호출을 설치된 Hermes AIAgent로 전달합니다. 앱 소스를 고치거나 Hermes를 복제하지 않습니다. 지원 규격을 발견한 앱의 설치 정보 → 대화 실행 엔진에서 켜고 끄며 registry의 harness 설정은 앱 업데이트에도 유지합니다. project-zero의 대화/업무 계획/역할 응답이 이 공통 함수를 쓰므로 원래 UI와 사업 승인·DB 기록을 유지합니다.
+
+harness.py는 현재 Hermes의 모델·도구·읽기 권한을 사용하고 앱별 실행 세션을 기록합니다. harness_hook.py/app_worker.py는 비동기 왕복 통신으로 원본 provider 호출 결과를 반환하며 원본의 비동기 전송/상태 조회를 막지 않습니다. ProjectHarness.tsx는 같은 앱 상단에서 작업 내역·승인/질문·해당 앱 작업 중지를 제공합니다. 다른 사용자의 Hermes 작업을 중지하지 않으며 동시 앱 요청은 직렬화합니다. 장기 요청은 원본 앱의 비동기 제출 API를 사용해야 합니다. 일반 HTTP 요청의 기존 60초 제한은 유지합니다.
+
+API: projects/settings(use_harness), projects/harness(GET/POST). 아직 이 함수 규격이 없는 임의 앱까지 자동 변환하지 않습니다. 끄거나 독립 분리/내보내기로 실행하면 원본 provider가 작동하며 독립 앱에 Hermes가 자동 포함되는 기능은 아닙니다. 회귀: development.tests.test_project_harness, 실제 모델 검증 결과는 아래 검증 기록과 구분합니다.
+
+2026-10-19 확인: 회귀 58개·TypeScript·Vite 적용 통과. 실제 project-zero 기존 UI에서 원래 인증 절차로 로그인하고 하네스 대화를 제출했습니다. Hermes 세션 36c95333a036448f9be507939f0efb4b에서 실제 도구 검색/파일 읽기와 최종 응답을 확인했고 원래 앱 DB와 대화창에 답이 표시됐습니다. 모델에게 내용이 제공되지 않은 임의 검사 문자열을 읽었으며 모델이 삽입한 공백은 제거한 뒤 문자 정보를 비교했습니다. 바이트 단위 복사 일치 검사는 아닙니다. 최종 요청은 약 46.7초·모델 API 3회·도구 이벤트 5개였으며 새 업무 배정은 요청하지 않았습니다. 초기 실제 검사에서 JSON 외 설명과 반복 세션 제목 충돌이 발견돼 응답 형식 보정/별도 앱 세션 생성을 수정했습니다. 승인·질문·중지의 소유권은 회귀 검사로 확인했고 실제 위험 명령/사업 승인/주문/배포/7개 역할 전체를 실행한 검사는 아닙니다.
+
+실행기 development/scripts/verify_project_harness.cjs는 원본 로그인·대화·작업 Drawer와 실제 모델을 사용합니다. --resume은 이미 완료된 동일 검사 파일/응답의 화면 확인만 재개하며 새 모델 요청을 보내지 않습니다. 초기 준비 실패·정상 종료 모두 자신이 생성한 검사 파일을 정리합니다. 결과 runtime/projects/manage/verification/project-harness.json, 화면 project-zero-hermes-harness.png. 원본 앱 코드/원래 모델 설정은 변경하지 않으며 설치 정보에서 원본 엔진으로 전환할 수 있습니다.

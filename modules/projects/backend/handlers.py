@@ -92,10 +92,25 @@ def settings(request: dict):
             worker = runtime.WORKERS.pop(key, None)
             if worker: worker.close()
             record = read(key); record['environment'] = {**record.get('environment', {}), **environment}
+            if 'use_harness' in request:
+                from .harness import configure
+                configure(record, request['use_harness'])
             if isinstance(request.get('allow_agent'), bool): record['allow_agent'] = request['allow_agent']
             save(record)
         return installer.public(record)
     return call(update)
+
+
+@router.get('/harness')
+def harness_status(id: str):
+    from .harness import status
+    return call(status, id)
+
+
+@router.post('/harness')
+def harness_control(request: dict):
+    from .harness import control
+    return call(control, request.get('id', ''), request)
 
 
 @router.post('/invoke')

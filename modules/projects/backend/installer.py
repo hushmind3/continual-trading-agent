@@ -57,6 +57,9 @@ def public(record):
     if record.get('id') and not record.get('builtin'):
         from .store import project_folder
         value['project_folder']=str(project_folder(record))
+        if record.get('active_source') and record.get('adapter', {}).get('kind') == 'fastapi':
+            from .harness import discover
+            value['harness_available'] = bool(discover(record['active_source']))
     value['environment_keys'] = sorted(record.get('environment', {}))
     for secret in record.get('environment', {}).values():
         if secret:
@@ -183,6 +186,10 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
                     target = source / relative; target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(file, target)
         spec = adapters.detect(source)
+        if record.get('harness', {}).get('enabled'):
+            from .harness import discover
+            if discover(source) != record['harness'].get('entry'):
+                raise ValueError('새 버전의 하네스 연결 규격이 바뀌었습니다. 기존 설치본을 유지합니다. 원본 엔진으로 전환한 뒤 업데이트하세요.')
         if spec is None and record.get('adapter'):
             try: spec = adapters.validate(source, record['adapter'])
             except ValueError: pass

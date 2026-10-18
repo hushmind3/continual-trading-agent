@@ -20,8 +20,9 @@ RESTARTING = False
 
 
 class AppWorker:
-    def __init__(self, source, spec, environment):
+    def __init__(self, source, spec, environment, harness=None, project_id=None):
         self.lock = threading.Lock(); self.responses = queue.Queue(); self.source = str(source)
+        self.input_lock = threading.Lock(); self.harness_pending = {}; self.project_id = project_id
         folder = owned(source, spec.get('directory', '.'))
         log = source.parent / 'application.log'
         self.output = log.open('a', encoding='utf8')
@@ -34,6 +35,7 @@ class AppWorker:
         else:
             from .python_packages import folder as packages
             arguments = [sys.executable, '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('app_worker.py')), str(folder), spec['app'], str(packages(source))]
+            if harness and harness.get('enabled'): arguments.append(harness['entry'])
         self.process = subprocess.Popen(arguments, cwd=folder, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.output,
             text=True, encoding='utf8', bufsize=1, env={**os.environ, **environment, 'PYTHONUTF8': '1'})
         self.reader = threading.Thread(target=self._read, daemon=True); self.reader.start()
@@ -41,14 +43,38 @@ class AppWorker:
     def _read(self):
         try:
             for line in self.process.stdout:
-                try: self.responses.put(json.loads(line))
+                try:
+                    value = json.loads(line)
+                    if 'harness_request' in value:
+                        payload = value['harness_request']; cancelled = threading.Event()
+                        self.harness_pending[payload['id']] = cancelled
+                        threading.Thread(target=self._harness, args=(payload, cancelled), daemon=True).start()
+                    elif 'harness_cancel' in value:
+                        if event := self.harness_pending.get(value['harness_cancel']): event.set()
+                    else: self.responses.put(value)
                 except ValueError: pass
         finally: self.responses.put({'error': '프로젝트 실행기가 종료됐습니다. 실행 로그를 확인하세요.'})
+
+    def _harness(self, payload, cancelled):
+        response = {'harness_result': True, 'id': payload['id']}
+        try:
+            from .harness import execute
+            if not self.project_id: raise ValueError('앱 하네스 소속이 없습니다.')
+            response['text'] = execute(self.project_id, payload, cancelled)
+        except Exception as exc: response['error'] = str(exc)
+        finally:
+            self.harness_pending.pop(payload['id'], None)
+        try: self.send(response)
+        except (OSError, ValueError): pass
+
+    def send(self, payload):
+        with self.input_lock:
+            self.process.stdin.write(json.dumps(payload) + '\n'); self.process.stdin.flush()
 
     def call(self, payload):
         with self.lock:
             if self.process.poll() is not None: raise ValueError('프로젝트 실행기가 종료됐습니다.')
-            self.process.stdin.write(json.dumps(payload) + '\n'); self.process.stdin.flush()
+            self.send(payload)
             try: result = self.responses.get(timeout=70)
             except queue.Empty:
                 self.close(); raise ValueError('프로젝트 응답 시간이 초과됐습니다.')
@@ -56,6 +82,7 @@ class AppWorker:
             return result
 
     def close(self):
+        for cancelled in list(self.harness_pending.values()): cancelled.set()
         if self.process.poll() is None:
             try:
                 self.process.stdin.close(); self.process.wait(timeout=3)
@@ -68,7 +95,9 @@ class AppWorker:
 
 
 def busy_reason():
-    with LOCK: return '실행 중인 외부 프로젝트 요청' if ACTIVE else ''
+    from . import harness
+    with LOCK: active = ACTIVE
+    return '실행 중인 외부 프로젝트 요청' if active else harness.busy_reason()
 
 
 def invoke(record, payload):
@@ -86,7 +115,7 @@ def invoke(record, payload):
             worker = WORKERS.get(key)
             if worker and worker.source != str(source): worker.close(); worker = None
             if worker is None:
-                worker = AppWorker(source, spec, record.get('environment', {})); WORKERS[key] = worker
+                worker = AppWorker(source, spec, record.get('environment', {}), record.get('harness'), key); WORKERS[key] = worker
         return worker.call(payload)
     finally:
         with LOCK: ACTIVE -= 1

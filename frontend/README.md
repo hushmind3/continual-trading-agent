@@ -1,49 +1,28 @@
-# 프론트엔드
+# 플랫폼 프론트엔드
 
-React 화면과 기능별 메뉴를 관리합니다. 백엔드가 등록한 기능은 기존 단일 /api로 호출합니다.
+용도: React/Vite/Tailwind 호스트의 소스 위치·공통 UI·빌드와 검사 연결을 안내합니다.
 
-## 구조
-
-| 역할 | 문서 |
+| 담당 | 구현·문서 |
 | --- | --- |
-| 전체 메뉴·공통 레이아웃·오류 표시 | [src/shell/README.md](src/shell/README.md) |
-| API·공통 상태 | [src/data/README.md](src/data/README.md) |
-| 대메뉴·소메뉴 화면 | [src/pages/README.md](src/pages/README.md) |
-| 버튼·패널·표·상세 창·디자인 | [src/ui/README.md](src/ui/README.md) |
+| 전체 메뉴·레이아웃 | [src/shell/](src/shell/README.md) |
+| API·공통 상태 | [src/data/](src/data/README.md) |
+| 화면 소유 경로 안내 | [src/pages/](src/pages/README.md) |
+| 버튼·입력·패널·공통 디자인 | [src/ui/](src/ui/README.md), [tailwind.css](src/tailwind.css) |
+| 금융 화면 | [modules/finance/frontend/](../modules/finance/frontend/README.md) |
+| REA 화면 | [modules/rea/frontend/](../modules/rea/frontend/README.md) |
+| Hermes 화면 | [modules/hermes/frontend/](../modules/hermes/frontend/README.md) |
+| 프로젝트 설치·앱 화면 | [modules/projects/](../modules/projects/README.md) |
 
-금융과 REA는 독립 대메뉴입니다. 소메뉴 화면 → 소메뉴 매니저 → 대메뉴 → 전체 메뉴 매니저의 등록 구조를 유지합니다. 금융 5개·REA 2개·Hermes의 대화/모델/작업 환경/MCP/스킬/시스템 프롬프트와 GitHub 관리 화면을 포함하며 백엔드 등록 추가 기능은 같은 메뉴 체계에 연결합니다. 메뉴 주소와 소메뉴 폴더는 영문 이름을 사용합니다.
+업무 화면은 각 모듈이 소유하며 호스트의 자동 등록기를 통해 연결합니다. 모듈이 없으면 그 모듈을 강제 import하지 않습니다. `@platform`은 `frontend/src` 별칭입니다. 모든 화면은 기존 `src/ui/` 공통 컴포넌트와 `src/tailwind.css`의 디자인 값을 사용합니다. 모듈별 임의 CSS나 별도 프론트 서버를 추가하지 않습니다. 업무 호출은 기존 단일 `/api`를 사용합니다.
 
-## 실행
+## 실행·확인
 
-운영: 루트 서버켜기.cmd → http://127.0.0.1:8766/
+운영: 루트 `서버켜기.cmd` → http://127.0.0.1:8766/ . 루트 package-lock.json과 node_modules는 플랫폼 frontend workspace의 설치 위치이며 REA/Hermes의 Node 실행 패키지는 각 모듈 내부에 있습니다.
 
-npm workspace: package-lock.json과 node_modules는 프로젝트 루트에서 공유합니다. 이 폴더의 package.json은 React/Vite workspace 선언입니다.
+- 설치: 루트에서 `npm ci`.
+- 개발: `npm run dev --workspace frontend` → 5173; API는 8766으로 전달.
+- 빌드: `npm run build --workspace frontend`.
+- 타입: `npm run typecheck --workspace frontend`.
+- API·브라우저 검사: `npm run test:api --workspace frontend`, `npm run test:browser --workspace frontend`.
 
-- 설치: 루트에서 npm ci
-- 개발: npm run dev --workspace frontend → http://127.0.0.1:5173/ (API는 8766으로 전달)
-- 운영 빌드: npm run build --workspace frontend
-- 타입 검사: npm run typecheck --workspace frontend
-- API 검사: npm run test:api --workspace frontend
-- 브라우저 검사: npm run test:browser --workspace frontend
-
-검사는 사용자의 별도 실행 지시에 따릅니다. 빌드 생성·서버 적용·화면 렌더링·기능 검사는 서로 다른 확인 단계입니다. dist는 운영 빌드 산출물이며 소스가 아닙니다.
-
-## 공통 디자인
-
-src/tailwind.css가 공통 테마와 Tailwind 유틸리티로 배경·타이포그래피·메뉴·카드·버튼·입력·상태·상세 창·반응형 화면을 관리합니다. 모든 메뉴의 버튼·입력·선택·상세 창·탭은 src/ui/의 공통 컴포넌트를 재사용합니다. 밝은 중성색과 한 가지 실행 강조색을 사용하고, 기본 화면은 핵심 동작과 실제 상태를 보여줍니다. 상세 기능은 펼쳐서 접근하며 기존 기능·API·데이터·모델 설정을 디자인 변경으로 삭제하지 않습니다.
-
-현재 공통 레이아웃·운영·가상계좌·MoE 라이브러리·정책 학습·연결 설정·REA 분석/프로젝트 탐색 화면을 재구성하고 Vite 운영 빌드와 프론트 적용을 완료했습니다. 기본 화면은 제어·상태·결과를 중심으로 표시하고 패널 설명은 제목 옆 안내에서 펼칩니다. 정책 학습은 모델 선택·설정·실행 로그, 가상계좌는 자산·보유·체결, REA는 대상 선택·저장 결과·코드 탐색을 연결합니다. 이번 디자인 변경의 브라우저·타입·기능 검사는 실행하지 않았습니다. 개발자용 진단·코드 적용/백엔드 기능 전체는 사용자 메뉴에서 제외했습니다. 전체 시각·동작 검사는 미실행입니다.
-
-2026-10-14: 가상계좌 자산 카드·내역 표·알림을 정돈했습니다. Vite 운영 빌드 성공 및 프론트 전용 서버 적용 완료. 테스트·타입 검사·브라우저 검사·실제 매매 실행은 하지 않았습니다.
-
-2026-10-14 디자인 최종 반영: PC 1440px·모바일 390px에서 기본 7개 화면을 직접 열어 확인했습니다. 가로 넘침·브라우저 표시 오류 없음. 모바일 운영 버튼과 상태 문구의 잘림 수정. 모델 목록은 2열 카드, 학습 상세 및 지난 로그는 접힌 영역으로 정돈했습니다. 모델 관리 창·설정 입력·저장 프로젝트 탐색의 표시를 확인했습니다. Vite 빌드와 프론트 전용 서버 적용 완료. 학습·매매·양자화·삭제 및 금융 기능 검사는 실행하지 않았습니다.
-
-2026-10-16: React·Vite·공통 tailwind.css를 사용하며 버튼·입력·선택 요소는 src/ui/Primitives.tsx를 재사용합니다. 화면의 API·데이터 처리 계약은 유지합니다.
-
-현재 확인 결과(2026-10-16): 사용자 메뉴 8개를 PC 1440px·모바일 390px에서 열어 가로 넘침과 JavaScript 화면 오류가 없음을 확인했습니다. TypeScript·Vite 빌드·헤르메스 UI 검사 4개 통과. 확인된 금융·REA 실패 2개는 현재 화면의 접근성 이름에 맞게 선택자를 수정한 뒤 통과했습니다. 이번 재실행 범위는 해당 2개와 헤르메스 4개이며, 전체 금융·REA 검사 통과를 뜻하지 않습니다. 실제 학습·양자화·주문은 이번 UI 변경 확인에서 실행하지 않았습니다.
-
-2026-10-16 후속 백엔드 확인: 금융·REA의 백엔드 회귀 검사 110개가 통과했습니다. 이 결과는 위 프론트 브라우저 검사 범위와 별개이며 전체 화면 버튼의 실제 업무 실행을 확인했다는 뜻은 아닙니다. 통합 상태 API의 중복 등록 파일 읽기를 줄여 백엔드에 적용했습니다. 이번 후속 변경에는 프론트 소스 변경·재빌드가 없습니다. Ornith 실제 추론 속도 비교와 최종 유지 설정은 `../backend/ai_agent/Hermes/models/README.md`에 기록했습니다.
-
-후속 적용: Hermes 설정의 시스템 프롬프트 화면을 추가했습니다. 단일 /api로 지침만 저장하며 원본 AIAgent 시스템 인자 전달 검사를 통과했습니다. TypeScript·Vite 빌드와 서버 적용 완료, Hermes 브라우저 검사 5개 통과. 이 검사는 가짜 모델 API를 사용하며 실제 GGUF 응답 준수 여부는 검사하지 않았습니다.
-
-소스 소유: 금융 화면은 `../modules/finance/frontend/`, REA는 `../modules/rea/frontend/`, Hermes는 `../modules/hermes/frontend/`에 있습니다. 플랫폼은 React/Vite/Tailwind·공통 UI/상태 전송 인터페이스와 자동 등록기만 제공합니다. 모듈 폴더를 빼도 해당 코드의 강제 import가 남지 않습니다. 이 UI 인터페이스 없이 독립 렌더링하는 배포본은 아직 검증하지 않았습니다.
+검사는 사용자 지시에 따라 실행하며 빌드·서버 적용·화면 표시·실제 업무 실행을 구분합니다. `dist/`는 빌드 산출물입니다. 현재 모듈 분리 확인은 [모듈 안내](../modules/README.md), Hermes UI의 최근 확인은 [대화 안내](../modules/hermes/frontend/chat/README.md), 모델 추론 실측은 [모델 안내](../modules/hermes/backend/models/README.md)를 따릅니다. 특정 UI 검사의 통과를 전체 금융·REA 업무 실행 완료로 확대하지 않습니다. 플랫폼 공통 UI 없이 독립 렌더링하는 기본 모듈 배포본은 아직 검증하지 않았습니다.

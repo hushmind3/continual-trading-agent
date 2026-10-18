@@ -1,5 +1,7 @@
 # 금융
 
+용도: 해당 모듈 프론트 소메뉴의 구현 위치·등록 계층과 API 연결을 안내합니다.
+
 취합: submenu_manager.ts → finance_menu_manager.ts → 전체 메뉴 매니저.
 
 - [trading/](trading/README.md): 운영 제어·가상계좌.
@@ -7,7 +9,7 @@
 - [extensions/](extensions/README.md): MoE.
 - [management/](management/README.md): 연결·설정·진단·백엔드 기능.
 
-대메뉴 표시는 금융 하나입니다. 기능·API 작업명은 유지하며 메뉴 주소는 #finance/<영문 작은 메뉴 이름>으로 통일합니다. 이번 변경 후 브라우저·타입·기능 검사는 미실행입니다.
+대메뉴 표시는 금융 하나입니다. 기능·API 작업명은 유지하며 메뉴 주소는 #finance/<영문 작은 메뉴 이름>으로 통일합니다. 현재 모듈 분리 검사와 미확인 업무 실행 범위는 [모듈 안내](../../README.md)를 따릅니다.
 
 | 메뉴 | 주소·폴더 이름 |
 | --- | --- |

@@ -1,8 +1,10 @@
 # 거래 운영
 
-취합: `finance_menu_manager.ts`. 이 파일만 상위 menu_registry가 import합니다.
+용도: 금융 거래 운영 소메뉴와 상위 등록 연결을 안내합니다.
 
-- [운영 제어](operation_operation_control/README.md): operation_control/
+취합: 이 폴더의 submenu_manager.ts → 상위 finance_menu_manager.ts → 모듈 register.ts → 플랫폼 자동 등록기입니다.
+
+- [운영 제어](operation_control/README.md): operation_control/
 - [가상계좌 · 주문](virtual_account_orders/README.md): virtual_account_orders/
 
 취합: submenu_manager.ts → finance_menu_manager.ts(대메뉴 등록) → 전체 menu_registry → API. 새 기능 구현은 소속 하위 폴더에 추가하고 소메뉴 매니저에 등록합니다.

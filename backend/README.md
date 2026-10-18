@@ -1,5 +1,7 @@
 # Backend platform
 
+용도: 공통 호스트의 API 등록·모듈 실행·런타임 소유와 검사 연결을 안내합니다.
+
 | 위치 | 역할 |
 | --- | --- |
 | [modules/finance/](../modules/finance/README.md) | 금융 대메뉴: 사용자 화면 5개 및 숨김 관리 메뉴 |
@@ -15,7 +17,7 @@
 하위 기능 → 소메뉴 매니저 → 대메뉴 → 전체 메뉴 매니저 → API.
 각 프로젝트와 작은 메뉴 README를 먼저 읽습니다. 새 프로젝트의 등록 규격은 [modules/README.md](../modules/README.md)입니다. 기능은 자기 매니저로 취합하며 중앙 파일에 프로젝트별 import를 추가하지 않습니다. 구조 이름은 영문 ASCII입니다.
 
-Python 설치 메타데이터는 .venv/Lib/site-packages/continual_trading_agent-0.1.0.dist-info/에 있습니다. backend/의 같은 버전 egg-info는 setuptools 빌드 잔여물이어서 휴지통으로 이동했습니다. __pycache__/는 Python이 생성하는 캐시이며 대메뉴가 아닙니다.
+운영 호스트는 `.venv/platform`을 사용합니다. 실제 업무 패키지와 소스는 각 모듈 내부에 있으며, 이전 루트 `.venv`는 개발 검사·복구용입니다. `__pycache__/`는 Python 캐시입니다.
 
 ## 런타임 소속
 
@@ -37,3 +39,9 @@ Python 설치 메타데이터는 .venv/Lib/site-packages/continual_trading_agent
 별도 생성 파일이 없는 메뉴는 빈 런타임 폴더를 만들지 않습니다. 원본 모델과 모델별 JSON은 바탕화면 모델 폴더를 계속 사용합니다. 기존 런타임 이동은 development/scripts/runtime_layout.py가 담당하며 서버·감시기·작업 프로세스를 중지한 상태에서만 사용합니다. 같은 이름의 목적지가 있으면 덮어쓰지 않습니다. 원본 모델을 역직렬화하거나 변환하지 않습니다.
 
 호스트 API 컨텍스트는 금융 라이브러리를 import하지 않습니다. module_runtime.py가 모듈별 실행 명령을 선택하고 JSON-line IPC/ASGI 응답만 연결합니다. Python 금융·REA와 Node 어댑터는 같은 규격을 사용합니다. platform_state_io.py는 호스트 자체 상태 입출력입니다. stockrl/·rea/에는 이전 import를 위한 연결만 남았습니다.
+
+## 모듈 분리·재연결 보호 점검 — 2026-10-18
+
+담당: module_runtime.py의 전용 프로세스 요청 접수·재시작 예약·종료입니다. 요청 접수 잠금은 응답 읽기 잠금과 분리하며, busy 확인 시작부터 예약 완료까지 새 요청을 대기시킨 뒤 거절합니다. 예약 취소가 끝나야 접수를 재개합니다. shutdown은 실행기가 이미 종료됐거나 없는 경우 새 프로세스를 시작하지 않습니다. 데이터·소스 경로를 이동/삭제하지 않습니다.
+
+확인: development/tests/test_module_runtime.py에서 두 결함을 수정 전 실패로 재현했습니다. 수정 후에는 실제 Node IPC의 예약·거절·취소·응답·종료, Python 환경 이동 후 명령 실행, 업무 모듈 없는 호스트, 의존성 실패 격리와 큰 파일 전달을 검사합니다. 모듈 등록/탈착·상태 보존은 test_platform_modules.py를 따릅니다. 검사 명령은 `.venv/Scripts/python.exe -X utf8 -B -m unittest discover -s development/tests -p test_module_runtime.py -q`이며 `test_platform_modules.py`도 같은 방식으로 실행합니다. 테스트 임시 소스·로그는 runtime/platform/module-verification 아래 각 임시 폴더에서 생성하고 정리합니다. 완전 독립 배포·다른 PC 실행은 이 검사로 확인하지 않습니다.

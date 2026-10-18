@@ -24,6 +24,7 @@ class ModuleRuntime:
         self.pending = {}
         self.mutable_pending = set()
         self.lock = threading.RLock()
+        self.admission = threading.RLock()
         self.writes = threading.Lock()
         self.log = None
         self.restarting = False
@@ -76,11 +77,13 @@ class ModuleRuntime:
         return self.process
 
     def call(self, operation, payload=None, timeout=90):
-        if self.restarting and operation != 'shutdown':raise RuntimeError('모듈 적용 준비 중입니다.')
         key = uuid.uuid4().hex; waiter = queue.Queue()
-        with self.lock:
-            process = self._start(); self.pending[key] = waiter
-            if operation=='request' and (payload or {}).get('method','GET')!='GET':self.mutable_pending.add(key)
+        with self.admission:
+            if self.restarting and operation != 'shutdown':raise RuntimeError('모듈 적용 준비 중입니다.')
+            with self.lock:
+                if operation=='shutdown' and (not self.process or self.process.poll() is not None):return True
+                process = self._start(); self.pending[key] = waiter
+                if operation=='request' and (payload or {}).get('method','GET')!='GET':self.mutable_pending.add(key)
         try:
             with self.writes:
                 process.stdin.write(json.dumps({'id': key, 'operation': operation, 'payload': payload or {}}, ensure_ascii=False) + '\n')
@@ -111,14 +114,18 @@ class ModuleRuntime:
         except (OSError, RuntimeError): return self.metadata['id'] + ' 실행 상태 확인 실패; 재시작 보류'
 
     def reserve_restart(self):
-        if self.restarting:return
-        if reason:=self.busy_reason():raise RuntimeError(reason)
-        self.call('hook',{'name':'reserve_restart'})
-        self.restarting=True
+        # Reader responses use self.lock, so admission can span the IPC check
+        # without blocking replies. New requests wait until reservation finishes.
+        with self.admission:
+            if self.restarting:return
+            if reason:=self.busy_reason():raise RuntimeError(reason)
+            self.call('hook',{'name':'reserve_restart'})
+            self.restarting=True
 
     def cancel_restart(self):
-        self.restarting=False
-        if self.process and self.process.poll() is None:self.call('hook',{'name':'cancel_restart'})
+        with self.admission:
+            self.restarting=False
+            if self.process and self.process.poll() is None:self.call('hook',{'name':'cancel_restart'})
 
 
 def proxy_router(runtime, description):

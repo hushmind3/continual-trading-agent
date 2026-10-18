@@ -1,6 +1,8 @@
 # REA 역공학
 
-취합: `rea_menu_manager.ts`. 이 파일만 상위 menu_registry가 import합니다.
+용도: 해당 모듈 프론트 소메뉴의 구현 위치·등록 계층과 API 연결을 안내합니다.
+
+취합: `rea_menu_manager.ts`. register.ts가 취합하며 module.json의 프론트 진입점을 통해 자동 등록합니다.
 
 - [프로그램 분석](program_analysis/README.md): program_analysis/
 - [프로젝트 탐색](project_explorer/README.md): project_explorer/

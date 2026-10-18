@@ -24,3 +24,37 @@
 | 기존 설정 복구 후 | 66.07 tok/s | 66.04 tok/s |
 
 비교 옵션의 출력은 기존 설정과 동일했지만, 기존 설정 재측정도 같은 수준이어서 유의미한 속도 개선은 확인하지 못했습니다. 비교 옵션을 기본값에 추가하지 않았으며 원래 설정으로 모델 준비 완료를 확인했습니다. 자동 작업은 재개하지 않았습니다. 원시 측정·실행 로그는 Git 제외 경로 `runtime/ai_agent/Hermes/verification/`에 저장합니다.
+
+
+## 생성 속도·새 대화 문맥 조사 — 2026-10-18
+
+용도: 메모리 적재와 원본 추론 정책·자동 문맥을 분리해 확인한 결과입니다. 영구 설정이나 기능 축소를 적용한 작업은 아닙니다.
+
+동일한 Ornith 파일, GPU 자동 적재, Q8 KV, Flash Attention, CPU 보조 스레드 2개에서 22토큰 입력·64토큰 생성(temperature 0, seed 42, EOS 무시, 프롬프트 캐시 비활성)을 비교했습니다. Hermes와 채팅 템플릿을 거치지 않는 직접 생성입니다.
+
+| 문맥 한도 | 최종 GPU 적재 | 생성 속도 | 주요 메모리 |
+| --- | --- | --- | --- |
+| 262,144 | 17/33층 | 10.99 tok/s | CPU 모델 2,553.89 MiB, CPU/GPU KV 각각 2,176 MiB, GPU 계산 버퍼 1,138 MiB |
+| 65,536 | 33/33층 | 66.08 tok/s | GPU KV 1,088 MiB, GPU 계산 버퍼 168.29 MiB |
+
+확인된 생성 병목은 큰 문맥 공간을 확보하면서 메모리 자동 맞춤이 모델의 많은 층을 CPU에 배치한 것입니다. 새 대화의 입력이 작아도 로딩 시 정한 적재 배치는 유지됩니다. 검사 전 현재 실행기를 직접 호출해도 11.40 tok/s·CPU 약 두 코어를 사용했습니다. 실사용 엔진 로그 6.35 tok/s와 화면 6.6 tok/s도 일치하는 편입니다. 66.08은 짧은 직접 생성의 측정이며 실제 긴 에이전트 작업 속도를 보장하지 않습니다.
+
+원래 설정을 복사한 임시 원본 worker의 실제 HTTP 요청을 가짜 응답 서버에서 캡처한 뒤, 실행 중인 Ornith의 apply-template/tokenize로 토큰을 셌습니다. 토큰 수를 문자 수로 추정한 것이 아닙니다.
+
+| 요청 구성 | 전체 입력 토큰 | 추가량 |
+| --- | ---: | ---: |
+| 짧은 사용자 입력·채팅 형식 | 15 | 15 |
+| 시스템 지침 포함 | 5,250 | 5,235 |
+| 도구 설명 포함 | 13,338 | 8,088 |
+
+시스템 메시지는 19,049자, 도구 23개의 JSON 설명은 32,613자였습니다. 새 대화도 원본 시스템 지침·프로젝트 문맥·스킬 안내·도구 스키마를 포함합니다. CPU 실행이 입력 토큰 수를 늘리는 것은 아닙니다. 캡처는 새 임시 홈의 짧은 입력이며 실제 화면의 대화 기록과 정확히 같은 요청은 아닙니다.
+
+어댑터 worker.py의 tools.tool_search.defer 기본값 []는 원본의 선별 지연 로딩 목록을 덮어씁니다. 원본 tools/tool_search.py와 hermes_cli/config_defaults.py의 의미를 확인하고, 임시 환경에서만 원본 목록으로 비교한 결과 11,763토큰이었습니다(약 1,575토큰 절약). 이것만으로 13,000토큰 전부를 제거할 수는 없습니다. 도구 기능을 삭제한 비교가 아니라 tool_search/tool_describe/tool_call을 통한 지연 제공입니다. 영구 defer 설정은 변경하지 않았습니다.
+
+Thinking 제어층은 원본 agent/reasoning_params.py·reasoning_effort.py에 있습니다. 현재 설정의 요청 캡처에는 thinking·reasoning·reasoning_effort·enable_thinking·출력 상한 강제값이 없었습니다. 하지만 Ornith의 apply-template은 기본적으로 열린 <think>로 끝나며 chat_template_kwargs.enable_thinking=false를 보냈을 때만 빈 thinking 구간을 닫았습니다. 따라서 현재는 모델 템플릿의 기본 thinking 경로를 따릅니다. Thinking을 끄는 영구 변경은 하지 않았습니다. Thinking 템플릿을 쓰지 않는 직접 생성도 느렸으므로 확인된 주병목과 구분합니다.
+
+단순 대화 캡처는 모델 요청 1회였습니다. 작업 후 검토는 추가 비용이 될 수 있지만 이번 직접 생성 병목의 원인은 아닙니다. auxiliary.goal_judge에 과거 주소가 남았지만 일반 대화는 이 경로를 사용하지 않고 goal/loop 진입 시 현재 연결로 갱신하는 코드도 확인했습니다.
+
+재현 소스: verification/probe_generation.py(현재 모델 직접 생성), capture_policy.py(임시 홈·가짜 응답으로 요청 캡처 및 실제 tokenizer 측정, --native-deferral로 원본 지연 로딩 비교), profile_allocation.py(현재 모델을 잠시 내리고 두 조건 검사 후 원래 연결 복원). 모두 프로젝트 루트에서 실행합니다. 정책 캡처는 modules/hermes/.venv/Scripts/python.exe, 나머지는 .venv/platform/Scripts/python.exe를 사용합니다. 모델 작업 중에는 실행하지 않습니다. profile_allocation.py는 모델 연결을 잠시 중단합니다.
+
+원시 JSON·할당 로그는 Git 제외 runtime/ai_agent/Hermes/verification/performance/에 있습니다. 검사 후 원래 262,144 문맥의 모델 준비 완료를 확인했고 임시 포트만 재할당됐습니다. 사용자 대화 기록·모델 원본·영구 문맥/추론 정책은 변경하지 않았습니다. 속도 복구나 설정 UI 추가를 완료했다는 뜻은 아닙니다.

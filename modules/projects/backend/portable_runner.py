@@ -83,7 +83,9 @@ def main():
         if kind in ('static', 'vite') and not inside(work, spec.get('output', '.')).joinpath('index.html').is_file():
             raise ValueError('빌드된 웹 화면이 없습니다. setup을 실행하세요.')
         if kind == 'node-mcp': node_command(source, spec)
-        if kind in ('fastapi', 'python-cli'):
+        if kind=='python-cli' and spec.get('script'):
+            if not inside(source,spec['script']).is_file():raise ValueError('원본 실행 파일이 없습니다.')
+        elif kind in ('fastapi', 'python-cli'):
             if not python().is_file(): raise ValueError('먼저 setup을 실행하세요.')
             target = spec.get('app') or spec['entry']
             execute([python(), '-c', 'import importlib,sys,site;site.addsitedir(sys.argv.pop(1));getattr(importlib.import_module(sys.argv[1]),sys.argv[2])', str(source/'.platform-runtime/python'), *target.split(':')], work)
@@ -99,6 +101,8 @@ def main():
         print(f'http://127.0.0.1:{args.port}', flush=True)
         with http.server.ThreadingHTTPServer(('127.0.0.1', args.port), handler) as server: server.serve_forever()
     elif kind == 'fastapi': execute([python(), '-m', 'uvicorn', '_platform_web:app', '--app-dir', ROOT, '--host', '127.0.0.1', '--port', str(args.port), *extra], work)
+    elif kind=='python-cli' and spec.get('script'):
+        execute([python() if python().is_file() else sys.executable,'-I','-X','utf8','-c','import runpy,sys,site;site.addsitedir(sys.argv.pop(1));sys.path.insert(0,sys.argv.pop(1));p=sys.argv.pop(1);sys.argv[0]=p;runpy.run_path(p,run_name="__main__")',str(source/'.platform-runtime/python'),source,inside(source,spec['script']),*extra],work)
     elif kind == 'python-cli':
         execute([python(), '-c', 'import sys,site,importlib;site.addsitedir(sys.argv.pop(1));m,n=sys.argv.pop(1).split(":");sys.exit(getattr(importlib.import_module(m),n)())', str(source/'.platform-runtime/python'),spec['entry'], *extra], work)
     elif kind=='powershell':

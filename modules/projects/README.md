@@ -67,3 +67,11 @@ Windows 원본 설치기: windows/install*.ps1·scripts/install*.ps1·install.ps
 설치 폴더 규칙: 모든 GitHub 앱은 프로젝트 관리 소속 runtime/projects/manage/projects/<ID>/ 아래에 소스 버전·전용 패키지·실행 자료를 둡니다. 이 부모 폴더를 project_folder로 공통 제공하고 폴더 열기도 해당 위치를 엽니다. Windows 설치기의 InstallDir/InstallPath/Destination/TargetDir 등 설치 대상 옵션은 이 앱의 application/으로 자동 지정해 입력칸을 숨깁니다. 기존 게임처럼 원본이 이미 있어야 하는 StarCraftDir 등은 설치 대상과 구분하며 빈 자동 생성 폴더로 대체하지 않습니다.
 
 폴더 자동 관리 확인(2026-10-18): 관련 회귀 검사 40개·TypeScript/Vite 통과. 원본 검사 설치기에 설치 경로를 입력하지 않고 앱의 application/ 내부 파일 생성까지 확인했습니다. 기존 게임 입력을 설치 대상과 구분하는 검사도 포함합니다. 실제 pluto-re의 앱 소유 폴더 표시와 PC/390px 화면·오류 표시를 확인했고 JavaScript 오류/가로 넘침은 없었습니다. 기존 게임 파일 없이 Pluto 전체를 설치한 것은 아닙니다.
+
+UI 없는 CLI의 자동 화면: cli_schema.py가 원본 argparse 코드를 AST로 읽어 하위 명령·필수 값·숫자·선택·스위치·목록을 추출하고 공통 CliApp/GeneratedFieldInput이 런타임에 화면을 구성합니다. 분석 때문에 원본을 import/실행하거나 사용자 모델을 호출하지 않습니다. main.py 등과 README가 직접 가리키는 Python 도구도 자동 탐지합니다. 앱마다 React 화면/HTML을 생성하지 않으며 기존 웹 UI는 우선 유지합니다.
+
+API: projects/interface(GET), projects/action(POST). 실행할 명령은 서버가 다시 추출한 원본 기능 ID/필드로 검증하고 기존 전용 패키지 실행기를 사용합니다. 기존 설치 앱도 새 공통 화면을 사용합니다. PowerShell 설치기가 있는 저장소의 Python 도구는 프로젝트 기능 탭에 자동 표시합니다. 원본 함수 진입점/스크립트와 분리 ZIP 실행을 유지합니다. 자동 추출하지 못한 원본 CLI는 고급 도움말/기존 실행을 보존하며 추출 성공으로 표시하지 않습니다. argparse 동적 옵션/임의 프레임워크 전체의 의미를 추론하는 범용 변환이 완성된 것은 아닙니다.
+
+2026-10-18 자동 UI 확인: 관련 회귀 35개·TypeScript 통과. 원본 UI 없는 일반 argparse 검사 앱을 자동 탐지해 기존 설치 경로로 등록했고 원본 2개 명령의 필수/숫자/선택/스위치/목록 화면과 실제 실행·결과 파일 생성을 확인했습니다. 앱 전용 프론트 파일은 자동 등록용 register.ts 하나뿐이었으며 별도 React UI는 만들지 않았습니다. 1440px/390px 가로 넘침·JavaScript 오류는 없었고 사용자 모델은 사용하지 않았습니다. 검사 앱/임시 소스는 제거했습니다. 실제 GitHub 다운로드 검사는 아닌 로컬 검사 소스의 공통 설치/메뉴/화면 검증입니다. 결과 runtime/projects/manage/verification/automatic-ui.json, 실행 development/scripts/verify_automatic_ui.cjs. 독립 ZIP의 원본 CLI check/run과 기존 웹 UI 우선 유지도 회귀에 포함합니다.
+
+기존 pluto-re도 재설치/전용 UI 수정 없이 README의 analysis/weights.py에서 1개 기능 화면을 자동 추출해 프로젝트 기능 탭에 표시합니다. 실제 브라우저에서 입력/검사 옵션과 JavaScript 오류 없음을 확인했으며 원본 가중치 분석 실행은 하지 않았습니다. 화면은 runtime/projects/manage/verification/pluto-generated-tools.png입니다.

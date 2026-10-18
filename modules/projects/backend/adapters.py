@@ -53,6 +53,8 @@ def detect(source):
         scripts = data.get('project', {}).get('scripts', {})
         if len(scripts) == 1:
             return validate(source, {'kind': 'python-cli', 'directory': '.', 'entry': next(iter(scripts.values())), 'install': True})
+    from .cli_schema import discover
+    if spec:=discover(source):return validate(source,spec)
     return None
 
 
@@ -70,7 +72,10 @@ def validate(source, spec):
     if spec['kind'] in ('static', 'vite'):
         owned(folder, spec.get('output', 'dist' if spec['kind'] == 'vite' else '.'))
     if spec['kind'] in ('fastapi', 'python-cli'):
-        if not re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*', spec.get('app') or spec.get('entry', '')):
+        if spec['kind']=='python-cli' and spec.get('script'):
+            script=owned(source,spec['script'])
+            if not script.is_file() or script.suffix!='.py':raise ValueError('Python 실행 스크립트가 없습니다.')
+        elif not re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*', spec.get('app') or spec.get('entry', '')):
             raise ValueError('Python 실행 진입점은 module:object 형식이어야 합니다.')
     if spec.get('ui'): validate(source, spec['ui'])
     return spec

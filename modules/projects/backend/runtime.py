@@ -15,6 +15,7 @@ from .store import owned, read
 WORKERS = {}
 LOCK = threading.RLock()
 ACTIVE = 0
+CLI_ACTIVE = set()
 RESTARTING = False
 
 
@@ -150,12 +151,17 @@ def run_cli(record, arguments):
     log = source.parent / 'last-run.log'
     with LOCK:
         if RESTARTING: raise ValueError('서버 적용 중입니다.')
+        if record['id'] in CLI_ACTIVE:raise ValueError('이 프로젝트의 실행이 끝난 뒤 다시 실행하세요.')
+        CLI_ACTIVE.add(record['id'])
         ACTIVE += 1
     try:
+        log.write_text('',encoding='utf8')
         run_command(command, owned(source, spec.get('directory', '.')), log, threading.Event(), timeout=120,
             environment=record.get('environment', {}))
     finally:
-        with LOCK: ACTIVE -= 1
+        with LOCK:
+            ACTIVE -= 1
+            CLI_ACTIVE.discard(record['id'])
     return {'text': log.read_text(encoding='utf8', errors='replace')[-30000:]}
 
 

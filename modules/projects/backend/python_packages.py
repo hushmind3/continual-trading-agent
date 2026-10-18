@@ -35,6 +35,10 @@ def prepare(source, spec, run):
 
 
 def cli_command(source, spec, arguments):
+    if spec.get('script'):
+        script=('import sys,site,runpy; p=sys.argv.pop(1);site.addsitedir(p);sys.path.insert(0,p);'
+                'sys.path.insert(0,sys.argv.pop(1));target=sys.argv.pop(1);sys.argv[0]=target;runpy.run_path(target,run_name="__main__")')
+        return [sys.executable,'-I','-X','utf8','-B','-c',script,str(folder(source)),str(source),str(owned(source,spec['script'])),*arguments]
     script = ('import sys,site,importlib; p=sys.argv.pop(1);site.addsitedir(p);sys.path.insert(0,p);'
               'sys.path.insert(0,sys.argv.pop(1));m,n=sys.argv.pop(1).split(":");'
               'sys.exit(getattr(importlib.import_module(m),n)())')

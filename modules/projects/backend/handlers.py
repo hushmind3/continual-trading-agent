@@ -111,6 +111,18 @@ def run(request: dict):
     return call(runtime.run_cli, call(read, request.get('id', '')), arguments)
 
 
+@router.get('/interface')
+def project_interface(id:str):
+    from .cli_schema import describe
+    return call(describe,call(read,id))
+
+
+@router.post('/action')
+def project_action(request:dict):
+    from .cli_schema import execute
+    return call(execute,call(read,request.get('id','')),request.get('command',''),request.get('values',{}))
+
+
 @router.get('/setup')
 def setup_details(id:str):
     from .powershell_app import describe

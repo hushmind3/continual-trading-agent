@@ -21,3 +21,5 @@ Projects.tsx는 폴더 열기·잔재 정리와 비동기 분리 상태를 관�
 InstallerApp.tsx·ScriptParameter.tsx: powershell 원본 설치기의 필수 경로·Windows 폴더 선택·선택 값·스위치를 공통 Input/Select/Button/Panel로 자동 표시합니다. ProjectApp.tsx가 유형에 따라 선택하며 설치 진행·중지·결과를 제공합니다. ProjectCard의 설치 화면 준비됨은 실제 프로그램 설치 완료를 뜻하지 않습니다. 원본 UI가 있는 앱은 기존 AppFrame을 계속 사용합니다.
 
 InstallerApp은 프로젝트 관리의 앱별 폴더와 자동 설치 위치를 표시합니다. managed 설치 대상은 사용자 입력에서 제외하며 기존 프로그램을 읽는 경로만 선택하도록 구분합니다. 설치 정보의 폴더 열기도 특정 버전 source 대신 앱 소유 부모를 엽니다.
+
+CliApp.tsx·GeneratedFieldInput.tsx: 원본 메타데이터를 받아 선택/숫자/스위치/목록/필수 입력과 결과 화면을 공통 컴포넌트로 구성합니다. 앱별 React 구현은 만들지 않습니다. ProjectApp은 원본 웹 UI를 유지하며 Python CLI는 자동 기능 화면, Windows 설치기와 함께 발견한 Python 도구는 프로젝트 기능 탭으로 연결합니다. 기존 원시 CLI 실행은 자동 추출 실패 시 고급 기능으로 유지합니다.

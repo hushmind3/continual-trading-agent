@@ -61,7 +61,7 @@ def prepare(record,target,progress):
     """Reuse existing exporters internally. No browser download or user setup."""
     from . import packages
     result=packages.export(record['id'],_preparing=True)
-    archive=store.STATE/'projects'/record['id']/'exports'/result['filename']
+    archive=store.project_folder(record)/'exports'/result['filename']
     try:
         with zipfile.ZipFile(archive) as bundle:bundle.extractall(target)
     finally:archive.unlink(missing_ok=True)
@@ -102,7 +102,7 @@ def start(key):
         before=dict(record);record.update(stage='detaching',error='',detail='분리할 프로그램과 실행 환경을 준비합니다.')
         store.save(record);installer.JOBS[key]=threading.Event()
     def run():
-        target=store.owned(store.STATE,'projects/'+key+'/standalone')
+        target=store.owned(store.project_folder(record),'standalone')
         moves=[];created=not target.exists()
         def progress(message):
             record['detail']=message;store.save(record)
@@ -166,7 +166,7 @@ def start(key):
 
 
 def reconnect_builtin(record):
-    target=store.owned(store.STATE,'projects/'+record['id']+'/standalone')
+    target=store.owned(store.project_folder(record),'standalone')
     import psutil
     for process in psutil.process_iter(['pid','cwd']):
         if process.info['pid']==os.getpid():continue

@@ -51,6 +51,30 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual((module / 'program.py').read_text(), 'working module')
         self.assertEqual((source / 'original.txt').read_text(), 'original program')
 
+    def test_readable_folder_migration_preserves_data_and_remove_ownership(self):
+        record,source,module=self.project()
+        record['install_log']=str(source.parent/'install.log')
+        manifest=module/'module.json'; metadata=json.loads(manifest.read_text())
+        metadata['data']=['runtime/projects/manage/projects/'+record['id']];manifest.write_text(json.dumps(metadata))
+        store.assign_folder(record)
+        self.assertEqual(record['folder_name'],'example')
+        self.assertEqual((store.project_folder(record)/'versions/v1/source/original.txt').read_text(),'original program')
+        self.assertFalse(source.exists()); self.assertIn('projects/example/',Path(record['active_source']).as_posix())
+        self.assertEqual(json.loads(manifest.read_text())['data'],['runtime/projects/manage/projects/example'])
+        lifecycle.detach(record['id']); lifecycle.reconnect(record['id']); lifecycle.remove(record['id'])
+        self.assertFalse(store.project_folder(record).exists())
+
+    def test_windows_directory_rename_failure_copies_before_removing_history(self):
+        record,source,module=self.project(); previous=store.project_folder(record)
+        rename=Path.rename
+        def locked(path,target):
+            if path==previous: raise PermissionError('Windows directory rename denied')
+            return rename(path,target)
+        with patch.object(Path,'rename',locked): store.assign_folder(record)
+        self.assertFalse(previous.exists())
+        self.assertEqual((Path(record['active_source'])/'original.txt').read_text(),'original program')
+        self.assertEqual(store.read(record['id'])['folder_name'],'example')
+
     def test_permanent_remove_also_works_for_detached_projects(self):
         record, source, module = self.project()
         other, other_source, other_module = self.project('p_unrelated')

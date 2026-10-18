@@ -9,7 +9,7 @@ def link(record, remove=False):
     from ai_agent.Hermes.engine.bridge import bridge
     payload = {'id': record['id'], 'remove': remove}
     if not remove:
-        source = store.owned(store.STATE / 'projects' / record['id'], str(Path(record['active_source']).relative_to(store.STATE / 'projects' / record['id'])))
+        source = store.owned(store.project_folder(record), str(Path(record['active_source']).relative_to(store.project_folder(record))))
         command = node_mcp.command(source, record['adapter'])
         payload['server'] = {'command': command[0], 'args': command[1:], 'env': record.get('environment', {})}
     return bridge.call('mcp/project', payload, timeout=90)

@@ -25,7 +25,7 @@ def export(key, _preparing=False):
         if competing or runtime.busy_reason() or installer.RESTARTING:
             raise ValueError('설치·실행이 끝난 뒤 내보내세요.')
         source = Path(record.get('active_source') or '').resolve()
-        base = store.owned(store.STATE, 'projects/' + store.identifier(key))
+        base = store.project_folder(record)
         if not source.is_relative_to(base.resolve()) or not source.is_dir(): raise ValueError('내보낼 설치 소스가 없습니다.')
         spec = adapters.validate(source, record['adapter'])
         if spec['kind'] not in KINDS:

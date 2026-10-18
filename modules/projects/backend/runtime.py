@@ -8,8 +8,8 @@ import queue
 import subprocess
 import sys
 import threading
-from fastapi import HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from .store import owned, read
 
 WORKERS = {}
@@ -77,6 +77,8 @@ def invoke(record, payload):
     if spec['kind'] not in ('fastapi', 'node-mcp'): raise ValueError('이 프로젝트는 API/MCP 앱이 아닙니다.')
     with LOCK:
         if RESTARTING: raise ValueError('서버 적용 중입니다. 잠시 뒤 다시 실행하세요.')
+        from .installer import JOBS
+        if record['id'] in JOBS: raise ValueError('이 앱을 업데이트 중입니다. 완료한 뒤 다시 실행하세요.')
         ACTIVE += 1
     try:
         key = record['id']
@@ -119,17 +121,29 @@ def render_html(text, identifier, has_api, korean=False):
     if korean: base += '<script defer src="/assets/projects/' + identifier + '/_platform-language.js"></script>'
     bridge = '<script>' + Path(__file__).with_name('assets_bridge.js').read_text(encoding='utf8').replace('__PROJECT_ID__', json.dumps(identifier)) + '</script>' if has_api else ''
     text = re.sub(r'<base\b[^>]*>', '', text, flags=re.I)
+    if has_api:
+        text = re.sub(r'((?:href|src|action)\s*=\s*[\"\'])/(?!/)', lambda m: m[1] + '/assets/projects/' + identifier + '/', text, flags=re.I)
     return re.sub(r'(<head\b[^>]*>)', lambda match: match[1] + base + bridge, text, count=1, flags=re.I) if '<head' in text.lower() else base + bridge + text
 
 
 def verify_ui(source, spec, environment, run, project_id='verification'):
     ui = spec.get('ui') if spec['kind'] == 'fastapi' else spec
-    if not ui or ui['kind'] not in ('static', 'vite'): return False
+    if not ui or ui['kind'] not in ('static', 'vite', 'asgi'): return False
     import shutil
     root = owned(owned(source, ui.get('directory', '.')), ui.get('output', '.'))
-    config = {'root': str(root), 'project_id': project_id,
+    server_ui = ui['kind'] == 'asgi'
+    if server_ui:
+        worker = AppWorker(source, spec, environment)
+        try:
+            result = worker.call({'path': '/'})
+            if result['status'] != 200 or 'text/html' not in result.get('headers', {}).get('content-type', ''):
+                raise ValueError('원본 서버의 첫 화면 실행 확인에 실패했습니다.')
+            index = base64.b64decode(result['body']).decode('utf8')
+        finally: worker.close()
+    else: index = (root / 'index.html').read_text(encoding='utf8')
+    config = {'root': str(root), 'project_id': project_id, 'server_ui': server_ui,
         'python': sys.executable, 'environment': environment, 'screenshot': str(source.parent / 'ui-verification.png'),
-        'index_html': render_html((root / 'index.html').read_text(encoding='utf8'), project_id, spec['kind'] == 'fastapi')}
+        'index_html': render_html(index, project_id, spec['kind'] == 'fastapi')}
     if spec['kind'] == 'fastapi':
         from .python_packages import folder as packages
         config['app'] = {'folder': str(owned(source, spec.get('directory', '.'))), 'target': spec['app'], 'packages': str(packages(source))}
@@ -181,19 +195,31 @@ def register_host(app):
             identifier(key)
             if key not in SUPPORTED: read(key)
             if not re.fullmatch(re.escape(key) + r'-[a-f0-9]{12}\.zip', name): raise ValueError('앱 패키지 이름이 올바르지 않습니다.')
-            path = owned(STATE, 'projects/' + key + '/exports/' + name)
+            from .store import project_folder
+            path = owned(project_folder(read(key) if key not in SUPPORTED else {'id': key}), 'exports/' + name)
             if not path.is_file(): raise ValueError('내보낸 앱 파일이 없습니다.')
             return FileResponse(path, filename=name, media_type='application/zip', headers={'Cache-Control': 'no-store'})
         except ValueError as exc: raise HTTPException(404, str(exc)) from exc
 
     @app.get('/assets/projects/{identifier}/{path:path}', include_in_schema=False)
-    def asset(identifier: str, path: str):
+    def asset(identifier: str, path: str, request: Request):
         try:
             record = read(identifier)
             if not record.get('active_source'): raise ValueError('아직 실행 가능한 설치본이 없습니다.')
             spec = record['adapter']; ui = spec.get('ui') if spec['kind'] == 'fastapi' else spec
-            if not ui or ui['kind'] not in ('static', 'vite'): raise ValueError('원본 웹 화면이 없습니다.')
+            if not ui or ui['kind'] not in ('static', 'vite', 'asgi'): raise ValueError('원본 웹 화면이 없습니다.')
             if path == '_platform-language.js': return FileResponse(Path(__file__).with_name('project_language.js'), media_type='application/javascript')
+            if ui['kind'] == 'asgi':
+                result = invoke(record, {'path': '/' if path in ('', 'index.html') else '/' + path,
+                    'query': request.url.query, 'method': 'GET', 'headers': dict(request.headers)})
+                headers = {k: v for k, v in result.get('headers', {}).items() if k.lower() not in ('content-length', 'content-encoding', 'connection')}
+                headers['Cache-Control'] = 'no-store'
+                body = base64.b64decode(result['body'])
+                if 'text/html' in headers.get('content-type', ''):
+                    body = render_html(body.decode('utf8'), identifier, True, korean=True).encode('utf8')
+                if headers.get('location', '').startswith('/'):
+                    headers['location'] = '/assets/projects/' + identifier + headers['location']
+                return Response(body, status_code=result['status'], headers=headers)
             source = Path(record['active_source'])
             base = owned(owned(source, ui.get('directory', '.')), ui.get('output', '.'))
             file = owned(base, path or 'index.html')
@@ -204,7 +230,7 @@ def register_host(app):
             if file.suffix.lower() == '.html':
                 text = render_html(file.read_text(encoding='utf8'), identifier, spec['kind'] == 'fastapi', korean=True)
                 return HTMLResponse(text, headers={'Cache-Control': 'no-store'})
-            return FileResponse(file)
+            return FileResponse(file, headers={'Cache-Control': 'no-store'})
         except ValueError as exc: raise HTTPException(404, str(exc)) from exc
 
 

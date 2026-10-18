@@ -13,7 +13,7 @@ import uuid
 from platform_modules import ROOT
 from . import adapters, runtime
 from .github import repository
-from .store import LOCK, STATE, identifier, read, records, save
+from .store import LOCK, STATE, identifier, read, records, save, project_folder, assign_folder
 from .requirements import RequirementError, check as check_requirements
 
 JOBS = {}
@@ -120,15 +120,20 @@ def start(url, source_override=None, resume=False, allow_agent=False, cleanup_im
         if JOBS: raise ValueError('진행 중인 설치가 있습니다. 완료하거나 취소한 뒤 등록하세요.')
         try: old = read(key)
         except ValueError: old = {}
+        if old.get('stage') == 'awaiting_activation': raise ValueError('현재 설치본의 메뉴 연결을 기다리고 있습니다.')
+        if runtime.busy_reason(): raise ValueError('앱 실행이 끝난 뒤 업데이트하세요.')
+        with runtime.LOCK:
+            worker = runtime.WORKERS.pop(key, None)
+            if worker: worker.close()
+        old = assign_folder({**old, 'id': key, 'repository': repo})
         resume_source = None
         if resume:
             resume_source = Path(old.get('source') or '').resolve()
-            expected = (STATE / 'projects' / key / 'versions').resolve()
+            expected = (project_folder(old) / 'versions').resolve()
             if not resume_source.is_relative_to(expected) or not resume_source.is_dir():
                 raise ValueError('다시 사용할 소스가 없습니다. 주소로 다시 등록하세요.')
             if str(resume_source) == old.get('active_source'):
                 raise ValueError('현재 사용 중인 설치본입니다. 업데이트로 새 버전을 준비하세요.')
-        if old.get('stage') == 'awaiting_activation': raise ValueError('현재 설치본의 메뉴 연결을 기다리고 있습니다.')
         import psutil
         record = {**old, 'id': key, 'repository': repo, 'url': 'https://github.com/' + repo,
             'title': repo.split('/')[-1], 'stage': 'queued', 'detail': '설치를 준비합니다.',
@@ -141,7 +146,10 @@ def start(url, source_override=None, resume=False, allow_agent=False, cleanup_im
 
 
 def install(record, cancelled, source_override=None, resume_source=None, cleanup_import=False):
-    key = record['id']; version = STATE / 'projects' / key / 'versions' / uuid.uuid4().hex[:12]
+    key = record['id']; versions = project_folder(record) / 'versions'
+    number = 1
+    while (versions / f'version-{number}').exists(): number += 1
+    version = versions / f'version-{number}'
     source = resume_source if resume_source is not None else version / 'source'
     log = version / 'install.log'; published = None; backup = None
     def progress(stage, detail, **extra):
@@ -159,6 +167,21 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
         else:
             run(['git', '-c', 'core.hooksPath=NUL', 'clone', '--depth', '1', '--', record['url'] + '.git', str(source)], version, 600)
         progress('analyze', 'README·의존성과 실제 실행 진입점을 확인합니다.')
+        source_commit = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True, encoding='utf8').strip() if (source / '.git').is_dir() else ''
+        previous_source = Path(record.get('active_source') or source)
+        # Untracked application data belongs to the user, never to a source update.
+        if previous_source != source and (previous_source / 'data').is_dir():
+            tracked = set()
+            for tree in (previous_source, source):
+                if (tree / '.git').is_dir():
+                    tracked.update(subprocess.check_output(['git', '-C', str(tree), 'ls-files', '-z', '--', 'data'], text=True, encoding='utf8').split('\0'))
+            for file in (previous_source / 'data').rglob('*'):
+                if file.is_symlink() or getattr(os.path, 'isjunction', lambda p: False)(file):
+                    raise ValueError('외부 폴더로 연결된 앱 데이터는 자동 복사하지 않습니다.')
+                relative = file.relative_to(previous_source)
+                if file.is_file() and relative.as_posix() not in tracked:
+                    target = source / relative; target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(file, target)
         spec = adapters.detect(source)
         if spec is None and record.get('adapter'):
             try: spec = adapters.validate(source, record['adapter'])
@@ -192,7 +215,7 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
             candidate = version / 'module'; (candidate / 'backend').mkdir(parents=True); (candidate / 'frontend').mkdir()
             metadata = {'schema': 1, 'id': module_id, 'app_title': record['title'], 'group': {'id': 'projects', 'title': 'GitHub'},
                 'backend': {'namespace': 'platform_plugins.' + module_id.replace('-', '_'), 'entry': 'register'},
-                'frontend': {'entry': 'frontend/register.ts'}, 'data': ['runtime/projects/manage/projects/' + key], 'order': 60}
+                'frontend': {'entry': 'frontend/register.ts'}, 'data': [project_folder(record).relative_to(ROOT).as_posix()], 'order': 60}
             (candidate / 'module.json').write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf8')
             menu = {'id': 'projects/app/' + key, 'title': record['title'], 'operations': []}
             (candidate / 'backend/register.py').write_text('from fastapi import APIRouter\nMENU=' + repr(menu) + '\nrouter=APIRouter()\n', encoding='utf8')
@@ -206,27 +229,31 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
         if record.get('module_id') and record['module_id'] != module_id:
             raise ValueError('업데이트에서 모듈 ID가 바뀌었습니다. 기존 모듈은 유지합니다.')
         destination = ROOT / 'modules' / identifier(module_id)
-        if destination.exists():
+        manifest = destination / 'module.json'
+        existing = json.loads(manifest.read_text(encoding='utf8')) if manifest.is_file() else {}
+        reuse = spec['kind'] != 'native' and record.get('module_id') == module_id and existing.get('id') == module_id and bool(existing.get('install_revision'))
+        if destination.exists() and not reuse:
             if record.get('module_id') != module_id: raise ValueError('같은 이름의 다른 모듈이 이미 있습니다.')
             backup = version / 'previous-module'; destination.rename(backup)
-        published = destination
-        shutil.copytree(candidate, destination, ignore=shutil.ignore_patterns('.git', '__pycache__', '.venv'))
-        metadata['app_title'] = record['title']
-        metadata['install_revision'] = version.name
-        (destination / 'module.json').write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf8')
-        progress('publish', '전체 연결을 사전 확인하고 새 메뉴를 준비합니다.')
-        run([sys.executable, '-B', '-c', 'import sys;sys.path.insert(0,"backend");import web_api'], ROOT, 120)
-        node = shutil.which('node')
-        run([node, str(ROOT / 'node_modules/typescript/bin/tsc'), '--noEmit'], ROOT / 'frontend', 120)
-        run([node, str(ROOT / 'node_modules/vite/bin/vite.js'), 'build', '--emptyOutDir', 'false'], ROOT / 'frontend', 180)
+        if not reuse:
+            published = destination
+            shutil.copytree(candidate, destination, ignore=shutil.ignore_patterns('.git', '__pycache__', '.venv'))
+            metadata['app_title'] = record['title']
+            metadata['install_revision'] = version.name
+            (destination / 'module.json').write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf8')
+            progress('publish', '전체 연결을 사전 확인하고 새 메뉴를 준비합니다.')
+            run([sys.executable, '-B', '-c', 'import sys;sys.path.insert(0,"backend");import web_api'], ROOT, 120)
+            node = shutil.which('node')
+            run([node, str(ROOT / 'node_modules/typescript/bin/tsc'), '--noEmit'], ROOT / 'frontend', 120)
+            run([node, str(ROOT / 'node_modules/vite/bin/vite.js'), 'build', '--emptyOutDir', 'false'], ROOT / 'frontend', 180)
         if spec['kind'] == 'node-mcp':
             from .agent_tasks import link_when_idle
             progress('agent_link', '설치된 도구와 한국어 작업 화면을 에이전트에 자동 연결합니다.')
             record['agent_connection'] = link_when_idle({**record, 'active_source': str(source), 'adapter': spec}, cancelled, progress)
         # The common watcher performs guarded application after the install transaction releases its busy hook.
-        record.update(active_source=str(source), adapter=spec, module_id=module_id, install_revision=version.name, menu='projects/app/' + key,
+        record.update(active_source=str(source), source_commit=source_commit, adapter=spec, module_id=module_id, install_revision=version.name, menu='projects/app/' + key,
             verification={'entry_executed': spec['kind'] in ('fastapi', 'python-cli', 'node-mcp'), 'original_ui_rendered': ui_verified,'installer_syntax_checked':spec['kind']=='powershell'},
-            stage='awaiting_activation', detail='실행 확인 완료 · 공통 실행기가 메뉴 연결을 적용합니다.', published_at=time.time())
+            stage='ready' if reuse else 'awaiting_activation', detail='앱 업데이트 완료 · 플랫폼 재시작 없이 적용했습니다.' if reuse else '실행 확인 완료 · 공통 실행기가 메뉴 연결을 적용합니다.', published_at=time.time())
         save(record)
     except Exception as exc:
         if published and published.exists():

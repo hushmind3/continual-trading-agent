@@ -20,6 +20,14 @@ async function main(){
    }
    if(url.pathname==='/favicon.ico')return route.fulfill({status:204});
    if(!url.pathname.startsWith(prefix)){errors.push('원본 화면이 플랫폼 밖의 경로를 요청합니다: '+url.pathname);return route.fulfill({status:404,body:'Mount adapter required'})}
+   if(cfg.server_ui){
+    const relative=decodeURIComponent(url.pathname.slice(prefix.length));
+    if(!relative||relative==='index.html')return route.fulfill({contentType:'text/html',body:cfg.index_html});
+    const result=await call({path:'/'+relative,query:url.search.slice(1),method:request.method()});
+    if(result.error)throw Error(result.error);
+    if(result.status>=400)errors.push('원본 서버 화면 요청 실패: '+url.pathname);
+    return route.fulfill({status:result.status,headers:result.headers,body:Buffer.from(result.body,'base64')});
+   }
    let relative=decodeURIComponent(url.pathname.slice(prefix.length));let file=path.resolve(cfg.root,relative||'index.html');
    if(!file.startsWith(path.resolve(cfg.root)+path.sep)&&file!==path.resolve(cfg.root))throw Error('프로젝트 밖의 파일 요청');
    if((!fs.existsSync(file)||fs.statSync(file).isDirectory())&&!path.extname(relative))file=path.join(cfg.root,'index.html');

@@ -16,7 +16,7 @@ packages=source/'.platform-runtime/python'
 if packages.is_dir():site.addsitedir(str(packages));sys.path.insert(0,str(packages))
 module, name = spec['app'].split(':')
 app = getattr(importlib.import_module(module), name)
-if ui := spec.get('ui'):
+if (ui := spec.get('ui')) and ui.get('kind') != 'asgi':
     from fastapi.staticfiles import StaticFiles
     output = (source / ui.get('directory', '.') / ui.get('output', '.')).resolve()
     if not output.is_relative_to(source.resolve()): raise ValueError('Invalid UI folder')

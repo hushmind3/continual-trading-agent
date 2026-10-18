@@ -29,7 +29,7 @@ def detect(source):
                 break
         if (folder / 'index.html').is_file():
             ui = {'kind': 'static', 'directory': folder.relative_to(source).as_posix(), 'output': '.'}
-    for filename in ('main.py', 'app.py', 'api.py', 'backend/main.py', 'backend/app.py', 'app/main.py', 'api/main.py', 'src/main.py'):
+    for filename in ('main.py', 'app.py', 'server.py', 'api.py', 'backend/main.py', 'backend/app.py', 'app/main.py', 'api/main.py', 'src/main.py'):
         file = source / filename
         if not file.is_file():
             continue
@@ -41,7 +41,14 @@ def detect(source):
                     name = next((target.id for target in node.targets if isinstance(target, ast.Name)), None)
                     if name:
                         result = {'kind': 'fastapi', 'directory': str(file.parent.relative_to(source)).replace('\\', '/'), 'app': file.stem + ':' + name}
-                        if ui: result['ui'] = ui
+                        # A server-rendered home page owns the UI; docs may be an old demo.
+                        server_home = any(isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and
+                            any(isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and
+                                d.func.attr == 'get' and d.args and isinstance(d.args[0], ast.Constant) and d.args[0].value == '/' and
+                                any(k.arg == 'response_class' and isinstance(k.value, ast.Name) and k.value.id in ('HTMLResponse', 'FileResponse') for k in d.keywords)
+                                for d in item.decorator_list) for item in tree.body)
+                        if server_home: result['ui'] = {'kind': 'asgi'}
+                        elif ui: result['ui'] = ui
                         return validate(source, result)
     if ui:
         return validate(source, ui)
@@ -77,7 +84,10 @@ def validate(source, spec):
             if not script.is_file() or script.suffix!='.py':raise ValueError('Python 실행 스크립트가 없습니다.')
         elif not re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*', spec.get('app') or spec.get('entry', '')):
             raise ValueError('Python 실행 진입점은 module:object 형식이어야 합니다.')
-    if spec.get('ui'): validate(source, spec['ui'])
+    if spec.get('ui'):
+        if spec['ui'].get('kind') == 'asgi':
+            if spec['kind'] != 'fastapi': raise ValueError('서버 화면에는 FastAPI 실행 진입점이 필요합니다.')
+        else: validate(source, spec['ui'])
     return spec
 
 
@@ -103,7 +113,7 @@ def prepare(source, spec, run):
     if kind in ('static', 'vite'):
         index = owned(owned(folder, spec.get('output', '.')), 'index.html')
         if not index.is_file(): raise ValueError('빌드 결과에 index.html이 없습니다.')
-    if spec.get('ui'): prepare(source, spec['ui'], run)
+    if spec.get('ui') and spec['ui'].get('kind') != 'asgi': prepare(source, spec['ui'], run)
 
 
 def generate_with_hermes(source, note, cancelled, progress, project_id='verification'):

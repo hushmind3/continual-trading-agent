@@ -10,7 +10,7 @@
 - `portable_runner.py`, `portable_web.py`: ZIP에 포함되는 표준 라이브러리 기반 독립 실행기. 플랫폼·Codex·사용자 모델이 없어도 정적/Vite/FastAPI/Python CLI/Node MCP 원본 실행을 준비합니다. 독립 실행한 앱은 플랫폼과 별개이므로 자체 로컬 웹 포트를 사용할 수 있습니다.
 - `localization.py`: 준비된 유휴 모델만 번역에 사용합니다. 번역 때문에 모델을 불러오지 않습니다. 꺼진 모델·작업 중에는 원문을 표시합니다.
 
-API: `projects/install`, `retry`, `settings`, `detach`, `reconnect`, `remove`, `export`, `import`, `agent/connect`, `agent/start`. 데이터와 검사 자료는 `runtime/projects/manage/` 소속입니다. 내보내기는 앱별 `projects/<ID>/exports/`, 가져오기 임시는 `imports/`이며 설치 성공·실패·취소 뒤 정리합니다.
+API: `projects/install`, `retry`, `settings`, `detach`, `reconnect`, `remove`, `export`, `import`, `agent/connect`, `agent/start`. 데이터와 검사 자료는 `runtime/projects/manage/` 소속입니다. 내보내기는 앱별 `projects/<앱 이름>/exports/`, 가져오기 임시는 `imports/`이며 설치 성공·실패·취소 뒤 정리합니다.
 
 검사 명령·현재 한계·실제 결과는 [상위 안내](../README.md)를 따릅니다. 외부 native 모듈과 임의 데스크톱 앱 변환은 기존 외부 앱 ZIP 대상이 아닙니다. 기본 금융·REA·Hermes는 별도 standalone-module 소스 배포 형식으로 지원합니다.
 
@@ -24,6 +24,8 @@ cleanup.py는 이전 ZIP/가져오기 잔재를 휴지통으로 이동합니다.
 
 Windows 설치기: powershell_app.py·powershell_metadata.ps1은 원본 PS AST만 읽어 옵션을 탐지합니다. adapters.py의 powershell 유형은 runtime.verify에서 문법만 확인하며 entry_executed로 표시하지 않습니다. 원본 실행은 projects/setup 사용자 요청에서만 별도 프로세스로 시작하며 runtime.ACTIVE로 서버 적용·제거를 보호합니다. setup/folder는 사용자 클릭 시에만 Windows 폴더 선택 창을 엽니다. setup/status는 JSON과 최근 로그만 읽고 매번 PowerShell을 띄우지 않습니다. 임시 다운로드는 해당 설치 버전의 setup-cache에 격리합니다. 원본 설치기가 지정 대상 폴더에 만든 파일은 저장소 제거로 자동 복원/제거되는 대상이 아닙니다. 회귀 명령: .venv/Scripts/python.exe -X utf8 -B -m unittest development.tests.test_project_windows_installer -q.
 
-store.project_folder/install_folder가 프로젝트 관리 앱별 부모/application 경로를 계산합니다. 기존 버전/설정/전용 패키지 경로를 이동하지 않고 동일 부모를 유지합니다. powershell_app.describe는 설치 대상 매개변수만 managed로 표시하고 start가 앱 내부 경로를 강제 사용해 외부 입력 경로로 설치되지 않게 합니다. 필수 기존 프로그램 입력은 자동 설치 경로로 오분류하지 않습니다.
+store.project_folder/install_folder가 프로젝트 관리 앱별 부모/application 경로를 계산합니다. 기존 등록 ID와 실제 저장 폴더 이름을 분리합니다. assign_folder는 유휴 상태에서 기존 폴더를 저장소 이름으로 이동하고 레코드/모듈의 소유 경로를 함께 갱신합니다. 새 소스는 versions/version-N/source에 준비하며 분리/재연결/내보내기/제거는 같은 project_folder 경계를 사용합니다. powershell_app.describe는 설치 대상 매개변수만 managed로 표시하고 start가 앱 내부 경로를 강제 사용해 외부 입력 경로로 설치되지 않게 합니다. 필수 기존 프로그램 입력은 자동 설치 경로로 오분류하지 않습니다.
 
 cli_schema.py: 원본 Python argparse의 정적 실행 명세를 읽고 입력 검증/실행 인수로 변환합니다. 모듈/스크립트를 분석 시 실행하지 않습니다. projects/interface·action은 handlers에서 등록하며 실제 실행은 runtime.run_cli → python_packages.cli_command를 사용합니다. 일반 main.py와 README 참조 도구를 탐지하고 pyproject 함수 진입점을 보존합니다. 동일 앱의 중복 실행을 거절하고 실행 로그를 요청마다 초기화해 이전 도움말/결과가 섞이지 않게 합니다. 검사: development/tests/test_project_automatic_ui.py, development/scripts/verify_automatic_ui.cjs.
+
+현재 업데이트 경로: server.py의 FastAPI와 HTML 첫 화면을 정적으로 발견하면 ui.kind=asgi로 연결합니다. runtime은 원본 ASGI 응답을 제공하고 원래 인증을 유지합니다. 앱 업데이트 때 기존 일반 연결 모듈은 재사용하여 호스트 빌드/재시작을 유발하지 않으며 실제 Git source_commit을 기록합니다. frontend/ProjectApp은 설치 revision 변경 시 iframe을 새로 열고 변경 가능한 화면/자산은 no-store로 제공합니다. data/.gitkeep 같은 추적 파일 유무로 폴더 전체를 제외하지 않고, data 안의 파일별로 Git 추적 여부를 비교해 사용자 DB/인증/설정을 새 버전으로 보존합니다. Git이 관리하는 data 소스는 임의 복사하지 않습니다. 임의 외부 저장소의 모든 데이터 위치까지 자동 추적하는 기능은 아닙니다.

@@ -3,7 +3,10 @@
  window.__platformFetch=original;
  window.fetch=async(input,init={})=>{
   const request=new Request(input,init),url=new URL(request.url,location.href);
-  if(url.origin!==location.origin||url.pathname.startsWith('/assets/'))return original(request);
+  const prefix='/assets/projects/'+project+'/';
+  if(url.origin!==location.origin)return original(request);
+  if(url.pathname.startsWith(prefix))url.pathname='/'+url.pathname.slice(prefix.length);
+  else if(url.pathname.startsWith('/assets/'))return original(request);
   const method=request.method,body=['GET','HEAD'].includes(method)?'':await request.text();
   const response=await original('/api',{method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({operation:'projects/invoke',payload:{id:project,path:url.pathname,

@@ -36,7 +36,7 @@ def idle(record):
 
 
 def detached(record):
-    base = store.owned(store.STATE, 'projects/' + record['id'])
+    base = store.project_folder(record)
     if record.get('detached_module'):
         candidate = store.owned(base, str(Path(record['detached_module']).relative_to(base)))
         if candidate.is_dir(): return candidate
@@ -59,7 +59,7 @@ def detach(key):
         idle(record)
         from .agent_tasks import link
         link(record, remove=True)
-        target = store.owned(store.STATE, 'projects/' + key + '/detached/' + uuid.uuid4().hex)
+        target = store.owned(store.project_folder(record), 'detached/' + uuid.uuid4().hex)
         target.parent.mkdir(parents=True, exist_ok=True)
         folder.rename(target)
         try:
@@ -79,7 +79,7 @@ def reconnect(key):
             idle(record)
             from .detachment import reconnect_builtin
             return reconnect_builtin(record)
-        source = store.owned(store.STATE / 'projects' / key, str(Path(record.get('active_source') or '').relative_to(store.STATE / 'projects' / key)))
+        source = store.owned(store.project_folder(record), str(Path(record.get('active_source') or '').relative_to(store.project_folder(record))))
         candidate = detached(record)
         if not source.is_dir() or not candidate: raise ValueError('보관된 설치 파일이 없습니다. 다시 설치하세요.')
         folder = module_folder(record)
@@ -106,7 +106,9 @@ def remove(key):
         idle(record)
         from .agent_tasks import link
         link(record, remove=True)
-        paths = [store.owned(store.STATE, 'projects/' + key)]
+        paths = [store.project_folder(record)]
+        if record.get('legacy_folder_name') == key:
+            paths.append(store.owned(store.STATE, 'projects/' + key))
         if folder and folder.exists(): paths.insert(0, folder)
         # Delete only this project's legacy detached modules, never unrelated trash.
         if record.get('module_id'):

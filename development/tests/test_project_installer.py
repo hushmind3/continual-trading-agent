@@ -3,6 +3,7 @@ import base64
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -83,6 +84,53 @@ class InstallerTests(unittest.TestCase):
         (backend / 'main.py').write_text('from fastapi import FastAPI\napp=FastAPI()\n')
         spec = adapters.detect(self.source)
         self.assertEqual((spec['kind'], spec['app'], spec['ui']['kind']), ('fastapi', 'main:app', 'vite'))
+
+    def test_server_rendered_home_precedes_stale_docs_and_keeps_auth(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        docs = self.source / 'docs'; docs.mkdir(); (docs/'index.html').write_text('Old demo')
+        (self.source/'server.py').write_text('from fastapi import FastAPI,Header,HTTPException\nfrom fastapi.responses import HTMLResponse\napp=FastAPI()\n'
+            '@app.get("/",response_class=HTMLResponse)\ndef home(): return "<html><head></head><body>Live company <a href=\'/product\'>Product</a></body></html>"\n'
+            '@app.get("/private")\ndef private(x_owner: str=Header("")):\n if x_owner!="owner": raise HTTPException(401)\n return {"current":True}\n')
+        spec=adapters.detect(self.source)
+        self.assertEqual((spec['kind'],spec['app'],spec['ui']['kind']),('fastapi','server:app','asgi'))
+        runtime.verify(self.source,spec)
+        state=self.base/'state'
+        with patch.object(store,'STATE',state):
+            store.save({'id':'p_server','adapter':spec,'active_source':str(self.source)})
+            app=FastAPI(); runtime.register_host(app)
+            with TestClient(app) as client:
+                response=client.get('/assets/projects/p_server/index.html')
+                self.assertEqual(response.status_code,200); self.assertIn('Live company',response.text)
+                self.assertIn('/assets/projects/p_server/product',response.text)
+                self.assertEqual(response.headers['cache-control'],'no-store')
+                self.assertEqual(client.get('/assets/projects/p_server/private').status_code,401)
+                self.assertTrue(client.get('/assets/projects/p_server/private',headers={'X-Owner':'owner'}).json()['current'])
+        log=self.base/'server-ui.log'
+        self.assertTrue(runtime.verify_ui(self.source,spec,{},lambda cmd,folder,timeout:installer.run_command(cmd,folder,log,threading.Event(),timeout)))
+
+    def test_existing_app_update_uses_same_module_without_host_build(self):
+        root=self.base/'host'; state=root/'runtime/projects/manage'
+        module=root/'modules/external_p_demo'; module.mkdir(parents=True)
+        original=json.dumps({'id':'external_p_demo','install_revision':'first'})
+        (module/'module.json').write_text(original)
+        old=state/'projects/demo/versions/previous/source'; (old/'data').mkdir(parents=True)
+        (old/'data/keep.txt').write_text('user data')
+        (old/'data/.gitkeep').write_text('tracked placeholder')
+        subprocess.run(['git','init','-q',str(old)],check=True)
+        subprocess.run(['git','-C',str(old),'add','data/.gitkeep'],check=True)
+        (self.source/'index.html').write_text('<html><body>NEW APP</body></html>')
+        record={'id':'p_demo','folder_name':'demo','title':'demo','module_id':'external_p_demo','active_source':str(old),'url':'https://github.com/owner/demo'}
+        with patch.object(installer,'ROOT',root),patch.object(installer,'STATE',state),patch.object(store,'STATE',state),patch.object(store,'ROOT',root), \
+             patch.object(runtime,'verify_ui',return_value=True),patch.object(installer,'run_command') as command:
+            installer.install(record,threading.Event(),self.source)
+            command.assert_not_called()
+            result=store.read('p_demo'); self.assertEqual(result['stage'],'ready')
+            self.assertEqual((module/'module.json').read_text(),original)
+            source=Path(result['active_source'])
+            self.assertEqual(source.parent.name,'version-1')
+            self.assertIn('NEW APP',(source/'index.html').read_text())
+            self.assertEqual((source/'data/keep.txt').read_text(),'user data')
 
     def test_asgi_worker_preserves_state_and_actual_working_directory(self):
         (self.source / 'main.py').write_text('from fastapi import FastAPI\nimport os\napp=FastAPI()\ncounter=0\n'

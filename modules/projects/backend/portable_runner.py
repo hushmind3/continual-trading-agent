@@ -53,7 +53,7 @@ def prepare(source, spec):
         if requirements: execute([python(), '-m', 'pip', 'install', '-r', requirements], work)
         if (work / 'pyproject.toml').is_file(): execute([python(), '-m', 'pip', 'install', work], work)
         if kind == 'fastapi': execute([python(), '-m', 'pip', 'install', 'fastapi', 'uvicorn'], work)
-    if spec.get('ui'): prepare(source, spec['ui'])
+    if spec.get('ui') and spec['ui'].get('kind') != 'asgi': prepare(source, spec['ui'])
 
 
 def node_command(source, spec):

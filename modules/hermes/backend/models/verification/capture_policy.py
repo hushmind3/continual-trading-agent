@@ -53,7 +53,7 @@ def main():
             with (home/'config.yaml').open('w',encoding='utf8') as stream:yaml.dump(native,stream)
             bridge=WorkerBridge(home)
             try:
-                bridge.call('settings/save',{k:settings[k] for k in ('model','workspace','max_iterations','toolsets','system_prompt') if k in settings}|{'base_url':f'http://127.0.0.1:{server.server_port}/v1','api_key':'local'})
+                bridge.call('settings/save',{k:settings[k] for k in ('model','workspace','max_iterations','toolsets','system_prompt','tool_loading') if k in settings}|{'base_url':f'http://127.0.0.1:{server.server_port}/v1','api_key':'local'}|({'tool_loading':'native'} if native_deferral else {}))
                 bridge.call('chat',{'message':'Hi. Reply briefly.','read_only':False})
                 deadline=time.monotonic()+45
                 while time.monotonic()<deadline:

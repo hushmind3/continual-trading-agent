@@ -459,3 +459,15 @@ test('activity panel can be dragged wider, resized with keys and remembers its w
  await expect.poll(async()=>Math.abs((await panel.boundingBox())!.width-original.width)).toBeLessThan(2);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
+
+test('model runtime options are saved and applied through the existing API',async({page})=>{
+ const {calls}=await fixture(page);
+ await page.goto('/#ai_agent/Hermes/models');
+ await page.getByLabel('문맥 한도',{exact:true}).fill('32768');
+ await page.getByLabel('Thinking',{exact:true}).selectOption('off');
+ await page.getByLabel('도구 설명 불러오기',{exact:true}).selectOption('lazy');
+ await page.getByRole('button',{name:'실행 설정 저장·적용',exact:true}).click();
+ await expect.poll(()=>calls.some(call=>call.op==='settings'&&call.payload.context_length===32768&&call.payload.thinking_mode==='off'&&call.payload.tool_loading==='lazy')).toBe(true);
+ await expect.poll(()=>calls.filter(call=>call.op==='model/load').length).toBe(1);
+ await expect(page.getByLabel('문맥 한도',{exact:true})).toHaveValue('32768');
+});

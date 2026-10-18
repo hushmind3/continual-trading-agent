@@ -3,6 +3,9 @@ import ast
 import importlib.util
 from pathlib import Path
 import threading
+import sys
+import types
+from unittest.mock import patch
 from types import SimpleNamespace
 import unittest
 
@@ -11,9 +14,48 @@ ENGINE = ROOT / 'modules/hermes/backend/engine'
 spec = importlib.util.spec_from_file_location('hermes_execution', ENGINE / 'execution.py')
 execution = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(execution)
+package=types.ModuleType('hermes_policy_test');package.__path__=[str(ENGINE)]
+sys.modules['hermes_policy_test']=package
+policy_spec=importlib.util.spec_from_file_location('hermes_policy_test.runtime_policy',ENGINE/'runtime_policy.py')
+policy=importlib.util.module_from_spec(policy_spec);policy_spec.loader.exec_module(policy)
 
 
 class ExecutionPolicyTests(unittest.TestCase):
+    def test_model_profiles_do_not_leak_between_models(self):
+        cfg={'model':'ornith','tool_loading':'lazy','model_options':{}}
+        policy.save_options(cfg,{'context_length':65536,'thinking_mode':'off'})
+        self.assertEqual(policy.model_options(cfg,{}),{'context_length':65536,'thinking_mode':'off'})
+        self.assertEqual(policy.model_options({**cfg,'model':'another'},{}),{'context_length':0,'thinking_mode':'auto'})
+        for value in (True,-1,0.5,'65536',2097153):
+            with self.subTest(value=value),self.assertRaises(ValueError):policy.save_options(cfg,{'context_length':value})
+        policy.save_options(cfg,{'context_length':0,'thinking_mode':'auto'})
+        self.assertEqual(policy.model_options(cfg,{})['context_length'],0)
+
+    def test_thinking_override_preserves_other_native_request_fields(self):
+        agent=SimpleNamespace(request_overrides={'extra_body':{'existing':1,'chat_template_kwargs':{'other':True}}})
+        policy.apply_thinking(agent,{'thinking_mode':'off'},True)
+        self.assertEqual(agent.request_overrides['extra_body'],{'existing':1,'chat_template_kwargs':{'other':True,'enable_thinking':False}})
+        policy.apply_thinking(agent,{'thinking_mode':'on'},True)
+        self.assertTrue(agent.request_overrides['extra_body']['chat_template_kwargs']['enable_thinking'])
+        untouched=SimpleNamespace(request_overrides={})
+        policy.apply_thinking(untouched,{'thinking_mode':'auto'},True)
+        policy.apply_thinking(untouched,{'thinking_mode':'off'},False)
+        self.assertEqual(untouched.request_overrides,{})
+
+    def test_lazy_tool_delivery_keeps_registry_capabilities_and_native_default(self):
+        native={'tools':{'tool_search':{'listing_max_tokens':4000,'defer':[]}}}
+        defaults={'tools':{'tool_search':{'defer':['computer_use']}}}
+        registry=SimpleNamespace(get_tool_to_toolset_map=lambda:{'terminal':'terminal','computer_use':'computer_use'})
+        worker=SimpleNamespace(native_config=lambda:native,write_config=lambda value:None)
+        with patch.dict(sys.modules,{'hermes_cli.config_defaults':SimpleNamespace(DEFAULT_CONFIG=defaults),'tools.registry':SimpleNamespace(registry=registry)}):
+            policy.configure_tools(worker,'lazy')
+            self.assertEqual(native['tools']['tool_search']['defer'],['computer_use','terminal'])
+            self.assertEqual(native['tools']['tool_search']['listing_max_tokens'],4000)
+            policy.configure_tools(worker,'native')
+            self.assertEqual(native['tools']['tool_search']['defer'],['computer_use'])
+            policy.configure_tools(worker,'eager')
+            self.assertEqual(native['tools']['tool_search']['enabled'],'off')
+
     def test_chat_switch_overrides_legacy_policy(self):
         self.assertFalse(execution.request_policy({'read_only': True}, {'read_only': False})['read_only'])
         self.assertTrue(execution.request_policy({}, {'read_only': True})['read_only'])

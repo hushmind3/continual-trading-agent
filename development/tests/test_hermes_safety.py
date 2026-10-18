@@ -49,11 +49,11 @@ class RestartTests(unittest.TestCase):
         with patch.object(bridge,'_start') as start,self.assertRaises(RuntimeError):bridge.call('chat',{'message':'work'})
         start.assert_not_called();bridge.cancel_restart()
 
-    def test_finance_restart_blockers_include_hermes(self):
-        from stockrl.platform import system_operations as operations
-        financial=SimpleNamespace(thread=None,controls={'paper':False,'engine':False,'learning':False},inference_active=False)
-        with patch.object(operations,'system',SimpleNamespace(job_state=lambda:{'running':False},active=False)),patch('stockrl.trading.operation_control.operations_runtime.runtime',financial),patch('stockrl.platform.library_operations.library',SimpleNamespace(active=False)),patch('ai_agent.Hermes.engine.bridge.bridge.busy_reason',return_value='Hermes busy'):
-            self.assertEqual(operations.busy(),['Hermes busy'])
+    def test_host_restart_blockers_include_hermes_without_finance_imports(self):
+        import platform_modules
+        entry=SimpleNamespace(busy_reason=lambda:'Hermes busy')
+        with patch.object(platform_modules,'registrations',return_value=[({'id':'hermes'},entry)]):
+            self.assertEqual(platform_modules.busy_reasons(),['Hermes busy'])
 
 
 class AutonomousCompletionTests(unittest.TestCase):

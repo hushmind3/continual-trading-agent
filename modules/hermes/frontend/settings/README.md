@@ -4,6 +4,6 @@
 
 상위 대메뉴 주소는 [../../README.md](../../README.md)에 있습니다. 대화로 돌아가기·화면 선택·브라우저 뒤로가기·새로고침을 지원합니다. 대화는 숨겨 둔 채 유지하며 메뉴 이동 자체가 모델이나 도구를 실행하지 않습니다.
 
-기능 코드: models/ModelSettings.tsx, mcp/McpPage.tsx, skills/Skills.tsx, prompt/SystemPrompt.tsx. workspace/WorkspaceSettings.tsx는 작업 폴더·도구·반복 한도를 별도 소메뉴로 표시합니다. useAgentSettings.ts는 설정 조회·실패·재시도를 공유합니다. 모델 설정은 서버 연결 필드만, 작업 환경은 workspace/toolsets/max_iterations만 저장합니다. 각 기능 API와 권한·저장 위치는 각 README를 따릅니다.
+기능 코드: models/ModelSettings.tsx, mcp/McpPage.tsx, skills/Skills.tsx, prompt/SystemPrompt.tsx. workspace/WorkspaceSettings.tsx는 작업 폴더·도구·반복 한도를 별도 소메뉴로 표시합니다. useAgentSettings.ts는 설정 조회·실패·재시도를 공유합니다. 모델 연결 저장은 서버 연결 필드만, 실행 설정 저장은 context_length/thinking_mode/tool_loading만, 작업 환경은 workspace/toolsets/max_iterations만 저장합니다. 각 기능 API와 권한·저장 위치는 각 README를 따릅니다.
 
 방문한 설정 화면은 숨겨 유지해 소메뉴 이동과 대화 왕복 때 미저장 초안을 잃지 않습니다. 브라우저 새로고침까지 저장하는 기능은 아니며, 접속 키를 브라우저 저장소에 기록하지 않습니다. useAgentSettings는 활성 화면에서 현재 서버 설정을 다시 읽되 로컬에서 수정한 필드는 유지하고, 저장 응답은 새 기준값으로 받아들입니다.

@@ -17,3 +17,5 @@ Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to 
 2026-10-16: 격리된 가짜 모델 서버를 통해 원본 지침 주입, 강제 출력 제한·reasoning 비활성화 제거, 원본 스킬 검토 종료, 읽기 전용 도구 차단을 확인했습니다. 실제 Ornith의 thinking 출력·문맥 할당·품질 비교는 실행하지 않았습니다. 설치된 llama.cpp 도움말에서도 ctx-size 0이 모델 문맥을 사용하는 값임을 확인했습니다.
 
 2026-10-18: 실제 GPU 적재·Thinking 템플릿·기본 지침/도구 토큰 조사는 [모델 안내](../models/README.md)에 기록했습니다. 실행 설정은 변경하지 않았으며 원본 지연 로딩 목록을 덮어쓰는 defer: []도 조사 대상입니다.
+
+현재 실행 제어: runtime_policy.py가 모델별 문맥/Thinking과 원본 도구 검색 제공 방식을 연결합니다. defer: [] 강제 생성은 제거했습니다. Thinking auto는 원본/모델 기본값을 보존합니다. 설정·실측·남은 제한은 [모델 안내](../models/README.md)의 설정 복구 항목을 봅니다.

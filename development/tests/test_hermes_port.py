@@ -191,8 +191,8 @@ class HermesPortTests(unittest.TestCase):
     def test_11_original_review_finishes_before_worker_releases_agent(self):
         config = self.folder / 'state' / 'config.yaml'
         original = config.read_text(encoding='utf-8')
-        self.assertNotIn('skills:', original)
-        config.write_text(original + '\nskills:\n  creation_nudge_interval: 1\n', encoding='utf-8')
+        configured=original.replace('skills:\n','skills:\n  creation_nudge_interval: 1\n',1) if 'skills:\n' in original else original+'\nskills:\n  creation_nudge_interval: 1\n'
+        config.write_text(configured, encoding='utf-8')
         try:
             self.bridge.call('chat', {'message': 'Create a greeting in the fixture workspace.'})
             job = self.wait_job()
@@ -217,7 +217,7 @@ for line in sys.stdin:
  result={'protocolVersion':'2025-03-26','capabilities':{'tools':{}},'serverInfo':{'name':'fixture','version':'1'}} if method=='initialize' else {'tools':[{'name':'echo','description':'Echo fixture','inputSchema':{'type':'object','properties':{'text':{'type':'string'}}}}]} if method=='tools/list' else {'content':[{'type':'text','text':r.get('params',{}).get('arguments',{}).get('text','')}]} if method=='tools/call' else {}
  print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}),flush=True)
 ''', encoding='utf-8')
-        settings = {'port_fixture': {'command': str(ROOT / '.venv/hermes/Scripts/python.exe'), 'args': ['-I', '-X', 'utf8', str(script)]}}
+        settings = {'port_fixture': {'command': str(ROOT / 'modules/hermes/.venv/Scripts/python.exe'), 'args': ['-I', '-X', 'utf8', str(script)]}}
         self.bridge.call('mcp/save', {'servers': settings})
         result = self.bridge.call('mcp/connect')
         self.assertEqual(result['servers'], settings)

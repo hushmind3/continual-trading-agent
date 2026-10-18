@@ -52,11 +52,13 @@ from run_agent import AIAgent
 from hermes_state import SessionDB
 from ruamel.yaml import YAML
 from ai_agent.Hermes.engine.execution import bind_model, context_window, request_policy, settle_review
+from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking
 
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
             'workspace': str(ROOT), 'max_iterations': 100,
-            'toolsets': ['terminal', 'file', 'todo', 'skills'], 'local_model': '', 'system_prompt': '', 'read_only': False}
+            'toolsets': ['terminal', 'file', 'todo', 'skills'], 'local_model': '', 'system_prompt': '', 'read_only': False,
+            'model_options': {}, 'tool_loading': 'native'}
 
 
 def atomic_json(path, value):
@@ -95,7 +97,6 @@ class HermesWorker:
         cfg.setdefault('computer_use', {}).setdefault('capture_after_mode', 'ax')
         if not cfg.setdefault('browser', {}).get('backend'):
             cfg['browser']['backend'] = 'off'  # native agent-browser stack, not browser-use CLI
-        cfg.setdefault('tools', {}).setdefault('tool_search', {}).setdefault('defer', [])
         self.write_config(cfg)
         # Original skills loader uses HERMES_HOME/skills; seed without overwriting user files.
         for source in (UPSTREAM / 'skills').rglob('*'):
@@ -130,7 +131,7 @@ class HermesWorker:
 
     def public_settings(self):
         cfg = load_settings()
-        return {**cfg, 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
+        return {**cfg, **model_options(cfg,self.native_config()), 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
                 'python': sys.version.split()[0], 'engine': str(UPSTREAM),
                 'available_toolsets': ['terminal', 'file', 'todo', 'skills', 'browser', 'computer_use', 'memory'],
                 'computer_driver_installed': _driver.is_file(),
@@ -140,6 +141,7 @@ class HermesWorker:
         self.idle_required()
         cfg = load_settings()
         for key in DEFAULTS:
+            if key=='model_options':continue
             if key in request and not (key == 'api_key' and request[key] == ''):
                 cfg[key] = request[key]
         from urllib.parse import urlparse
@@ -159,6 +161,7 @@ class HermesWorker:
             raise ValueError('최대 작업 반복 횟수는 1~10000입니다.')
         if not isinstance(cfg['toolsets'], list) or any(t not in self.public_settings()['available_toolsets'] for t in cfg['toolsets']):
             raise ValueError('지원하지 않는 도구 묶음입니다.')
+        cfg=save_options(cfg,request)
         atomic_json(SETTINGS, cfg)
         return self.public_settings()
 
@@ -263,6 +266,7 @@ class HermesWorker:
             tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'computer_use'}
             toolsets = list(cfg['toolsets']) + ['mcp-' + name for name in get_registered_mcp_server_names()]
             if cfg.get('read_only'):toolsets=['file']
+            configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'))
             self.agent = AIAgent(
                 model=cfg['model'], base_url=cfg['base_url'], api_key=cfg.get('api_key') or 'local',
                 provider='custom', api_mode='chat_completions', quiet_mode=True,
@@ -296,6 +300,7 @@ class HermesWorker:
                 tool_complete_callback=lambda *args, **kw: self.event('tool_complete', args),
                 clarify_callback=self.clarify,
             )
+            apply_thinking(self.agent,model_options(cfg,self.native_config()),bool(cfg.get('local_model')))
             if cfg.get('read_only'):
                 from ai_agent.Hermes.chat.read_only import bind as bind_read_only
                 bind_read_only(self.agent,cfg['workspace'],lambda reason:self.event('permission_denied',{'message':reason}),(request or {}).get('attachments',[]))
@@ -396,7 +401,7 @@ class HermesWorker:
             raise ValueError('설치된 llama-server 실행기를 찾을 수 없습니다.')
         alias = path.parent.name if path.stem.upper() in {'GGUF', 'MODEL'} else path.stem
         native = self.native_config()
-        context_length = context_window(native, alias)
+        context_length = model_options({**load_settings(),'model':alias},native)['context_length']
         self.unload_model()
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
@@ -411,6 +416,8 @@ class HermesWorker:
             cwd=path.parent, stdout=self.model_log, stderr=self.model_log,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
         self.model_base = f'http://127.0.0.1:{port}/v1'
+        self._slot_sample=None
+        with self.lock:self.job.pop('metrics',None)
         self.write_config(bind_model(native, alias, self.model_base, context_length))
         self.save_settings({'base_url': self.model_base, 'model': alias, 'local_model': str(path)})
         return self.status()

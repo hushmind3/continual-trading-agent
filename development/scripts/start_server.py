@@ -146,7 +146,7 @@ def ensure_watchdog():
     """Keep the API available independently of the launching console."""
     from server_watchdog import running
     if running():
-        if read_json(RUNTIME/'server-watchdog.json').get('module_watch_version')==2:return
+        if read_json(RUNTIME/'server-watchdog.json').get('module_watch_version')==4:return
         (RUNTIME/'server-watchdog.stop').write_text('',encoding='utf8')
         deadline=time.monotonic()+8
         while running() and time.monotonic()<deadline:time.sleep(.2)
@@ -185,6 +185,9 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
             operation.update(changed_files=changed,revision=revision)
             frontend_changed=groups['frontend']!=old.get('frontend') or not (FRONTEND/'dist/index.html').is_file()
             backend_changed=groups['backend']!=old.get('backend')
+            if live:
+                from platform_modules import signature
+                backend_changed|=api('health').get('module_signature')!=signature()
             if before.get('dist_sha256') and (FRONTEND/'dist/index.html').is_file():
                 frontend_changed|=hashlib.sha256((FRONTEND/'dist/index.html').read_bytes()).hexdigest()!=before['dist_sha256']
             phase(stage,'변경 소스 확인','complete',f'{len(changed)}개 변경; 프론트 빌드 {frontend_changed}, 서버 갱신 {not frontend_only and (backend_changed or not live)}')

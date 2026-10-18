@@ -9,7 +9,7 @@ from pathlib import Path
 
 import psutil
 
-from start_server import ROOT,RUNTIME,PORT,ready,listeners,main,blockers
+from start_server import ROOT,RUNTIME,PORT,ready,listeners,main,blockers,api
 from platform_modules import signature
 from platform_state_io import read_json,atomic_json
 
@@ -37,6 +37,14 @@ def recover():
     return True
 
 
+def modules_changed(desired,previous):
+    # An add/remove during apply may return the disk to its prior signature
+    # while the live API still has the intermediate module loaded.
+    applied=read_json(RUNTIME/'applied-sources.json').get('sources',{})
+    return (desired!=api('health',timeout=3).get('module_signature',previous)
+        or any(desired!=applied.get(part,{}).get('modules/.registration',desired) for part in ('frontend','backend')))
+
+
 def supervise():
     import msvcrt
     RUNTIME.mkdir(parents=True,exist_ok=True)
@@ -47,7 +55,7 @@ def supervise():
         except OSError:return
         record={'pid':os.getpid(),'process_created':psutil.Process().create_time(),
             'status':'running','started_at':time.time(),'restarts':0,'last_error':'',
-            'module_watch_version':2,'modules_signature':signature()}
+            'module_watch_version':4,'modules_signature':signature()}
         atomic_json(record,STATUS)
         try:
             while not STOP.exists():
@@ -56,7 +64,7 @@ def supervise():
                     if recover():
                         record.update(restarts=record['restarts']+1,last_restart_at=time.time(),last_error='')
                         atomic_json(record,STATUS)
-                    elif (desired:=signature())!=record['modules_signature']:
+                    elif modules_changed(desired:=signature(),record['modules_signature']):
                         active=blockers()
                         if active:
                             record.update(modules_pending=desired,modules_blockers=active)

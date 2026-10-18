@@ -1,6 +1,6 @@
 // Translate displayed text without rewriting the installed application's source.
 (()=>{
- if(localStorage.getItem('projects.korean')==='false')return;
+ if(localStorage.getItem('projects.korean')!=='true')return;
  document.documentElement.lang='ko';
  const originals=new WeakMap(),translated=new Set(),cache=new Map();let timer,busy=false;
  const schedule=()=>{clearTimeout(timer);timer=setTimeout(update,800)};

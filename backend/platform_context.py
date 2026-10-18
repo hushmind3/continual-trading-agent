@@ -49,7 +49,8 @@ system=HostSystem()
 def register_controls(router):
     """Global apply guards belong to the host, even when a business module is absent."""
     from fastapi import HTTPException
-    from platform_modules import busy_reasons,lifecycle
+    from platform_modules import busy_reasons,lifecycle,signature
+    loaded_signature=signature()
     paths={'/api/system/blockers','/api/system/prepare-restart','/api/health','/api/state'}
     router.routes[:]=[route for route in router.routes if getattr(route,'path',None) not in paths]
     @router.get('/api/system/blockers')
@@ -65,7 +66,7 @@ def register_controls(router):
     @router.get('/api/health')
     def health():return {'ok':True,'service':'project-platform','project':str(ROOT),'status':'ok',
                         'pid':os.getpid(),'python':sys.executable,'python_prefix':sys.prefix,
-                        'deployment_id':os.environ.get('STOCKRL_APPLY_ID')}
+                        'deployment_id':os.environ.get('STOCKRL_APPLY_ID'),'module_signature':loaded_signature}
     @router.get('/api/state')
     def state(views:str='[]',refresh_views:bool=False):
         import json

@@ -24,6 +24,30 @@ def installed():
     return {'items': installer.installed(), 'active_module_ids': [metadata['id'] for metadata, _ in MODULE_ENTRIES]}
 
 
+@router.post('/cleanup')
+def cleanup_projects():
+    from .cleanup import clean
+    return call(clean)
+
+
+@router.post('/folder/open')
+def open_folder(request:dict):
+    def open_owned():
+        import os
+        key=identifier(request.get('id',''))
+        try:record=read(key)
+        except ValueError:
+            from .detachment import builtin_record
+            record=builtin_record(key)
+        folder=Path(record.get('standalone_path') or record.get('active_source') or record.get('source') or STATE/'projects'/key).resolve()
+        from .store import ROOT
+        if not folder.is_dir() or not folder.is_relative_to(ROOT.resolve()):raise ValueError('앱 폴더가 없습니다.')
+        if os.name!='nt':raise ValueError('폴더 열기는 현재 Windows에서 지원합니다.')
+        os.startfile(str(folder))
+        return {'path':str(folder)}
+    return call(open_owned)
+
+
 @router.post('/install')
 def install(request: dict): return call(installer.start, request.get('url', ''), None, False, request.get('allow_agent') is True)
 
@@ -40,7 +64,12 @@ def retry(request: dict):
 
 @router.get('/detail')
 def detail(id: str):
-    record = call(read, id); value = installer.public(record)
+    def record_for():
+        try:return read(id)
+        except ValueError:
+            from .detachment import builtin_record
+            return builtin_record(id)
+    record = call(record_for); value = installer.public(record)
     log = Path(record.get('install_log') or STATE / 'absent')
     if log.is_file() and log.resolve().is_relative_to(STATE.resolve()):
         with log.open('rb') as stream:
@@ -87,7 +116,9 @@ def remove(request: dict):
 
 
 @router.post('/detach')
-def detach(request: dict): return call(lifecycle.detach, request.get('id', ''))
+def detach(request: dict):
+    from .detachment import start
+    return call(start,request.get('id',''))
 
 
 @router.post('/reconnect')

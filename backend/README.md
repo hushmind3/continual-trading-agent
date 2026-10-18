@@ -45,3 +45,5 @@
 담당: module_runtime.py의 전용 프로세스 요청 접수·재시작 예약·종료입니다. 요청 접수 잠금은 응답 읽기 잠금과 분리하며, busy 확인 시작부터 예약 완료까지 새 요청을 대기시킨 뒤 거절합니다. 예약 취소가 끝나야 접수를 재개합니다. shutdown은 실행기가 이미 종료됐거나 없는 경우 새 프로세스를 시작하지 않습니다. 데이터·소스 경로를 이동/삭제하지 않습니다.
 
 확인: development/tests/test_module_runtime.py에서 두 결함을 수정 전 실패로 재현했습니다. 수정 후에는 실제 Node IPC의 예약·거절·취소·응답·종료, Python 환경 이동 후 명령 실행, 업무 모듈 없는 호스트, 의존성 실패 격리와 큰 파일 전달을 검사합니다. 모듈 등록/탈착·상태 보존은 test_platform_modules.py를 따릅니다. 검사 명령은 `.venv/Scripts/python.exe -X utf8 -B -m unittest discover -s development/tests -p test_module_runtime.py -q`이며 `test_platform_modules.py`도 같은 방식으로 실행합니다. 테스트 임시 소스·로그는 runtime/platform/module-verification 아래 각 임시 폴더에서 생성하고 정리합니다. 완전 독립 배포·다른 PC 실행은 이 검사로 확인하지 않습니다.
+
+등록 상태: health의 module_signature는 호스트 시작 시 로드한 모듈 서명입니다. 감시기는 디스크뿐 아니라 실제 API·프론트/백엔드 적용 기록도 비교해 빠른 제거 후의 메뉴 잔재를 정리합니다. 실제 분리/복원 결과는 projects README를 따릅니다.

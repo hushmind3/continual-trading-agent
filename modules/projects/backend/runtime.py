@@ -27,7 +27,7 @@ class AppWorker:
         if spec['kind'] == 'node-mcp':
             from .node_mcp import command
             from platform_modules import ROOT
-            python = ROOT / '.venv/hermes/Scripts/python.exe'
+            python = ROOT / 'modules/hermes/.venv/Scripts/python.exe'
             if not python.is_file(): raise ValueError('공유 MCP Python 실행 환경이 없습니다.')
             arguments = [str(python), '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('mcp_worker.py')), json.dumps(command(source, spec))]
         else:

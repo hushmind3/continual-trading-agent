@@ -12,6 +12,8 @@
 
 이 모듈은 플랫폼의 공통 UI·HTTP 통로와 공유 모델 실행기를 사용하며 Python/브라우저 패키지는 모듈 전용 환경에 설치합니다. 폴더 탈착과 독립 배포는 별개입니다. 독립 실행 소스 ZIP은 프로젝트 관리에서 공통 API/UI 소스 복사본과 설치/실행 진입점을 함께 내보냅니다. 다른 PC의 신규 의존성 설치·원본 모델 추론 전체와 모든 외부 GitHub 프로젝트의 자동 변환까지 확인한 뜻은 아닙니다.
 
-패키지 소유: Python은 모듈 내부 `.venv`, Node는 `backend/engine/browser/node_modules`, 명세와 잠금은 각 설치 폴더에 있습니다. 설정·대화 DB·MCP·스킬·작업 기록은 기존 runtime/ai_agent/Hermes에 보존하며 경로는 engine/locations.py에서 모듈 기준으로 계산합니다. Python/Node 버전 자체를 바꾸지 않았습니다.
+패키지 소유: Python은 모듈 내부 `.venv`, Node는 `backend/engine/browser/node_modules`, 명세와 잠금은 각 설치 폴더에 있습니다. 연결 상태의 설정·대화 DB·MCP·스킬·작업 기록은 runtime/ai_agent/Hermes에 저장하며 로컬 분리 시 소유 데이터를 함께 옮깁니다. 기본 경로는 engine/locations.py에서 모듈 기준으로 계산합니다. Python/Node 버전 자체를 바꾸지 않았습니다.
 
-독립 실행 소스: GitHub → 프로젝트 관리 → 설치된 프로젝트의 이 모듈에서 내보냅니다. 압축을 푼 뒤 `python run.py setup`, `check`, `run --port 8080`으로 설치·검사·실행합니다. 필요한 공통 API/UI는 ZIP 안의 복사본을 사용합니다. 기존 데이터·비밀 설정·모델은 자동 포함하지 않습니다. 형식·실제 확인 범위는 [프로젝트 관리](../projects/README.md)를 따릅니다.
+로컬 분리: GitHub → 프로젝트 관리 → 설치된 프로젝트에서 **분리**를 누르면 실제 프로그램·전용 환경·소유 데이터/설정을 독립 폴더로 옮깁니다. `실행.cmd`로 실행하고 다시 연결하면 같은 파일을 복원합니다. 원본 모델은 사용자 지정 위치에 유지합니다.
+
+전달용 소스 ZIP: 설치 정보 → 개발자 상세에서 선택적으로 저장합니다. 압축을 푼 뒤 `python run.py setup`, `check`, `run --port 8080`으로 설치·검사·실행합니다. 필요한 공통 API/UI는 ZIP 안의 복사본을 사용합니다. 기존 데이터·비밀 설정·모델은 자동 포함하지 않습니다. 형식·실제 확인 범위는 [프로젝트 관리](../projects/README.md)를 따릅니다.

@@ -2,6 +2,8 @@
 
 - start_server.py: 기존 소유 서버에 소스를 적용하고 단일 API를 실행합니다.
 - Git 제외 설치 모듈도 등록 서명으로 변경을 추적해 프론트와 API를 함께 갱신합니다. 감시기가 빌드만 하고 API를 유지해 새 메뉴 활성화가 대기하던 경로를 수정했습니다. 실행 중 작업 보호는 그대로 적용합니다.
+- verify_project_detachment.cjs: 실제 공개 GitHub 정적 앱의 설치·브라우저·자동 분리·단독 실행·재연결·완전 제거와 모바일 화면을 확인합니다. 검사 앱만 제거하고 모델은 사용하지 않습니다.
+- verify_builtin_detachment.py: 유휴 REA의 실제 소스·전용 환경·소유 데이터를 분리해 독립 API/브라우저와 원래 위치 복원을 확인합니다. 실패 시에도 재연결을 시도하며 사용자 작업 중에는 실행하지 않습니다. 결과는 runtime/projects/manage/verification/builtin-detachment.json입니다.
 - server_watchdog.py: 실행 창과 분리된 단일 감시 프로세스. 서버 종료 시 기존 실행기로 API만 복구합니다.
 - verify_module_detach.py: 실제 Hermes 폴더를 잠시 분리·복원하고 자동 등록·프론트 빌드·API 복원·설정 보존·중앙 코드 무변경을 확인합니다. 실행 중 작업은 먼저 확인하며 실패해도 폴더를 복원합니다. 결과는 `runtime/platform/module-verification.json`입니다.
 - verify_module_registration.py: 새로운 대메뉴·API·React 화면을 가진 검사 모듈을 폴더 하나로 추가·분리합니다. 기존 메뉴·API 보존과 중앙 파일 수정 0건을 확인하며 검사 모듈은 runtime/platform에 보관합니다.
@@ -36,3 +38,5 @@ npm은 루트 workspace 설치를 사용합니다. REA install()은 modules/rea�
 실제 탈착 검사: `verify_builtin_module_isolation.py`는 작업 보호 후 금융·REA·Hermes의 소스와 전용 환경 폴더를 잠시 옮기고, 남은 GitHub 화면/호스트와 이동된 각 모듈의 실행을 확인합니다. 성공·실패 모두 원래 폴더를 복원하며 데이터·모델은 이동하지 않습니다. 결과는 `runtime/platform/module-verification/builtin-isolation.json`. 이 검사는 빌드·재시작을 수행하므로 운영 작업이 없는 때 실행합니다. `module_sources.py`는 이동한 전용 환경의 소스 검색과 console 실행기 경로를 복구합니다. 다른 PC의 Python/Node/CUDA까지 포함한 포터블 배포 검사는 아닙니다.
 
 독립 소스 검증: verify_standalone_modules.py는 기본 모듈 ZIP을 각각 추출하고, 설치된 의존성의 전용 경로 복사본에서 타입·화면 빌드·API/카탈로그·브라우저 표시를 확인합니다. 원래 프로젝트 소스 import를 차단하고 사용자 데이터/모델을 복사하거나 추론하지 않습니다. 불변 패키지 파일은 NTFS 하드 링크로 저장 공간을 재사용하며 경로·실행기·쓰기 파일은 독립 사본입니다. 새 PC에서 pip/npm 다운로드 설치를 재현한 검사는 아닙니다. 모든 임시 폴더/검사 서버는 종료·정리하며 결과/화면은 runtime/projects/manage/verification/standalone-modules.json 및 <모듈>-standalone.png입니다.
+
+현재 등록 동기화: health의 module_signature는 실행 서버가 로드한 등록 상태입니다. 감시기는 이 값과 디스크·적용된 프론트/백엔드 등록 서명을 함께 비교합니다. 빠른 분리/재연결/제거로 이전 디스크 상태로 돌아와도 메뉴/API 잔재를 다시 적용합니다. 설치 완료는 두 빌드 등록의 적용까지 기다립니다. 관련 감시 회귀 검사 7개 통과.

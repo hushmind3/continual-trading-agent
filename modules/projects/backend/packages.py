@@ -14,14 +14,15 @@ SKIP = {'.git', '.venv', 'venv', 'node_modules', '.platform-runtime', '__pycache
         '.pytest_cache', '.mypy_cache', '.cache', '.runtime', 'runtime', 'logs', 'data'}
 
 
-def export(key):
+def export(key, _preparing=False):
     from . import builtin_packages
     if key in builtin_packages.SUPPORTED:
         with store.LOCK:
             return builtin_packages.export(key)
     with store.LOCK, runtime.LOCK:
         record = store.read(key)
-        if installer.JOBS or runtime.busy_reason() or installer.RESTARTING:
+        competing=set(installer.JOBS)-({key} if _preparing else set())
+        if competing or runtime.busy_reason() or installer.RESTARTING:
             raise ValueError('설치·실행이 끝난 뒤 내보내세요.')
         source = Path(record.get('active_source') or '').resolve()
         base = store.owned(store.STATE, 'projects/' + store.identifier(key))

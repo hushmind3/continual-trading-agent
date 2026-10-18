@@ -18,7 +18,7 @@ from .requirements import RequirementError, check as check_requirements
 
 JOBS = {}
 RESTARTING = False
-ACTIVE_STAGES = {'queued', 'download', 'analyze', 'adapter', 'dependencies', 'verify', 'publish', 'agent_link'}
+ACTIVE_STAGES = {'queued', 'download', 'analyze', 'adapter', 'dependencies', 'verify', 'publish', 'agent_link', 'detaching'}
 
 
 def run_command(command, folder, log, cancelled, timeout=180, environment=None):
@@ -64,18 +64,26 @@ def public(record):
 
 def installed():
     from menu_registry import MODULE_ENTRIES
-    loaded = {item['id']: item.get('install_revision') for item, _ in MODULE_ENTRIES}
+    from platform_state_io import read_json
+    from platform_modules import signature
+    applied=read_json(ROOT/'runtime/platform/applied-sources.json').get('sources',{})
+    current=signature(ROOT/'modules')
+    activated=all(applied.get(part,{}).get('modules/.registration',current)==current for part in ('frontend','backend'))
+    loaded = {item['id']: item.get('install_revision') for item, entry in MODULE_ENTRIES if not getattr(entry,'load_error',None)}
+    errors={item['id']:str(entry.load_error) for item,entry in MODULE_ENTRIES if getattr(entry,'load_error',None)}
     result = []
     for record in records():
+        record['connection_pending']=record['stage']=='removed' and record.get('module_id') in loaded
+        record['connection_error']=errors.get(record.get('module_id'),'')
         record['can_open'] = record.get('module_id') in loaded and record['stage'] not in ('removed', 'removal_failed')
-        if record['stage'] == 'awaiting_activation' and record.get('module_id') in loaded and loaded[record['module_id']] == record.get('install_revision'):
+        if activated and record['stage'] == 'awaiting_activation' and record.get('module_id') in loaded and loaded[record['module_id']] == record.get('install_revision'):
             record.update(stage='ready', detail='실행 확인과 메뉴 연결을 마쳤습니다.', finished_at=time.time())
             save(record)
         elif record['stage'] in ACTIVE_STAGES and record['id'] not in JOBS:
             import psutil
             try:
-                owner = psutil.Process(record.get('install_pid', 0))
-                alive = abs(owner.create_time() - record.get('install_process_created', 0)) < .01
+                pid=record.get('install_pid');created=record.get('install_process_created')
+                alive=bool(pid and created) and abs(psutil.Process(pid).create_time()-created)<.01
             except psutil.Error: alive = False
             if not alive:
                 record.update(stage='failed', error='서버 종료로 설치가 중단됐습니다. 다시 시도하면 저장된 설정으로 재설치합니다.')
@@ -94,7 +102,9 @@ def installed():
         result.append({'id': metadata['id'], 'module_id': metadata['id'], 'title': getattr(entry, 'MENU', {}).get('title') or metadata['group']['title'],
             'repository': '플랫폼에 포함된 모듈', 'url': '', 'stage': 'ready', 'builtin': True, 'group_title': metadata['group']['title'],
             'menu': menus[0]['id'], 'active_source': str(metadata['folder']),
-            'detail': '기존 기능이 연결돼 있습니다.' + (' 공용 코드가 남아 있어 독립 분리는 별도 작업입니다.' if metadata.get('legacy_shared_code') else '')})
+            'can_open':metadata['id'] in loaded,
+            'error':getattr(entry,'load_error',''),
+            'detail': '플랫폼 기본 앱 · 설치된 환경을 그대로 분리하고 다시 연결할 수 있습니다.'})
     return result
 
 
@@ -220,7 +230,7 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
             trash = ROOT / '휴지통/modules' / (published.name + '-' + uuid.uuid4().hex[:8]); trash.parent.mkdir(parents=True, exist_ok=True)
             published.rename(trash)
         if backup and backup.exists(): backup.rename(ROOT / 'modules' / record['module_id'])
-        record.update(stage='cancelled' if cancelled.is_set() else exc.stage if isinstance(exc, RequirementError) else 'failed', error=str(exc), detail='설치를 완료하지 못했습니다. 기존 사용 데이터와 설치본은 보존했습니다.', finished_at=time.time())
+        record.update(stage='cancelled' if cancelled.is_set() else exc.stage if isinstance(exc, RequirementError) else 'failed', error=str(exc), detail='문서·분석 자료를 내려받았습니다. 실행할 앱이 포함된 저장소를 선택하세요.' if isinstance(exc,RequirementError) and exc.stage=='not_app' else '설치를 완료하지 못했습니다. 기존 사용 데이터와 설치본은 보존했습니다.', finished_at=time.time())
         save(record)
     finally:
         if cleanup_import and source_override:

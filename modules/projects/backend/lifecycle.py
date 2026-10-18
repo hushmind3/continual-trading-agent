@@ -16,7 +16,8 @@ def module_folder(record):
         manifest = folder / 'module.json'
         if not manifest.is_file() and record.get('stage') == 'removal_failed' and record.get('install_revision'): return folder
         metadata = json.loads(manifest.read_text(encoding='utf8'))
-        if metadata.get('id') != name or not metadata.get('install_revision'):
+        builtin=record.get('builtin') and name in {'finance','rea','hermes'}
+        if metadata.get('id') != name or not (metadata.get('install_revision') or builtin):
             raise ValueError('이 설치기가 소유한 프로젝트 모듈이 아닙니다.')
     return folder
 
@@ -74,6 +75,10 @@ def reconnect(key):
     with store.LOCK, runtime.LOCK:
         record = store.read(key)
         if record['stage'] != 'removed': raise ValueError('분리된 프로젝트만 다시 연결할 수 있습니다.')
+        if record.get('builtin'):
+            idle(record)
+            from .detachment import reconnect_builtin
+            return reconnect_builtin(record)
         source = store.owned(store.STATE / 'projects' / key, str(Path(record.get('active_source') or '').relative_to(store.STATE / 'projects' / key)))
         candidate = detached(record)
         if not source.is_dir() or not candidate: raise ValueError('보관된 설치 파일이 없습니다. 다시 설치하세요.')

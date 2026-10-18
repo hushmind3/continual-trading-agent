@@ -11,6 +11,13 @@ class RequirementError(ValueError):
 
 
 def check(source):
+    # Documentation/research repositories are not broken applications. Do not
+    # offer model conversion as though the original program were included.
+    manifests=('package.json','pyproject.toml','Cargo.toml','go.mod','CMakeLists.txt','Makefile')
+    folders=('src','app','backend','frontend','bin')
+    code=('*.py','*.js','*.ts','*.cpp','*.c','*.cs','*.rs','*.exe','*.sln','*.html')
+    if (source/'docs').is_dir() and any((source/'docs').glob('*.md')) and not any((source/name).exists() for name in (*manifests,*folders)) and not any(any(source.glob(pattern)) for pattern in code):
+        raise RequirementError('실행 프로그램이 포함되지 않은 문서·분석 자료 저장소입니다. 설치할 앱·화면·모델 파일은 없으며 내려받은 자료는 폴더 열기로 읽을 수 있습니다.',stage='not_app')
     for solution in source.glob('*.sln'):
         for relative in re.findall(r'"([^"\r\n]+\.csproj)"', solution.read_text(encoding='utf-8-sig')):
             project = owned(source, relative.replace('\\', '/'))

@@ -34,7 +34,7 @@ cli_schema.py: 원본 Python argparse의 정적 실행 명세를 읽고 입력 �
 
 용도: 원본 FastAPI 앱의 async ai_provider.compose(system,user,...) 호출을 설치된 Hermes AIAgent로 전달합니다. 앱 소스를 고치거나 Hermes를 복제하지 않습니다. 지원 규격을 발견한 앱의 설치 정보 → 대화 실행 엔진에서 켜고 끄며 registry의 harness 설정은 앱 업데이트에도 유지합니다.
 
-harness.py는 현재 Hermes의 모델·도구·읽기 권한을 사용하고 앱별 실행 세션을 기록합니다. harness_hook.py/app_worker.py는 비동기 왕복 통신으로 원본 provider 호출 결과를 반환하며 원본의 비동기 전송/상태 조회를 막지 않습니다. ProjectHarness.tsx는 같은 앱 상단에서 작업 내역·승인/질문·해당 앱 작업 중지를 제공합니다. 다른 사용자의 Hermes 작업을 중지하지 않으며 동시 앱 요청은 직렬화합니다. 장기 요청은 원본 앱의 비동기 제출 API를 사용해야 합니다. 일반 HTTP 요청의 기존 60초 제한은 유지합니다.
+harness.py는 현재 Hermes의 모델·도구·읽기 권한을 사용하고 사용자 대화 세션을 생성하지 않고 앱 요청을 실행합니다. harness_hook.py/app_worker.py는 비동기 왕복 통신으로 원본 provider 호출 결과를 반환하며 원본의 비동기 전송/상태 조회를 막지 않습니다. ProjectHarness.tsx는 같은 앱 상단에서 작업 내역·승인/질문·해당 앱 작업 중지를 제공합니다. 다른 사용자의 Hermes 작업을 중지하지 않으며 동시 앱 요청은 직렬화합니다. 장기 요청은 원본 앱의 비동기 제출 API를 사용해야 합니다. 일반 HTTP 요청의 기존 60초 제한은 유지합니다.
 
 API: projects/settings(use_harness), projects/harness(GET/POST). 아직 이 함수 규격이 없는 임의 앱까지 자동 변환하지 않습니다. 끄거나 독립 분리/내보내기로 실행하면 원본 provider가 작동하며 독립 앱에 Hermes가 자동 포함되는 기능은 아닙니다. 회귀: development.tests.test_project_harness, 실제 모델 검증 결과는 아래 검증 기록과 구분합니다.
 
@@ -44,12 +44,14 @@ API: projects/settings(use_harness), projects/harness(GET/POST). 아직 이 함�
 
 정리 후 검증: 공통 프로젝트 관리 회귀 62개·TypeScript 통과. 실제 서버 화면에 모의 재설치 정보를 제공해 원본 iframe 표시·전용 경영실 미적용·JavaScript 오류 0건을 확인했습니다. 실제 GitHub 재설치와 모델 추론은 실행하지 않았습니다.
 
-## 설치 앱의 Hermes 상단 탭 연결
+## 설치 앱 화면과 헤르메스 통합 대화
 
-`workspaces.py`·`workspace_embed.js`는 명시적으로 선택한 설치 앱의 고정 Git 커밋 HTML을 앱 소유 `integrations/hermes/owner.html`에 저장합니다. `projects/workspace/connect`는 커밋·HTML 경로·data-tab 화면 전환 규격·탭 목록을 검증하고 기존 provider 하네스를 연결합니다. `projects/workspace-tabs`와 `_platform-workspace.html`은 해당 설치 기록이 ready일 때만 노출합니다. 분리/제거 시 탭이 사라지고 문서는 앱 폴더와 함께 처리됩니다. 저장소 이름으로 원본 UI/API를 덮어쓰지 않습니다.
+workspaces.py·workspace_embed.js는 명시적으로 연결한 고정 Git 커밋 HTML을 앱 소유 integrations/hermes/owner.html에 저장하고 해시를 확인합니다. projects/workspace/connect는 커밋·HTML·data-tab·탭 규격을 검증합니다. projects/workspace-tabs는 ready 앱에만 화면 목록과 명시적 company-v1 대화 연결 여부를 제공합니다. 분리/제거/연결 해제 시 대화 연결도 사라집니다. 저장소 이름에 따른 전용 처리는 없습니다.
 
-호스트 메뉴만 React/Vite/Tailwind 공통 Button으로 구성하며 외부 앱의 고정 원본 HTML·색상·업무 API·데이터는 보존합니다. 내장 모델 설정으로 이동하는 링크는 Hermes 모델 설정을 엽니다. `harness.py`의 앱 요청은 원본 Hermes의 실행별 지침/응답 계약을 사용하고 대화 세션을 생성하지 않습니다. 모델·API 키·Thinking·출력 한도는 Hermes에서 읽으며 원본 앱 설정 파일로 복제하지 않습니다. 기존 앱의 짧은 연결 시험용 출력 한도를 공유 모델 설정에 강제하지 않습니다. 계획/회의/일반 답변은 호스트 프로젝트 기억 없이 앱 문맥만 사용하고, 명시적인 직원 실행은 원래 도구 경로를 유지합니다.
+company-v1의 AI 총괄 대화는 별도 iframe 탭 대신 Hermes 기존 채팅을 사용합니다. conversation.py의 projects/conversation(GET/POST)은 원본 앱의 local/session 인증을 내부에서 받아 원래 ceo 조회·async chat/submit·상태 조회·ventures decision을 호출합니다. 토큰은 응답/브라우저 저장소에 반환하지 않습니다. 허용한 동작과 ID만 받아 임의 API 경로를 전달하지 않으며 꺼진/제거된 앱은 접근할 수 없습니다. 기록은 원본 앱 DB를 유지하고 복사본을 만들지 않습니다. 서버 재시작 뒤 없는 요청 ID는 failed 상태로 반환해 중복 제출 없이 UI를 복구합니다.
 
-확인 명령: `python -m unittest development.tests.test_project_workspaces development.tests.test_project_harness`와 `test_hermes_port`의 일반 대화/앱 요청 회귀입니다. 사용자 모델 호출과 실제 사업 실행은 별도 검증입니다.
+현황·업무 실행 기록은 고정 원본 HTML을 유지합니다. 현황의 CEO 대화 버튼은 네이티브 Hermes 채팅으로 이동하고 모델 설정은 기존 Hermes 설정을 엽니다. 모델/API 키/Thinking/출력 한도는 복제하지 않습니다. harness.py는 사용자 세션을 생성하지 않는 앱 요청을 사용하며 계획/회의는 앱 문맥만 읽고 직원 실행은 실제 도구를 사용합니다.
 
-회사 업무 연결: 명시적인 workspace/connect(recipe=company-v1)는 integrations/company.py를 앱 소유 폴더에 복사하고 해시를 검증한 뒤 자식 실행기에만 적용합니다. 승인→CPO requirements.md→CTO React/Vite/Tailwind 제작→QA 실제 npm test/빌드를 순차 실행하고 실패·검증 자료 부재 시 완료로 기록하지 않습니다. 내부 HTTP 조회를 막지 않고 제작/검증 동안 application_activity로 서버 재시작·제거를 보호합니다. 기존 승인 사업은 인증된 ventures/{id}/build로 이어가며 반복 호출은 실행 중 작업을 중복 생성하지 않습니다. 기본 제공된 완성 제품의 원래 출시 경로는 유지합니다. 로컬 작업 결과는 앱 소유 workspaces 아래에서만 제공하며 앱 제거와 함께 정리합니다.
+명시적인 workspace/connect(recipe=company-v1)는 integrations/company.py를 앱 소유 폴더로 복사하고 해시를 검증합니다. 승인→CPO 요구사항→CTO 로컬 MVP→QA 실제 npm test/빌드를 순차 실행하고 실패/검증 자료 부재 시 완료하지 않습니다. 앱 작업 동안 application_activity로 서버 재시작·제거를 보호합니다. 기존 승인 사업은 인증된 ventures/{id}/build로 재개하며 실행 중 호출은 중복 생성하지 않습니다. 로컬 산출물은 앱 소유 workspaces에 저장하고 제거와 함께 처리합니다. 자세한 실제 실행 상태는 integrations/README.md를 따릅니다.
+
+검사: development.tests.test_company_conversation, test_project_workspaces, test_project_harness(27개 통과). 원본 조회·비동기 전송 계약·인증 유지·명시적 승인·삭제/연결 해제 차단·재시작 후 복구를 검증합니다. 실제 모델 답변/사업 실행은 별도이며 이번 통합 검사에서는 호출하지 않았습니다.

@@ -1,5 +1,5 @@
 export const prefix='ai_agent/Hermes/';
-export interface Session {id:string;title?:string;model?:string;updated_at?:number;created_at?:number}
+export interface Session {managed?:boolean;id:string;title?:string;model?:string;updated_at?:number;created_at?:number}
 export interface Message {role:string;content:unknown;tool_calls?:unknown[];tool_call_id?:string;name?:string}
 export interface SessionDetail {session:Session;messages:Message[]}
 export interface Settings {base_url:string;model:string;api_key:string;has_api_key:boolean;workspace:string;max_iterations:number;toolsets:string[];local_model:string;system_prompt?:string;read_only?:boolean;context_length?:number;thinking_mode?:'auto'|'on'|'off';tool_loading?:'native'|'lazy'|'eager';python:string;engine:string;available_toolsets:string[];computer_driver_installed:boolean;browser_runtime_installed?:boolean}

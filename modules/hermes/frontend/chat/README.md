@@ -42,14 +42,12 @@ ThinkingControl.tsx·useThinking.ts는 읽기 모드 옆에서 Thinking 자동/�
 
 2026-10-18 확인: TypeScript·Vite 빌드, 모의 API 브라우저 검사 29개 통과. Thinking 선택 후 전송·작업 중 다음 값 변경·새로고침 복원·390px 가로 넘침 없음을 검사했습니다. 실제 1440px 화면에서 읽기 모드 옆 Thinking 끄기와 JavaScript 오류 0건을 확인했고 390px도 표시·넘침 없음을 확인했습니다. 이번 UI 이동은 백엔드·모델 재시작 없이 프론트만 적용했으며 실제 추론 비교 검사는 추가 실행하지 않았습니다.
 
-AppTabs.tsx는 명시적으로 연결한 외부 앱의 화면을 대화 위 탭으로 표시합니다. projects/workspace-tabs 목록을 사용하며 연결이 없거나 프로젝트 관리 모듈이 없으면 기존 대화만 표시합니다. 대화와 원본 iframe을 유지해 탭 전환 중 초안을 보존합니다. 회사 화면의 모델 설정 링크는 기존 Hermes 모델 설정으로 연결하고 iframe의 동일 출처·contentWindow만 메시지를 수신합니다. 설치 앱을 분리/제거하면 목록 갱신 후 연결 탭을 제거합니다.
+AppTabs.tsx는 선택형 company-v1 앱을 헤르메스 대화에 연결합니다. 상단은 대화·회사 현황·업무 실행 기록의 3개 탭이며 AI 총괄 대화 탭은 따로 만들지 않습니다. 회사 현황의 CEO 대화 버튼도 헤르메스 대화로 이동합니다. 현황/기록만 고정 원본 HTML을 유지합니다(hushmind3/project-zero, be659d0c329fc4b93b82ee43399cc5542d8b7bf2).
 
-2026-10-19 연결: 회사 현황·AI 총괄 대화·업무 실행 기록은 GitHub hushmind3/project-zero의 be659d0c329fc4b93b82ee43399cc5542d8b7bf2 원본 화면을 사용합니다. 현재 GitHub 최신 설치본의 경영실/직원·실행 UI와 다른 과거 버전이며 원본 동작은 설치 앱 API를 사용합니다. 모델 설정 탭은 별도로 만들지 않습니다.
+CompanyConversation.tsx는 projects/conversation을 통해 원본 총괄 기록·비동기 전송·사업 승인을 연결합니다. 기존 ChatWorkspace·Transcript·MessageBody·ChatComposer·작업 내역을 공유하며 대화 목록에 보관된 AI 총괄 항목으로 접근합니다. 기존 Hermes 세션/초안과 원본 회사 DB를 복제·삭제하지 않습니다. 총괄 기록은 원본 DB에 유지하므로 앱 제거 시 해당 기록도 앱 수명주기를 따릅니다. 총괄 항목은 일반 Hermes 세션 이름 변경/보관 API로 보내지 않습니다.
 
-확인: 관련 회귀 23개(원본 Hermes+가짜 모델 API의 일반 저장 대화/내부 앱 요청 포함), TypeScript·Vite, 실제 PC1440/모바일390 탭·양쪽 초안 보존·원본 버튼 이동·Hermes 모델 설정 이동·가로 넘침/JS 오류 없음. verify_hermes_workspaces.cjs는 모델을 호출하지 않습니다. 별도 실제 연결 시험은 선택된 Ornith 모델로 11.8초에 답변을 받았고 사용자 세션 11→11 및 모델 설정 불변을 확인했습니다. 최초 시험은 모델 미적재로 추론 전 차단됐으며 같은 선택 모델을 기존 Thinking/컨텍스트 설정으로 적재한 뒤 재확인했습니다. 연결 시험은 전 역할의 사업 기획 품질·홈페이지 제작·외부 배포 검증이 아닙니다. 결과/화면은 runtime/ai_agent/Hermes/verification/workspace-tabs 소속입니다.
+사업 초안은 입력창 위에서 승인 후 실행/보류하며 읽기 모드에서는 승인 실행을 비활성화합니다. 전송은 원본 async submit 후 상태 조회로 처리하고 요청 ID·초안을 저장해 새로고침에도 복원합니다. 서버 재시작으로 요청 ID가 없어지면 오류를 표시하고 재전송을 허용하며 자동으로 중복 전송하지 않습니다. Thinking/모델 설정은 기존 Hermes 설정을 사용합니다. 총괄의 사업 실행 방식은 승인 큐이므로 일반 대화의 목표/반복 실행 선택을 함께 표시하지 않습니다.
 
-회사 대화/회의록의 Markdown은 AppTabs.tsx가 같은 출처·같은 iframe의 요청만 받아 공통 MarkdownContent로 렌더링합니다. HTML 스크립트는 허용하지 않으며 반복 조회는 제한된 캐시를 사용합니다. 원본 대화 문자열/과거 기록을 수정하지 않습니다.
+대화 화면의 도구 질문/권한/중지는 기존 입력창·오른쪽 작업 내역에서 처리하며 현황/기록 탭에는 공통 AppExecution을 표시합니다. 본문은 기존 공통 Markdown·문서 미리보기를 사용합니다. iframe 메뉴 이동은 같은 출처/같은 contentWindow만 받습니다. 앱을 분리/제거하거나 연결을 끄면 총괄 대화 항목도 해제됩니다.
 
-연결 앱의 도구 질문·권한 요청·중지는 공통 AppExecution을 상단에 표시합니다. 회사 탭을 보고 있어도 질문이 묻히지 않고 원본 작업 기록과 모델 도구 기록을 구분해 볼 수 있습니다.
-
-2026-10-20: 원본 사업 승인과 실제 제작이 분리돼 있던 경로는 선택형 company-v1 연결에서 보정합니다. 제작 결과와 npm 검사 증거가 없으면 완료하지 않습니다. 회사/회의록 및 업무 결과의 Markdown은 공통 렌더러로 표시하며 PC1440/모바일390·초안·화면 전환·스크립트 비실행을 verify_hermes_workspaces.cjs로 확인합니다. 앱 소유 질문/권한/중지는 공통 AppExecution에서 처리합니다. 실제 사업 제작/QA 진행 상태는 백엔드 integrations 안내에 구분합니다.
+2026-10-20 확인: 관련 백엔드 회귀 27개·TypeScript 통과, React/Vite 서버 적용 완료. verify_hermes_workspaces.cjs에서 실제 원본 기록 표시·3개 탭·현황→총괄 이동·기존 세션 보존·통합 초안의 탭/새로고침 복원을 확인했습니다. 전송/응답/승인은 브라우저에서 요청을 가로채 검증했으며 실제 모델 호출·사업 실행은 하지 않았습니다. PC1440·모바일390에서 가로 넘침/JavaScript 오류가 없었습니다. 결과/화면은 runtime/ai_agent/Hermes/verification/workspace-tabs 소속입니다.

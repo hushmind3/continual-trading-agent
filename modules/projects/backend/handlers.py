@@ -219,6 +219,18 @@ def workspace_tabs():
     return call(tabs)
 
 
+@router.get('/conversation')
+def conversation_state(id: str, connection: Request, request_id: str = ''):
+    from .conversation import call as converse
+    return call(lambda: converse(id, {'request_id': request_id}, connection))
+
+
+@router.post('/conversation')
+def conversation_action(request: dict, connection: Request):
+    from .conversation import call as converse
+    return call(lambda: converse(request['id'], request, connection))
+
+
 @router.post("/workspace/connect")
 def workspace_connect(request: dict):
     from .workspaces import connect

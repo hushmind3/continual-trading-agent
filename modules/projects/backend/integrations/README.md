@@ -8,6 +8,8 @@
 
 2026-10-20 검증: 관련 회귀 72개 통과. 실제 원본 ASGI 자식 실행기의 승인 큐·모델 IPC·화면 조회·작업 중 재시작 보호와 실제 Node 테스트/빌드를 격리 환경에서 확인했습니다. 모델이 파일 없이 완료를 주장하거나 Node 검사가 실패하면 실패/후속 중단으로 기록합니다. 원본 sqlite context의 연결을 commit/rollback 뒤 명시적으로 닫아 검사·재시작 시 DB 핸들이 남지 않게 했습니다.
 
-실제 승인 사업의 재개에서는 CPO의 5,589바이트 requirements.md 생성·완료와 CTO의 package.json·Vite·Vitest 설정 파일 작성을 확인했습니다. CTO 제작 중이며 QA는 대기입니다. 이 상태를 실제 제품 완성/QA 통과/서비스 공개/매출 발생으로 기록하지 않습니다. 실측 상태는 runtime/ai_agent/Hermes/verification/workspace-tabs/company-live.json에 분리합니다.
+실제 승인 사업의 재개에서는 CPO의 5,589바이트 requirements.md 생성·완료와 CTO의 package.json·Vite·Vitest 설정 파일 작성을 확인했습니다. 이후 실제 총괄 기록에서 CTO TimeoutError와 후속 실행 중단을 확인했습니다. 실제 제품 QA는 통과하지 않았습니다. 이 상태를 실제 제품 완성/QA 통과/서비스 공개/매출 발생으로 기록하지 않습니다. 실측 상태는 runtime/ai_agent/Hermes/verification/workspace-tabs/company-live.json에 분리합니다.
 
-프론트 TypeScript 검사·Vite 빌드를 통과했습니다. 1440px·390px 브라우저 검사에서 원본 UI·4개 탭·각 대화 초안·공유 모델 설정·Markdown 제목/강조 렌더링을 확인했고, 스크립트 실행·가로 넘침·JavaScript 오류·검사용 모델 요청은 없었습니다. Markdown 합성 입력은 브라우저 DOM에만 삽입하고 제거하며 실제 대화 DB를 변경하지 않습니다.
+프론트 TypeScript 검사·Vite 빌드를 통과했습니다. 1440px·390px 브라우저 검사에서 원본 UI·통합 전 4개 탭·각 대화 초안·공유 모델 설정·Markdown 제목/강조 렌더링을 확인했고, 스크립트 실행·가로 넘침·JavaScript 오류·검사용 모델 요청은 없었습니다. Markdown 합성 입력은 브라우저 DOM에만 삽입하고 제거하며 실제 대화 DB를 변경하지 않습니다.
+
+현재 총괄 대화 UI는 Hermes 네이티브 대화로 통합됐습니다. projects/conversation을 통해 같은 원본 기록/승인 API를 사용하며 회사 현황·업무 기록은 별도 탭으로 유지합니다. 현재 UI 검사는 상위 backend/README.md와 Hermes chat/README.md를 따릅니다.

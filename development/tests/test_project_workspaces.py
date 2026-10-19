@@ -52,6 +52,7 @@ class WorkspaceTests(unittest.TestCase):
     def test_opted_in_adapter_is_app_owned_and_disabled_with_its_harness(self):
         self.config['recipe']='company-v1';self.connect()
         record=store.read('p_demo')
+        self.assertTrue(workspaces.tabs()['items'][0]['conversation'])
         self.assertEqual(workspaces.adapter(record),self.state/'projects/demo/integrations/hermes/workflow.py')
         self.config.pop('recipe');self.connect()
         self.assertEqual(store.read('p_demo')['workspace_ui']['recipe'],'company-v1')

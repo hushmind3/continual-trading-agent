@@ -55,7 +55,8 @@ def tabs():
         if record.get('stage') != 'ready' or ui.get('host') != 'hermes/chat': continue
         if not store.owned(store.project_folder(record), ui.get('document', '')).is_file(): continue
         result.extend({'id': record['id'] + ':' + t['id'], 'view': t['id'], 'title': t['title'],
-            'src': '/assets/projects/' + record['id'] + '/_platform-workspace.html', 'revision': ui['revision']}
+            'src': '/assets/projects/' + record['id'] + '/_platform-workspace.html', 'revision': ui['revision'],
+            'conversation': ui.get('recipe') == 'company-v1' and record.get('harness', {}).get('enabled', False)}
             for t in ui.get('tabs', []))
     return {'items': result}
 

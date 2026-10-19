@@ -211,3 +211,15 @@ def agent_connect(request: dict):
 def agent_start(request: dict):
     from .agent_tasks import start
     return call(start, request)
+
+
+@router.get("/workspace-tabs")
+def workspace_tabs():
+    from .workspaces import tabs
+    return call(tabs)
+
+
+@router.post("/workspace/connect")
+def workspace_connect(request: dict):
+    from .workspaces import connect
+    return call(connect, request.get("id", ""), request)

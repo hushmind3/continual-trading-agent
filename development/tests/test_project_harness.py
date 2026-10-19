@@ -163,16 +163,17 @@ class HarnessTests(unittest.TestCase):
         with patch('ai_agent.Hermes.engine.bridge.bridge',fake):
             result=harness.execute('p_demo',{'system':'JSON only','user':'owner request','max_tokens':1700},threading.Event())
         self.assertIn('verified',result)
-        self.assertEqual(fake.call.call_args_list[1].args[1]['workspace'],str(self.source))
-        self.assertEqual(fake.call.call_args_list[1].args[1]['application_generation'],{})
-        self.assertFalse(fake.call.call_args_list[1].args[1]['application_plan_only'])
+        self.assertEqual(fake.call.call_args_list[0].args[1]['workspace'],str(self.source))
+        self.assertEqual(fake.call.call_args_list[0].args[1]['application_generation'],{})
+        self.assertTrue(fake.call.call_args_list[0].args[1]['application_plan_only'])
+        self.assertTrue(fake.call.call_args_list[0].args[1]['application_request'])
         self.assertEqual(store.read('p_demo')['harness']['session_id'],'owned')
         self.assertFalse(harness.ACTIVE)
         job['state']='paused'
         with patch('ai_agent.Hermes.engine.bridge.bridge',fake),self.assertRaisesRegex(ValueError,'완료'):
             harness.execute('p_demo',{'system':'JSON only','user':'owner request'},threading.Event())
         titles=[c.args[1]['title'] for c in fake.call.call_args_list if c.args[0]=='session/create']
-        self.assertEqual(len(set(titles)),2)
+        self.assertEqual(titles,[])
 
     def test_disabled_harness_status_does_not_contact_hermes_for_a_stale_session(self):
         self.record['harness'].update(session_id='previous',enabled=False,state='idle');store.save(self.record)

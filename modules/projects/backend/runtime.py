@@ -240,6 +240,9 @@ def register_host(app):
             if not record.get('active_source'): raise ValueError('아직 실행 가능한 설치본이 없습니다.')
             spec = record['adapter']; ui = spec.get('ui') if spec['kind'] == 'fastapi' else spec
             if not ui or ui['kind'] not in ('static', 'vite', 'asgi'): raise ValueError('원본 웹 화면이 없습니다.')
+            if path == '_platform-workspace.html':
+                from .workspaces import document
+                return HTMLResponse(render_html(document(record), identifier, True), headers={'Cache-Control': 'no-store'})
             if path == '_platform-language.js': return FileResponse(Path(__file__).with_name('project_language.js'), media_type='application/javascript')
             if ui['kind'] == 'asgi':
                 result = invoke(record, {'path': '/' if path in ('', 'index.html') else '/' + path,

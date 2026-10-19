@@ -43,3 +43,11 @@ API: projects/settings(use_harness), projects/harness(GET/POST). 아직 이 함�
 정리 확인: Project Zero 내부 세션 35개·메시지 123개를 원본 SessionDB 삭제 기능으로 제거하고 나머지 29개 세션 보존을 확인했습니다. 전용 소스·검사 자료와 대상 대화 백업은 프로젝트 휴지통에 보관하며 Git에 포함하지 않습니다.
 
 정리 후 검증: 공통 프로젝트 관리 회귀 62개·TypeScript 통과. 실제 서버 화면에 모의 재설치 정보를 제공해 원본 iframe 표시·전용 경영실 미적용·JavaScript 오류 0건을 확인했습니다. 실제 GitHub 재설치와 모델 추론은 실행하지 않았습니다.
+
+## 설치 앱의 Hermes 상단 탭 연결
+
+`workspaces.py`·`workspace_embed.js`는 명시적으로 선택한 설치 앱의 고정 Git 커밋 HTML을 앱 소유 `integrations/hermes/owner.html`에 저장합니다. `projects/workspace/connect`는 커밋·HTML 경로·data-tab 화면 전환 규격·탭 목록을 검증하고 기존 provider 하네스를 연결합니다. `projects/workspace-tabs`와 `_platform-workspace.html`은 해당 설치 기록이 ready일 때만 노출합니다. 분리/제거 시 탭이 사라지고 문서는 앱 폴더와 함께 처리됩니다. 저장소 이름으로 원본 UI/API를 덮어쓰지 않습니다.
+
+호스트 메뉴만 React/Vite/Tailwind 공통 Button으로 구성하며 외부 앱의 고정 원본 HTML·색상·업무 API·데이터는 보존합니다. 내장 모델 설정으로 이동하는 링크는 Hermes 모델 설정을 엽니다. `harness.py`의 앱 요청은 원본 Hermes의 실행별 지침/응답 계약을 사용하고 대화 세션을 생성하지 않습니다. 모델·API 키·Thinking·출력 한도는 Hermes에서 읽으며 원본 앱 설정 파일로 복제하지 않습니다. 기존 앱의 짧은 연결 시험용 출력 한도를 공유 모델 설정에 강제하지 않습니다. 계획/회의/일반 답변은 호스트 프로젝트 기억 없이 앱 문맥만 사용하고, 명시적인 직원 실행은 원래 도구 경로를 유지합니다.
+
+확인 명령: `python -m unittest development.tests.test_project_workspaces development.tests.test_project_harness`와 `test_hermes_port`의 일반 대화/앱 요청 회귀입니다. 사용자 모델 호출과 실제 사업 실행은 별도 검증입니다.

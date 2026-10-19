@@ -248,13 +248,22 @@ class HermesWorker:
         if len(prompt) > 200000:
             raise ValueError('메시지가 너무 깁니다.')
         session_id = str(request.get('session_id') or '')
-        row = self.session(session_id) if session_id else self.create_session({'title': prompt[:60]})
-        session_id = row['session']['id']
-        if str(row['session'].get('title') or '').startswith('새 대화'):
-            self.db.set_session_title(session_id, self.db.get_next_title_in_lineage(prompt[:60]))
-        history = row['messages']
+        internal = request.get('application_request', False)
+        if not isinstance(internal, bool): raise ValueError('앱 실행 구분이 올바르지 않습니다.')
+        cfg['application_request'] = internal
+        if internal:
+            if session_id or not application_prompt or request.get('mode', 'chat') != 'chat':
+                raise ValueError('앱 실행은 독립 지침으로 요청하며 대화 세션·자율 실행을 지정하지 않습니다.')
+            session_id = 'app-' + uuid.uuid4().hex
+            history = []
+        else:
+            row = self.session(session_id) if session_id else self.create_session({'title': prompt[:60]})
+            session_id = row['session']['id']
+            if str(row['session'].get('title') or '').startswith('새 대화'):
+                self.db.set_session_title(session_id, self.db.get_next_title_in_lineage(prompt[:60]))
+            history = row['messages']
         with self.lock:
-            self.job = {'state': 'starting', 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time()}
+            self.job = {'state': 'starting', 'application': internal, 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time()}
         self.thread = threading.Thread(target=self.run_chat, args=(cfg, session_id, prompt, history, request), daemon=True)
         self.thread.start()
         return self.status()
@@ -286,10 +295,10 @@ class HermesWorker:
             self.agent = AIAgent(
                 model=cfg['model'], base_url=cfg['base_url'], api_key=cfg.get('api_key') or 'local',
                 provider='custom', api_mode='chat_completions', quiet_mode=True,
-                session_id=session_id, session_db=self.db, platform='platform',
+                session_id=session_id, session_db=None if cfg.get('application_request') else self.db, platform='application' if cfg.get('application_request') else 'platform',
                 enabled_toolsets=toolsets, max_iterations=cfg['max_iterations'], cwd=cfg['workspace'],
                 # Read-only and focused app discussions avoid unrelated shared-memory review writes.
-                skip_background_review=bool(cfg.get('read_only')) or focused,
+                skip_background_review=bool(cfg.get('read_only')) or focused or bool(cfg.get('application_request')),
                 skip_context_files=focused, skip_memory=focused,
                 ephemeral_system_prompt=discussion_prompt(cfg, (
                     f'The selected working directory is {cfg["workspace"]}. '
@@ -321,6 +330,7 @@ class HermesWorker:
                 tool_complete_callback=lambda *args, **kw: self.event('tool_complete', args),
                 clarify_callback=self.clarify,
             )
+            if cfg.get('application_request'): self.agent._persist_disabled = True
             bind_discussion_context(self.agent,cfg)
             apply_thinking(self.agent,model_options(cfg,self.native_config()),bool(cfg.get('local_model')))
             apply_response_contract(self.agent, cfg.get('application_response_format'), cfg.get('application_plan_only', False))

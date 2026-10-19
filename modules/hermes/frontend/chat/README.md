@@ -41,3 +41,9 @@ ChatHeader, SessionSidebar, ActivityPanel, ChatComposer and ChatWelcome are cont
 ThinkingControl.tsx·useThinking.ts는 읽기 모드 옆에서 Thinking 자동/켜기/끄기를 선택합니다. 로컬 모델에만 표시하고 모델별 선택을 브라우저에 기억합니다. 전송·재개 직전에 기존 /api/ai_agent/Hermes/settings에 thinking_mode를 저장한 뒤 chat을 호출합니다. 실행 중 선택은 다음 요청에 적용하며 진행 중 작업과 모델 적재 상태는 변경하지 않습니다. 원본 request_overrides 연결은 [백엔드 모델 안내](../../backend/models/README.md)를 따릅니다.
 
 2026-10-18 확인: TypeScript·Vite 빌드, 모의 API 브라우저 검사 29개 통과. Thinking 선택 후 전송·작업 중 다음 값 변경·새로고침 복원·390px 가로 넘침 없음을 검사했습니다. 실제 1440px 화면에서 읽기 모드 옆 Thinking 끄기와 JavaScript 오류 0건을 확인했고 390px도 표시·넘침 없음을 확인했습니다. 이번 UI 이동은 백엔드·모델 재시작 없이 프론트만 적용했으며 실제 추론 비교 검사는 추가 실행하지 않았습니다.
+
+AppTabs.tsx는 명시적으로 연결한 외부 앱의 화면을 대화 위 탭으로 표시합니다. projects/workspace-tabs 목록을 사용하며 연결이 없거나 프로젝트 관리 모듈이 없으면 기존 대화만 표시합니다. 대화와 원본 iframe을 유지해 탭 전환 중 초안을 보존합니다. 회사 화면의 모델 설정 링크는 기존 Hermes 모델 설정으로 연결하고 iframe의 동일 출처·contentWindow만 메시지를 수신합니다. 설치 앱을 분리/제거하면 목록 갱신 후 연결 탭을 제거합니다.
+
+2026-10-19 연결: 회사 현황·AI 총괄 대화·업무 실행 기록은 GitHub hushmind3/project-zero의 be659d0c329fc4b93b82ee43399cc5542d8b7bf2 원본 화면을 사용합니다. 현재 GitHub 최신 설치본의 경영실/직원·실행 UI와 다른 과거 버전이며 원본 동작은 설치 앱 API를 사용합니다. 모델 설정 탭은 별도로 만들지 않습니다.
+
+확인: 관련 회귀 23개(원본 Hermes+가짜 모델 API의 일반 저장 대화/내부 앱 요청 포함), TypeScript·Vite, 실제 PC1440/모바일390 탭·양쪽 초안 보존·원본 버튼 이동·Hermes 모델 설정 이동·가로 넘침/JS 오류 없음. verify_hermes_workspaces.cjs는 모델을 호출하지 않습니다. 별도 실제 연결 시험은 선택된 Ornith 모델로 11.8초에 답변을 받았고 사용자 세션 11→11 및 모델 설정 불변을 확인했습니다. 최초 시험은 모델 미적재로 추론 전 차단됐으며 같은 선택 모델을 기존 Thinking/컨텍스트 설정으로 적재한 뒤 재확인했습니다. 연결 시험은 전 역할의 사업 기획 품질·홈페이지 제작·외부 배포 검증이 아닙니다. 결과/화면은 runtime/ai_agent/Hermes/verification/workspace-tabs 소속입니다.

@@ -12,11 +12,12 @@ import {ActivityPanel} from './ActivityPanel';
 import {ChatComposer,type Attachment} from './ChatComposer';
 import {ChatWelcome} from './ChatWelcome';
 import {useThinking} from './useThinking';
+import {AppTabs} from './AppTabs';
 
 interface Props {status?:AgentStatus;modelName:string;focused:boolean;onFocus:()=>void;onStatus:(s:AgentStatus)=>void;onModels:()=>void;onSettings:()=>void;onRefresh:()=>void}
 const draftKey=(id:string)=>'hermes.draft.'+(id||'new');
 const mobile=()=>window.matchMedia('(max-width:760px)').matches;
-export function Chat(props:Props){return <DocumentWorkspace><ChatWorkspace {...props}/></DocumentWorkspace>;}
+export function Chat(props:Props){return <AppTabs onModels={props.onModels}><DocumentWorkspace><ChatWorkspace {...props}/></DocumentWorkspace></AppTabs>;}
 function ChatWorkspace({status,modelName,focused,onFocus,onStatus,onModels,onSettings,onRefresh}:Props){
  const documents=useDocumentWorkspace();
  const thinking=useThinking(modelName);
@@ -73,7 +74,7 @@ function ChatWorkspace({status,modelName,focused,onFocus,onStatus,onModels,onSet
 </div>
  <div className="ha-composer-dock">
  {thisJob?.approval&&<div className="hermes-approval"><b>{thisJob.approval.kind==='question'?'헤르메스의 질문':'작업 실행 확인'}</b><details><summary>요청 내용 보기</summary><pre>{thisJob.approval.detail}</pre></details>{thisJob.approval.kind==='question'?<><Textarea aria-label="헤르메스 질문에 답변" value={answer} onChange={e=>setAnswer(e.target.value)}/><Button disabled={pending||!answer.trim()} onClick={()=>void respond(true)}>답변 보내기</Button></>:<div className="hermes-actions"><Button tone="primary" disabled={pending} onClick={()=>void respond(true)}>허용</Button><Button disabled={pending} onClick={()=>void respond(false)}>거절</Button></div>}</div>}
- {active&&!thisJob?<div className="hermes-current-activity is-active"><span>다른 대화에서 작업 중입니다.</span><Button onClick={()=>void choose(status?.job.session_id??'')}>해당 대화로 이동</Button></div>:null}
+ {active&&!thisJob&&!status?.job.application?<div className="hermes-current-activity is-active"><span>다른 대화에서 작업 중입니다.</span><Button onClick={()=>void choose(status?.job.session_id??'')}>해당 대화로 이동</Button></div>:null}
  {auto&&['active','paused'].includes(auto.status)&&<div className="hermes-autonomy-state"><b>{auto.mode==='goal'?'목표 실행':'반복 실행'}</b><span>{auto.status==='paused'?'일시정지':'진행 중'} · {auto.mode==='goal'?String(auto.turns_used??0)+'/'+String(auto.max_turns??0)+'회':String(auto.ticks_fired??0)+'회 실행'}</span>{auto.status==='paused'&&!active&&<Button disabled={pending} onClick={()=>void resume()}>재개</Button>}<details><summary>판정 내용</summary><p>{auto.paused_reason||auto.last_stop_reason||auto.last_reason||'진행 중입니다.'}</p></details></div>}
  <ErrorMessage message={error||thisJob?.error||''}/>
  <ChatComposer thinking={thinking.value} setThinking={thinking.change} localThinking={thinking.local} readOnly={readOnly} setReadOnly={setReadOnly} attachments={attachments} uploading={uploading} upload={files=>void upload(files)} removeAttachment={path=>setAttachments(files=>files.filter(file=>file.path!==path))} composer={composer} text={text} draft={draft} send={()=>void send()} stop={()=>void stop()} active={active} pending={pending} stopping={status?.job.state==='stopping'} mode={mode} setMode={setMode} turns={turns} setTurns={setTurns} interval={interval} setIntervalSeconds={setIntervalSeconds} times={times} setTimes={setTimes}/></div>

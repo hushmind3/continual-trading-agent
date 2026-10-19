@@ -82,17 +82,13 @@ def execute(key, payload, cancelled):
         try:
             if cancelled.is_set(): raise ValueError('하네스 요청을 중단했습니다.')
             if bridge.busy_reason(): raise ValueError('Hermes가 다른 작업을 실행 중입니다. 완료 후 다시 요청하세요.')
-            number = store.read(key).get('harness', {}).get('request_number', 0) + 1
-            update(key, request_number=number)
-            session = bridge.call('session/create', {'title': f'{record.get("title", key)} · 앱 요청 {number}'})['session']['id']
-            plan_only = False
+            plan_only = requires_json(system)
             generation = {}
-            result = bridge.call('chat', {'session_id': session, 'workspace': record['active_source'],
-                'application_system_prompt': system,
-                'application_plan_only': plan_only,
-                'application_context_scope': 'native',
+            result = bridge.call('chat', {'application_request': True, 'workspace': record['active_source'],
+                'application_system_prompt': system, 'application_plan_only': plan_only,
+                'application_context_scope': 'native' if phase['kind'] == 'task' else 'focused_discussion',
                 'application_generation': generation,
-                'application_response_format': 'json_object' if requires_json(system) and plan_only else '', 'message': message_for(user)})
+                'application_response_format': 'json_object' if plan_only else '', 'message': message_for(user)})
             session = result['job']['session_id']
             update(key, state='running', session_id=session, phase={**phase, 'started_at': time.time()})
             while True:

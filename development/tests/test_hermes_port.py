@@ -14,6 +14,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
+from platform_modules import mount_namespaces
+mount_namespaces()
 from ai_agent.Hermes.engine.bridge import WorkerBridge
 
 
@@ -90,7 +92,7 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError): pass
 
 
-@unittest.skipUnless((ROOT / '.venv/hermes/Scripts/python.exe').exists(), 'Hermes Python environment is not installed')
+@unittest.skipUnless((ROOT / 'modules/hermes/.venv/Scripts/python.exe').exists(), 'Hermes Python environment is not installed')
 class HermesPortTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -133,6 +135,23 @@ class HermesPortTests(unittest.TestCase):
             if status['state'] not in ('starting', 'running', 'stopping'): return status
             time.sleep(.15)
         self.fail('Agent did not finish in the bounded fixture timeout')
+
+    def test_12_application_calls_share_settings_without_creating_chat_sessions(self):
+        before=self.bridge.call('sessions')
+        settings=self.bridge.call('settings')
+        for _ in range(2):
+            result=self.bridge.call('chat',{'message':'Respond briefly.','application_request':True,
+                'application_system_prompt':'You are the application CEO. Reply briefly.',
+                'application_context_scope':'focused_discussion','application_plan_only':True})
+            self.assertTrue(result['job']['application'])
+            complete=self.wait_job()
+            self.assertEqual(complete['state'],'complete',complete.get('error'))
+            self.assertEqual(complete['text'],'PORT_DONE')
+        self.assertEqual(self.bridge.call('sessions'),before)
+        after=self.bridge.call('settings')
+        for key in ('model','base_url','model_options','api_key'):self.assertEqual(after.get(key),settings.get(key))
+        for file in (self.folder/'state/sessions').glob('*'):
+            self.assertNotIn('app-',file.name)
 
     def test_01_native_chat_tool_and_persistent_session(self):
         saved=self.bridge.call('settings/save',{'system_prompt':'PORT_SYSTEM_PROMPT: answer concisely in Korean.'})

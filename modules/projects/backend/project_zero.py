@@ -35,7 +35,9 @@ def provider_system(system):
         from project_zero_roles import system_persona
     return system_persona(system)
 
-def failed_plan(message):
+def failed_plan(message,error=None):
+    if error and 'Timeout' in type(error).__name__:
+        return '모델 연결 설정은 유지돼 있지만 이번 응답의 대기 시간이 초과됐습니다. 요청한 작업은 실행하지 않았으며 대체 규칙 업무도 생성하지 않았습니다.',[]
     return '요청한 작업은 실행하지 않았습니다. 모델 응답 처리 오류를 해결한 뒤 다시 요청하세요.', []
 
 
@@ -51,12 +53,15 @@ def install():
     if __package__:
         from .project_zero_roles import install as install_roles,CONVERSATION
         from .project_zero_context import clean_context
+        from .project_zero_provider import install as install_provider
     else:
         from project_zero_roles import install as install_roles,CONVERSATION
         from project_zero_context import clean_context
+        from project_zero_provider import install as install_provider
     import server
     install_roles()
     install_business(venture)
+    install_provider()
     install_workspace(server.app)
     original = ceo._is_new_venture_request
     ceo._is_new_venture_request = lambda message: is_new_request(message, original)
@@ -80,7 +85,11 @@ def install():
         if isinstance(node, ast.ExceptHandler):
             for statement in ast.walk(node):
                 if isinstance(statement, ast.Assign) and isinstance(statement.value, ast.Call) and isinstance(statement.value.func, ast.Name) and statement.value.func.id == 'fallback_plan':
-                    statement.value.func.id = '_platform_failed_plan'; failures += 1
+                    statement.value.func.id = '_platform_failed_plan'
+                    if node.name:statement.value.args.append(ast.Name(id=node.name,ctx=ast.Load()))
+                    failures += 1
+    for item in ast.walk(tree):
+        if isinstance(item,ast.Constant) and isinstance(item.value,str):item.value=item.value.replace('모델 계획 생성 실패','모델 응답 처리 실패')
     if changes != 1 or failures != 1: raise ValueError('프로젝트제로의 대화 분기가 변경돼 호환 어댑터를 확인해야 합니다.')
     ceo._platform_is_revision = is_revision
     ceo._platform_failed_plan = failed_plan

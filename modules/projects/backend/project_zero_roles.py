@@ -16,7 +16,7 @@ CONVERSATION=('당신은 PROJECT ZERO의 CEO입니다. 현재 소유자와 대�
  'JSON 전송 형식과 실제 실행은 별개입니다. 보통 답변은 2~5문장으로 추천·이유·다음 선택을 말하세요. '
  '필수 정보가 부족할 때만 핵심 질문 하나를 하고, 사소한 부분은 가정을 명시해 초안을 제시하세요. '
  '검토 필요라는 말로 답을 대신하지 마세요. 매출 미검증·위험 경고는 답변에 필요한 경우에만 한 번 언급하세요. 기획·화면 흐름은 CPO, 기술 설계·구현은 CTO, 검증은 QA가 담당합니다. '
- '이 플랫폼의 이름·기능·예제 상품을 사용자의 사업으로 자동 선정하지 마세요. 새로운 JSON 필드 intent는 conversation 또는 execution입니다. 기존 reply와 tasks 형식은 유지합니다.')
+ '이 플랫폼의 이름·기능·예제 상품을 사용자의 사업으로 자동 선정하지 마세요. 사이트 기획·제작·문서 작성·검색 같은 자유형 업무는 agent_task로 맡기세요. 고정 product_review/finance/marketing은 원본 운영 제품을 관리하라는 요청에만 사용하세요. 새로운 JSON 필드 intent는 conversation 또는 execution입니다. 기존 reply와 tasks 형식은 유지합니다.')
 
 def system_persona(system):
     match=re.search(r'(?<![A-Z])(CEO|CPO|CTO|CMO|CFO|CS|QA)(?![A-Z])',system)

@@ -16,7 +16,7 @@ export function ProjectApp({projectId}:{projectId:string}){
  useEffect(()=>{if(project?.adapter?.kind!=='powershell')return;let live=true;request<GeneratedInterface>('projects/interface',{id:projectId},'GET').then(value=>{if(live)setGenerated(value)}).catch(e=>{if(live)setError(String(e))});return()=>{live=false}},[projectId,project?.adapter?.kind]);
  const web=project&&(['static','vite'].includes(project.adapter?.kind||'')||!!project.adapter?.ui);
  const frame='/assets/projects/'+projectId+'/index.html?v='+encodeURIComponent(project?.install_revision||'');
- const workflow=project?.repository?.toLowerCase()==='hushmind3/project-zero'&&project.harness?.enabled;
+ const workflow=project?.repository?.toLowerCase()==='hushmind3/project-zero';
  return <AppWorkspace title={project?.title||'프로젝트'} subtitle={project?.repository} actions={<>{project?.harness?.enabled&&<ProjectHarness projectId={projectId}/>}<Button onClick={()=>{location.hash='projects/manage/installed'}}>프로젝트 관리</Button>{web&&<Button onClick={()=>window.open(frame,'_blank','noopener')}>원본 화면 열기</Button>}</>}><ErrorMessage message={error}/>
  {workflow?<ProjectZeroWorkspace key={projectId} projectId={projectId}/>:web&&<AppFrame key={frame} title={project?.title+' 원본 화면'} src={frame}/>}
  {project?.adapter?.kind==='python-cli'&&<CliApp projectId={projectId}/>}

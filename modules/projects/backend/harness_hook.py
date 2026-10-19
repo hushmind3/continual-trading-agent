@@ -12,6 +12,7 @@ class ProviderHook:
         self.pending = {}; self.output = output
         module, name = entry.split(':')
         provider = importlib.import_module(module)
+        provider.platform_harness_connected = True
         original = getattr(provider, name)
         signature = inspect.signature(original)
         @functools.wraps(original)

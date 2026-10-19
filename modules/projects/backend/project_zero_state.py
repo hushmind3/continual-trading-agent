@@ -22,6 +22,14 @@ def install(app):
         import project_zero_plans as plans
         from project_zero_meeting import install as install_meeting,PREPARING
     install_meeting(app)
+    # The original worker defaults to rules before awaiting a model call; an error is not a rules run.
+    import ast,inspect,operations
+    tree=ast.parse(inspect.getsource(operations.process_one));changed=0
+    for node in ast.walk(tree):
+        if isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='mode' for t in node.targets) and isinstance(node.value,ast.Constant) and node.value.value=='rules':
+            node.value=ast.Constant(value='unconfirmed');changed+=1
+    if changed!=1:raise ValueError('원본 업무 실행 상태 구성이 변경됐습니다.')
+    exec(compile(ast.fix_missing_locations(tree),inspect.getfile(operations.process_one),'exec'),operations.__dict__)
     life = app.router.lifespan_context
     @asynccontextmanager
     async def managed_life(instance):
@@ -53,7 +61,9 @@ def install(app):
         for person in team['roles']:
             persona=meetings.TEAM.get(person['role'],{})
             person.update(persona=persona.get('style',''),responsibility=persona.get('priority',''))
-        return {'plan_preparing':sorted(PREPARING),'plans': plans.latest(db), 'ceo': {'messages': ceo['messages']}, 'include_engine_context':db.settings().get('platform_meeting_engine_context','false')=='true',
+        import ai_provider
+        transport='hermes' if getattr(ai_provider,'platform_harness_connected',False) else 'native_api'
+        return {'model_transport':transport,'plan_preparing':sorted(PREPARING),'plans': plans.latest(db), 'ceo': {'messages': ceo['messages']}, 'include_engine_context':db.settings().get('platform_meeting_engine_context','false')=='true',
                 'team': team, 'meetings': meetings.latest(20),
                 'ventures': ventures, 'active_product': venture_engine.live(),
                 'jobs': db.many('SELECT id,role,type,title,status,result,error,mode,created_at,started_at,finished_at FROM jobs ORDER BY rowid DESC LIMIT 60'),

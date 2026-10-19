@@ -83,6 +83,15 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(opinion['context_kind'],'role_reference')
         self.assertNotIn('draft',opinion)
 
+    def test_native_response_timeout_is_separate_from_connection_and_bounded(self):
+        from platform_plugins.projects.project_zero_provider import response_timeout
+        with patch.dict('os.environ',{},clear=True):
+            options=response_timeout(lambda:{})
+            self.assertEqual(options.read,300);self.assertEqual(options.connect,10)
+            self.assertEqual(response_timeout(lambda:{'response_timeout_seconds':450}).read,450)
+            for value in [0,901,'invalid']:
+                with self.assertRaises(ValueError):response_timeout(lambda:{'response_timeout_seconds':value})
+
     def test_call_stage_separates_meeting_summary_and_employee_execution(self):
         from platform_plugins.projects.harness_prompt import stage_for
         self.assertEqual(stage_for('PROJECT ZERO (CFO)',json.dumps({'topic':'가격','prior_colleagues':[]})),{'kind':'meeting','role':'CFO','label':'회의 발언 작성'})
@@ -228,6 +237,12 @@ class HarnessTests(unittest.TestCase):
             harness.execute('p_demo',{'system':'JSON only','user':'owner request'},threading.Event())
         titles=[c.args[1]['title'] for c in fake.call.call_args_list if c.args[0]=='session/create']
         self.assertEqual(len(set(titles)),2)
+
+    def test_disabled_harness_status_does_not_contact_hermes_for_a_stale_session(self):
+        self.record['harness'].update(session_id='previous',enabled=False,state='idle');store.save(self.record)
+        with patch('ai_agent.Hermes.engine.bridge.bridge') as bridge:
+            state=harness.status('p_demo')
+            self.assertFalse(state['enabled']);bridge.call.assert_not_called()
 
     def test_switch_off_uses_original_provider(self):
         harness.configure(self.record,False);store.save(self.record)

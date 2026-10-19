@@ -135,7 +135,7 @@ def status(key):
         update(key, state='failed', error='플랫폼 연결이 중단됐습니다. 앱에서 다시 요청하세요.')
         state = store.read(key)['harness']
     result = dict(state)
-    if state.get('session_id'):
+    if state.get('enabled') and state.get('session_id'):
         from ai_agent.Hermes.engine.bridge import bridge
         job = bridge.call('status')['job']
         if job.get('session_id') == state['session_id']: result['job'] = job

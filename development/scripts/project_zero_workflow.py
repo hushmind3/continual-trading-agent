@@ -56,7 +56,7 @@ def test_broken_connected_model_never_creates_fallback_jobs(live,monkeypatch):
     before=db.one('SELECT count(*) AS n FROM jobs')['n']
     response=client.post('/api/admin/ceo/chat',headers=headers,json={'message':'마케팅 콘텐츠 업무를 검토해줘'})
     assert response.status_code==200 and response.json()['jobs']==[]
-    assert '모델 계획 생성 실패' in response.json()['reply']
+    assert '모델 응답 처리 실패' in response.json()['reply']
     assert '실행하지 않았습니다' in response.json()['reply']
     assert '모델이 연결되지' not in response.json()['reply']
     assert db.one('SELECT count(*) AS n FROM jobs')['n']==before
@@ -314,3 +314,62 @@ def test_pending_draft_opinion_uses_app_context_without_native_project_memory(li
     options=ai_provider.platform_request_options('한국어 AI CEO로서 소유자와 대화하세요.',json.dumps({'owner':'왜 이렇게 정했어?','draft':{'name':'새 홈페이지'}}))
     assert options['context_scope']=='focused_discussion'
     assert ai_provider.platform_request_options('CTO 업무',json.dumps({'owner_instruction':'설계해','task':'실제 설계 파일 작성'}))['context_scope']=='native'
+
+
+def test_read_timeout_does_not_become_disconnected_or_spawn_rule_jobs(live,monkeypatch):
+    import ai_provider,httpx
+    client,headers,db=live
+    monkeypatch.setattr(ai_provider,'status',AsyncMock(return_value={'mode':'configured','name':'fake'}))
+    monkeypatch.setattr(ai_provider,'compose',AsyncMock(side_effect=httpx.ReadTimeout('injected timeout')))
+    before=db.one('SELECT count(*) AS n FROM jobs')['n']
+    response=client.post('/api/admin/ceo/chat',headers=headers,json={'message':'사업초안 1000만원월 벌만한거'})
+    assert response.status_code==200 and response.json()['jobs']==[]
+    assert '응답의 대기 시간이 초과' in response.json()['reply']
+    assert '연결되지 않아' not in response.json()['reply']
+    assert db.one('SELECT count(*) AS n FROM jobs')['n']==before
+
+
+def test_model_timeout_job_is_failed_without_a_false_rules_execution_label(live,monkeypatch):
+    import asyncio,operations,httpx
+    client,headers,db=live
+    async def fail(args):raise httpx.ReadTimeout('worker response timed out')
+    monkeypatch.setitem(operations.ACTIONS,'agent_task',fail)
+    jid=db.create_job('agent_task','CFO','응답 실패 검증',{'brief':'비용 초안'})
+    asyncio.run(operations.process_one())
+    row=db.one('SELECT * FROM jobs WHERE id=?',(jid,))
+    assert row['status']=='failed' and row['mode']=='unconfirmed' and 'ReadTimeout' in row['error']
+
+
+def test_native_worker_without_hermes_still_applies_profile_and_blocks_rules_fallback(live,tmp_path,monkeypatch):
+    import base64,json,sys,time
+    from unittest.mock import patch
+    from pathlib import Path
+    import server
+    from platform_plugins.projects import runtime,store,python_packages
+    client,headers,db=live
+    source=Path(server.__file__).parent
+    (source/'native_profile_probe.py').write_text("import asyncio,httpx,server,ai_provider\napp=server.app\nasync def status():return {'mode':'configured','name':'fake','endpoint':'http://127.0.0.1:1/v1'}\nasync def compose(system,user,max_tokens=1000):\n await asyncio.sleep(.4)\n raise httpx.ReadTimeout('native transport injection')\nai_provider.status=status\nai_provider.compose=compose\n",encoding='utf-8')
+    packages=next(Path(item) for item in sys.path if str(item).replace('\\','/').endswith('.platform-runtime/python'))
+    record={'id':'p_native_profile_test','repository':'hushmind3/project-zero','active_source':str(source),
+            'adapter':{'kind':'fastapi','directory':'.','app':'native_profile_probe:app'},'harness':{'enabled':False},
+            'environment':{'PROJECT_ZERO_DATA_DIR':str(tmp_path/'native-data')}}
+    with patch.object(store,'STATE',tmp_path/'registry'),patch.object(python_packages,'folder',return_value=packages):
+        store.save(record)
+        try:
+            api=runtime.invoke(record,{'path':'/openapi.json'})
+            assert '/api/admin/platform/workspace' in json.loads(base64.b64decode(api['body']))['paths']
+            response=runtime.invoke(record,{'path':'/api/admin/ceo/chat/submit','method':'POST','headers':{**headers,'content-type':'application/json'},'body':json.dumps({'message':'검색을해봐'})})
+            assert response['status']==202
+            deadline=time.monotonic()+5;protected=False;body=''
+            while time.monotonic()<deadline:
+                protected=protected or '원본 모델 응답 대기' in runtime.busy_reason()
+                result=runtime.invoke(record,{'path':'/api/admin/platform/workspace','headers':headers})
+                state=json.loads(base64.b64decode(result['body']))
+                assert state['model_transport']=='native_api'
+                if state['requests'] and state['requests'][-1]['status']!='working':
+                    body=state['ceo']['messages'][-1]['body'];assert not state['jobs'];break
+                time.sleep(.05)
+            assert '응답의 대기 시간이 초과' in body and '연결되지 않아' not in body
+            assert protected
+            assert not runtime.WORKERS[record['id']].harness_pending
+        finally:runtime.close()

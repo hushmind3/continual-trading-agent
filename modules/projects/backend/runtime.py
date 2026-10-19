@@ -20,9 +20,9 @@ RESTARTING = False
 
 
 class AppWorker:
-    def __init__(self, source, spec, environment, harness=None, project_id=None, profile=''):
+    def __init__(self, source, spec, environment, harness=None, project_id=None):
         self.lock = threading.Lock(); self.responses = queue.Queue(); self.source = str(source)
-        self.input_lock = threading.Lock(); self.harness_pending = {}; self.project_id = project_id; self.native_active = 0
+        self.input_lock = threading.Lock(); self.harness_pending = {}; self.project_id = project_id
         folder = owned(source, spec.get('directory', '.'))
         log = source.parent / 'application.log'
         self.output = log.open('a', encoding='utf8')
@@ -36,8 +36,6 @@ class AppWorker:
             from .python_packages import folder as packages
             arguments = [sys.executable, '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('app_worker.py')), str(folder), spec['app'], str(packages(source))]
             arguments.append(harness['entry'] if harness and harness.get('enabled') else '')
-            if profile=='project-zero':
-                arguments.append('project-zero')
         self.process = subprocess.Popen(arguments, cwd=folder, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.output,
             text=True, encoding='utf8', bufsize=1, env={**os.environ, **environment, 'PYTHONUTF8': '1'})
         self.reader = threading.Thread(target=self._read, daemon=True); self.reader.start()
@@ -47,9 +45,7 @@ class AppWorker:
             for line in self.process.stdout:
                 try:
                     value = json.loads(line)
-                    if 'application_activity' in value:
-                        self.native_active=int(value['application_activity'])
-                    elif 'harness_request' in value:
+                    if 'harness_request' in value:
                         payload = value['harness_request']; cancelled = threading.Event()
                         self.harness_pending[payload['id']] = cancelled
                         threading.Thread(target=self._harness, args=(payload, cancelled), daemon=True).start()
@@ -100,10 +96,8 @@ class AppWorker:
 
 def busy_reason():
     from . import harness
-    with LOCK:
-        active=ACTIVE
-        native=any(worker.native_active and worker.process.poll() is None for worker in WORKERS.values())
-    return '실행 중인 외부 프로젝트 요청' if active else '외부 앱 원본 모델 응답 대기 중' if native else harness.busy_reason()
+    with LOCK: active = ACTIVE
+    return '실행 중인 외부 프로젝트 요청' if active else harness.busy_reason()
 
 
 def invoke(record, payload, origin=None):
@@ -121,8 +115,7 @@ def invoke(record, payload, origin=None):
             worker = WORKERS.get(key)
             if worker and worker.source != str(source): worker.close(); worker = None
             if worker is None:
-                profile='project-zero' if record.get('repository','').lower()=='hushmind3/project-zero' else ''
-                worker = AppWorker(source, spec, record.get('environment', {}), record.get('harness'), key, profile); WORKERS[key] = worker
+                worker = AppWorker(source, spec, record.get('environment', {}), record.get('harness'), key); WORKERS[key] = worker
         forwarded = {**payload, '_host': origin.headers.get('host', '') if origin else '',
             '_client': [origin.client.host, origin.client.port] if origin and origin.client else ['platform-internal', 0],
             '_server': [origin.url.hostname, origin.url.port or 80] if origin else ['127.0.0.1', 8766]}

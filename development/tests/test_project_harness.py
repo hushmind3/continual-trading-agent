@@ -15,22 +15,9 @@ from platform_modules import mount_namespaces
 mount_namespaces()
 from platform_plugins.projects import harness, runtime, store
 from platform_plugins.projects.harness_prompt import message_for
-from platform_plugins.projects.project_zero import is_new_request, is_revision
 
 
 class HarnessTests(unittest.TestCase):
-    def test_focused_business_context_excludes_coding_memory_and_peer_anchoring(self):
-        from platform_plugins.projects.project_zero_business import discussion_context
-        from ai_agent.Hermes.engine.runtime_policy import discussion_prompt
-        context=json.dumps({'topic':'새 사업 검토','prior_colleagues':[{'statement':'old product'}],'recent_lessons':[{'insight':'unrelated failure'}]})
-        system,user=discussion_context('현재 역할',context,'focused_discussion')
-        self.assertEqual(json.loads(user)['prior_colleagues'],[])
-        self.assertNotIn('recent_lessons',json.loads(user))
-        self.assertIn('독립',system)
-        prompt=discussion_prompt({'application_context_scope':'focused_discussion','application_system_prompt':system,'system_prompt':'사용자 지침'},'Repository desktop launch rules')
-        self.assertNotIn('desktop launch',prompt);self.assertIn('사용자 지침',prompt)
-        self.assertEqual(discussion_context('ROLE',context,'native'),('ROLE',context))
-
     def test_focused_prompt_rebuild_never_calls_native_host_or_repository_builder(self):
         from types import SimpleNamespace
         from ai_agent.Hermes.engine.runtime_policy import bind_discussion_context
@@ -57,44 +44,9 @@ class HarnessTests(unittest.TestCase):
         result=stage_for('당신은 CEO입니다. JSON 객체만',json.dumps({'_platform_turn':'dialogue','owner_instruction':'설계는 누가 해?'}))
         self.assertEqual(result,{'kind':'conversation','role':'CEO','label':'답변 작성'})
 
-    def test_unselected_example_history_is_not_reused_as_business_evidence(self):
-        from platform_plugins.projects.project_zero_context import clean_context
-        data={'owner_instruction':'홈페이지 방향을 얘기하자','recent_chat':[{'speaker':'owner','body':'홈페이지 얘기하자'},{'speaker':'ceo','body':'DealPage가 답이다'},{'speaker':'ceo','body':'고객용 화면을 먼저 정하자'}],
-              'learned_lessons':[{'insight':'DealPage를 팔자'}],'recent_meetings':[{'summary':'DealPage 계획'}],'active_venture':None,'pending_venture':{'name':'DealPage'}}
-        clean=clean_context(data)
-        self.assertNotIn('DealPage',json.dumps(clean));self.assertEqual(len(clean['recent_chat']),2)
-        self.assertEqual(data['pending_venture']['name'],'DealPage')
-        asked=clean_context({'owner_instruction':'DealPage가 뭐야?'})
-        self.assertIn('원본에 포함',asked['example_reference'])
-        active={**data,'active_venture':{'name':'DealPage'}}
-        self.assertEqual(clean_context(active),active)
-
-    def test_role_reference_excludes_old_project_claims_but_scoped_work_keeps_context(self):
-        from platform_plugins.projects.project_zero_context import clean_context,role_reference
-        old={'_platform_turn':'dialogue','owner_instruction':'CPO와 CTO는 각각 뭘 담당해?',
-             'recent_chat':[{'speaker':'ceo','body':'로컬 금융매매모델 개발은 멈췄다'}],
-             'recent_meetings':[{'summary':'금융 모델 설계'}],'learned_lessons':[{'insight':'고객 0명'}]}
-        context=clean_context(old)
-        self.assertEqual(context['context_kind'],'role_reference')
-        self.assertNotIn('금융',json.dumps(context,ensure_ascii=False))
-        self.assertIn('아키텍처',context['role_catalog']['CTO']['responsibility'])
-        self.assertFalse(role_reference('그 홈페이지의 CTO 진행 상황을 설명해 줘'))
-        opinion=clean_context({'owner':'CPO와 CTO 역할을 설명해 줘','draft':{'name':'unrelated'},'lessons':[]})
-        self.assertEqual(opinion['context_kind'],'role_reference')
-        self.assertNotIn('draft',opinion)
-
-    def test_native_response_timeout_is_separate_from_connection_and_bounded(self):
-        from platform_plugins.projects.project_zero_provider import response_timeout
-        with patch.dict('os.environ',{},clear=True):
-            options=response_timeout(lambda:{})
-            self.assertEqual(options.read,300);self.assertEqual(options.connect,10)
-            self.assertEqual(response_timeout(lambda:{'response_timeout_seconds':450}).read,450)
-            for value in [0,901,'invalid']:
-                with self.assertRaises(ValueError):response_timeout(lambda:{'response_timeout_seconds':value})
-
     def test_call_stage_separates_meeting_summary_and_employee_execution(self):
         from platform_plugins.projects.harness_prompt import stage_for
-        self.assertEqual(stage_for('PROJECT ZERO (CFO)',json.dumps({'topic':'가격','prior_colleagues':[]})),{'kind':'meeting','role':'CFO','label':'회의 발언 작성'})
+        self.assertEqual(stage_for('앱 (CFO)',json.dumps({'topic':'가격','prior_colleagues':[]})),{'kind':'meeting','role':'CFO','label':'회의 발언 작성'})
         self.assertEqual(stage_for('AI CEO',json.dumps({'topic':'가격','minutes':[]}))['kind'],'summary')
         self.assertEqual(stage_for('직원 CTO',json.dumps({'task':'파일 읽기'}))['kind'],'task')
         self.assertEqual(stage_for('당신은 CPO입니다.','주문 분석')['role'],'CPO')
@@ -141,21 +93,6 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(agent.request_overrides['extra_body'],{'thinking':True})
         for value in [{'max_tokens':True},{'max_tokens':0},{'temperature':float('nan')},{'unsupported':1}]:
             with self.assertRaises(ValueError):application_generation(value)
-
-    def test_business_negation_and_followup_do_not_mutate_a_draft(self):
-        original=lambda message: '사업' in message
-        for message in ['새 사업 초안을 만들지 마세요','사업안 설명만 해줘','그럼 안녕']:
-            self.assertFalse(is_new_request(message,original))
-        self.assertTrue(is_new_request('새 사업 아이디어를 제안해줘',original))
-        self.assertTrue(is_new_request('월천만원 벌거리 의논좀해봐라',lambda message:False))
-        self.assertFalse(is_revision('그럼 안녕',{'id':'pending'}))
-        self.assertFalse(is_revision('초안 수정하지 마세요',{'id':'pending'}))
-        self.assertTrue(is_revision('가격을 19000원으로 바꿔줘',{'id':'pending'}))
-        from platform_plugins.projects.project_zero import provider_system
-        prompt=provider_system('이 시스템에서 할 수 없는 외부 검색, 코드 수정, 배포, 광고 집행은 수행했다고 주장하지 마세요.')
-        self.assertNotIn('할 수 없는',prompt)
-        self.assertIn('실제 도구 결과',prompt)
-        self.assertIn('명시적 승인',prompt)
 
     def test_internal_origin_cannot_be_forged_in_an_app_payload(self):
         from starlette.requests import Request
@@ -222,14 +159,13 @@ class HarnessTests(unittest.TestCase):
         from ai_agent.Hermes.engine.bridge import bridge
         job={'state':'complete','session_id':'owned','text':'{"reply":"verified","tasks":[]}','events':[]}
         fake=Mock();fake.busy_reason.return_value=''
-        self.record['repository']='hushmind3/project-zero';store.save(self.record)
         fake.call.side_effect=lambda operation,payload=None: {'session':{'id':'owned'}} if operation=='session/create' else {'job':job}
         with patch('ai_agent.Hermes.engine.bridge.bridge',fake):
             result=harness.execute('p_demo',{'system':'JSON only','user':'owner request','max_tokens':1700},threading.Event())
         self.assertIn('verified',result)
         self.assertEqual(fake.call.call_args_list[1].args[1]['workspace'],str(self.source))
-        self.assertEqual(fake.call.call_args_list[1].args[1]['application_generation'],{'temperature':.3,'max_tokens':1700})
-        self.assertTrue(fake.call.call_args_list[1].args[1]['application_plan_only'])
+        self.assertEqual(fake.call.call_args_list[1].args[1]['application_generation'],{})
+        self.assertFalse(fake.call.call_args_list[1].args[1]['application_plan_only'])
         self.assertEqual(store.read('p_demo')['harness']['session_id'],'owned')
         self.assertFalse(harness.ACTIVE)
         job['state']='paused'
@@ -243,6 +179,14 @@ class HarnessTests(unittest.TestCase):
         with patch('ai_agent.Hermes.engine.bridge.bridge') as bridge:
             state=harness.status('p_demo')
             self.assertFalse(state['enabled']);bridge.call.assert_not_called()
+
+    def test_repository_name_does_not_install_an_application_profile(self):
+        self.record['repository']='hushmind3/project-zero'
+        harness.configure(self.record,False);store.save(self.record)
+        data=runtime.invoke(self.record,{'path':'/compose'})
+        self.assertEqual(json.loads(base64.b64decode(data['body']))['text'],'ORIGINAL')
+        schema=runtime.invoke(self.record,{'path':'/openapi.json'})
+        self.assertNotIn('/api/admin/platform/workspace',json.loads(base64.b64decode(schema['body']))['paths'])
 
     def test_switch_off_uses_original_provider(self):
         harness.configure(self.record,False);store.save(self.record)

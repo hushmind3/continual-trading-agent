@@ -67,11 +67,6 @@ def execute(key, payload, cancelled):
     with store.LOCK:
         record = store.read(key)
         if not record.get('harness', {}).get('enabled'): raise ValueError('앱의 Hermes 연결이 꺼져 있습니다.')
-        if record.get('repository', '').lower() == 'hushmind3/project-zero':
-            from .project_zero import provider_system
-            from .project_zero_business import discussion_context
-            system = provider_system(system)
-            system,user = discussion_context(system,user,payload.get('context_scope'))
         if payload.get('operation') == 'settings':
             cfg = bridge.call('settings')
             return {'mode': 'hermes' if cfg.get('model') else 'rules', 'name': cfg.get('model') or '모델 미선택', 'endpoint': cfg.get('base_url', '')}
@@ -90,15 +85,12 @@ def execute(key, payload, cancelled):
             number = store.read(key).get('harness', {}).get('request_number', 0) + 1
             update(key, request_number=number)
             session = bridge.call('session/create', {'title': f'{record.get("title", key)} · 앱 요청 {number}'})['session']['id']
-            plan_only = record.get('repository', '').lower() == 'hushmind3/project-zero' and (requires_json(system) or phase['kind'] in ('meeting','summary'))
+            plan_only = False
             generation = {}
-            if record.get('repository', '').lower() == 'hushmind3/project-zero':
-                generation = {'temperature': .3}
-                if payload.get('max_tokens') is not None: generation['max_tokens'] = payload['max_tokens']
             result = bridge.call('chat', {'session_id': session, 'workspace': record['active_source'],
                 'application_system_prompt': system,
                 'application_plan_only': plan_only,
-                'application_context_scope': payload.get('context_scope', 'native') if record.get('repository','').lower()=='hushmind3/project-zero' else 'native',
+                'application_context_scope': 'native',
                 'application_generation': generation,
                 'application_response_format': 'json_object' if requires_json(system) and plan_only else '', 'message': message_for(user)})
             session = result['job']['session_id']

@@ -9,7 +9,6 @@ import traceback
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from harness_hook import ProviderHook
-from project_zero import install as install_project_zero
 
 protocol = sys.stdout
 sys.stdout = sys.stderr
@@ -59,15 +58,6 @@ async def main():
     module, name = target.split(':')
     app = getattr(importlib.import_module(module), name)
     hook = ProviderHook(sys.argv[4], protocol) if len(sys.argv) > 4 and sys.argv[4] else None
-    if len(sys.argv) > 5 and sys.argv[5] == 'project-zero': install_project_zero()
-    native_active=0
-    def activity(delta):
-        nonlocal native_active
-        native_active=max(0,native_active+delta)
-        protocol.write(json.dumps({'application_activity':native_active})+'\n');protocol.flush()
-    if len(sys.argv)>5 and sys.argv[5]=='project-zero':
-        import ai_provider
-        ai_provider.platform_activity=activity
     tasks = set()
     async def handle(message):
         try: result = await request(app, message)

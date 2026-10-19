@@ -12,15 +12,13 @@ class ProviderHook:
         self.pending = {}; self.output = output
         module, name = entry.split(':')
         provider = importlib.import_module(module)
-        provider.platform_harness_connected = True
         original = getattr(provider, name)
         signature = inspect.signature(original)
         @functools.wraps(original)
         async def compose(*args, **kwargs):
             arguments = signature.bind(*args, **kwargs); arguments.apply_defaults()
             system,user=arguments.arguments['system'],arguments.arguments['user']
-            policy=getattr(provider,'platform_request_options',lambda *_:{})
-            return await self.request({'system':system,'user':user,'max_tokens':arguments.arguments.get('max_tokens'),**policy(system,user)})
+            return await self.request({'system':system,'user':user,'max_tokens':arguments.arguments.get('max_tokens')})
         setattr(provider, name, compose)
         if hasattr(provider, 'status'):
             async def status(): return await self.request({'operation': 'settings'})

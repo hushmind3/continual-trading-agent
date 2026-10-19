@@ -32,70 +32,14 @@ cli_schema.py: 원본 Python argparse의 정적 실행 명세를 읽고 입력 �
 
 ## 원본 앱 대화의 Hermes 하네스 연결
 
-용도: 원본 FastAPI 앱의 async ai_provider.compose(system,user,...) 호출을 설치된 Hermes AIAgent로 전달합니다. 앱 소스를 고치거나 Hermes를 복제하지 않습니다. 지원 규격을 발견한 앱의 설치 정보 → 대화 실행 엔진에서 켜고 끄며 registry의 harness 설정은 앱 업데이트에도 유지합니다. project-zero의 대화/업무 계획/역할 응답이 이 공통 함수를 쓰므로 원래 UI와 사업 승인·DB 기록을 유지합니다.
+용도: 원본 FastAPI 앱의 async ai_provider.compose(system,user,...) 호출을 설치된 Hermes AIAgent로 전달합니다. 앱 소스를 고치거나 Hermes를 복제하지 않습니다. 지원 규격을 발견한 앱의 설치 정보 → 대화 실행 엔진에서 켜고 끄며 registry의 harness 설정은 앱 업데이트에도 유지합니다.
 
 harness.py는 현재 Hermes의 모델·도구·읽기 권한을 사용하고 앱별 실행 세션을 기록합니다. harness_hook.py/app_worker.py는 비동기 왕복 통신으로 원본 provider 호출 결과를 반환하며 원본의 비동기 전송/상태 조회를 막지 않습니다. ProjectHarness.tsx는 같은 앱 상단에서 작업 내역·승인/질문·해당 앱 작업 중지를 제공합니다. 다른 사용자의 Hermes 작업을 중지하지 않으며 동시 앱 요청은 직렬화합니다. 장기 요청은 원본 앱의 비동기 제출 API를 사용해야 합니다. 일반 HTTP 요청의 기존 60초 제한은 유지합니다.
 
 API: projects/settings(use_harness), projects/harness(GET/POST). 아직 이 함수 규격이 없는 임의 앱까지 자동 변환하지 않습니다. 끄거나 독립 분리/내보내기로 실행하면 원본 provider가 작동하며 독립 앱에 Hermes가 자동 포함되는 기능은 아닙니다. 회귀: development.tests.test_project_harness, 실제 모델 검증 결과는 아래 검증 기록과 구분합니다.
 
-2026-10-19 이전 직접실행 구성 기록(현재 계획/직원 분리 전): 회귀 58개·TypeScript·Vite 적용 통과. 실제 project-zero 기존 UI에서 원래 인증 절차로 로그인하고 하네스 대화를 제출했습니다. Hermes 세션 36c95333a036448f9be507939f0efb4b에서 실제 도구 검색/파일 읽기와 최종 응답을 확인했고 원래 앱 DB와 대화창에 답이 표시됐습니다. 모델에게 내용이 제공되지 않은 임의 검사 문자열을 읽었으며 모델이 삽입한 공백은 제거한 뒤 문자 정보를 비교했습니다. 바이트 단위 복사 일치 검사는 아닙니다. 최종 요청은 약 46.7초·모델 API 3회·도구 이벤트 5개였으며 새 업무 배정은 요청하지 않았습니다. 초기 실제 검사에서 JSON 외 설명과 반복 세션 제목 충돌이 발견돼 응답 형식 보정/별도 앱 세션 생성을 수정했습니다. 승인·질문·중지의 소유권은 회귀 검사로 확인했고 실제 위험 명령/사업 승인/주문/배포/7개 역할 전체를 실행한 검사는 아닙니다.
+현재 상태(2026-10-19): Project Zero 전용 화면·실행 보정·검사기는 폐기했습니다. 재설치한 앱은 일반 설치 경로로 원본 UI/API를 사용하며 저장소 이름에 따른 전용 처리를 적용하지 않습니다. 공통 설치·실행·선택형 Hermes 연결은 유지합니다.
 
-실행기 development/scripts/verify_project_harness.cjs는 현재 verify_project_zero_live.cjs(실제 인사) → verify_project_zero_task.cjs(대표 배정·직원 파일 읽기)를 순서대로 실행합니다. 원본 화면·로컬 인증·원래 작업 DB·실제 모델을 사용합니다. 과거 임의 확인 파일을 만드는 검사는 대화 맥락을 오염시켜 제거했습니다. 새 두 검사 각각의 --resume은 직전 완료 결과의 화면/기록 확인만 재개하며 새 모델 요청을 보내지 않습니다.
+정리 확인: Project Zero 내부 세션 35개·메시지 123개를 원본 SessionDB 삭제 기능으로 제거하고 나머지 29개 세션 보존을 확인했습니다. 전용 소스·검사 자료와 대상 대화 백업은 프로젝트 휴지통에 보관하며 Git에 포함하지 않습니다.
 
-## Project Zero 업무·대화 호환
-
-용도: 원본 대표 대화 → 사업안 → 역할 검토 → 소유자 승인 → 실행·기록 흐름을 유지하면서 플랫폼 연결의 오작동을 보정합니다. `harness_prompt.py`는 현재 지시와 과거 대화를 구분하고, 앱 역할/JSON 응답 규격은 Hermes의 실행별 시스템 지침으로 전달합니다. 과거 검사 요청을 새 인사에 재실행하지 않도록 합니다.
-
-단순 인사에는 과거 실행 기록을 보내지 않습니다. Project Zero의 JSON 계획 계약은 원본 OpenAI 호환 전송의 `response_format=json_object`를 사용하며, 다른 앱의 기존 JSON 반환 검증도 유지합니다. 일반 문장을 임의로 업무 계획으로 바꾸거나 성공 응답을 만들어내지 않습니다. Thinking·도구 설정은 보존합니다.
-
-Project Zero의 JSON 계획/검토 단계는 `application_plan_only`로 외부 도구 없이 구조화 응답을 받습니다. 현재 Ollama는 JSON 문법과 도구 호출 문법을 함께 요청하면 sampler 초기화가 실패합니다. 실제 실행은 원본이 생성한 `agent_task`의 별도 일반 텍스트 하네스 호출에서 설정된 도구를 사용합니다. 전체 앱이나 일반 Hermes 대화의 도구를 비활성화하는 설정이 아닙니다.
-
-직원 `agent_task`의 기존 도구 미지원 문구도 실행 시 `project_zero.provider_system`으로 보정합니다. 연결된 도구로 실제 확인할 수 있는 기능을 제공하며, 공개·지출·메일에 대한 소유자 승인 요구는 유지합니다.
-
-`harness_hook`는 원본 compose의 `max_tokens` 인수도 전달합니다. Project Zero는 원래 provider의 temperature 0.3과 요청별 출력 한도를 실행별 `application_generation`에 반영합니다. 저장된 Hermes 설정이나 다른 앱의 생성 정책을 바꾸지 않습니다. 이전 연결에서는 이 인수들이 누락되어 원본과 다른 생성 조건을 사용했습니다.
-
-원본 엔진의 스트리밍 재시도에서 미완성 앞부분 뒤에 완성 JSON이 이어진 응답도 실제 발견했습니다. 반환 보정은 실제로 디코딩되는 완성 객체만 선택하고, CEO 계획에서는 reply가 없는 내부 업무 객체를 답으로 오인하지 않습니다. 괄호를 덧붙이거나 일반 문장을 가짜 계획으로 변환하지 않습니다.
-
-`project_zero.py`는 등록된 Project Zero 자식 실행기에 하네스 사용 여부와 무관하게 적용됩니다. 원본 소스·UI·DB를 복사하거나 수정하지 않고 부정문 사업 생성, 단순 후속 대화의 초안 수정 오판, 현재 사업/회의 맥락 누락, 도구가 없다는 고정 안내를 보정합니다. 원본 승인 절차를 우회하거나 미구현 제품을 완성했다고 표시하지 않습니다. 원본 대화 함수 구조가 달라지면 호환 오류를 표시합니다.
-
-`runtime.invoke`와 `app_worker`는 실제 플랫폼 HTTP 요청의 Host·접속자를 원본 ASGI에 전달합니다. 호출 본문의 가짜 접속자 정보는 덮어씁니다. 원본의 로컬 자동 로그인은 루프백 접속에만 적용되고 외부 인증 요구는 유지됩니다.
-
-검사: `.venv/Scripts/python.exe -X utf8 -B development/scripts/verify_project_zero.py`. Git 추적 소스 사본·임시 DB에서 원본 업무 검사와 호환 회귀 51개를 통과했습니다. 모델 호출은 모의 응답이며 사용자 모델/기존 DB를 사용하지 않습니다. 임시는 실패 시에도 정리하고 결과를 `runtime/projects/manage/verification/project-zero-workflow.json`에 기록합니다. 실제 모델 대화 확인은 별도 검증이며, 임의 제품 제작·결제·광고·배포 성공을 뜻하지 않습니다.
-
-회의 화면 개선 전 확인(2026-10-19): 원본 업무·호환 36개(임시 DB/모의 모델), 플랫폼 관련 회귀 57개 통과. 실제 원본 UI의 인사는 모델 API 1회·24.1초·도구 0회·업무 0개로 표시됐습니다. CTO README 업무 1개는 원래 큐에서 completed/llm으로 저장됐고 실제 read_file 호출과 화면 표시를 확인했습니다(직원 단계 89.9초·모델 API 6회·도구 4회). JavaScript 오류 0건, 설치된 원본 추적 소스 변경 없음. 결과는 runtime/projects/manage/verification/project-zero-live.json·project-zero-task.json, 화면은 project-zero-live.png·project-zero-cto.png입니다. 중복 상대 경로 재탐색과 9B 요약의 어색하거나 부정확한 표현은 남아 있으며 실제 카드 결제·광고·임의 신제품 배포를 검증한 결과가 아닙니다.
-
-연결된 모델의 계획 생성/파싱 실패는 모델 미연결로 안내하거나 규칙 기반 업무를 대신 생성하지 않습니다. 원본 오류 기록과 오류 설명은 보존하고 이번 요청의 새 업무를 0개로 반환합니다. 모델이 실제 미연결인 원래 규칙 모드는 유지합니다. 오류 주입 회귀는 모의 모델로 확인했습니다.
-
-실제 모델 검사 명령: `node development/scripts/verify_project_harness.cjs --allow-local-model`. 이 검사는 원본 앱의 실제 대화/작업 기록을 남깁니다. 일반 회귀에서는 실행하지 않습니다. 새 두 실행기의 `--resume`은 이미 완료된 자기 검사 기록 확인에만 사용합니다. 최근 인사와 직원 업무를 각각 확인한 직후에 사용해야 하며 임의 다른 작업 결과를 대신 검사하지 않습니다.
-
-## Project Zero 대화·역할·회의·실행안
-
-용도: 설치된 원본 AIAgent/앱을 유지하면서 원본 provider·대화·업무 큐와 공통 UI를 연결합니다. 원본 추적 파일을 수정하지 않습니다.
-
-- `project_zero.py`: 원본 CEO 분기·승인 오류 호환, 현재 앱 대화 문맥 연결.
-- `project_zero_roles.py`: CEO/CPO/CTO/CMO/CFO/CS/QA의 실제 프롬프트와 TEAM 페르소나. CPO 요구사항·사용자 흐름·화면 구성 → CTO 아키텍처·구현 → QA 검증. 일반 대화 intent는 실행 업무를 만들지 않습니다. 기존 명시적 실행/원본 JSON 계약은 보존합니다.
-- `harness_prompt.py`: 구조화된 CEO 대화를 conversation/답변 작성으로 표시합니다. JSON 형식 자체와 회의·계획·실제 직원 실행을 혼동하지 않습니다.
-- `project_zero_context.py`: 미승인 예제 상품을 포함한 과거 AI 답변·교훈·회의를 현재 사업 근거로 재사용하지 않습니다. 원본 DB·표시 기록은 보존하며 명시적 예제 질문·실제 승인 제품은 구분합니다. 앱 주문/장부를 사용자의 다른 사업 실적으로 해석하지 않습니다.
-- `project_zero_business.py`: 새 사업의 previous_draft는 빈 값, 일반 CEO 의견도 focused_discussion 범위로 전달합니다. 직원 task는 원래 실행 도구·맥락을 유지합니다.
-- `project_zero_state.py`: 원본 ASGI에 인증된 workspace/공유 맥락 옵션을 추가합니다. 재시작으로 복구할 수 없는 회의는 발언을 보존한 failed로 처리합니다. 현재 동작 UI는 [경영실 안내](../frontend/project_zero/README.md)를 따릅니다.
-- `project_zero_meeting.py`, `project_zero_plans.py`: 원본 회의의 전문가 5회+CEO 1회에서 실행안을 생성·보존합니다. 승인 전 업무 0개, 중복 승인 거절, 단계별 산출물 전달, 선행 실패 시 후속 중단입니다. QA는 사업/기획/설계도 검토하며 제작이 있으면 제작 후 QA 순서를 강제합니다. 예전 회의는 prepare로 CEO 종합만 요청하고 유효한 캐시 초안은 재사용합니다. 실제 외부 공개·지출·메일은 별도 승인 대상입니다.
-
-API는 원본 앱의 `/api/admin/platform/workspace`, `/discussion-context`, `/meeting-plans/{id}/prepare`, `/meeting-plans/{id}/decision`입니다. 앱 DB settings와 platform_meeting_plans에만 앱 상태를 저장합니다. include_engine_context는 진행 중 회의에서는 변경을 거절하며 전역 Hermes 설정을 변경하지 않습니다. focused_discussion의 호스트 프롬프트 제외는 [Hermes 대화 안내](../../hermes/backend/chat/README.md)를 따릅니다.
-
-확인: `development/scripts/verify_project_zero.py`(격리 원본/업무·모의 모델), `development/tests/test_project_harness.py`(전송/상태 계약), `verify_project_zero_workspace.cjs`(실제 인증+모의 진행/승인 화면), `verify_project_zero_context.py`(원본 AIAgent와 가짜 API). 검사 임시는 정상/실패 모두 정리하며 결과는 runtime/projects/manage/verification 소속입니다.
-
-이전 실측: 실제 회의 6세션·각 발언 저장, CEO 실행안 1회 생성(243.6초), 초기 QA 규칙 오류의 실제 응답 복구·승인 대기·실행 업무 0개를 확인했습니다. 과거 검사와 이번 페르소나 보정의 검증을 혼동하지 않습니다. 이번 보정의 실제 역할 질문·여행 아이디어 대화 2회와 회귀 결과는 프론트 안내에 구분했습니다. 모든 발언의 사실성·임의 홈페이지 제작·배포 성공은 미확인입니다.
-
-일반 역할 질문은 role_reference로 분류해 등록된 7개 역할 정보만 전달합니다. 특정 프로젝트의 최근 작업/진행 상태를 묻는 질문은 이 경로로 축소하지 않습니다. 과거 회의는 회의·발언·실행안 관련 질문에만 연결합니다. 실제 첫 역할 답변에서 DealPage는 나오지 않았지만 과거 금융 주제를 재사용한 것을 발견해 추가한 문맥 경계입니다. 원본 대화·회의는 삭제하지 않습니다.
-
-최신 회귀(2026-10-19)는 격리 원본/업무 54개와 프로젝트 관리 66개(하네스 21개 포함) 통과입니다. 실제 대화 재검증 명령은 `node development/scripts/verify_project_zero_dialogue.cjs --allow-local-model`이며 원본 앱의 대화 기록을 남깁니다. 일반 검사에서는 사용자 모델을 호출하지 않습니다.
-
-## 원본 모델 API와 하네스의 공통 오류 정책
-
-`runtime.py`/`app_worker.py`의 project-zero 프로필 인수는 Hermes ProviderHook 선택과 분리합니다. 하네스를 끄고 원본 API로 전환해도 문맥/페르소나/승인/타임아웃 오류 보정과 공통 경영실을 유지합니다. 원본 UI도 별도로 엽니다. 원본 API는 텍스트 생성 연결이며 Hermes 도구 실행 연결과 구분합니다.
-
-`project_zero_provider.py`는 하네스가 없을 때 원본 compose에만 앱 문맥·역할 정책을 연결합니다. 원본 httpx 연결 제한은 10초, 응답 읽기는 기본 300초(이전 100초)이며 `PROJECT_ZERO_RESPONSE_TIMEOUT_SECONDS` 또는 앱 model_runtime.json의 response_timeout_seconds로 5~900초 범위에서 조절합니다. Hermes는 기존 900초 연결을 사용하며 원본 모델 이름·Thinking·출력 한도는 변경하지 않습니다. 응답이 사라지거나 타임아웃/JSON 오류가 나면 모델 미연결로 오인하거나 대체 rules 업무를 생성하지 않습니다. 실패한 직원 실행은 unconfirmed로 기록하고 성공한 고정 프로그램의 rules 기록은 보존합니다.
-
-원본 API 모델 대기도 자식 실행기의 application_activity로 총괄 실행 관리자에 전달해 서버 적용·설정 변경 중 작업이 끊기지 않도록 busy 보호합니다. 하네스가 꺼진 상태 조회는 예전 세션 ID가 있어도 Hermes에 접속하지 않습니다.
-
-검증: 실제 원본 앱 사본의 하네스 없는 ASGI 자식 프로세스에서 ReadTimeout을 주입해 공통 프로필/API 등록, 연결 상태 유지 안내, 업무 0개, 모델 대기 busy 보호를 확인합니다. 사용자 모델에는 요청하지 않습니다. 과거 오류 메시지나 작업 기록은 소급 수정하지 않습니다. 실제 느린 응답의 재발/생성 속도와 별개인 검증입니다.
+정리 후 검증: 공통 프로젝트 관리 회귀 62개·TypeScript 통과. 실제 서버 화면에 모의 재설치 정보를 제공해 원본 iframe 표시·전용 경영실 미적용·JavaScript 오류 0건을 확인했습니다. 실제 GitHub 재설치와 모델 추론은 실행하지 않았습니다.

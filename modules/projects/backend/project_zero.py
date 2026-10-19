@@ -22,13 +22,18 @@ def is_revision(message, pending):
 
 
 def provider_system(system):
-    return system.replace('이 시스템에서 할 수 없는 외부 검색, 코드 수정, 배포, 광고 집행은 수행했다고 주장하지 마세요.',
+    system=system.replace('이 시스템에서 할 수 없는 외부 검색, 코드 수정, 배포, 광고 집행은 수행했다고 주장하지 마세요.',
         '현재 Hermes에 설정된 도구와 권한으로 요청받은 분석·파일 작업·검증을 수행하세요. '
         '실제 도구 결과로 확인한 작업만 완료했다고 보고하세요. '
         '이미 명시된 파일을 읽을 때는 tool_describe로 read_file 명세를 확인한 뒤 해당 파일을 읽으세요. '
         'tool_search에 파일명을 넣어 검색을 반복하지 마세요. 보고에는 확인한 파일과 근거 줄을 표시하세요. '
         '외부 공개·배포·광고 구매·메일 발송은 소유자의 명시적 승인 후에만 수행하세요.')
 
+    if __package__:
+        from .project_zero_roles import system_persona
+    else:
+        from project_zero_roles import system_persona
+    return system_persona(system)
 
 def failed_plan(message):
     return '요청한 작업은 실행하지 않았습니다. 모델 응답 처리 오류를 해결한 뒤 다시 요청하세요.', []
@@ -43,7 +48,14 @@ def install():
     else:
         from project_zero_business import install as install_business
         from project_zero_state import install as install_workspace
+    if __package__:
+        from .project_zero_roles import install as install_roles,CONVERSATION
+        from .project_zero_context import clean_context
+    else:
+        from project_zero_roles import install as install_roles,CONVERSATION
+        from project_zero_context import clean_context
     import server
+    install_roles()
     install_business(venture)
     install_workspace(server.app)
     original = ceo._is_new_venture_request
@@ -54,8 +66,9 @@ def install():
         value = json.loads(context(message))
         import meeting_engine
         value.update(pending_venture=venture.current_pending(), active_venture=venture.live(),
-            recent_meetings=meeting_engine.latest(2))
-        return json.dumps(value, ensure_ascii=False, default=str)
+            recent_meetings=meeting_engine.latest(2) if any(term in message for term in ('회의','실행안','직원 의견','팀 의견','발언','승인안')) else [])
+        value['_platform_turn']='dialogue'
+        return json.dumps(clean_context(value), ensure_ascii=False, default=str)
     ceo._context = current_context
     # Replace only the over-broad revision condition; retain the original transaction/approval flow.
     tree = ast.parse(inspect.getsource(ceo.talk))
@@ -75,7 +88,7 @@ def install():
     prompt = ceo.planning_system_prompt
     @functools.wraps(prompt)
     def planning_prompt():
-        return prompt().replace(
+        return CONVERSATION+'\n'+prompt().replace(
             'agent_task는 정보/기획/문서 제작만 가능하며 코드 변경·외부 조사·광고 구매·배포·메일 발송을 직접 수행하지 못합니다.',
             'agent_task는 현재 Hermes에 설정된 도구와 권한으로 요청한 분석·파일 작업·검증을 수행할 수 있습니다. '
             '실행 결과가 있을 때만 완료로 보고하고 광고 구매·외부 공개·메일 발송은 소유자의 명시적 승인이 필요합니다.')

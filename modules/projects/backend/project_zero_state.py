@@ -49,8 +49,12 @@ def install(app):
         ventures = db.many('SELECT * FROM ventures ORDER BY rowid DESC LIMIT 20')
         for row in ventures: row['proposal'] = json.loads(row.pop('proposal_json'))
         ceo = await server.ceo_state(x_project_zero_token)
+        team=await server.team_state(x_project_zero_token)
+        for person in team['roles']:
+            persona=meetings.TEAM.get(person['role'],{})
+            person.update(persona=persona.get('style',''),responsibility=persona.get('priority',''))
         return {'plan_preparing':sorted(PREPARING),'plans': plans.latest(db), 'ceo': {'messages': ceo['messages']}, 'include_engine_context':db.settings().get('platform_meeting_engine_context','false')=='true',
-                'team': await server.team_state(x_project_zero_token), 'meetings': meetings.latest(20),
+                'team': team, 'meetings': meetings.latest(20),
                 'ventures': ventures, 'active_product': venture_engine.live(),
                 'jobs': db.many('SELECT id,role,type,title,status,result,error,mode,created_at,started_at,finished_at FROM jobs ORDER BY rowid DESC LIMIT 60'),
                 'requests': [{'id': key, 'status': value['status'], 'error': value.get('error', ''),

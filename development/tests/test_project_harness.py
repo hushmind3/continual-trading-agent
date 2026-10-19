@@ -24,7 +24,8 @@ class HarnessTests(unittest.TestCase):
         from ai_agent.Hermes.engine.runtime_policy import discussion_prompt
         context=json.dumps({'topic':'새 사업 검토','prior_colleagues':[{'statement':'old product'}],'recent_lessons':[{'insight':'unrelated failure'}]})
         system,user=discussion_context('현재 역할',context,'focused_discussion')
-        self.assertEqual(json.loads(user),{'topic':'새 사업 검토','prior_colleagues':[]})
+        self.assertEqual(json.loads(user)['prior_colleagues'],[])
+        self.assertNotIn('recent_lessons',json.loads(user))
         self.assertIn('독립',system)
         prompt=discussion_prompt({'application_context_scope':'focused_discussion','application_system_prompt':system,'system_prompt':'사용자 지침'},'Repository desktop launch rules')
         self.assertNotIn('desktop launch',prompt);self.assertIn('사용자 지침',prompt)
@@ -50,6 +51,37 @@ class HarnessTests(unittest.TestCase):
         regular=SimpleNamespace(_build_system_prompt=native)
         bind_discussion_context(regular,{'application_context_scope':'native'})
         self.assertIs(regular._build_system_prompt,native)
+
+    def test_conversational_json_is_a_reply_not_an_execution_phase(self):
+        from platform_plugins.projects.harness_prompt import stage_for
+        result=stage_for('당신은 CEO입니다. JSON 객체만',json.dumps({'_platform_turn':'dialogue','owner_instruction':'설계는 누가 해?'}))
+        self.assertEqual(result,{'kind':'conversation','role':'CEO','label':'답변 작성'})
+
+    def test_unselected_example_history_is_not_reused_as_business_evidence(self):
+        from platform_plugins.projects.project_zero_context import clean_context
+        data={'owner_instruction':'홈페이지 방향을 얘기하자','recent_chat':[{'speaker':'owner','body':'홈페이지 얘기하자'},{'speaker':'ceo','body':'DealPage가 답이다'},{'speaker':'ceo','body':'고객용 화면을 먼저 정하자'}],
+              'learned_lessons':[{'insight':'DealPage를 팔자'}],'recent_meetings':[{'summary':'DealPage 계획'}],'active_venture':None,'pending_venture':{'name':'DealPage'}}
+        clean=clean_context(data)
+        self.assertNotIn('DealPage',json.dumps(clean));self.assertEqual(len(clean['recent_chat']),2)
+        self.assertEqual(data['pending_venture']['name'],'DealPage')
+        asked=clean_context({'owner_instruction':'DealPage가 뭐야?'})
+        self.assertIn('원본에 포함',asked['example_reference'])
+        active={**data,'active_venture':{'name':'DealPage'}}
+        self.assertEqual(clean_context(active),active)
+
+    def test_role_reference_excludes_old_project_claims_but_scoped_work_keeps_context(self):
+        from platform_plugins.projects.project_zero_context import clean_context,role_reference
+        old={'_platform_turn':'dialogue','owner_instruction':'CPO와 CTO는 각각 뭘 담당해?',
+             'recent_chat':[{'speaker':'ceo','body':'로컬 금융매매모델 개발은 멈췄다'}],
+             'recent_meetings':[{'summary':'금융 모델 설계'}],'learned_lessons':[{'insight':'고객 0명'}]}
+        context=clean_context(old)
+        self.assertEqual(context['context_kind'],'role_reference')
+        self.assertNotIn('금융',json.dumps(context,ensure_ascii=False))
+        self.assertIn('아키텍처',context['role_catalog']['CTO']['responsibility'])
+        self.assertFalse(role_reference('그 홈페이지의 CTO 진행 상황을 설명해 줘'))
+        opinion=clean_context({'owner':'CPO와 CTO 역할을 설명해 줘','draft':{'name':'unrelated'},'lessons':[]})
+        self.assertEqual(opinion['context_kind'],'role_reference')
+        self.assertNotIn('draft',opinion)
 
     def test_call_stage_separates_meeting_summary_and_employee_execution(self):
         from platform_plugins.projects.harness_prompt import stage_for

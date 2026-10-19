@@ -261,3 +261,56 @@ def test_cached_real_business_review_can_be_recovered_without_another_model_call
     assert row['status']=='pending' and row['report_message_id']
     assert db.one('SELECT count(*) AS n FROM jobs')['n']==0
     mock.assert_not_awaited()
+
+
+def test_conversation_does_not_dispatch_unsolicited_model_tasks(live,monkeypatch):
+    import ai_provider
+    client,headers,db=live
+    monkeypatch.setattr(ai_provider,'status',AsyncMock(return_value={'mode':'hermes'}))
+    mock=AsyncMock(return_value=json.dumps({'intent':'conversation','reply':'제품·화면 흐름은 CPO, 기술 설계·구현은 CTO가 맡습니다.','tasks':[{'role':'CTO','action':'agent_task','title':'불필요한 검사','brief':'질문인데 실행하지 마세요'}]},ensure_ascii=False))
+    monkeypatch.setattr(ai_provider,'compose',mock)
+    result=client.post('/api/admin/ceo/chat',headers=headers,json={'message':'설계는 누가 하는 거야?'})
+    assert result.status_code==200 and result.json()['jobs']==[]
+    assert db.one('SELECT count(*) AS n FROM jobs')['n']==0
+    system,user=mock.call_args.args
+    assert 'intent="conversation"' in system and json.loads(user)['_platform_turn']=='dialogue'
+    assert json.loads(user)['context_kind']=='role_reference'
+    assert system.index('CEO')<system.index('CPO')
+    assert 'CTO' in result.json()['reply']
+
+
+def test_generated_example_poison_is_excluded_but_original_chat_is_preserved(live,monkeypatch):
+    import ai_provider
+    client,headers,db=live
+    db.save_ceo_message('ceo','DealPage를 사용자의 사업으로 출시해야 합니다.')
+    db.record_lesson('CEO','DealPage만 하면 됩니다','team_meeting',1)
+    monkeypatch.setattr(ai_provider,'status',AsyncMock(return_value={'mode':'hermes'}))
+    mock=AsyncMock(return_value='{"intent":"conversation","reply":"독립적인 홈페이지 방향부터 정하죠.","tasks":[]}')
+    monkeypatch.setattr(ai_provider,'compose',mock)
+    response=client.post('/api/admin/ceo/chat',headers=headers,json={'message':'새 홈페이지 방향에 대해 얘기하자'})
+    assert response.status_code==200
+    context=json.loads(mock.call_args.args[1]);assert 'DealPage' not in json.dumps(context)
+    assert db.one("SELECT count(*) AS n FROM ceo_messages WHERE body LIKE '%DealPage%'")['n']==1
+
+
+def test_role_personas_reach_real_meeting_and_employee_prompts(live,monkeypatch):
+    import asyncio,ai_provider,meeting_engine,operations
+    client,headers,db=live
+    assert '화면 구성' in meeting_engine.TEAM['CPO']['priority']
+    assert '아키텍처' in meeting_engine.TEAM['CTO']['priority']
+    assert len({v['priority'] for v in meeting_engine.TEAM.values()})==7
+    monkeypatch.setattr(ai_provider,'status',AsyncMock(return_value={'mode':'hermes'}))
+    mock=AsyncMock(return_value='요구사항에 따라 아키텍처와 실제 구현 파일을 만들고 확인한 실행 결과를 보고합니다. 설계 문서에는 데이터와 API 및 화면 컴포넌트의 연결 관계를 적습니다.')
+    monkeypatch.setattr(ai_provider,'compose',mock)
+    asyncio.run(operations.agent_task({'role':'CTO','brief':'승인된 홈페이지 설계와 제작','owner_instruction':'홈페이지 제작'}))
+    assert '아키텍처' in mock.call_args.args[0] and '구현' in mock.call_args.args[0]
+    roles=client.get('/api/admin/platform/workspace',headers=headers).json()['team']['roles']
+    assert any(r['role']=='CPO' and '화면 구성' in r['responsibility'] for r in roles)
+
+
+def test_pending_draft_opinion_uses_app_context_without_native_project_memory(live):
+    import ai_provider
+    client,headers,db=live
+    options=ai_provider.platform_request_options('한국어 AI CEO로서 소유자와 대화하세요.',json.dumps({'owner':'왜 이렇게 정했어?','draft':{'name':'새 홈페이지'}}))
+    assert options['context_scope']=='focused_discussion'
+    assert ai_provider.platform_request_options('CTO 업무',json.dumps({'owner_instruction':'설계해','task':'실제 설계 파일 작성'}))['context_scope']=='native'

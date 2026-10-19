@@ -8,7 +8,7 @@ def request_options(system, user):
     import database as db
     try: data = json.loads(user)
     except (ValueError, TypeError): data = {}
-    pure = isinstance(data, dict) and (any(k in data for k in ('prior_colleagues','minutes','previous_draft')) or 'JSON' in system)
+    pure = isinstance(data, dict) and 'task' not in data and (any(k in data for k in ('prior_colleagues','minutes','previous_draft','_platform_turn','owner','owner_instruction','conversation')) or 'JSON' in system)
     shared = db.settings().get('platform_meeting_engine_context', 'false') == 'true'
     return {'context_scope': 'focused_discussion' if pure and not shared else 'native'}
 
@@ -16,10 +16,18 @@ def request_options(system, user):
 def discussion_context(system, user, scope):
     if scope != 'focused_discussion': return system, user
     data = json.loads(user)
+    if __package__:
+        from .project_zero_context import clean_context
+    else:
+        from project_zero_context import clean_context
+    data=clean_context(data)
     if 'prior_colleagues' in data:
         data = {**data, 'prior_colleagues': []}
         data.pop('recent_lessons', None)
-    system += ('\n이번 단계는 사업 검토입니다. 현재 주제와 제공된 실제 사업 상태만 근거로 삼으세요. '
+    if data.get('_platform_turn')=='dialogue' or 'owner' in data:
+        system+='\n현재 질문에 먼저 직접 답하세요. 의견 대화를 매번 회의·가설 검토·업무 배정으로 바꾸지 마세요. 기록에 없는 사실은 만들지 말고, 실행은 명시된 요청과 승인 범위를 따르세요.'
+        return system,json.dumps(data,ensure_ascii=False)
+    system += ('\n현재 앱의 대화·의견 작성 단계입니다. 현재 주제와 제공된 실제 사업 상태만 근거로 삼으세요. '
                '과거 개발 점검이나 예제 상품을 이번에 선택된 사업으로 간주하지 마세요. '
                '각 전문가는 먼저 독립적으로 자기 담당 관점의 가설·반론·검증안을 작성하고 CEO가 실행안으로 종합합니다. '
                'CPO는 고객·제품 요구사항을 담당하며 코드·명령·도구 호출문을 발언으로 출력하지 마세요. '

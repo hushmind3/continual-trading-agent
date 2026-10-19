@@ -12,9 +12,9 @@ def stage_for(system, user):
     except (ValueError, TypeError): data = {}
     if not isinstance(data, dict): data = {}
     role = re.search(r'(?<![A-Z])(CEO|CPO|CTO|CMO|CFO|CS|QA)(?![A-Z])', system)
-    kind = 'meeting' if 'prior_colleagues' in data else 'summary' if 'minutes' in data and 'topic' in data else 'task' if 'task' in data else 'planning' if requires_json(system) or any(k in data for k in ('owner_instruction','conversation','owner')) else 'response'
-    return {'kind': kind, 'role': role.group(1) if role else 'CEO' if kind in ('planning','summary') else '',
-            'label': {'meeting':'회의 발언 작성', 'summary':'회의 결론 정리', 'task':'직원 업무 실행', 'planning':'요청 검토·계획','response':'앱 응답 작성'}[kind]}
+    kind = 'meeting' if 'prior_colleagues' in data else 'summary' if 'minutes' in data and 'topic' in data else 'task' if 'task' in data else 'conversation' if data.get('_platform_turn')=='dialogue' or 'owner' in data else 'planning' if requires_json(system) or any(k in data for k in ('owner_instruction','conversation','owner')) else 'response'
+    return {'kind': kind, 'role': role.group(1) if role else 'CEO' if kind in ('planning','summary','conversation') else '',
+            'label': {'conversation':'답변 작성','meeting':'회의 발언 작성', 'summary':'회의 결론 정리', 'task':'직원 업무 실행', 'planning':'요청 검토·계획','response':'앱 응답 작성'}[kind]}
 
 
 def message_for(user):

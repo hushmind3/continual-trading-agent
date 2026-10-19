@@ -10,7 +10,7 @@ async function main(){
   page=await browser.newPage({viewport:{width:1440,height:960}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(origin+'/#projects/app/'+id,{waitUntil:'networkidle'});await page.getByRole('textbox',{name:'CEO에게 보낼 메시지'}).waitFor();
   assert.equal(await page.locator('iframe').count(),0);await page.getByRole('textbox',{name:'CEO에게 보낼 메시지'}).fill('작성 중인 요청을 보존합니다');
-  await page.getByRole('button',{name:'업무',exact:true}).click();await page.getByRole('heading',{name:'업무 현황',exact:true}).waitFor();
+  await page.getByRole('button',{name:'업무',exact:true}).click();await page.getByRole('heading',{name:'업무 현황',exact:true}).waitFor();await page.getByText('팀 역할과 담당 산출물',{exact:true}).click();await page.getByText(/요구사항·사용자 흐름·화면 구성/).waitFor();await page.screenshot({path:path.join(out,'project-zero-team-roles.png')});
   await page.getByRole('button',{name:'대화',exact:true}).click();assert.equal(await page.getByRole('textbox',{name:'CEO에게 보낼 메시지'}).inputValue(),'작성 중인 요청을 보존합니다');
   await page.screenshot({path:path.join(out,'project-zero-workspace-desktop.png')});
   let approvalClicks=0;const reportSummary='추천안: 로컬 홈페이지 제작\n이유: 고객 검증\n산출물: 홈페이지와 검사 결과\n승인 범위: 로컬 작업';const plan={report_message_id:'visual-report',meeting_id:'visual-plan',status:'pending',summary:reportSummary,tasks:[{phase:'requirements',role:'CPO',title:'요구사항 정리',brief:'정리',deliverable:'요구사항 문서',acceptance:'실제 문서 확인'}],jobs:[]};const simulated={...state,plans:[plan],ceo:{messages:[...state.ceo.messages,{id:'visual-report',seq:999999,speaker:'ceo',body:'[팀 회의 완료] '+reportSummary}]},meetings:[{id:'visual-only',status:'running',topic:'시각 검사 · 수익 가설 검토',summary:'',minutes:[{role:'CPO',name:'제품 책임자',statement:'**고객 문제**를 먼저 검증합니다.'},{role:'CTO',name:'기술 책임자',statement:'기술 가설과 구현 위험을 검토합니다.'}]}]};
@@ -28,7 +28,7 @@ async function main(){
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(300);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow');
   await page.screenshot({path:path.join(out,'project-zero-workspace-mobile.png')});await page.getByRole('button',{name:'대화',exact:true}).click();const card=page.getByRole('region',{name:'회의 실행안 승인'});await card.waitFor();assert.equal(await card.locator('details[open]').count(),0);await card.getByRole('button',{name:'승인하고 실행',exact:true}).click();await card.getByText('승인됨',{exact:true}).waitFor();assert.equal(approvalClicks,1);await page.screenshot({path:path.join(out,'project-zero-execution-approval.png')});assert.deepEqual(errors,[]);
-  const report={real_authenticated_workspace:true,draft_preserved:true,role_steps:6,partial_progress:'simulated CPO/CTO saved, CMO responding; no DB writes',viewports:[1440,390],horizontal_overflow:false,js_errors:errors,approval_click:'simulated endpoint; no DB jobs',model_calls:0};
+  const report={real_authenticated_workspace:true,role_personas_visible:true,draft_preserved:true,role_steps:6,partial_progress:'simulated CPO/CTO saved, CMO responding; no DB writes',viewports:[1440,390],horizontal_overflow:false,js_errors:errors,approval_click:'simulated endpoint; no DB jobs',model_calls:0};
   fs.writeFileSync(path.join(out,'project-zero-workspace.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
  }catch(error){if(page)await page.screenshot({path:path.join(out,'project-zero-workspace-failure.png')}).catch(()=>{});throw error}finally{await browser.close()}
 }

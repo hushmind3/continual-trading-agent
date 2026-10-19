@@ -60,7 +60,7 @@ Project Zero의 JSON 계획/검토 단계는 `application_plan_only`로 외부 �
 
 `runtime.invoke`와 `app_worker`는 실제 플랫폼 HTTP 요청의 Host·접속자를 원본 ASGI에 전달합니다. 호출 본문의 가짜 접속자 정보는 덮어씁니다. 원본의 로컬 자동 로그인은 루프백 접속에만 적용되고 외부 인증 요구는 유지됩니다.
 
-검사: `.venv/Scripts/python.exe -X utf8 -B development/scripts/verify_project_zero.py`. Git 추적 소스 사본·임시 DB에서 원본 업무 검사와 호환 회귀 41개를 통과했습니다. 모델 호출은 모의 응답이며 사용자 모델/기존 DB를 사용하지 않습니다. 임시는 실패 시에도 정리하고 결과를 `runtime/projects/manage/verification/project-zero-workflow.json`에 기록합니다. 실제 모델 대화 확인은 별도 검증이며, 임의 제품 제작·결제·광고·배포 성공을 뜻하지 않습니다.
+검사: `.venv/Scripts/python.exe -X utf8 -B development/scripts/verify_project_zero.py`. Git 추적 소스 사본·임시 DB에서 원본 업무 검사와 호환 회귀 51개를 통과했습니다. 모델 호출은 모의 응답이며 사용자 모델/기존 DB를 사용하지 않습니다. 임시는 실패 시에도 정리하고 결과를 `runtime/projects/manage/verification/project-zero-workflow.json`에 기록합니다. 실제 모델 대화 확인은 별도 검증이며, 임의 제품 제작·결제·광고·배포 성공을 뜻하지 않습니다.
 
 회의 화면 개선 전 확인(2026-10-19): 원본 업무·호환 36개(임시 DB/모의 모델), 플랫폼 관련 회귀 57개 통과. 실제 원본 UI의 인사는 모델 API 1회·24.1초·도구 0회·업무 0개로 표시됐습니다. CTO README 업무 1개는 원래 큐에서 completed/llm으로 저장됐고 실제 read_file 호출과 화면 표시를 확인했습니다(직원 단계 89.9초·모델 API 6회·도구 4회). JavaScript 오류 0건, 설치된 원본 추적 소스 변경 없음. 결과는 runtime/projects/manage/verification/project-zero-live.json·project-zero-task.json, 화면은 project-zero-live.png·project-zero-cto.png입니다. 중복 상대 경로 재탐색과 9B 요약의 어색하거나 부정확한 표현은 남아 있으며 실제 카드 결제·광고·임의 신제품 배포를 검증한 결과가 아닙니다.
 
@@ -68,28 +68,24 @@ Project Zero의 JSON 계획/검토 단계는 `application_plan_only`로 외부 �
 
 실제 모델 검사 명령: `node development/scripts/verify_project_harness.cjs --allow-local-model`. 이 검사는 원본 앱의 실제 대화/작업 기록을 남깁니다. 일반 회귀에서는 실행하지 않습니다. 새 두 실행기의 `--resume`은 이미 완료된 자기 검사 기록 확인에만 사용합니다. 최근 인사와 직원 업무를 각각 확인한 직후에 사용해야 하며 임의 다른 작업 결과를 대신 검사하지 않습니다.
 
-## 회의 진행·경영실 보기
+## Project Zero 대화·역할·회의·실행안
 
-용도: `project_zero_state.py`가 기존 앱에 인증된 `/api/admin/platform/workspace` 조회를 추가합니다. 대화/회의/업무/사업안은 원본 DB와 API를 그대로 사용하며 `harness_prompt.stage_for`의 실제 역할/호출 종류를 별도 진행 정보로 제공합니다. 회의 발언 5개와 CEO 종합은 순차 모델 호출이며 업무 큐의 실행 상태가 아닙니다. 앱 재시작 시 복구할 수 없는 running 회의는 발언을 보존한 failed로 표시해 영구 진행 상태를 막습니다.
+용도: 설치된 원본 AIAgent/앱을 유지하면서 원본 provider·대화·업무 큐와 공통 UI를 연결합니다. 원본 추적 파일을 수정하지 않습니다.
 
-`project_zero_business.py`는 새 사업 모델 요청의 previous_draft를 빈 값으로 시작합니다. 기존 BASE의 DealPage 예제를 항상 보내던 편향을 제거하고 필수 내용 없는 응답은 실패로 처리합니다. 실제 승인된 DealPage 제품과 기존 사용자 사업안을 삭제하거나 출시 조건을 바꾸지 않습니다. 수익 목표를 의논하는 '월천만원 벌거리'도 새 사업 검토로 연결합니다.
+- `project_zero.py`: 원본 CEO 분기·승인 오류 호환, 현재 앱 대화 문맥 연결.
+- `project_zero_roles.py`: CEO/CPO/CTO/CMO/CFO/CS/QA의 실제 프롬프트와 TEAM 페르소나. CPO 요구사항·사용자 흐름·화면 구성 → CTO 아키텍처·구현 → QA 검증. 일반 대화 intent는 실행 업무를 만들지 않습니다. 기존 명시적 실행/원본 JSON 계약은 보존합니다.
+- `harness_prompt.py`: 구조화된 CEO 대화를 conversation/답변 작성으로 표시합니다. JSON 형식 자체와 회의·계획·실제 직원 실행을 혼동하지 않습니다.
+- `project_zero_context.py`: 미승인 예제 상품을 포함한 과거 AI 답변·교훈·회의를 현재 사업 근거로 재사용하지 않습니다. 원본 DB·표시 기록은 보존하며 명시적 예제 질문·실제 승인 제품은 구분합니다. 앱 주문/장부를 사용자의 다른 사업 실적으로 해석하지 않습니다.
+- `project_zero_business.py`: 새 사업의 previous_draft는 빈 값, 일반 CEO 의견도 focused_discussion 범위로 전달합니다. 직원 task는 원래 실행 도구·맥락을 유지합니다.
+- `project_zero_state.py`: 원본 ASGI에 인증된 workspace/공유 맥락 옵션을 추가합니다. 재시작으로 복구할 수 없는 회의는 발언을 보존한 failed로 처리합니다. 현재 동작 UI는 [경영실 안내](../frontend/project_zero/README.md)를 따릅니다.
+- `project_zero_meeting.py`, `project_zero_plans.py`: 원본 회의의 전문가 5회+CEO 1회에서 실행안을 생성·보존합니다. 승인 전 업무 0개, 중복 승인 거절, 단계별 산출물 전달, 선행 실패 시 후속 중단입니다. QA는 사업/기획/설계도 검토하며 제작이 있으면 제작 후 QA 순서를 강제합니다. 예전 회의는 prepare로 CEO 종합만 요청하고 유효한 캐시 초안은 재사용합니다. 실제 외부 공개·지출·메일은 별도 승인 대상입니다.
 
-회의/종합은 원본처럼 도구 실행 없는 의견 작성 단계입니다. agent_task 업무만 설정된 실행 도구를 사용합니다. 원본 파일은 변경하지 않으며 원본 UI도 별도로 엽니다. 플랫폼 보기 구현과 확인 방법은 [프론트 안내](../frontend/project_zero/README.md)를 따릅니다.
+API는 원본 앱의 `/api/admin/platform/workspace`, `/discussion-context`, `/meeting-plans/{id}/prepare`, `/meeting-plans/{id}/decision`입니다. 앱 DB settings와 platform_meeting_plans에만 앱 상태를 저장합니다. include_engine_context는 진행 중 회의에서는 변경을 거절하며 전역 Hermes 설정을 변경하지 않습니다. focused_discussion의 호스트 프롬프트 제외는 [Hermes 대화 안내](../../hermes/backend/chat/README.md)를 따릅니다.
 
-회의 맥락: project_zero_business.request_options는 기본적으로 회의·사업 검토를 focused_discussion으로 지정합니다. 회사 역할·현재 주제·사용자 시스템 지침은 유지하고, 관련 없는 엔진 개발 지침/공유 기억/검토 쓰기를 해당 요청에만 제외합니다. 직원 agent_task는 원래 도구·맥락을 유지합니다. 전문가 단계는 이전 발언/주제 연결이 없는 과거 교훈을 제외해 먼저 독립 검토하고, CEO는 현재 회의의 전체 발언을 종합합니다. 원본 DB 기록은 삭제하지 않습니다.
+확인: `development/scripts/verify_project_zero.py`(격리 원본/업무·모의 모델), `development/tests/test_project_harness.py`(전송/상태 계약), `verify_project_zero_workspace.cjs`(실제 인증+모의 진행/승인 화면), `verify_project_zero_context.py`(원본 AIAgent와 가짜 API). 검사 임시는 정상/실패 모두 정리하며 결과는 runtime/projects/manage/verification 소속입니다.
 
-/api/admin/platform/discussion-context의 include_engine_context 스위치를 켜면 원본처럼 이전 발언·교훈·엔진 공유 맥락을 다시 포함합니다. 앱 DB settings의 platform_meeting_engine_context에만 보관하고 진행 중 회의에서는 변경을 거절합니다. UI에서 다음 회의·사업 검토 옵션임을 표시하며 전역 Hermes 설정은 변경하지 않습니다.
+이전 실측: 실제 회의 6세션·각 발언 저장, CEO 실행안 1회 생성(243.6초), 초기 QA 규칙 오류의 실제 응답 복구·승인 대기·실행 업무 0개를 확인했습니다. 과거 검사와 이번 페르소나 보정의 검증을 혼동하지 않습니다. 이번 보정의 실제 역할 질문·여행 아이디어 대화 2회와 회귀 결과는 프론트 안내에 구분했습니다. 모든 발언의 사실성·임의 홈페이지 제작·배포 성공은 미확인입니다.
 
-확인 명령: node development/scripts/verify_project_zero_workspace.cjs는 실제 인증/기록과 별도의 화면 전용 진행 모의 데이터를 사용하며 모델을 실행하지 않습니다. node development/scripts/verify_project_zero_meeting.cjs --allow-local-model은 실제 전문가 5명·CEO 호출 6개와 서로 다른 세션·저장 발언·완료 화면을 확인합니다. 원본 UI 호환 검사는 이제 /assets/projects/<id>/index.html에서 실행합니다.
+일반 역할 질문은 role_reference로 분류해 등록된 7개 역할 정보만 전달합니다. 특정 프로젝트의 최근 작업/진행 상태를 묻는 질문은 이 경로로 축소하지 않습니다. 과거 회의는 회의·발언·실행안 관련 질문에만 연결합니다. 실제 첫 역할 답변에서 DealPage는 나오지 않았지만 과거 금융 주제를 재사용한 것을 발견해 추가한 문맥 경계입니다. 원본 대화·회의는 삭제하지 않습니다.
 
-2026-10-19 회의·경영실 개선 확인: 격리 업무/호환 41개·플랫폼 회귀 60개, TypeScript·Vite 통과. 실제 인증/기록과 화면 전용 진행 모의 데이터로 PC 1440px·모바일 390px의 탭·입력 보존·진행 6단계·가로 넘침 없음·JavaScript 오류 0건을 확인했습니다. 첫 실제 회의는 개발 맥락/앞선 발언의 예제 편향이 발견됐고, 기본 주제 전용 맥락 적용 후 다시 실행한 실제 회의는 전문가 5명·CEO의 6개 독립 세션으로 완료됐습니다. 통제한 시험 주제의 선택되지 않은 예제 상품 언급은 0건입니다. 진행/결과는 project-zero-real-meeting.json, 화면은 project-zero-real-meeting.png·project-zero-workspace-desktop.png·project-zero-workspace-mobile.png입니다. 이는 실제 시장조사·매출·출시 검증이 아니며 모든 모델 응답의 사실성을 보장하는 검사는 아닙니다.
-
-2026-10-19 문맥 격리 보정: skip_context_files/skip_memory만으로는 원본 시스템 프롬프트의 호스트·현재 경로·코딩 맥락·플러그인 구간이 없어지지 않았습니다. focused_discussion은 실행별 프롬프트 빌더를 앱 역할+사용자 지정 지침으로 교체하고 압축 재생성에도 같은 경계를 유지합니다. 일반 native/직원 도구 실행은 변경하지 않습니다. 기존 회의/앱 대화에 저장된 잘못된 추정은 삭제하지 않으며, 과거 기록과 사용자 지정 공유 맥락의 영향은 별개입니다. 회귀는 test_project_harness의 원본 빌더 미호출·캐시 재생성·native 보존 검사로 확인합니다. 수정 후 실제 모델 답변의 주제 혼동 재발 여부는 별도 확인 대상입니다.
-
-회의 실행안: project_zero_meeting.py는 기존 CEO 종합 1회에서 4줄 요약과 담당·단계·산출물·완료 기준이 있는 실행안을 생성합니다(모델 6회 구조 유지). project_zero_plans.py는 앱 DB에 승인 대기로 저장하며 대화창 ExecutionPlanCard의 승인하고 실행/보류에 연결합니다. 승인 전 업무 0개, 승인 시 원본 agent_task 큐에 기획→설계→제작→QA를 순차 등록하고 선행 실제 결과를 넘깁니다. 선행 실패 시 후속 실행 중단, 중복 승인 거절, 인증 필수입니다. 지출·외부 공개·메일은 별도 승인 대상입니다. 잘못된 계획은 회의 실패로 표시하며 임의 고정 실행안으로 대체하지 않습니다. 이전 회의는 바로 실행 승인하지 않고 이 회의로 실행안 작성을 누르면 저장된 발언으로 CEO 종합만 1회 다시 요청합니다. 비동기 작성 상태를 표시하고 중복 작성을 거절하며 기존 기록은 보존합니다. 발언은 상세 기록으로 접고 대표 대화에는 CEO 요약과 승인안만 표시합니다. 실제 모델의 새 실행안 생성·홈페이지 제작·배포 품질은 격리 회귀 검사와 구분해 미확인으로 남깁니다.
-
-실행안 보정 확인: 격리된 원본·업무 검사 46개, 하네스 단위 16개, TypeScript·Vite 통과. 실제 인증과 모의 승인 요청으로 PC1440/모바일390의 요약·접힌 상세·승인 버튼을 확인했으며 DB 업무 생성 없이 중복 클릭·가로 넘침·JS 오류를 검사했습니다. verify_project_zero_context.py는 사용자 모델 대신 로컬 가짜 API에 원본 AIAgent 요청을 보내 호스트/현재 경로가 전송되지 않는 것을 확인합니다(가짜 API 2회). 승인 후 실제 홈페이지 제작·QA 품질·배포는 미확인입니다. 실제 CEO 실행안 생성 결과는 runtime/projects/manage/verification/project-zero-plan-live.json이 있을 때 별도 확인하며, 과거 회의 6회 호출 검사와 구분합니다.
-
-실제 CEO 실행안 검사에서 사업 검증계획 QA를 제작 후 검사로만 취급하는 규칙 오류를 발견했습니다. QA는 앞선 사업·기획·설계 산출물도 검토할 수 있으며, 제작이 포함된 실행안에서는 제작→QA 순서를 계속 강제합니다. 원본 CEO 응답은 앱 settings의 platform_meeting_draft:<회의 ID>에 보존하고 재요청 때 현재 규칙으로 검증해 사용합니다. 복구 불가능한 초안만 모델에 재요청합니다. 승인 카드의 기본 요약은 4줄이며 전체 보고·작업 기준은 상세에 보존합니다.
-
-최종 확인: 격리 업무 검사 47개 통과. 기존 실제 회의의 CEO 종합 1회는 243.6초 후 완료됐고, 초기 규칙 오류로 실패한 원본 응답을 보존·재검증하여 모델 재호출 없이 승인 대기 실행안 4개와 CEO 대화 메시지로 연결했습니다. 실제 승인 버튼 표시, 승인 전 업무 0개, 앱 공유 맥락 false를 확인했습니다(project-zero-plan-live.json/png). 실제 승인 버튼은 누르지 않았습니다. PC1440/모바일390 UI 회귀도 다시 통과했습니다. 모델의 모든 사실 주장이나 홈페이지 제작 성공을 확인한 결과는 아닙니다.
+최신 회귀는 원본/업무 51개와 하네스 19개입니다. 실제 대화 재검증 명령은 `node development/scripts/verify_project_zero_dialogue.cjs --allow-local-model`이며 원본 앱의 대화 기록을 남깁니다. 일반 검사에서는 사용자 모델을 호출하지 않습니다.

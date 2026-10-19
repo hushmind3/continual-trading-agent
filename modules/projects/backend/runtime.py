@@ -35,7 +35,10 @@ class AppWorker:
         else:
             from .python_packages import folder as packages
             arguments = [sys.executable, '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('app_worker.py')), str(folder), spec['app'], str(packages(source))]
-            if harness and harness.get('enabled'): arguments.append(harness['entry'])
+            if harness and harness.get('enabled'):
+                arguments.append(harness['entry'])
+                if project_id and read(project_id).get('repository', '').lower() == 'hushmind3/project-zero':
+                    arguments.append('project-zero')
         self.process = subprocess.Popen(arguments, cwd=folder, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.output,
             text=True, encoding='utf8', bufsize=1, env={**os.environ, **environment, 'PYTHONUTF8': '1'})
         self.reader = threading.Thread(target=self._read, daemon=True); self.reader.start()
@@ -100,7 +103,7 @@ def busy_reason():
     return '실행 중인 외부 프로젝트 요청' if active else harness.busy_reason()
 
 
-def invoke(record, payload):
+def invoke(record, payload, origin=None):
     global ACTIVE
     source = Path(record['active_source']); spec = record['adapter']
     if spec['kind'] not in ('fastapi', 'node-mcp'): raise ValueError('이 프로젝트는 API/MCP 앱이 아닙니다.')
@@ -116,7 +119,10 @@ def invoke(record, payload):
             if worker and worker.source != str(source): worker.close(); worker = None
             if worker is None:
                 worker = AppWorker(source, spec, record.get('environment', {}), record.get('harness'), key); WORKERS[key] = worker
-        return worker.call(payload)
+        forwarded = {**payload, '_host': origin.headers.get('host', '') if origin else '',
+            '_client': [origin.client.host, origin.client.port] if origin and origin.client else ['platform-internal', 0],
+            '_server': [origin.url.hostname, origin.url.port or 80] if origin else ['127.0.0.1', 8766]}
+        return worker.call(forwarded)
     finally:
         with LOCK: ACTIVE -= 1
 
@@ -240,7 +246,7 @@ def register_host(app):
             if path == '_platform-language.js': return FileResponse(Path(__file__).with_name('project_language.js'), media_type='application/javascript')
             if ui['kind'] == 'asgi':
                 result = invoke(record, {'path': '/' if path in ('', 'index.html') else '/' + path,
-                    'query': request.url.query, 'method': 'GET', 'headers': dict(request.headers)})
+                    'query': request.url.query, 'method': 'GET', 'headers': dict(request.headers)}, request)
                 headers = {k: v for k, v in result.get('headers', {}).items() if k.lower() not in ('content-length', 'content-encoding', 'connection')}
                 headers['Cache-Control'] = 'no-store'
                 body = base64.b64decode(result['body'])

@@ -1,12 +1,12 @@
 """Optional original-provider calls through the installed Hermes agent, without copying it."""
 import ast
 import json
-import re
 from pathlib import Path
 import threading
 import time
 from collections import Counter
 from . import store
+from .harness_prompt import message_for, requires_json
 
 SERIAL = threading.Lock()
 ACTIVE = Counter()
@@ -15,13 +15,18 @@ CANCELS = {}
 
 def format_response(text, system):
     # Preserve the provider's JSON-object contract across agent tool/progress output.
-    if 'JSON 객체' not in system and not re.search(r'JSON\s*(?:만|형식|only|object)', system, re.I): return text
-    start = text.find('{')
-    if start < 0: raise ValueError('앱이 요구한 JSON 객체가 하네스 응답에 없습니다.')
-    try: value, _ = json.JSONDecoder().raw_decode(text[start:])
-    except ValueError as exc: raise ValueError('하네스의 JSON 응답을 해석할 수 없습니다.') from exc
-    if not isinstance(value, dict): raise ValueError('앱의 응답은 JSON 객체여야 합니다.')
-    return json.dumps(value, ensure_ascii=False)
+    if not requires_json(system): return text
+    decoder = json.JSONDecoder()
+    # A native streaming retry can leave an unfinished prefix before the completed final object.
+    # Use a genuinely decoded object; never close braces or invent a plan from plain prose.
+    for start, char in enumerate(text):
+        if char != '{': continue
+        try: value, _ = decoder.raw_decode(text, start)
+        except ValueError: continue
+        if not isinstance(value, dict): continue
+        if '"reply"' in system and not isinstance(value.get('reply'), str): continue
+        return json.dumps(value, ensure_ascii=False)
+    raise ValueError('앱이 요구한 완전한 JSON 객체가 하네스 응답에 없습니다.')
 
 
 def discover(source):
@@ -62,6 +67,9 @@ def execute(key, payload, cancelled):
     with store.LOCK:
         record = store.read(key)
         if not record.get('harness', {}).get('enabled'): raise ValueError('앱의 Hermes 연결이 꺼져 있습니다.')
+        if record.get('repository', '').lower() == 'hushmind3/project-zero':
+            from .project_zero import provider_system
+            system = provider_system(system)
         if payload.get('operation') == 'settings':
             cfg = bridge.call('settings')
             return {'mode': 'hermes' if cfg.get('model') else 'rules', 'name': cfg.get('model') or '모델 미선택', 'endpoint': cfg.get('base_url', '')}
@@ -79,12 +87,16 @@ def execute(key, payload, cancelled):
             number = store.read(key).get('harness', {}).get('request_number', 0) + 1
             update(key, request_number=number)
             session = bridge.call('session/create', {'title': f'{record.get("title", key)} · 앱 요청 {number}'})['session']['id']
-            result = bridge.call('chat', {'session_id': session, 'workspace': record['active_source'], 'message':
-                'Execute this installed application request using the Hermes harness and configured tools. '
-                'Preserve its required output format and owner approval/business decision rules. '
-                'Use tools when needed to verify facts; never claim unperformed actions. '
-                'Return only the final application response, not intermediate progress.\n\n'
-                f'Application instructions:\n{system}\n\nApplication context and user request:\n{user}'})
+            plan_only = record.get('repository', '').lower() == 'hushmind3/project-zero' and requires_json(system)
+            generation = {}
+            if record.get('repository', '').lower() == 'hushmind3/project-zero':
+                generation = {'temperature': .3}
+                if payload.get('max_tokens') is not None: generation['max_tokens'] = payload['max_tokens']
+            result = bridge.call('chat', {'session_id': session, 'workspace': record['active_source'],
+                'application_system_prompt': system,
+                'application_plan_only': plan_only,
+                'application_generation': generation,
+                'application_response_format': 'json_object' if plan_only else '', 'message': message_for(user)})
             session = result['job']['session_id']
             update(key, state='running', session_id=session)
             while True:

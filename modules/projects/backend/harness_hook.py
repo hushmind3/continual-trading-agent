@@ -17,7 +17,8 @@ class ProviderHook:
         @functools.wraps(original)
         async def compose(*args, **kwargs):
             arguments = signature.bind(*args, **kwargs); arguments.apply_defaults()
-            return await self.request({'system': arguments.arguments['system'], 'user': arguments.arguments['user']})
+            return await self.request({'system': arguments.arguments['system'], 'user': arguments.arguments['user'],
+                                       'max_tokens': arguments.arguments.get('max_tokens')})
         setattr(provider, name, compose)
         if hasattr(provider, 'status'):
             async def status(): return await self.request({'operation': 'settings'})

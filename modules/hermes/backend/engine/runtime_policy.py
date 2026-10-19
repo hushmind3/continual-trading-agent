@@ -40,3 +40,30 @@ def apply_thinking(agent, options, local):
     template['enable_thinking']=options['thinking_mode']=='on'
     extra['chat_template_kwargs']=template;overrides['extra_body']=extra
     agent.request_overrides=overrides
+
+
+def apply_response_contract(agent, mode, plan_only=False):
+    """Use the native OpenAI-compatible transport's constrained JSON response option."""
+    if mode == 'json_object' and agent.api_mode == 'chat_completions':
+        agent.request_overrides = {**(getattr(agent, 'request_overrides', {}) or {}),
+                                   'response_format': {'type': 'json_object'}}
+        if plan_only:
+            # Project Zero routes execution through the jobs returned by its structured planner.
+            # Ollama cannot combine its JSON grammar with a live tool-call grammar.
+            agent.request_overrides.update(tools=[], tool_choice='none')
+
+
+def application_generation(value):
+    if not isinstance(value, dict) or set(value)-{'max_tokens','temperature'}:
+        raise ValueError('앱 생성 옵션을 확인하세요.')
+    if 'max_tokens' in value and (type(value['max_tokens']) is not int or not 1<=value['max_tokens']<=65536):
+        raise ValueError('앱 출력 한도는 1~65,536 정수여야 합니다.')
+    if 'temperature' in value and (type(value['temperature']) not in (int,float) or not 0<=value['temperature']<=2):
+        raise ValueError('앱 temperature는 0~2 숫자여야 합니다.')
+    return dict(value)
+
+
+def apply_application_generation(agent, options):
+    if 'max_tokens' in options: agent.max_tokens = options['max_tokens']
+    if 'temperature' in options:
+        agent.request_overrides = {**(getattr(agent,'request_overrides',{}) or {}),'temperature':options['temperature']}

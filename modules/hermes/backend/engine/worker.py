@@ -52,7 +52,7 @@ from run_agent import AIAgent
 from hermes_state import SessionDB
 from ruamel.yaml import YAML
 from ai_agent.Hermes.engine.execution import bind_model, context_window, request_policy, settle_review
-from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking
+from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, apply_response_contract, application_generation, apply_application_generation
 
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
@@ -220,6 +220,17 @@ class HermesWorker:
             request.update(mode='loop',message=parsed.pop('prompt'), **parsed)
         self.idle_required()
         cfg = request_policy(load_settings(), request)
+        application_prompt = request.get('application_system_prompt', '')
+        if not isinstance(application_prompt, str) or len(application_prompt) > 50000:
+            raise ValueError('앱 시스템 지침은 50,000자 이하 문자열이어야 합니다.')
+        cfg['application_system_prompt'] = application_prompt
+        response_format = request.get('application_response_format', '')
+        if response_format not in ('', 'json_object'): raise ValueError('앱 응답 형식을 확인하세요.')
+        cfg['application_response_format'] = response_format
+        plan_only = request.get('application_plan_only', False)
+        if not isinstance(plan_only, bool): raise ValueError('앱 계획 단계는 참/거짓이어야 합니다.')
+        cfg['application_plan_only'] = plan_only
+        cfg['application_generation'] = application_generation(request.get('application_generation', {}))
         if request.get('workspace'):
             selected = Path(str(request['workspace'])).expanduser().resolve()
             if not selected.is_dir():raise ValueError('선택한 프로젝트 폴더가 없습니다.')
@@ -293,7 +304,11 @@ class HermesWorker:
                     'If the user closes the app, do not reopen it without a new request. '
                     'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'
                     + ('\nRead-only code analysis: only read_file and search_files inside the selected workspace are permitted. Do not request editing, terminal, code execution, MCP, delegation or desktop tools.' if cfg.get('read_only') else '')
-                    + ('\n\nAdditional user-configured system instructions:\n'+cfg['system_prompt'] if cfg.get('system_prompt') else '')),
+                    + ('\n\nAdditional user-configured system instructions:\n'+cfg['system_prompt'] if cfg.get('system_prompt') else '')
+                    + ('\n\nApplication role and response contract for this request:\n'+cfg['application_system_prompt']+
+                       '\nPreserve owner approval requirements. Use configured tools only when the current request needs them; '
+                       'never execute historical requests from application context. Return only the final application response in its required format.'
+                       if cfg.get('application_system_prompt') else '')),
                 stream_delta_callback=self.delta, event_callback=self.event,
                 status_callback=lambda *args, **kw: self.event('status', args),
                 tool_start_callback=lambda *args, **kw: self.event('tool_start', args),
@@ -301,6 +316,8 @@ class HermesWorker:
                 clarify_callback=self.clarify,
             )
             apply_thinking(self.agent,model_options(cfg,self.native_config()),bool(cfg.get('local_model')))
+            apply_response_contract(self.agent, cfg.get('application_response_format'), cfg.get('application_plan_only', False))
+            apply_application_generation(self.agent, cfg.get('application_generation', {}))
             if cfg.get('read_only'):
                 from ai_agent.Hermes.chat.read_only import bind as bind_read_only
                 bind_read_only(self.agent,cfg['workspace'],lambda reason:self.event('permission_denied',{'message':reason}),(request or {}).get('attachments',[]))

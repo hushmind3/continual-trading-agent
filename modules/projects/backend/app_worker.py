@@ -9,6 +9,7 @@ import traceback
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from harness_hook import ProviderHook
+from project_zero import install as install_project_zero
 
 protocol = sys.stdout
 sys.stdout = sys.stderr
@@ -20,10 +21,12 @@ async def request(app, message):
     if not path.startswith('/') or '?' in path: raise ValueError('Invalid application path')
     headers = [(str(key).lower().encode(), str(value).encode()) for key, value in message.get('headers', {}).items()
                if key.lower() not in ('host', 'content-length', 'connection')]
+    if message.get('_host'): headers.append((b'host', str(message['_host']).encode()))
     scope = {'type': 'http', 'asgi': {'version': '3.0'}, 'http_version': '1.1', 'method': message.get('method', 'GET'),
         'scheme': 'http', 'path': path, 'raw_path': path.encode(), 'root_path': '',
         'query_string': str(message.get('query', '')).encode(), 'headers': headers,
-        'client': ('127.0.0.1', 0), 'server': ('127.0.0.1', 8766)}
+        'client': tuple(message.get('_client', ['platform-internal', 0])),
+        'server': tuple(message.get('_server', ['127.0.0.1', 8766]))}
     response = {'status': 500, 'headers': {}, 'body': ''}; parts = []; sent = False
     async def receive():
         nonlocal sent
@@ -56,6 +59,7 @@ async def main():
     module, name = target.split(':')
     app = getattr(importlib.import_module(module), name)
     hook = ProviderHook(sys.argv[4], protocol) if len(sys.argv) > 4 and sys.argv[4] else None
+    if hook and len(sys.argv) > 5 and sys.argv[5] == 'project-zero': install_project_zero()
     tasks = set()
     async def handle(message):
         try: result = await request(app, message)

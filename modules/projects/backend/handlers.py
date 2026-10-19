@@ -2,7 +2,7 @@
 from pathlib import Path
 import shlex
 import re
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from . import github, installer, runtime, lifecycle, localization
 from .store import LOCK, STATE, identifier, read, save
 
@@ -114,9 +114,9 @@ def harness_control(request: dict):
 
 
 @router.post('/invoke')
-def invoke(request: dict):
+def invoke(request: dict, connection: Request):
     if len(str(request.get('body', ''))) > 2 * 1024 * 1024: raise HTTPException(413, '요청 본문이 너무 큽니다.')
-    return call(runtime.invoke, call(read, request.get('id', '')), request)
+    return call(runtime.invoke, call(read, request.get('id', '')), request, connection)
 
 
 @router.post('/run')

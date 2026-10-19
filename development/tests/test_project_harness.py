@@ -14,14 +14,76 @@ sys.path.insert(0, str(ROOT/'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
 from platform_plugins.projects import harness, runtime, store
+from platform_plugins.projects.harness_prompt import message_for
+from platform_plugins.projects.project_zero import is_new_request, is_revision
 
 
 class HarnessTests(unittest.TestCase):
+    def test_current_greeting_does_not_resume_historical_tool_requests(self):
+        user=json.dumps({'recent_chat':[{'body':'Read verification/probe.txt'}], 'owner_instruction':'안녕'},ensure_ascii=False)
+        result=message_for(user)
+        self.assertTrue(result.endswith('Current instruction for this request ONLY:\n안녕'))
+        self.assertIn('historical',result)
+        self.assertNotIn('verification/probe.txt',result)
+        self.assertTrue(message_for(json.dumps({'task':'CFO audit','owner_instruction':'Run the entire company'})).endswith('CFO audit'))
+
+    def test_structured_native_transport_preserves_thinking_and_tools(self):
+        from types import SimpleNamespace
+        from ai_agent.Hermes.engine.runtime_policy import apply_response_contract
+        agent=SimpleNamespace(api_mode='chat_completions',request_overrides={'extra_body':{'chat_template_kwargs':{'enable_thinking':True}}},tools=['read_file'])
+        apply_response_contract(agent,'json_object')
+        self.assertEqual(agent.request_overrides['response_format'],{'type':'json_object'})
+        self.assertTrue(agent.request_overrides['extra_body']['chat_template_kwargs']['enable_thinking'])
+        self.assertEqual(agent.tools,['read_file'])
+        apply_response_contract(agent,'json_object',plan_only=True)
+        self.assertEqual(agent.request_overrides['tools'],[])
+        self.assertEqual(agent.request_overrides['tool_choice'],'none')
+        self.assertTrue(agent.request_overrides['extra_body']['chat_template_kwargs']['enable_thinking'])
+
+    def test_application_generation_is_validated_and_run_scoped(self):
+        from types import SimpleNamespace
+        from ai_agent.Hermes.engine.runtime_policy import application_generation,apply_application_generation
+        agent=SimpleNamespace(max_tokens=9000,request_overrides={'extra_body':{'thinking':True}})
+        options=application_generation({'max_tokens':2500,'temperature':.3})
+        apply_application_generation(agent,options)
+        self.assertEqual(agent.max_tokens,2500)
+        self.assertEqual(agent.request_overrides['temperature'],.3)
+        self.assertEqual(agent.request_overrides['extra_body'],{'thinking':True})
+        for value in [{'max_tokens':True},{'max_tokens':0},{'temperature':float('nan')},{'unsupported':1}]:
+            with self.assertRaises(ValueError):application_generation(value)
+
+    def test_business_negation_and_followup_do_not_mutate_a_draft(self):
+        original=lambda message: '사업' in message
+        for message in ['새 사업 초안을 만들지 마세요','사업안 설명만 해줘','그럼 안녕']:
+            self.assertFalse(is_new_request(message,original))
+        self.assertTrue(is_new_request('새 사업 아이디어를 제안해줘',original))
+        self.assertFalse(is_revision('그럼 안녕',{'id':'pending'}))
+        self.assertFalse(is_revision('초안 수정하지 마세요',{'id':'pending'}))
+        self.assertTrue(is_revision('가격을 19000원으로 바꿔줘',{'id':'pending'}))
+        from platform_plugins.projects.project_zero import provider_system
+        prompt=provider_system('이 시스템에서 할 수 없는 외부 검색, 코드 수정, 배포, 광고 집행은 수행했다고 주장하지 마세요.')
+        self.assertNotIn('할 수 없는',prompt)
+        self.assertIn('실제 도구 결과',prompt)
+        self.assertIn('명시적 승인',prompt)
+
+    def test_internal_origin_cannot_be_forged_in_an_app_payload(self):
+        from starlette.requests import Request
+        (self.source/'origin.py').write_text('from fastapi import FastAPI,Request\napp=FastAPI()\n@app.get("/")\ndef origin(request:Request):return {"client":request.client.host,"host":request.headers.get("host","")}\n')
+        self.record.update(adapter={'kind':'fastapi','directory':'.','app':'origin:app'},harness={'enabled':False})
+        origin=Request({'type':'http','method':'POST','scheme':'http','path':'/api','query_string':b'',
+            'headers':[(b'host',b'127.0.0.1:8766')],'client':('203.0.113.9',5000),'server':('127.0.0.1',8766)})
+        response=runtime.invoke(self.record,{'path':'/','_client':['127.0.0.1',1],'_host':'localhost'},origin)
+        value=json.loads(base64.b64decode(response['body']))
+        self.assertEqual(value['client'],'203.0.113.9')
+        self.assertEqual(value['host'],'127.0.0.1:8766')
     def test_structured_response_preserves_json_without_tool_narration(self):
         text='```json\n{"reply":"actual tool result","tasks":[]}\n```\nTool finished.'
         value=json.loads(harness.format_response(text,'다음 JSON 객체만 반환하세요'))
         self.assertEqual(value,{'reply':'actual tool result','tasks':[]})
         with self.assertRaises(ValueError):harness.format_response('not JSON','JSON 객체만')
+        retried='{"reply":"unfinished\n{"reply":"completed","tasks":[]}'
+        self.assertEqual(json.loads(harness.format_response(retried,'JSON 객체만 {"reply":"text","tasks":[]}'))['reply'],'completed')
+        with self.assertRaises(ValueError):harness.format_response('{"reply":"unfinished\n{"role":"CTO"}','JSON 객체만 {"reply":"text"}')
         self.assertEqual(harness.format_response('normal text','plain response'),'normal text')
     def setUp(self):
         base=ROOT/'runtime/projects/manage/verification';base.mkdir(parents=True,exist_ok=True)
@@ -44,6 +106,7 @@ class HarnessTests(unittest.TestCase):
         original=(self.source/'ai_provider.py').read_bytes()
         def execute(key,payload,cancelled):
             self.assertEqual(key,'p_demo')
+            if payload.get('operation')!='settings':self.assertEqual(payload['max_tokens'],100)
             return {'mode':'hermes','name':'test'} if payload.get('operation')=='settings' else 'HERMES TOOL RESULT'
         with patch.object(harness,'execute',side_effect=execute):
             result=runtime.invoke(self.record,{'path':'/compose'})
@@ -68,11 +131,14 @@ class HarnessTests(unittest.TestCase):
         from ai_agent.Hermes.engine.bridge import bridge
         job={'state':'complete','session_id':'owned','text':'{"reply":"verified","tasks":[]}','events':[]}
         fake=Mock();fake.busy_reason.return_value=''
+        self.record['repository']='hushmind3/project-zero';store.save(self.record)
         fake.call.side_effect=lambda operation,payload=None: {'session':{'id':'owned'}} if operation=='session/create' else {'job':job}
         with patch('ai_agent.Hermes.engine.bridge.bridge',fake):
-            result=harness.execute('p_demo',{'system':'JSON only','user':'owner request'},threading.Event())
+            result=harness.execute('p_demo',{'system':'JSON only','user':'owner request','max_tokens':1700},threading.Event())
         self.assertIn('verified',result)
         self.assertEqual(fake.call.call_args_list[1].args[1]['workspace'],str(self.source))
+        self.assertEqual(fake.call.call_args_list[1].args[1]['application_generation'],{'temperature':.3,'max_tokens':1700})
+        self.assertTrue(fake.call.call_args_list[1].args[1]['application_plan_only'])
         self.assertEqual(store.read('p_demo')['harness']['session_id'],'owned')
         self.assertFalse(harness.ACTIVE)
         job['state']='paused'

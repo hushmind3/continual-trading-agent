@@ -19,3 +19,5 @@ Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to 
 2026-10-18: 실제 GPU 적재·Thinking 템플릿·기본 지침/도구 토큰 조사는 [모델 안내](../models/README.md)에 기록했습니다. 실행 설정은 변경하지 않았으며 원본 지연 로딩 목록을 덮어쓰는 defer: []도 조사 대상입니다.
 
 현재 실행 제어: runtime_policy.py가 모델별 문맥/Thinking과 원본 도구 검색 제공 방식을 연결합니다. defer: [] 강제 생성은 제거했습니다. Thinking auto는 원본/모델 기본값을 보존합니다. 설정·실측·남은 제한은 [모델 안내](../models/README.md)의 설정 복구 항목을 봅니다.
+
+앱 하네스의 실행별 시스템 지침·JSON 응답 계약은 [대화 안내](../chat/README.md)를 따릅니다. 사용자 모델 설정은 저장 변경하지 않으며 JSON 제약은 원본 chat_completions 전송의 request_overrides를 사용합니다.

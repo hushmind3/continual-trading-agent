@@ -1,6 +1,23 @@
 // Adapt navigation only. The pinned original UI, API calls and stored records stay original.
 (()=>{
  const config=window.platformWorkspace;
+ let companyTeam;
+ const annotateTeam=()=>{
+  if(!companyTeam?.roles)return;
+  document.querySelectorAll('#teamGrid .team-card').forEach(card=>{
+   const role=companyTeam.roles.find(row=>row.role===card.dataset.role);if(!role)return;
+   const count=card.querySelector('.role-bottom b'),state=card.querySelector('.role-state');
+   const countText='누적 완료 '+Number(role.completed||0).toLocaleString('ko-KR')+'건';
+   if(count&&count.textContent!==countText)count.textContent=countText;
+   if(state){const blocked=role.status==='failed'&&role.latest?.mode==='blocked';const text=blocked?'선행 실패로 미실행':'최근: '+({running:'실행 중',queued:'대기',completed:'완료',failed:'실패',idle:'배정 없음'}[role.status]||role.status);if(state.textContent!==text)state.textContent=text;if(blocked&&state.className!=='role-state idle')state.className='role-state idle';}
+  });
+  if(!document.getElementById('platform-team-state-help')){const help=document.createElement('p');help.id='platform-team-state-help';help.className='muted';help.textContent='상태는 최근 업무 기준이며, 누적 완료는 과거 업무를 포함합니다. 선행 실패로 미실행한 업무는 실제 검사 실패와 구분합니다.';document.getElementById('teamGrid')?.before(help)}
+ };
+ if(config.company){
+  const originalFetch=window.fetch;
+  window.fetch=async(...args)=>{const response=await originalFetch(...args);if(String(args[0]?.url??args[0]).split('?')[0].endsWith('/api/admin/team')&&response.ok){try{companyTeam=await response.clone().json();annotateTeam()}catch{}}return response;};
+  const observer=new MutationObserver(annotateTeam);const grid=document.getElementById('teamGrid');if(grid)observer.observe(grid,{childList:true,subtree:true});
+ }
  const buttons=new Map(config.views.map(view=>[view,document.querySelector('[data-tab="'+view+'"]')]));
  if([...buttons.values()].some(button=>!button))throw Error('원본 화면 전환 버튼을 찾지 못했습니다.');
  const navigation=document.createElement('div');navigation.hidden=true;

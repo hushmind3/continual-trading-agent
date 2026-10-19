@@ -52,6 +52,11 @@ def busy_reason():
     with store.LOCK: return '외부 앱에서 실행 중인 Hermes 하네스' if ACTIVE else ''
 
 
+def measured_job(job):
+    """Keep actual owned measurements without storing tool payloads."""
+    return {key: job[key] for key in ('state', 'session_id', 'application', 'metrics', 'started_at', 'error') if key in job}
+
+
 def update(key, **values):
     with store.LOCK:
         record = store.read(key)
@@ -76,12 +81,15 @@ def execute(key, payload, cancelled):
     deadline = time.monotonic() + 900
     try:
         phase = {**stage_for(system, user), 'started_at': time.time()}
-        if ACTIVE[key] == 1: update(key, state='waiting', error='', session_id=None, phase=phase)
+        if ACTIVE[key] == 1: update(key, state='waiting', error='', session_id=None, last_job=None, phase=phase)
         while not SERIAL.acquire(timeout=.25):
             if cancelled.is_set() or time.monotonic() > deadline: raise ValueError('하네스 대기를 중단했습니다.')
         try:
             if cancelled.is_set(): raise ValueError('하네스 요청을 중단했습니다.')
             if bridge.busy_reason(): raise ValueError('Hermes가 다른 작업을 실행 중입니다. 완료 후 다시 요청하세요.')
+            from .company_context import grounded_system, grounded_user
+            system = grounded_system(record, system)
+            user = grounded_user(record, user)
             plan_only = requires_json(system)
             generation = {}
             workspace = record['active_source']
@@ -109,7 +117,7 @@ def execute(key, payload, cancelled):
                     text = job.get('text', '').strip()
                     if not text: raise ValueError('하네스의 최종 응답이 비었습니다.')
                     text = format_response(text, system)
-                    update(key, state='complete', finished_at=time.time())
+                    update(key, state='complete', last_job=measured_job(job), finished_at=time.time())
                     return text
                 cancelled.wait(.4)
         finally: SERIAL.release()
@@ -130,10 +138,15 @@ def status(key):
         update(key, state='failed', error='플랫폼 연결이 중단됐습니다. 앱에서 다시 요청하세요.')
         state = store.read(key)['harness']
     result = dict(state)
+    if state.get('enabled') and state.get('state') in ('complete', 'failed') and state.get('last_job'):
+        result['job'] = {**state['last_job'], 'events': []}
     if state.get('enabled') and state.get('session_id'):
         from ai_agent.Hermes.engine.bridge import bridge
         job = bridge.call('status')['job']
-        if job.get('session_id') == state['session_id']: result['job'] = job
+        if job.get('session_id') == state['session_id']:
+            result['job'] = job
+            if job.get('state') in ('complete', 'failed', 'stopped') and measured_job(job) != state.get('last_job'):
+                update(key, last_job=measured_job(job))
     return result
 
 

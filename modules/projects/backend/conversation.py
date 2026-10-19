@@ -34,7 +34,8 @@ def call(key, payload, origin=None):
     if action != 'state': raise ValueError('지원하지 않는 대화 요청입니다.')
     history = invoke('/api/admin/ceo', token=token)
     control = invoke('/api/admin/control', token=token)
-    result = {'messages': history['messages'], 'ventures': control['ventures']}
+    result = {'messages': history['messages'], 'ventures': control['ventures'],
+              'progress': invoke('/api/store/info')}
     if request_id := payload.get('request_id'):
         if not re.fullmatch('[a-f0-9]{32}', str(request_id)): raise ValueError('대화 요청 ID를 확인하세요.')
         try: result['request'] = invoke('/api/admin/ceo/chat/status/' + request_id, token=token)

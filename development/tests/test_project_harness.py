@@ -181,6 +181,25 @@ class HarnessTests(unittest.TestCase):
             state=harness.status('p_demo')
             self.assertFalse(state['enabled']);bridge.call.assert_not_called()
 
+    def test_measured_app_job_survives_a_different_hermes_job(self):
+        metrics={'generation_tps':42.5,'input_tokens':300,'output_tokens':84,'api_calls':1}
+        self.record['harness'].update(state='complete',session_id='owned');store.save(self.record)
+        fake=Mock();fake.call.return_value={'job':{'session_id':'owned','state':'complete','metrics':metrics,'events':[]}}
+        with patch('ai_agent.Hermes.engine.bridge.bridge',fake):
+            self.assertEqual(harness.status('p_demo')['job']['metrics'],metrics)
+            fake.call.return_value={'job':{'session_id':'someone-else','state':'running','metrics':{'generation_tps':999},'events':[]}}
+            restored=harness.status('p_demo')['job']
+            self.assertEqual(restored['session_id'],'owned')
+            self.assertEqual(restored['metrics'],metrics)
+
+    def test_unmeasured_new_request_does_not_show_previous_job_metrics(self):
+        self.record['harness'].update(state='waiting',session_id=None,last_job={'metrics':{'generation_tps':99}});store.save(self.record)
+        harness.ACTIVE['p_demo']+=1
+        try:
+            with patch('ai_agent.Hermes.engine.bridge.bridge') as bridge:
+                self.assertNotIn('job',harness.status('p_demo'));bridge.call.assert_not_called()
+        finally:del harness.ACTIVE['p_demo']
+
     def test_repository_name_does_not_install_an_application_profile(self):
         self.record['repository']='hushmind3/project-zero'
         harness.configure(self.record,False);store.save(self.record)

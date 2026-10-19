@@ -265,6 +265,8 @@ class HermesWorker:
         with self.lock:
             self.job = {'state': 'starting', 'application': internal, 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time()}
         self.thread = threading.Thread(target=self.run_chat, args=(cfg, session_id, prompt, history, request), daemon=True)
+        from ai_agent.Hermes.chat.telemetry import begin
+        begin(self)
         self.thread.start()
         return self.status()
 

@@ -66,7 +66,8 @@ def document(record):
     if ui.get('host') != 'hermes/chat': raise ValueError('연결된 화면이 없습니다.')
     content = store.owned(store.project_folder(record), ui['document']).read_bytes()
     if hashlib.sha256(content).hexdigest() != ui['sha256']: raise ValueError('원본 화면 무결성 확인 실패')
-    config = json.dumps({'navigation': ui['navigation'], 'views': [t['id'] for t in ui['tabs']]}, ensure_ascii=False).replace('<', '\\u003c')
+    config = json.dumps({'navigation': ui['navigation'], 'views': [t['id'] for t in ui['tabs']],
+                         'company': ui.get('recipe') == 'company-v1'}, ensure_ascii=False).replace('<', '\\u003c')
     script = Path(__file__).with_name('workspace_embed.js').read_text(encoding='utf-8')
     return content.decode('utf-8').replace('</body>', '<script>window.platformWorkspace=' + config + ';' + script + '</script></body>')
 

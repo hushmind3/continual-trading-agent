@@ -6,25 +6,27 @@ import {failure,type Job,type Message} from '../types';
 
 export const CompanyConversations=createContext<{id:string;title:string}[]>([]);
 export const companySession=(id:string)=>'company:'+id;
-type Venture={id:string;name:string;status:string;proposal_json:string};
-type State={messages:{speaker:string;body:string}[];ventures:Venture[];request?:{status:string;error:string}};
+export type Venture={id:string;name:string;status:string;proposal_json:string};
+export type CompanyProgress={published?:boolean;free_trial?:boolean;payment_connected?:boolean;usage?:{requests?:number};product_url?:string};
+type State={messages:{speaker:string;body:string}[];ventures:Venture[];progress?:CompanyProgress;request?:{status:string;error:string}};
 export function useCompanyConversation(selected:string){
- const sources=useContext(CompanyConversations),source=sources.find(v=>companySession(v.id)===selected),id=source?.id;
+ const sources=useContext(CompanyConversations),source=sources.find(v=>companySession(v.id)===selected),id=source?.id??sources[0]?.id;
  const [state,setState]=useState<State>({messages:[],ventures:[]}),[job,setJob]=useState<Job>(),[error,setError]=useState(''),[pending,setPending]=useState(false);
  const key='hermes.company.request.'+(id||''),[requestId,setRequestId]=useState('');
  useEffect(()=>{setState({messages:[],ventures:[]});setJob(undefined);setError('');setRequestId(id?localStorage.getItem(key)||'':'')},[id]);
  useEffect(()=>{if(!id)return;let live=true,reading=false;
   const refresh=async()=>{if(reading)return;reading=true;try{
-   const [next,activity]=await Promise.all([request<State>('projects/conversation',{id,request_id:requestId},'GET'),request<{job?:Job}>('projects/harness',{id},'GET')]);
-   if(!live)return;setState(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);setJob(activity.job);setError(next.request?.error||'');
+   const next=await request<State>('projects/conversation',{id,request_id:requestId},'GET');
+   if(!live)return;setState(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);setError(next.request?.error||'');
    if(next.request&&next.request.status!=='working'){localStorage.removeItem(key);setRequestId('')}
   }catch(e){if(live)setError(failure(e))}finally{reading=false}};
-  void refresh();const timer=setInterval(()=>{if(!document.hidden)void refresh()},2500);return()=>{live=false;clearInterval(timer)};
+  let measuring=false;const metrics=async()=>{if(measuring)return;measuring=true;try{const activity=await request<{job?:Job}>('projects/harness',{id},'GET');if(live)setJob(previous=>JSON.stringify(previous)===JSON.stringify(activity.job)?previous:activity.job)}catch{/* History errors remain independent of measured progress. */}finally{measuring=false}};
+  void refresh();void metrics();const timer=setInterval(()=>{if(!document.hidden)void refresh()},2500),measureTimer=setInterval(()=>{if(!document.hidden)void metrics()},1000);return()=>{live=false;clearInterval(timer);clearInterval(measureTimer)};
  },[id,requestId]);
  const send=async(message:string)=>{if(!id)return;setError('');setPending(true);try{const result=await request<{request_id:string}>('projects/conversation',{id,action:'send',message});localStorage.setItem(key,result.request_id);setRequestId(result.request_id)}finally{setPending(false)}};
  const decide=async(venture_id:string,approve:boolean)=>{if(!id)return;setPending(true);setError('');try{await request('projects/conversation',{id,action:'decision',venture_id,approve});setState(await request<State>('projects/conversation',{id},'GET'))}catch(e){setError(failure(e))}finally{setPending(false)}};
  const messages:Message[]=useMemo(()=>state.messages.map(m=>({role:m.speaker==='owner'?'user':'assistant',content:m.body})),[state.messages]);
- return {sources,enabled:!!id,id,messages,ventures:state.ventures.filter(v=>v.status==='pending'),job,error,pending,waiting:!!requestId,send,decide};
+ return {sources,enabled:!!source,id,messages,ventures:state.ventures.filter(v=>v.status==='pending'),progress:state.progress,job,error,pending,waiting:!!source&&!!requestId,send,decide};
 }
 
 export function CompanyApprovals({items,pending,readOnly,decide}:{items:Venture[];pending:boolean;readOnly:boolean;decide:(id:string,approve:boolean)=>void}){

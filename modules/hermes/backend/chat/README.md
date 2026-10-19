@@ -20,7 +20,7 @@ Goals stop when judged done, blocked, interrupted or budget-limited. Loops stop 
 
 State lives in the native session DB. Stop pauses autonomous work. After a worker restart, opening a formerly active session marks it paused and offers Resume; it does not silently restart work. The platform backend must stay running for recurring execution. This is in-session /loop, not an OS scheduler or the standalone Hermes cron gateway. Status polling alone never starts a model or task.
 
-telemetry.py reads original agent usage counters and the owned local llama.cpp /slots endpoint, cached for at least 0.8 seconds. Generation speed is sampled from actual decoded-token deltas while the same task is processing; missing observations stay unknown. Status retains final counters after agent cleanup. Tool events delimit the current streamed response and phase.
+telemetry.py reads original agent usage counters and the owned local llama.cpp /slots endpoint, cached for at least 0.8 seconds. Generation speed is sampled from actual decoded-token deltas while the same task is processing. begin() captures the owned model log byte offset before the execution thread starts; only decoder timings written after that point supplement short responses that finish before two slot samples. Prompt evaluation throughput is never shown as generation speed; missing observations stay unknown. Status retains final counters after agent cleanup. Tool events delimit the current streamed response and phase.
 
 The worker tells the original agent its Windows host and detected browser executable, explains that Git Bash ps/which cannot identify Windows applications reliably, and directs visible GUI launches through detached PowerShell Start-Process. It must verify once, leave the requested app open, and not relaunch after the user closes it. This is operating-context guidance, not a replacement for native tools or proof that every model obeys it.
 
@@ -33,3 +33,5 @@ A native failed/incomplete/budget-exhausted result becomes paused with an explic
 application_context_scope=focused_discussion은 외부 앱의 순수 사업 검토용 요청입니다. 해당 agent에만 skip_context_files/skip_memory/skip_background_review와 빈 도구 목록을 적용하고, 앱 역할·사용자 시스템 지침·Thinking·출력 옵션은 유지합니다. 기본 native 범위와 직원 실행은 그대로입니다. Project Zero 화면의 공유 맥락 스위치로 native 범위를 선택할 수 있습니다.
 
 2026-10-19 문맥 격리 보정: skip_context_files/skip_memory만으로는 원본 시스템 프롬프트의 호스트·현재 경로·코딩 맥락·플러그인 구간이 없어지지 않았습니다. focused_discussion은 실행별 프롬프트 빌더를 앱 역할+사용자 지정 지침으로 교체하고 압축 재생성에도 같은 경계를 유지합니다. 일반 native/직원 도구 실행은 변경하지 않습니다. 기존 회의/앱 대화에 저장된 잘못된 추정은 삭제하지 않으며, 과거 기록과 사용자 지정 공유 맥락의 영향은 별개입니다. 회귀는 test_project_harness의 원본 빌더 미호출·캐시 재생성·native 보존 검사로 확인합니다. 수정 후 실제 모델 답변의 주제 혼동 재발 여부는 별도 확인 대상입니다.
+
+2026-10-20 확인: test_hermes_telemetry의 이전 작업 제외·부분 로그·prompt/decoder 구분 회귀와 원본 Hermes 경계 13개 통과. 실제 짧은 총괄 응답의 61.7/62.3 tok/s는 해당 llama.cpp decoder receipt를 사용했습니다. 모델/문맥/Thinking 설정은 변경하지 않았습니다.

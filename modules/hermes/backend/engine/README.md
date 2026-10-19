@@ -25,3 +25,5 @@ Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to 
 2026-10-19 문맥 격리 보정: skip_context_files/skip_memory만으로는 원본 시스템 프롬프트의 호스트·현재 경로·코딩 맥락·플러그인 구간이 없어지지 않았습니다. focused_discussion은 실행별 프롬프트 빌더를 앱 역할+사용자 지정 지침으로 교체하고 압축 재생성에도 같은 경계를 유지합니다. 일반 native/직원 도구 실행은 변경하지 않습니다. 기존 회의/앱 대화에 저장된 잘못된 추정은 삭제하지 않으며, 과거 기록과 사용자 지정 공유 맥락의 영향은 별개입니다. 회귀는 test_project_harness의 원본 빌더 미호출·캐시 재생성·native 보존 검사로 확인합니다. 수정 후 실제 모델 답변의 주제 혼동 재발 여부는 별도 확인 대상입니다.
 
 앱 실행은 application_request=true와 실행별 시스템 지침을 사용합니다. worker는 사용자 대화를 생성하지 않고 별도 실행 ID/빈 이력을 사용하며 원본 AIAgent의 _persist_disabled를 적용합니다. 앱 DB가 업무/대화 이력을 소유하며 Hermes 모델·API·Thinking은 기존 설정을 공유합니다. 앱 실행은 사용자 Goal/Loop나 기존 세션 ID와 섞을 수 없습니다. 백그라운드 경험 정리는 내부 요청에서 수행하지 않습니다. 일반 Hermes 대화의 저장·재개는 유지합니다.
+
+실행 수치: worker.py는 작업 스레드 시작 직전 chat.telemetry.begin으로 소유 모델 로그의 현재 위치를 잡습니다. telemetry가 이후 decoder timing만 읽어 짧은 응답의 실제 속도를 보완합니다. 원본 agent loop/출력 한도/Thinking 설정은 변경하지 않습니다. 관련 검증은 ../chat/README.md를 따릅니다.

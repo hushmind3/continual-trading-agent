@@ -57,3 +57,9 @@ company-v1의 AI 총괄 대화는 별도 iframe 탭 대신 Hermes 기존 채팅�
 검사: development.tests.test_company_conversation, test_project_workspaces, test_project_harness(28개 통과). 원본 조회·비동기 전송 계약·인증 유지·명시적 승인·삭제/연결 해제 차단·재시작 후 복구를 검증합니다. 실제 모델 답변/사업 실행은 별도입니다. 실제 원본 모델 왕복 자료는 runtime/ai_agent/Hermes/verification/workspace-tabs/live-chat.json에서 구분합니다.
 
 conversation.py의 앱 요청 body는 원본 ASGI 규격에 맞는 JSON 문자열이며 응답 body만 base64로 해석합니다. 잘못된 요청 인코딩으로 발생했던 FastAPI JSON decode error를 실제 호출로 재현하고 수정했습니다. 회귀에는 runtime.invoke→실제 ASGI 자식→FastAPI body 검증→원본 JSON 수신까지 포함하며 모델/인증 응답만 흉내 내는 검사와 구분합니다. 일반 Hermes의 chat/goal/loop를 총괄 API로 전달하지 않고 기존 경로로 유지합니다.
+
+사업 관리/측정 연결: conversation.py는 원본 /api/store/info의 실제 공개 상태·고객 요청·결제 연결·제품 경로를 반환합니다. harness.py는 실행 소유 ID에 해당하는 마지막 실제 측정값만 기록하며 다른 Hermes 작업의 수치를 노출하지 않습니다. 새 대기 요청에는 과거 측정값을 비웁니다. CompanyConversation은 기록과 측정을 독립적으로 조회합니다.
+
+company_context.py는 명시적 company-v1 실행에만 현재 연결 사실과 원본 dashboard의 최근 직원 작업 오류·누적 건수를 읽기 전용으로 제공합니다. 대화와 직원은 같은 모델이며 로컬 승인 제작과 외부 배포/결제 연동을 구분합니다. 과거 assistant의 모델 미연결 주장만 이번 모델 참고 문맥에서 제외하고 원본 DB/화면 기록과 소유자 메시지는 보존합니다. 일반 앱 지침은 변경하지 않습니다. workspace_embed.js는 원본 team 응답을 재사용해 최근 상태/누적 완료/선행 실패로 미실행을 구분하고 원본 작업 상태·건수는 수정하지 않습니다.
+
+현재 검증: 관련 회귀 35개, 원본 Hermes 경계 13개 통과. 실제 선택 모델이 별도 실행 모델이 필요 없다는 설명과 CTO 시간 초과/QA 선행 실패를 구분해 답하고 tasks=0을 반환했습니다. 실제 제품 제작 실패는 해결 완료로 기록하지 않습니다. 상세 수치는 Hermes chat/README.md 및 해당 verification 자료를 따릅니다.

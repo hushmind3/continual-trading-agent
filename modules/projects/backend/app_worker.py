@@ -58,6 +58,16 @@ async def main():
     module, name = target.split(':')
     app = getattr(importlib.import_module(module), name)
     hook = ProviderHook(sys.argv[4], protocol) if len(sys.argv) > 4 and sys.argv[4] else None
+    application_active=0
+    def activity(delta):
+        nonlocal application_active
+        application_active=max(0,application_active+delta)
+        protocol.write(json.dumps({'application_activity':application_active})+'\n');protocol.flush()
+    if hook and len(sys.argv)>6:
+        from importlib import util
+        spec=util.spec_from_file_location('application_workflow',sys.argv[5])
+        integration=util.module_from_spec(spec);spec.loader.exec_module(integration)
+        integration.install(app,sys.argv[6],activity)
     tasks = set()
     async def handle(message):
         try: result = await request(app, message)

@@ -5,6 +5,7 @@ import importlib
 import inspect
 import json
 import uuid
+from contextvars import ContextVar
 
 
 class ProviderHook:
@@ -12,13 +13,14 @@ class ProviderHook:
         self.pending = {}; self.output = output
         module, name = entry.split(':')
         provider = importlib.import_module(module)
+        provider.platform_request_options = ContextVar("application_request_options",default={})
         original = getattr(provider, name)
         signature = inspect.signature(original)
         @functools.wraps(original)
         async def compose(*args, **kwargs):
             arguments = signature.bind(*args, **kwargs); arguments.apply_defaults()
             system,user=arguments.arguments['system'],arguments.arguments['user']
-            return await self.request({'system':system,'user':user,'max_tokens':arguments.arguments.get('max_tokens')})
+            return await self.request({'system':system,'user':user,'max_tokens':arguments.arguments.get('max_tokens'),**provider.platform_request_options.get()})
         setattr(provider, name, compose)
         if hasattr(provider, 'status'):
             async def status(): return await self.request({'operation': 'settings'})

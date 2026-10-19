@@ -49,6 +49,15 @@ class WorkspaceTests(unittest.TestCase):
         (self.state / 'registry/p_demo.json').unlink()
         self.assertEqual(workspaces.tabs(), {'items': []})
 
+    def test_opted_in_adapter_is_app_owned_and_disabled_with_its_harness(self):
+        self.config['recipe']='company-v1';self.connect()
+        record=store.read('p_demo')
+        self.assertEqual(workspaces.adapter(record),self.state/'projects/demo/integrations/hermes/workflow.py')
+        self.config.pop('recipe');self.connect()
+        self.assertEqual(store.read('p_demo')['workspace_ui']['recipe'],'company-v1')
+        record['harness']['enabled']=False
+        self.assertIsNone(workspaces.adapter(record))
+
     def test_mutated_document_is_rejected(self):
         self.connect(); record = store.read('p_demo')
         store.owned(store.project_folder(record), record['workspace_ui']['document']).write_text('modified', encoding='utf-8')

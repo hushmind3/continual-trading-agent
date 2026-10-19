@@ -84,7 +84,14 @@ def execute(key, payload, cancelled):
             if bridge.busy_reason(): raise ValueError('Hermes가 다른 작업을 실행 중입니다. 완료 후 다시 요청하세요.')
             plan_only = requires_json(system)
             generation = {}
-            result = bridge.call('chat', {'application_request': True, 'workspace': record['active_source'],
+            workspace = record['active_source']
+            if payload.get('workspace'):
+                from .store import owned,project_folder
+                candidate=Path(payload['workspace']).resolve()
+                base=project_folder(record).resolve()
+                if not candidate.is_relative_to(base) or not candidate.is_dir(): raise ValueError('앱 소유 작업 폴더가 아닙니다.')
+                workspace=str(candidate)
+            result = bridge.call('chat', {'application_request': True, 'workspace': workspace,
                 'application_system_prompt': system, 'application_plan_only': plan_only,
                 'application_context_scope': 'native' if phase['kind'] == 'task' else 'focused_discussion',
                 'application_generation': generation,

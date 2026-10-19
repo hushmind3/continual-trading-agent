@@ -51,3 +51,5 @@ API: projects/settings(use_harness), projects/harness(GET/POST). 아직 이 함�
 호스트 메뉴만 React/Vite/Tailwind 공통 Button으로 구성하며 외부 앱의 고정 원본 HTML·색상·업무 API·데이터는 보존합니다. 내장 모델 설정으로 이동하는 링크는 Hermes 모델 설정을 엽니다. `harness.py`의 앱 요청은 원본 Hermes의 실행별 지침/응답 계약을 사용하고 대화 세션을 생성하지 않습니다. 모델·API 키·Thinking·출력 한도는 Hermes에서 읽으며 원본 앱 설정 파일로 복제하지 않습니다. 기존 앱의 짧은 연결 시험용 출력 한도를 공유 모델 설정에 강제하지 않습니다. 계획/회의/일반 답변은 호스트 프로젝트 기억 없이 앱 문맥만 사용하고, 명시적인 직원 실행은 원래 도구 경로를 유지합니다.
 
 확인 명령: `python -m unittest development.tests.test_project_workspaces development.tests.test_project_harness`와 `test_hermes_port`의 일반 대화/앱 요청 회귀입니다. 사용자 모델 호출과 실제 사업 실행은 별도 검증입니다.
+
+회사 업무 연결: 명시적인 workspace/connect(recipe=company-v1)는 integrations/company.py를 앱 소유 폴더에 복사하고 해시를 검증한 뒤 자식 실행기에만 적용합니다. 승인→CPO requirements.md→CTO React/Vite/Tailwind 제작→QA 실제 npm test/빌드를 순차 실행하고 실패·검증 자료 부재 시 완료로 기록하지 않습니다. 내부 HTTP 조회를 막지 않고 제작/검증 동안 application_activity로 서버 재시작·제거를 보호합니다. 기존 승인 사업은 인증된 ventures/{id}/build로 이어가며 반복 호출은 실행 중 작업을 중복 생성하지 않습니다. 기본 제공된 완성 제품의 원래 출시 경로는 유지합니다. 로컬 작업 결과는 앱 소유 workspaces 아래에서만 제공하며 앱 제거와 함께 정리합니다.

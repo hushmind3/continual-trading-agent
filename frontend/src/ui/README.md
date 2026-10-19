@@ -41,3 +41,5 @@ ToggleSwitch는 공통 버튼을 사용하는 키보드 접근 가능한 on/off 
 documentPaths는 로컬 문서 경로와 문서 기준 상대 링크를 해석합니다. 열린 Markdown 안의 로컬 링크도 같은 문서 패널에서 읽으며 외부 URL은 외부 링크로 유지합니다.
 
 PanelResizeHandle은 공통 사이드 패널 크기 조절 컴포넌트입니다. 드래그·방향키·Home/End·더블클릭 초기화와 폭 기억을 제공하며 범위·이동 간격은 tailwind.css의 공통 토큰을 따릅니다. 문서·작업 내역에서 공유합니다.
+
+AppExecution.tsx는 설치 앱 화면과 Hermes 상단 탭에서 재사용하는 앱 소유 작업 내역·질문·권한 응답·중지 제어입니다. 기존 projects/harness의 세션 소유권 검사를 사용하며 다른 사용자 작업은 제어하지 않습니다.

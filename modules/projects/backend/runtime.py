@@ -20,9 +20,9 @@ RESTARTING = False
 
 
 class AppWorker:
-    def __init__(self, source, spec, environment, harness=None, project_id=None):
+    def __init__(self, source, spec, environment, harness=None, project_id=None, integration=None, app_data=None):
         self.lock = threading.Lock(); self.responses = queue.Queue(); self.source = str(source)
-        self.input_lock = threading.Lock(); self.harness_pending = {}; self.project_id = project_id
+        self.input_lock = threading.Lock(); self.harness_pending = {}; self.project_id = project_id; self.application_active=0
         folder = owned(source, spec.get('directory', '.'))
         log = source.parent / 'application.log'
         self.output = log.open('a', encoding='utf8')
@@ -36,8 +36,9 @@ class AppWorker:
             from .python_packages import folder as packages
             arguments = [sys.executable, '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('app_worker.py')), str(folder), spec['app'], str(packages(source))]
             arguments.append(harness['entry'] if harness and harness.get('enabled') else '')
+            if integration: arguments.extend([str(integration),str(app_data)])
         self.process = subprocess.Popen(arguments, cwd=folder, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.output,
-            text=True, encoding='utf8', bufsize=1, env={**os.environ, **environment, 'PYTHONUTF8': '1'})
+            text=True, encoding='utf8', bufsize=1, env={**os.environ, **environment, 'PYTHONUTF8': '1','PLATFORM_PROJECT_ID':project_id or ''})
         self.reader = threading.Thread(target=self._read, daemon=True); self.reader.start()
 
     def _read(self):
@@ -45,7 +46,9 @@ class AppWorker:
             for line in self.process.stdout:
                 try:
                     value = json.loads(line)
-                    if 'harness_request' in value:
+                    if 'application_activity' in value:
+                        self.application_active=int(value['application_activity'])
+                    elif 'harness_request' in value:
                         payload = value['harness_request']; cancelled = threading.Event()
                         self.harness_pending[payload['id']] = cancelled
                         threading.Thread(target=self._harness, args=(payload, cancelled), daemon=True).start()
@@ -96,8 +99,10 @@ class AppWorker:
 
 def busy_reason():
     from . import harness
-    with LOCK: active = ACTIVE
-    return '실행 중인 외부 프로젝트 요청' if active else harness.busy_reason()
+    with LOCK:
+        active=ACTIVE
+        background=any(worker.application_active and worker.process.poll() is None for worker in WORKERS.values())
+    return '실행 중인 외부 프로젝트 요청' if active else '실행 중인 앱 제작·검증 작업' if background else harness.busy_reason()
 
 
 def invoke(record, payload, origin=None):
@@ -115,7 +120,9 @@ def invoke(record, payload, origin=None):
             worker = WORKERS.get(key)
             if worker and worker.source != str(source): worker.close(); worker = None
             if worker is None:
-                worker = AppWorker(source, spec, record.get('environment', {}), record.get('harness'), key); WORKERS[key] = worker
+                from .workspaces import adapter
+                from .store import project_folder
+                worker = AppWorker(source, spec, record.get('environment', {}), record.get('harness'), key, adapter(record), project_folder(record)); WORKERS[key] = worker
         forwarded = {**payload, '_host': origin.headers.get('host', '') if origin else '',
             '_client': [origin.client.host, origin.client.port] if origin and origin.client else ['platform-internal', 0],
             '_server': [origin.url.hostname, origin.url.port or 80] if origin else ['127.0.0.1', 8766]}
@@ -240,6 +247,15 @@ def register_host(app):
             if not record.get('active_source'): raise ValueError('아직 실행 가능한 설치본이 없습니다.')
             spec = record['adapter']; ui = spec.get('ui') if spec['kind'] == 'fastapi' else spec
             if not ui or ui['kind'] not in ('static', 'vite', 'asgi'): raise ValueError('원본 웹 화면이 없습니다.')
+            if path.startswith('_platform-output/'):
+                from .store import project_folder
+                relative=path.removeprefix('_platform-output/')
+                parts=Path(relative).parts
+                if len(parts)<2 or any(part.startswith('.') or part=='node_modules' for part in parts) or not (parts[1]=='dist' or len(parts)==2 and parts[1] in ('requirements.md','verification.json')):
+                    raise ValueError('공개된 작업 결과 경로가 아닙니다.')
+                file=owned(project_folder(record)/'workspaces',relative)
+                if not file.is_file(): raise ValueError('생성된 결과 파일이 없습니다.')
+                return FileResponse(file,headers={'Cache-Control':'no-store'})
             if path == '_platform-workspace.html':
                 from .workspaces import document
                 return HTMLResponse(render_html(document(record), identifier, True), headers={'Cache-Control': 'no-store'})

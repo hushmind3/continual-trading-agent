@@ -12,6 +12,8 @@ def connect(key, config):
     with store.LOCK, runtime.LOCK:
         if installer.JOBS or runtime.busy_reason(): raise ValueError('실행 중인 작업이 끝난 뒤 연결하세요.')
         record = store.read(key)
+        recipe = config.get('recipe',record.get('workspace_ui',{}).get('recipe'))
+        if recipe is not None and recipe != 'company-v1': raise ValueError('지원하지 않는 업무 연결 규격입니다.')
         revision = str(config.get('revision', ''))
         path = PurePosixPath(str(config.get('path', '')))
         tabs = config.get('tabs', [])
@@ -35,6 +37,11 @@ def connect(key, config):
         record['workspace_ui'] = {'host': 'hermes/chat', 'document': 'integrations/hermes/owner.html',
             'revision': revision, 'url': url, 'sha256': hashlib.sha256(content).hexdigest(), 'tabs': tabs,
             'navigation': navigation}
+        if recipe is not None:
+            if recipe != 'company-v1': raise ValueError('지원하지 않는 업무 연결 규격입니다.')
+            adapter = store.owned(store.project_folder(record), 'integrations/hermes/workflow.py')
+            adapter.write_bytes(Path(__file__).with_name('integrations').joinpath('company.py').read_bytes())
+            record['workspace_ui'].update(recipe=recipe, adapter='integrations/hermes/workflow.py', adapter_sha256=hashlib.sha256(adapter.read_bytes()).hexdigest())
         worker = runtime.WORKERS.pop(key, None)
         if worker: worker.close()
         store.save(record)
@@ -61,3 +68,11 @@ def document(record):
     config = json.dumps({'navigation': ui['navigation'], 'views': [t['id'] for t in ui['tabs']]}, ensure_ascii=False).replace('<', '\\u003c')
     script = Path(__file__).with_name('workspace_embed.js').read_text(encoding='utf-8')
     return content.decode('utf-8').replace('</body>', '<script>window.platformWorkspace=' + config + ';' + script + '</script></body>')
+
+
+def adapter(record):
+    ui=record.get("workspace_ui",{})
+    if not record.get("harness",{}).get("enabled") or not ui.get("adapter"): return None
+    path=store.owned(store.project_folder(record),ui["adapter"])
+    if hashlib.sha256(path.read_bytes()).hexdigest()!=ui["adapter_sha256"]: raise ValueError("업무 연결 파일 무결성 오류")
+    return path

@@ -19,6 +19,34 @@ from platform_plugins.projects.project_zero import is_new_request, is_revision
 
 
 class HarnessTests(unittest.TestCase):
+    def test_focused_business_context_excludes_coding_memory_and_peer_anchoring(self):
+        from platform_plugins.projects.project_zero_business import discussion_context
+        from ai_agent.Hermes.engine.runtime_policy import discussion_prompt
+        context=json.dumps({'topic':'새 사업 검토','prior_colleagues':[{'statement':'old product'}],'recent_lessons':[{'insight':'unrelated failure'}]})
+        system,user=discussion_context('현재 역할',context,'focused_discussion')
+        self.assertEqual(json.loads(user),{'topic':'새 사업 검토','prior_colleagues':[]})
+        self.assertIn('독립',system)
+        prompt=discussion_prompt({'application_context_scope':'focused_discussion','application_system_prompt':system,'system_prompt':'사용자 지침'},'Repository desktop launch rules')
+        self.assertNotIn('desktop launch',prompt);self.assertIn('사용자 지침',prompt)
+        self.assertEqual(discussion_context('ROLE',context,'native'),('ROLE',context))
+
+    def test_call_stage_separates_meeting_summary_and_employee_execution(self):
+        from platform_plugins.projects.harness_prompt import stage_for
+        self.assertEqual(stage_for('PROJECT ZERO (CFO)',json.dumps({'topic':'가격','prior_colleagues':[]})),{'kind':'meeting','role':'CFO','label':'회의 발언 작성'})
+        self.assertEqual(stage_for('AI CEO',json.dumps({'topic':'가격','minutes':[]}))['kind'],'summary')
+        self.assertEqual(stage_for('직원 CTO',json.dumps({'task':'파일 읽기'}))['kind'],'task')
+        self.assertEqual(stage_for('당신은 CPO입니다.','주문 분석')['role'],'CPO')
+        self.assertEqual(stage_for('응답을 작성하세요.','일반 요청')['role'],'')
+
+    def test_plain_meeting_disables_execution_without_forcing_json(self):
+        from types import SimpleNamespace
+        from ai_agent.Hermes.engine.runtime_policy import apply_response_contract
+        agent=SimpleNamespace(api_mode='chat_completions',request_overrides={'temperature':.3})
+        apply_response_contract(agent,'',plan_only=True)
+        self.assertEqual(agent.request_overrides['tools'],[])
+        self.assertNotIn('response_format',agent.request_overrides)
+        self.assertEqual(agent.request_overrides['temperature'],.3)
+
     def test_current_greeting_does_not_resume_historical_tool_requests(self):
         user=json.dumps({'recent_chat':[{'body':'Read verification/probe.txt'}], 'owner_instruction':'안녕'},ensure_ascii=False)
         result=message_for(user)
@@ -57,6 +85,7 @@ class HarnessTests(unittest.TestCase):
         for message in ['새 사업 초안을 만들지 마세요','사업안 설명만 해줘','그럼 안녕']:
             self.assertFalse(is_new_request(message,original))
         self.assertTrue(is_new_request('새 사업 아이디어를 제안해줘',original))
+        self.assertTrue(is_new_request('월천만원 벌거리 의논좀해봐라',lambda message:False))
         self.assertFalse(is_revision('그럼 안녕',{'id':'pending'}))
         self.assertFalse(is_revision('초안 수정하지 마세요',{'id':'pending'}))
         self.assertTrue(is_revision('가격을 19000원으로 바꿔줘',{'id':'pending'}))

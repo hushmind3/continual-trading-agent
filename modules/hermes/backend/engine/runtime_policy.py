@@ -47,10 +47,9 @@ def apply_response_contract(agent, mode, plan_only=False):
     if mode == 'json_object' and agent.api_mode == 'chat_completions':
         agent.request_overrides = {**(getattr(agent, 'request_overrides', {}) or {}),
                                    'response_format': {'type': 'json_object'}}
-        if plan_only:
-            # Project Zero routes execution through the jobs returned by its structured planner.
-            # Ollama cannot combine its JSON grammar with a live tool-call grammar.
-            agent.request_overrides.update(tools=[], tool_choice='none')
+    if plan_only and agent.api_mode == 'chat_completions':
+        # Original Project Zero meetings deliberate; its separate employee jobs execute tools.
+        agent.request_overrides = {**(getattr(agent, 'request_overrides', {}) or {}), 'tools': [], 'tool_choice': 'none'}
 
 
 def application_generation(value):
@@ -67,3 +66,11 @@ def apply_application_generation(agent, options):
     if 'max_tokens' in options: agent.max_tokens = options['max_tokens']
     if 'temperature' in options:
         agent.request_overrides = {**(getattr(agent,'request_overrides',{}) or {}),'temperature':options['temperature']}
+
+
+def discussion_prompt(cfg, normal):
+    if cfg.get('application_context_scope') != 'focused_discussion':return normal
+    return ('You are performing the supplied application role, not a repository development task. '
+            'Use only the current business discussion and application evidence. Prior model claims are not verified facts. '
+            'Return the requested response format. Do not execute actions during deliberation.\n'+
+            cfg.get('system_prompt','')+'\n'+cfg.get('application_system_prompt',''))

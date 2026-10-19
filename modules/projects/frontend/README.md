@@ -23,3 +23,5 @@ InstallerApp.tsx·ScriptParameter.tsx: powershell 원본 설치기의 필수 경
 InstallerApp은 프로젝트 관리의 앱별 폴더와 자동 설치 위치를 표시합니다. managed 설치 대상은 사용자 입력에서 제외하며 기존 프로그램을 읽는 경로만 선택하도록 구분합니다. 설치 정보의 폴더 열기도 특정 버전 source 대신 앱 소유 부모를 엽니다.
 
 CliApp.tsx·GeneratedFieldInput.tsx: 원본 메타데이터를 받아 선택/숫자/스위치/목록/필수 입력과 결과 화면을 공통 컴포넌트로 구성합니다. 앱별 React 구현은 만들지 않습니다. ProjectApp은 원본 웹 UI를 유지하며 Python CLI는 자동 기능 화면, Windows 설치기와 함께 발견한 Python 도구는 프로젝트 기능 탭으로 연결합니다. 기존 원시 CLI 실행은 자동 추출 실패 시 고급 기능으로 유지합니다.
+
+Project Zero의 하네스 연결 시에는 [경영실 보기](project_zero/README.md)를 기본 표시합니다. 이는 원본 업무 API를 사용하는 대화/회의/업무/사업안 화면이며 원본 앱 자체는 상단 원본 화면 열기로 유지합니다. 다른 앱을 임의로 이 화면으로 변환하지 않습니다. 회의의 참가자·저장 발언·CEO 종합을 업무 큐와 구분하고 원문 결과는 공통 MarkdownContent로 표시합니다.

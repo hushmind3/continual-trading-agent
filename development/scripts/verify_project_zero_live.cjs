@@ -16,8 +16,8 @@ async function main(){
  const browser=await chromium.launch({headless:true});let page,ownedSession;
  try{
   page=await browser.newPage({viewport:{width:1440,height:960}});const errors=[];page.on('pageerror',error=>errors.push(error.message));
-  await page.goto(origin+'/#projects/app/'+id,{waitUntil:'networkidle'});
-  const frame=page.frameLocator('iframe[title="project-zero 원본 화면"]');
+  await page.goto(origin+'/assets/projects/'+id+'/index.html',{waitUntil:'networkidle'});
+  const frame=page;
   await frame.locator('#login').waitFor({state:'hidden',timeout:20000});
   await frame.locator('#message').waitFor({state:'visible',timeout:15000});
   const oldNumber=project.harness.request_number||0;

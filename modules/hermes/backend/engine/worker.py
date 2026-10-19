@@ -52,7 +52,7 @@ from run_agent import AIAgent
 from hermes_state import SessionDB
 from ruamel.yaml import YAML
 from ai_agent.Hermes.engine.execution import bind_model, context_window, request_policy, settle_review
-from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, apply_response_contract, application_generation, apply_application_generation
+from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, apply_response_contract, application_generation, apply_application_generation, discussion_prompt
 
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
@@ -231,6 +231,9 @@ class HermesWorker:
         if not isinstance(plan_only, bool): raise ValueError('앱 계획 단계는 참/거짓이어야 합니다.')
         cfg['application_plan_only'] = plan_only
         cfg['application_generation'] = application_generation(request.get('application_generation', {}))
+        scope=request.get('application_context_scope','native')
+        if scope not in ('native','focused_discussion'):raise ValueError('앱 맥락 범위를 확인하세요.')
+        cfg['application_context_scope']=scope
         if request.get('workspace'):
             selected = Path(str(request['workspace'])).expanduser().resolve()
             if not selected.is_dir():raise ValueError('선택한 프로젝트 폴더가 없습니다.')
@@ -277,15 +280,18 @@ class HermesWorker:
             tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'computer_use'}
             toolsets = list(cfg['toolsets']) + ['mcp-' + name for name in get_registered_mcp_server_names()]
             if cfg.get('read_only'):toolsets=['file']
+            focused=cfg.get('application_context_scope')=='focused_discussion'
+            if focused:toolsets=[]
             configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'))
             self.agent = AIAgent(
                 model=cfg['model'], base_url=cfg['base_url'], api_key=cfg.get('api_key') or 'local',
                 provider='custom', api_mode='chat_completions', quiet_mode=True,
                 session_id=session_id, session_db=self.db, platform='platform',
                 enabled_toolsets=toolsets, max_iterations=cfg['max_iterations'], cwd=cfg['workspace'],
-                # Only read-only mode suppresses review writes; normal runs use upstream defaults.
-                skip_background_review=bool(cfg.get('read_only')),
-                ephemeral_system_prompt=(
+                # Read-only and focused app discussions avoid unrelated shared-memory review writes.
+                skip_background_review=bool(cfg.get('read_only')) or focused,
+                skip_context_files=focused, skip_memory=focused,
+                ephemeral_system_prompt=discussion_prompt(cfg, (
                     f'The selected working directory is {cfg["workspace"]}. '
                     'Resolve relative file paths against this exact directory. '
                     'Never invent or substitute another working directory. '
@@ -308,7 +314,7 @@ class HermesWorker:
                     + ('\n\nApplication role and response contract for this request:\n'+cfg['application_system_prompt']+
                        '\nPreserve owner approval requirements. Use configured tools only when the current request needs them; '
                        'never execute historical requests from application context. Return only the final application response in its required format.'
-                       if cfg.get('application_system_prompt') else '')),
+                       if cfg.get('application_system_prompt') else ''))),
                 stream_delta_callback=self.delta, event_callback=self.event,
                 status_callback=lambda *args, **kw: self.event('status', args),
                 tool_start_callback=lambda *args, **kw: self.event('tool_start', args),

@@ -7,6 +7,16 @@ def requires_json(system):
     return bool('JSON 객체' in system or re.search(r'JSON\s*(?:만|형식|only|object)', system, re.I))
 
 
+def stage_for(system, user):
+    try: data = json.loads(user)
+    except (ValueError, TypeError): data = {}
+    if not isinstance(data, dict): data = {}
+    role = re.search(r'(?<![A-Z])(CEO|CPO|CTO|CMO|CFO|CS|QA)(?![A-Z])', system)
+    kind = 'meeting' if 'prior_colleagues' in data else 'summary' if 'minutes' in data and 'topic' in data else 'task' if 'task' in data else 'planning' if requires_json(system) or any(k in data for k in ('owner_instruction','conversation','owner')) else 'response'
+    return {'kind': kind, 'role': role.group(1) if role else 'CEO' if kind in ('planning','summary') else '',
+            'label': {'meeting':'회의 발언 작성', 'summary':'회의 결론 정리', 'task':'직원 업무 실행', 'planning':'요청 검토·계획','response':'앱 응답 작성'}[kind]}
+
+
 def message_for(user):
     try: context = json.loads(user)
     except (ValueError, TypeError): context = None

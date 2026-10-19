@@ -60,10 +60,26 @@ Project Zero의 JSON 계획/검토 단계는 `application_plan_only`로 외부 �
 
 `runtime.invoke`와 `app_worker`는 실제 플랫폼 HTTP 요청의 Host·접속자를 원본 ASGI에 전달합니다. 호출 본문의 가짜 접속자 정보는 덮어씁니다. 원본의 로컬 자동 로그인은 루프백 접속에만 적용되고 외부 인증 요구는 유지됩니다.
 
-검사: `.venv/Scripts/python.exe -X utf8 -B development/scripts/verify_project_zero.py`. Git 추적 소스 사본·임시 DB에서 원본 업무 검사와 호환 회귀 36개를 통과했습니다. 모델 호출은 모의 응답이며 사용자 모델/기존 DB를 사용하지 않습니다. 임시는 실패 시에도 정리하고 결과를 `runtime/projects/manage/verification/project-zero-workflow.json`에 기록합니다. 실제 모델 대화 확인은 별도 검증이며, 임의 제품 제작·결제·광고·배포 성공을 뜻하지 않습니다.
+검사: `.venv/Scripts/python.exe -X utf8 -B development/scripts/verify_project_zero.py`. Git 추적 소스 사본·임시 DB에서 원본 업무 검사와 호환 회귀 41개를 통과했습니다. 모델 호출은 모의 응답이며 사용자 모델/기존 DB를 사용하지 않습니다. 임시는 실패 시에도 정리하고 결과를 `runtime/projects/manage/verification/project-zero-workflow.json`에 기록합니다. 실제 모델 대화 확인은 별도 검증이며, 임의 제품 제작·결제·광고·배포 성공을 뜻하지 않습니다.
 
-현재 확인(2026-10-19): 원본 업무·호환 36개(임시 DB/모의 모델), 플랫폼 관련 회귀 57개 통과. 실제 원본 UI의 인사는 모델 API 1회·24.1초·도구 0회·업무 0개로 표시됐습니다. CTO README 업무 1개는 원래 큐에서 completed/llm으로 저장됐고 실제 read_file 호출과 화면 표시를 확인했습니다(직원 단계 89.9초·모델 API 6회·도구 4회). JavaScript 오류 0건, 설치된 원본 추적 소스 변경 없음. 결과는 runtime/projects/manage/verification/project-zero-live.json·project-zero-task.json, 화면은 project-zero-live.png·project-zero-cto.png입니다. 중복 상대 경로 재탐색과 9B 요약의 어색하거나 부정확한 표현은 남아 있으며 실제 카드 결제·광고·임의 신제품 배포를 검증한 결과가 아닙니다.
+회의 화면 개선 전 확인(2026-10-19): 원본 업무·호환 36개(임시 DB/모의 모델), 플랫폼 관련 회귀 57개 통과. 실제 원본 UI의 인사는 모델 API 1회·24.1초·도구 0회·업무 0개로 표시됐습니다. CTO README 업무 1개는 원래 큐에서 completed/llm으로 저장됐고 실제 read_file 호출과 화면 표시를 확인했습니다(직원 단계 89.9초·모델 API 6회·도구 4회). JavaScript 오류 0건, 설치된 원본 추적 소스 변경 없음. 결과는 runtime/projects/manage/verification/project-zero-live.json·project-zero-task.json, 화면은 project-zero-live.png·project-zero-cto.png입니다. 중복 상대 경로 재탐색과 9B 요약의 어색하거나 부정확한 표현은 남아 있으며 실제 카드 결제·광고·임의 신제품 배포를 검증한 결과가 아닙니다.
 
 연결된 모델의 계획 생성/파싱 실패는 모델 미연결로 안내하거나 규칙 기반 업무를 대신 생성하지 않습니다. 원본 오류 기록과 오류 설명은 보존하고 이번 요청의 새 업무를 0개로 반환합니다. 모델이 실제 미연결인 원래 규칙 모드는 유지합니다. 오류 주입 회귀는 모의 모델로 확인했습니다.
 
 실제 모델 검사 명령: `node development/scripts/verify_project_harness.cjs --allow-local-model`. 이 검사는 원본 앱의 실제 대화/작업 기록을 남깁니다. 일반 회귀에서는 실행하지 않습니다. 새 두 실행기의 `--resume`은 이미 완료된 자기 검사 기록 확인에만 사용합니다. 최근 인사와 직원 업무를 각각 확인한 직후에 사용해야 하며 임의 다른 작업 결과를 대신 검사하지 않습니다.
+
+## 회의 진행·경영실 보기
+
+용도: `project_zero_state.py`가 기존 앱에 인증된 `/api/admin/platform/workspace` 조회를 추가합니다. 대화/회의/업무/사업안은 원본 DB와 API를 그대로 사용하며 `harness_prompt.stage_for`의 실제 역할/호출 종류를 별도 진행 정보로 제공합니다. 회의 발언 5개와 CEO 종합은 순차 모델 호출이며 업무 큐의 실행 상태가 아닙니다. 앱 재시작 시 복구할 수 없는 running 회의는 발언을 보존한 failed로 표시해 영구 진행 상태를 막습니다.
+
+`project_zero_business.py`는 새 사업 모델 요청의 previous_draft를 빈 값으로 시작합니다. 기존 BASE의 DealPage 예제를 항상 보내던 편향을 제거하고 필수 내용 없는 응답은 실패로 처리합니다. 실제 승인된 DealPage 제품과 기존 사용자 사업안을 삭제하거나 출시 조건을 바꾸지 않습니다. 수익 목표를 의논하는 '월천만원 벌거리'도 새 사업 검토로 연결합니다.
+
+회의/종합은 원본처럼 도구 실행 없는 의견 작성 단계입니다. agent_task 업무만 설정된 실행 도구를 사용합니다. 원본 파일은 변경하지 않으며 원본 UI도 별도로 엽니다. 플랫폼 보기 구현과 확인 방법은 [프론트 안내](../frontend/project_zero/README.md)를 따릅니다.
+
+회의 맥락: project_zero_business.request_options는 기본적으로 회의·사업 검토를 focused_discussion으로 지정합니다. 회사 역할·현재 주제·사용자 시스템 지침은 유지하고, 관련 없는 엔진 개발 지침/공유 기억/검토 쓰기를 해당 요청에만 제외합니다. 직원 agent_task는 원래 도구·맥락을 유지합니다. 전문가 단계는 이전 발언/주제 연결이 없는 과거 교훈을 제외해 먼저 독립 검토하고, CEO는 현재 회의의 전체 발언을 종합합니다. 원본 DB 기록은 삭제하지 않습니다.
+
+/api/admin/platform/discussion-context의 include_engine_context 스위치를 켜면 원본처럼 이전 발언·교훈·엔진 공유 맥락을 다시 포함합니다. 앱 DB settings의 platform_meeting_engine_context에만 보관하고 진행 중 회의에서는 변경을 거절합니다. UI에서 다음 회의·사업 검토 옵션임을 표시하며 전역 Hermes 설정은 변경하지 않습니다.
+
+확인 명령: node development/scripts/verify_project_zero_workspace.cjs는 실제 인증/기록과 별도의 화면 전용 진행 모의 데이터를 사용하며 모델을 실행하지 않습니다. node development/scripts/verify_project_zero_meeting.cjs --allow-local-model은 실제 전문가 5명·CEO 호출 6개와 서로 다른 세션·저장 발언·완료 화면을 확인합니다. 원본 UI 호환 검사는 이제 /assets/projects/<id>/index.html에서 실행합니다.
+
+2026-10-19 회의·경영실 개선 확인: 격리 업무/호환 41개·플랫폼 회귀 60개, TypeScript·Vite 통과. 실제 인증/기록과 화면 전용 진행 모의 데이터로 PC 1440px·모바일 390px의 탭·입력 보존·진행 6단계·가로 넘침 없음·JavaScript 오류 0건을 확인했습니다. 첫 실제 회의는 개발 맥락/앞선 발언의 예제 편향이 발견됐고, 기본 주제 전용 맥락 적용 후 다시 실행한 실제 회의는 전문가 5명·CEO의 6개 독립 세션으로 완료됐습니다. 통제한 시험 주제의 선택되지 않은 예제 상품 언급은 0건입니다. 진행/결과는 project-zero-real-meeting.json, 화면은 project-zero-real-meeting.png·project-zero-workspace-desktop.png·project-zero-workspace-mobile.png입니다. 이는 실제 시장조사·매출·출시 검증이 아니며 모든 모델 응답의 사실성을 보장하는 검사는 아닙니다.

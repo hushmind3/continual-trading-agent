@@ -21,8 +21,8 @@ async function main(){
  let page,ownedSession;
  try{
   page=await browser.newPage({viewport:{width:1440,height:960}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(origin+'/#projects/app/'+id,{waitUntil:'networkidle'});
-  const frame=page.frameLocator('iframe[title="project-zero 원본 화면"]');await frame.locator('#message').waitFor({state:'visible'});
+  await page.goto(origin+'/assets/projects/'+id+'/index.html',{waitUntil:'networkidle'});
+  const frame=page;await frame.locator('#message').waitFor({state:'visible'});
   const state=()=>frame.locator('body').evaluate(async()=>{
    const session=await fetch('/api/local/session').then(r=>r.json());
    const r=await fetch('/api/admin/ceo',{headers:{'X-Project-Zero-Token':session.token}});

@@ -6,7 +6,7 @@ import threading
 import time
 from collections import Counter
 from . import store
-from .harness_prompt import message_for, requires_json
+from .harness_prompt import message_for, requires_json, stage_for
 
 SERIAL = threading.Lock()
 ACTIVE = Counter()
@@ -69,7 +69,9 @@ def execute(key, payload, cancelled):
         if not record.get('harness', {}).get('enabled'): raise ValueError('앱의 Hermes 연결이 꺼져 있습니다.')
         if record.get('repository', '').lower() == 'hushmind3/project-zero':
             from .project_zero import provider_system
+            from .project_zero_business import discussion_context
             system = provider_system(system)
+            system,user = discussion_context(system,user,payload.get('context_scope'))
         if payload.get('operation') == 'settings':
             cfg = bridge.call('settings')
             return {'mode': 'hermes' if cfg.get('model') else 'rules', 'name': cfg.get('model') or '모델 미선택', 'endpoint': cfg.get('base_url', '')}
@@ -78,7 +80,8 @@ def execute(key, payload, cancelled):
     session = None
     deadline = time.monotonic() + 900
     try:
-        if ACTIVE[key] == 1: update(key, state='waiting', error='', session_id=None)
+        phase = {**stage_for(system, user), 'started_at': time.time()}
+        if ACTIVE[key] == 1: update(key, state='waiting', error='', session_id=None, phase=phase)
         while not SERIAL.acquire(timeout=.25):
             if cancelled.is_set() or time.monotonic() > deadline: raise ValueError('하네스 대기를 중단했습니다.')
         try:
@@ -87,7 +90,7 @@ def execute(key, payload, cancelled):
             number = store.read(key).get('harness', {}).get('request_number', 0) + 1
             update(key, request_number=number)
             session = bridge.call('session/create', {'title': f'{record.get("title", key)} · 앱 요청 {number}'})['session']['id']
-            plan_only = record.get('repository', '').lower() == 'hushmind3/project-zero' and requires_json(system)
+            plan_only = record.get('repository', '').lower() == 'hushmind3/project-zero' and (requires_json(system) or phase['kind'] in ('meeting','summary'))
             generation = {}
             if record.get('repository', '').lower() == 'hushmind3/project-zero':
                 generation = {'temperature': .3}
@@ -95,10 +98,11 @@ def execute(key, payload, cancelled):
             result = bridge.call('chat', {'session_id': session, 'workspace': record['active_source'],
                 'application_system_prompt': system,
                 'application_plan_only': plan_only,
+                'application_context_scope': payload.get('context_scope', 'native') if record.get('repository','').lower()=='hushmind3/project-zero' else 'native',
                 'application_generation': generation,
-                'application_response_format': 'json_object' if plan_only else '', 'message': message_for(user)})
+                'application_response_format': 'json_object' if requires_json(system) and plan_only else '', 'message': message_for(user)})
             session = result['job']['session_id']
-            update(key, state='running', session_id=session)
+            update(key, state='running', session_id=session, phase={**phase, 'started_at': time.time()})
             while True:
                 job = bridge.call('status')['job']
                 if job.get('session_id') != session: raise ValueError('하네스 작업의 세션이 바뀌었습니다.')

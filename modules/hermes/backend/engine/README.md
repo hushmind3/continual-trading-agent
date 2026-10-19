@@ -12,7 +12,7 @@ Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to 
 
 실행 안내는 문서 결과를 로컬 Markdown 링크로 보고하도록 설명합니다. 플랫폼 HTML 미리보기는 정적 HTML·인라인 CSS를 지원하고 스크립트·외부 자원은 차단하므로, 단순 문서 열람을 위해 별도 메모장·브라우저를 실행하지 않도록 안내합니다. 이는 모델에 전달하는 지침이며 모든 모델이 이를 따랐다는 실행 검증은 아닙니다.
 
-실행 정책: 프로젝트 지침 자동 주입·출력 한도·reasoning은 원본 AIAgent 기본값을 사용합니다. 일반 작업의 기억·스킬 검토도 원본 조건과 auxiliary.background_review 설정에 맡깁니다. 읽기 전용 작업만 검토 쓰기를 막습니다. execution.py는 모델별 문맥 설정 연결과 검토 종료 대기를 담당하며, 검토 중에는 worker 작업 소유권을 유지해 모델 내리기·서버 재시작이 겹치지 않게 합니다.
+실행 정책: 프로젝트 지침 자동 주입·출력 한도·reasoning은 원본 AIAgent 기본값을 사용합니다. 일반 작업의 기억·스킬 검토도 원본 조건과 auxiliary.background_review 설정에 맡깁니다. 읽기 전용 작업과 명시된 focused_discussion 요청은 검토 쓰기를 막습니다. 앱의 주제 전용 맥락은 [대화 안내](../chat/README.md)를 따르며 일반 코드 작업은 원본 지침·기억을 유지합니다. execution.py는 모델별 문맥 설정 연결과 검토 종료 대기를 담당하며, 검토 중에는 worker 작업 소유권을 유지해 모델 내리기·서버 재시작이 겹치지 않게 합니다.
 
 2026-10-16: 격리된 가짜 모델 서버를 통해 원본 지침 주입, 강제 출력 제한·reasoning 비활성화 제거, 원본 스킬 검토 종료, 읽기 전용 도구 차단을 확인했습니다. 실제 Ornith의 thinking 출력·문맥 할당·품질 비교는 실행하지 않았습니다. 설치된 llama.cpp 도움말에서도 ctx-size 0이 모델 문맥을 사용하는 값임을 확인했습니다.
 

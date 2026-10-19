@@ -13,7 +13,7 @@ def _negated(message):
 def is_new_request(message, original):
     if _negated(message): return False
     if re.search(r'설명|비교|의미|뭐야|어때|왜|진행\s*상황', message) and not re.search(r'제안|추천|찾아|만들|기획|작성|발굴', message): return False
-    return original(message)
+    return original(message) or bool(re.search(r'벌\s*거리|수익.*(?:아이디어|추천)|월.*(?:벌|수익).*(?:의논|추천|제안|찾)', message))
 
 
 def is_revision(message, pending):
@@ -37,6 +37,15 @@ def failed_plan(message):
 def install():
     import ceo_engine as ceo
     import venture_engine as venture
+    if __package__:
+        from .project_zero_business import install as install_business
+        from .project_zero_state import install as install_workspace
+    else:
+        from project_zero_business import install as install_business
+        from project_zero_state import install as install_workspace
+    import server
+    install_business(venture)
+    install_workspace(server.app)
     original = ceo._is_new_venture_request
     ceo._is_new_venture_request = lambda message: is_new_request(message, original)
     context = ceo._context

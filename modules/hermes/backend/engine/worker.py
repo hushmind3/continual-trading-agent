@@ -52,7 +52,7 @@ from run_agent import AIAgent
 from hermes_state import SessionDB
 from ruamel.yaml import YAML
 from ai_agent.Hermes.engine.execution import bind_model, context_window, request_policy, settle_review
-from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, apply_response_contract, application_generation, apply_application_generation, discussion_prompt, bind_discussion_context
+from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, auxiliary_thinking, apply_response_contract, application_generation, apply_application_generation, discussion_prompt, bind_discussion_context
 
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
@@ -262,8 +262,12 @@ class HermesWorker:
             if str(row['session'].get('title') or '').startswith('새 대화'):
                 self.db.set_session_title(session_id, self.db.get_next_title_in_lineage(prompt[:60]))
             history = row['messages']
+        from ai_agent.Hermes.chat.company import prepare
+        self.company_links_path = HOME / 'company-links.json'
+        cfg['company_instructions'] = prepare(self, cfg, session_id, request.get('workspace'))
         with self.lock:
             self.job = {'state': 'starting', 'application': internal, 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time()}
+            if getattr(self, 'company_link', None): self.job['company_id'] = self.company_link['id']
         self.thread = threading.Thread(target=self.run_chat, args=(cfg, session_id, prompt, history, request), daemon=True)
         from ai_agent.Hermes.chat.telemetry import begin
         begin(self)
@@ -275,10 +279,19 @@ class HermesWorker:
         interactive_token = set_hermes_interactive_context(True)
         completion = {}
         try:
+            native=self.native_config()
+            if auxiliary_thinking(native,cfg,model_options(cfg,native)):
+                self.write_config(native)
             # Several upstream file/skill helpers use process cwd as their final fallback.
             # This worker owns a single active task, so pin all helpers to the selected workspace.
             os.chdir(cfg['workspace'])
-            from tools.terminal_tool import set_approval_callback
+            if cfg.get('company_instructions') and not cfg.get('read_only') and (request or {}).get('mode', 'chat') != 'chat':
+                from ai_agent.Hermes.chat.company import lifecycle
+                lifecycle(self, 'run_start', prompt=prompt)
+            from tools.terminal_tool import register_task_env_overrides, set_approval_callback
+            # Native terminal environments survive turns. Refresh their recorded
+            # CWD too; os.chdir/TERMINAL_CWD alone leave a previous `cd` cached.
+            register_task_env_overrides(session_id, {'cwd': cfg['workspace']})
             from tools.computer_use.tool import set_approval_callback as set_computer_approval
             set_approval_callback(self.approve)
             set_computer_approval(self.approve)
@@ -290,6 +303,11 @@ class HermesWorker:
             from tools import tool_search
             tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'computer_use'}
             toolsets = list(cfg['toolsets']) + ['mcp-' + name for name in get_registered_mcp_server_names()]
+            if cfg.get('company_instructions'):
+                from ai_agent.Hermes.chat.company import register
+                register()
+                tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'platform_company'}
+                toolsets.extend(['platform_company', 'delegation'])
             if cfg.get('read_only'):toolsets=['file']
             focused=cfg.get('application_context_scope')=='focused_discussion'
             if focused:toolsets=[]
@@ -320,6 +338,7 @@ class HermesWorker:
                     'Once the requested app is open, leave it open and finish. Do not close, relaunch or keep polling it. '
                     'If the user closes the app, do not reopen it without a new request. '
                     'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'
+                    + cfg.get('company_instructions', '')
                     + ('\nRead-only code analysis: only read_file and search_files inside the selected workspace are permitted. Do not request editing, terminal, code execution, MCP, delegation or desktop tools.' if cfg.get('read_only') else '')
                     + ('\n\nAdditional user-configured system instructions:\n'+cfg['system_prompt'] if cfg.get('system_prompt') else '')
                     + ('\n\nApplication role and response contract for this request:\n'+cfg['application_system_prompt']+
@@ -335,6 +354,8 @@ class HermesWorker:
             if cfg.get('application_request'): self.agent._persist_disabled = True
             bind_discussion_context(self.agent,cfg)
             apply_thinking(self.agent,model_options(cfg,self.native_config()),bool(cfg.get('local_model')))
+            output_limit=model_options(cfg,self.native_config())['max_output_tokens']
+            if output_limit:self.agent.max_tokens=output_limit
             apply_response_contract(self.agent, cfg.get('application_response_format'), cfg.get('application_plan_only', False))
             apply_application_generation(self.agent, cfg.get('application_generation', {}))
             if cfg.get('read_only'):
@@ -367,6 +388,9 @@ class HermesWorker:
             self.agent = None
             if self.stopping:
                 completion['state'] = 'stopped'
+            if self.job.get('company_job_id'):
+                from ai_agent.Hermes.chat.company import lifecycle
+                lifecycle(self, 'run_finish', outcome=completion)
             completion['finished_at'] = time.time()
             self.stopping = False
             reset_hermes_interactive_context(interactive_token)
@@ -395,15 +419,18 @@ class HermesWorker:
         return {'job': job, 'local_model': model,
             'mcp_installation':{'state':'running' if installing and installing.is_alive() else 'idle'}}
 
-    def stop(self):
-        if self.thread and self.thread.is_alive():
-            self.stopping = True
-            self.approval_result = False
-            self.approval_waiter.set()
-            if self.agent:
-                self.agent.interrupt(hard_cancel=True)
-            with self.lock:
+    def stop(self, session_id=None):
+        with self.lock:
+            if session_id and session_id != self.job.get('session_id'):
+                raise ValueError('다른 실행의 중지를 요청할 수 없습니다.')
+            running = self.thread and self.thread.is_alive()
+            agent = self.agent
+            if running:
+                self.stopping = True
+                self.approval_result = False
+                self.approval_waiter.set()
                 self.job['state'] = 'stopping'
+        if running and agent: agent.interrupt(hard_cancel=True)
         return self.status()
 
     def approve(self, *args, **kwargs):
@@ -497,6 +524,10 @@ class HermesWorker:
         return self.mcp()
 
     def execute(self, operation, payload):
+        if operation == 'company/session':
+            from ai_agent.Hermes.chat.company import connect
+            self.company_links_path = HOME / 'company-links.json'
+            return connect(self, payload)
         if operation == 'autonomy':
             from ai_agent.Hermes.chat.autonomy import snapshot
             self.session(str(payload.get('id') or ''))
@@ -544,7 +575,7 @@ class HermesWorker:
             return self.sessions()
         if operation == 'chat': return self.start_chat(payload)
         if operation == 'status': return self.status()
-        if operation == 'stop': return self.stop()
+        if operation == 'stop': return self.stop(payload.get('session_id'))
         if operation == 'answer':
             if not self.job.get('approval'):
                 raise ValueError('응답을 기다리는 요청이 없습니다.')

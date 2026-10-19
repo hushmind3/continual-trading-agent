@@ -1,15 +1,13 @@
-# 선택형 회사 업무 연결
+# 회사/조직 기록 어댑터
 
-용도: 회사/사업안/직원 큐 규격을 제공하는 설치 앱을 실제 Hermes 제작 흐름에 연결하는 선택형 어댑터입니다. 저장소 이름으로 자동 적용하지 않습니다.
+용도: Project Zero 원본 UI/DB를 기존 Hermes 총괄이 사용하는 업무 기록 도구로 연결합니다.
 
-`company.py`는 명시적인 `workspace/connect(recipe=company-v1)`에서 앱 소유 integrations/hermes/workflow.py로 복사됩니다. 원본 앱의 database/venture_engine/operations 공개 함수를 사용하며 승인→요구사항→제작→검증을 순차 실행합니다. 생성물은 앱 소유 workspaces/<사업 ID>/에 저장합니다. 실패 시 후속 작업을 실패 처리하고 원본 기록은 보존합니다. 로컬 제작 승인은 외부 공개·결제·지출 승인이 아닙니다.
+`company_records.py`는 명시적인 company-v1 연결에서 앱 소유 integrations/hermes/workflow.py에 설치됩니다. 원본 DB의 사업안·승인·업무·회의록과 인증을 재사용하고, 별도 planner/provider/직원 실행 루프는 사용하지 않습니다. 소유자가 직접 지시한 일반 업무는 사업안 없이 기록할 수 있고, 모델이 제안한 신규 사업은 소유자 승인 뒤 실행합니다. 역할·순서는 총괄이 선택합니다.
 
-연결·실행기는 ../workspaces.py, ../app_worker.py, ../harness_hook.py, ../harness.py를 사용합니다. 원본 모델/API/Thinking 설정을 복제하지 않습니다. 연결을 끄거나 앱을 제거하면 어댑터도 적용되지 않습니다. 회귀는 development/tests/test_company_integration.py입니다.
+연결: workspaces.py → app_worker.py → 인증된 /api/admin/hermes/records. 대화/도구 실행은 modules/hermes/backend/chat/company.py의 native SessionDB/registry와 일반 chat/Goal/Loop입니다. 생성물은 앱 소유 workspaces/<사업 ID 또는 owner-tasks>/에 남습니다. 외부 공개·계정 인증·유료 지출은 실제 승인/연결이 필요합니다.
 
-2026-10-20 검증: 관련 회귀 72개 통과. 실제 원본 ASGI 자식 실행기의 승인 큐·모델 IPC·화면 조회·작업 중 재시작 보호와 실제 Node 테스트/빌드를 격리 환경에서 확인했습니다. 모델이 파일 없이 완료를 주장하거나 Node 검사가 실패하면 실패/후속 중단으로 기록합니다. 원본 sqlite context의 연결을 commit/rollback 뒤 명시적으로 닫아 검사·재시작 시 DB 핸들이 남지 않게 했습니다.
+검사: development.tests.test_company_integration, test_company_conversation. 실제 원본 ASGI/DB로 인증·소유자 승인·고정 큐 없음·임의 역할 순서·중복 시작 방지·직접 지시·실패·회의 기록·adapter 갱신/롤백을 확인했습니다. 이전 회사 provider/pipeline와 company_context 보정 잔재는 의존성을 제거하고 프로젝트 휴지통으로 이동했습니다.
 
-실제 승인 사업의 재개에서는 CPO의 5,589바이트 requirements.md 생성·완료와 CTO의 package.json·Vite·Vitest 설정 파일 작성을 확인했습니다. 이후 실제 총괄 기록에서 CTO TimeoutError와 후속 실행 중단을 확인했습니다. 실제 제품 QA는 통과하지 않았습니다. 이 상태를 실제 제품 완성/QA 통과/서비스 공개/매출 발생으로 기록하지 않습니다. 실측 상태는 runtime/ai_agent/Hermes/verification/workspace-tabs/company-live.json에 분리합니다.
+실제 견적서 사업의 이전 CPO 성공/CTO TimeoutError/QA 선행 실패는 보존합니다. 새 native 실행의 실제 결과와 UI 검증은 Hermes chat/README.md 및 해당 verification 자료를 따릅니다. DB 활용 학습·파인튜닝·강화학습은 현재 구현/검증 완료 항목이 아닙니다.
 
-프론트 TypeScript 검사·Vite 빌드를 통과했습니다. 1440px·390px 브라우저 검사에서 원본 UI·통합 전 4개 탭·각 대화 초안·공유 모델 설정·Markdown 제목/강조 렌더링을 확인했고, 스크립트 실행·가로 넘침·JavaScript 오류·검사용 모델 요청은 없었습니다. Markdown 합성 입력은 브라우저 DOM에만 삽입하고 제거하며 실제 대화 DB를 변경하지 않습니다.
-
-현재 총괄 대화 UI는 Hermes 네이티브 대화로 통합됐습니다. projects/conversation을 통해 같은 원본 기록/승인 API를 사용하며 회사 현황·업무 기록은 별도 탭으로 유지합니다. 현재 UI 검사는 상위 backend/README.md와 Hermes chat/README.md를 따릅니다.
+2026-10-20 실행 연결 보정: 새 긴 목표 누락·이전 터미널 CWD 잔류·자식 npm의 IPC 입력 상속·불투명한 HTTP 오류를 수정했습니다. 실제 native 실행에서 설치 → 오류 수신 → 소스 수정 → 최초 Vite 빌드(exit 0, 2.21초)를 확인했습니다. 관련 회귀 64개와 실제 총괄 수치/사업 패널을 확인했습니다. 제품 누락 기능은 Codex가 직접 보완했으며 로컬 견적 도구의 12개 검사·타입/빌드·브라우저 8개 시나리오가 통과했습니다. 무개입 제품 개발/공개/매출 검증과 구분합니다. 자료와 범위는 연결된 제품 README/verification 및 Hermes 대화 README를 따릅니다.

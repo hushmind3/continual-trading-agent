@@ -11,6 +11,10 @@ const enabled=Object.entries(manifests).filter(([,manifest])=>manifest.enabled!=
   if(manifest.schema!==1)throw new Error('지원하지 않는 모듈 규격: '+manifest.id);
   const entry=entries[path.replace('module.json',manifest.frontend.entry)];
   if(!entry)throw new Error('모듈 화면 등록 파일이 없습니다: '+manifest.id);
+  if(manifest.workspace_host==='hermes/chat'){
+   const redirect=()=>{if(entry.menus.some(menu=>location.hash==='#'+menu.hash))location.replace('#ai_agent/Hermes')};
+   redirect();window.addEventListener('hashchange',redirect);
+  }
   return {...entry,menus:installedNavigation(manifest,entry.menus),
    registeredMenus:entry.registeredMenus
     ?(actions:BackendAction[])=>installedNavigation(manifest,entry.registeredMenus!(actions)):undefined};

@@ -12,6 +12,8 @@
 
 확인: frontend/tests/hermes-workspace.local-browser.spec.ts의 모델 검색·요청 경로·설정 실패 복구 검사. 모델 API는 픽스처로 대체하며 실제 추론을 시작하지 않습니다.
 
-ModelRuntimeControls.tsx는 공통 Input/Select/Button으로 현재 모델의 문맥 한도와 도구 설명 전달 방식을 표시합니다. 기존 settings API에 context_length/tool_loading만 저장하고 적재된 로컬 모델은 기존 model/load로 재적재합니다. 0=모델 기본값이며 도구 설명은 필요할 때/원본/모두 제공을 선택합니다. 문맥은 모델별로 보존하고 작업 중 변경을 막습니다. Thinking은 [대화 입력창](../../chat/README.md)의 읽기 모드 옆에서 선택하며 모델 화면 저장으로 덮어쓰지 않습니다.
+ModelRuntimeControls.tsx는 공통 Input/Select/Button으로 현재 모델의 문맥 한도와 도구 설명 전달 방식을 표시합니다. 기존 settings API에 context_length/tool_loading/max_output_tokens를 저장하고 문맥 한도가 바뀐 경우에만 기존 model/load로 재적재합니다. 출력 한도는 모델별로 저장하고 0은 원본 기본값이며 전체 컨텍스트와 구분합니다. 0=모델 기본값이며 도구 설명은 필요할 때/원본/모두 제공을 선택합니다. 문맥은 모델별로 보존하고 작업 중 변경을 막습니다. Thinking은 [대화 입력창](../../chat/README.md)의 읽기 모드 옆에서 선택하며 모델 화면 저장으로 덮어쓰지 않습니다.
 
 2026-10-18 확인: TypeScript·Vite 빌드와 UI 검사 29개 통과. 모델 실행 설정 저장은 문맥·도구 전달만 보내고, Thinking은 다음 대화 전송에 별도 적용하는 것을 모의 API로 확인했습니다. 실제 채팅/파일 도구 실측은 백엔드 모델 README에 별도 기록합니다.
+
+요청별 최대 출력 토큰은 원본 agent.max_tokens로 전달합니다. 검증에는 8,192를 사용했습니다. 0은 원본 기본값이며 시험 뒤 이전 값으로 복구합니다. 문맥 한도와 Thinking은 바꾸지 않았습니다. 출력 설정만 저장하면 모델을 재적재하지 않습니다.

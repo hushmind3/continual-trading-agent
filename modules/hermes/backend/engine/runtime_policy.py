@@ -3,7 +3,8 @@ def model_options(settings, native):
     from .execution import context_window
     saved=(settings.get('model_options') or {}).get(settings['model'],{})
     return {'context_length':saved.get('context_length',context_window(native,settings['model'])),
-            'thinking_mode':saved.get('thinking_mode','auto')}
+            'thinking_mode':saved.get('thinking_mode','auto'),
+            'max_output_tokens':saved.get('max_output_tokens',0)}
 
 def save_options(settings, request):
     saved=dict((settings.get('model_options') or {}).get(settings['model'],{}))
@@ -15,6 +16,11 @@ def save_options(settings, request):
     if 'thinking_mode' in request:
         if request['thinking_mode'] not in ('auto','on','off'):raise ValueError('Thinking 설정을 확인하세요.')
         saved['thinking_mode']=request['thinking_mode']
+    if 'max_output_tokens' in request:
+        value=request['max_output_tokens']
+        if type(value) is not int or value!=0 and not 256<=value<=131072:
+            raise ValueError('요청별 출력 한도는 0(원본 기본값) 또는 256~131,072 정수입니다.')
+        saved['max_output_tokens']=value
     if saved:
         if not settings.get('model'):raise ValueError('설정할 모델을 먼저 선택하세요.')
         settings['model_options']={**(settings.get('model_options') or {}),settings['model']:saved}
@@ -40,6 +46,45 @@ def apply_thinking(agent, options, local):
     template['enable_thinking']=options['thinking_mode']=='on'
     extra['chat_template_kwargs']=template;overrides['extra_body']=extra
     agent.request_overrides=overrides
+
+
+def auxiliary_thinking(native, cfg, options):
+    """Share an explicit local Thinking choice through native aux configuration.
+
+    Auto restores the prior native value; differently routed aux models keep
+    their own settings. No auxiliary feature or summary output is disabled.
+    """
+    from copy import deepcopy
+    before=deepcopy(native)
+    auxiliary=native.get('auxiliary') or {}
+    owned=native.get('_platform_aux_thinking',{})
+    for task in ('compression','goal_judge'):
+        section=auxiliary.get(task) or {}
+        extra=section.get('extra_body') or {}
+        template=extra.get('chat_template_kwargs') or {}
+        saved=owned.get(task)
+        shared=(section.get('model') in (None,'','auto',cfg['model'])
+                and section.get('base_url') in (None,'',cfg['base_url'])
+                and section.get('provider') in (None,'','auto','custom'))
+        if cfg.get('local_model') and options['thinking_mode']!='auto' and shared:
+            if saved is None:
+                saved=owned[task]={'present':'enable_thinking' in template,'value':template.get('enable_thinking')}
+            saved['applied']=options['thinking_mode']=='on'
+            template['enable_thinking']=saved['applied']
+            extra['chat_template_kwargs']=template;section['extra_body']=extra;auxiliary[task]=section
+        elif saved is not None:
+            if template.get('enable_thinking')==saved['applied']:
+                if saved['present']:template['enable_thinking']=saved['value']
+                else:template.pop('enable_thinking',None)
+                if not template:extra.pop('chat_template_kwargs',None)
+                if not extra:section.pop('extra_body',None)
+                if not section:auxiliary.pop(task,None)
+            owned.pop(task)
+    if auxiliary:native['auxiliary']=auxiliary
+    elif 'auxiliary' not in before:native.pop('auxiliary',None)
+    if owned:native['_platform_aux_thinking']=owned
+    else:native.pop('_platform_aux_thinking',None)
+    return native!=before
 
 
 def apply_response_contract(agent, mode, plan_only=False):

@@ -231,6 +231,12 @@ def conversation_action(request: dict, connection: Request):
     return call(lambda: converse(request['id'], request, connection))
 
 
+@router.post('/company-tool')
+def company_tool(request: dict, connection: Request):
+    from .conversation import call as converse
+    return call(lambda: converse(request['id'], {**request, 'action': 'tool'}, connection))
+
+
 @router.post("/workspace/connect")
 def workspace_connect(request: dict):
     from .workspaces import connect

@@ -60,6 +60,9 @@ def public(record):
         if record.get('active_source') and record.get('adapter', {}).get('kind') == 'fastapi':
             from .harness import discover
             value['harness_available'] = bool(discover(record['active_source']))
+    if record.get('workspace_ui', {}).get('host') == 'hermes/chat':
+        value['menu'] = 'ai_agent/Hermes'
+        value['workspace_ui'] = {k: v for k, v in record['workspace_ui'].items() if k != 'native'}
     value['environment_keys'] = sorted(record.get('environment', {}))
     for secret in record.get('environment', {}).values():
         if secret:

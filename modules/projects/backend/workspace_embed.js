@@ -2,7 +2,9 @@
 (()=>{
  const config=window.platformWorkspace;
  let companyTeam;
+ let nativeEngine;
  const annotateTeam=()=>{
+  if(nativeEngine){for(const id of ['aiBadge','teamEngine','overviewModel']){const node=document.getElementById(id),text=(id==='teamEngine'?'공유 AI · ':'')+(nativeEngine.modelName||'모델 선택 전')+(id==='aiBadge'&&nativeEngine.modelState!=='ready'?' · '+({loading:'불러오는 중',failed:'연결 오류',idle:'미실행'}[nativeEngine.modelState]||'상태 확인 중'):'');if(node&&node.textContent!==text)node.textContent=text;}}
   if(!companyTeam?.roles)return;
   document.querySelectorAll('#teamGrid .team-card').forEach(card=>{
    const role=companyTeam.roles.find(row=>row.role===card.dataset.role);if(!role)return;
@@ -14,6 +16,7 @@
   if(!document.getElementById('platform-team-state-help')){const help=document.createElement('p');help.id='platform-team-state-help';help.className='muted';help.textContent='상태는 최근 업무 기준이며, 누적 완료는 과거 업무를 포함합니다. 선행 실패로 미실행한 업무는 실제 검사 실패와 구분합니다.';document.getElementById('teamGrid')?.before(help)}
  };
  if(config.company){
+  window.addEventListener('message',event=>{if(event.source===parent&&event.origin===location.origin&&event.data?.type==='hermes-engine-state'){nativeEngine=event.data;annotateTeam()}});
   const originalFetch=window.fetch;
   window.fetch=async(...args)=>{const response=await originalFetch(...args);if(String(args[0]?.url??args[0]).split('?')[0].endsWith('/api/admin/team')&&response.ok){try{companyTeam=await response.clone().json();annotateTeam()}catch{}}return response;};
   const observer=new MutationObserver(annotateTeam);const grid=document.getElementById('teamGrid');if(grid)observer.observe(grid,{childList:true,subtree:true});

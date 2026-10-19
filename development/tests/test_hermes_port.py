@@ -5,6 +5,8 @@ Run: .venv\Scripts\python.exe -X utf8 -m unittest development.tests.test_hermes_
 from __future__ import annotations
 import http.server
 import json
+import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -23,6 +25,7 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
     slow = threading.Event()
     calls = []
     forced_tools = []
+    company_requests = []
 
     def log_message(self, *args): pass
 
@@ -34,6 +37,11 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        if self.path == '/api':
+            self.company_requests.append(body)
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
+            self.wfile.write(json.dumps({'native_company_fixture': True, 'jobs': []}).encode())
+            return
         self.calls.append(body)
         if any('PORT_STOP' in str(m.get('content')) for m in body.get('messages', [])):
             self.slow.set()
@@ -48,7 +56,16 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
             mcp_echo = next((name for name in found if 'echo' in name and 'port_fixture' in name), mcp_echo)
         described = any(call.get('function', {}).get('name') == 'tool_describe'
                         for row in body.get('messages', []) for call in row.get('tool_calls', []))
-        if any('PORT_WRITE_ATTACK' in str(m.get('content')) for m in body.get('messages', [])):
+        latest_user = next((str(m.get('content')) for m in reversed(body.get('messages', [])) if m.get('role') == 'user'), '')
+        cwd_marker = latest_user.split('PORT_CWD_', 1)[1].split()[0] if 'PORT_CWD_' in latest_user else ''
+        cwd_done = any(m.get('tool_call_id') == 'port_cwd_' + cwd_marker for m in tool_results)
+        if cwd_marker and not cwd_done:
+            message={'role':'assistant','content':None,'tool_calls':[{'id':'port_cwd_'+cwd_marker,'type':'function','function':{'name':'terminal','arguments':json.dumps({'command':'node -p "process.cwd()"'})}}]}
+            finish='tool_calls'
+        elif any('PORT_COMPANY_RECORDS' in str(m.get('content')) for m in body.get('messages', [])) and not any('native_company_fixture' in str(m.get('content')) for m in tool_results):
+            message={'role':'assistant','content':None,'tool_calls':[{'id':'company-records','type':'function','function':{'name':'company_records','arguments':json.dumps({'action':'overview'})}}]}
+            finish='tool_calls'
+        elif any('PORT_WRITE_ATTACK' in str(m.get('content')) for m in body.get('messages', [])):
             self.forced_tools.append('write_file')
             message={'role':'assistant','content':None,'tool_calls':[{'id':'blocked-write','type':'function','function':{'name':'write_file','arguments':json.dumps({'path':'hermes_port_result.txt','content':'changed'})}}]}
             finish='tool_calls'
@@ -94,6 +111,95 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
 
 @unittest.skipUnless((ROOT / 'modules/hermes/.venv/Scripts/python.exe').exists(), 'Hermes Python environment is not installed')
 class HermesPortTests(unittest.TestCase):
+    def test_18_original_auxiliary_wire_receives_shared_thinking_choice(self):
+        from ai_agent.Hermes.engine.runtime_policy import auxiliary_thinking
+        native={'auxiliary':{task:{'provider':'custom','model':'port-fixture','base_url':self.base,
+            'extra_body':{'chat_template_kwargs':{'keep_option':True}}} for task in ('compression','goal_judge')}}
+        auxiliary_thinking(native,{'model':'port-fixture','base_url':self.base,'local_model':'fixture.gguf'},{'thinking_mode':'off'})
+        home=self.folder/'aux-wire';home.mkdir(exist_ok=True)
+        (home/'config.yaml').write_text(json.dumps(native),encoding='utf-8')
+        upstream=ROOT/'modules/hermes/backend/engine/upstream'
+        script=f"import sys;sys.path.insert(0,{str(upstream)!r});from agent.auxiliary_client import call_llm\nfor task in ('compression','goal_judge'):\n call_llm(task,provider='custom',model='port-fixture',base_url={self.base!r},api_key='fixture',messages=[{{'role':'user','content':'AUX_THINKING_WIRE'}}],timeout=5)"
+        before=len(ModelFixture.calls)
+        result=subprocess.run([str(ROOT/'modules/hermes/.venv/Scripts/python.exe'),'-I','-X','utf8','-B','-c',script],
+            env={**os.environ,'HERMES_HOME':str(home)},capture_output=True,text=True,timeout=25)
+        self.assertEqual(result.returncode,0,result.stderr[-1800:])
+        calls=[c for c in ModelFixture.calls[before:] if any(m.get('content')=='AUX_THINKING_WIRE' for m in c.get('messages',[]))]
+        self.assertEqual(len(calls),2)
+        self.assertTrue(all(c.get('chat_template_kwargs')=={'keep_option':True,'enable_thinking':False} for c in calls))
+
+    def test_17_new_long_goal_is_delivered_on_first_model_turn(self):
+        goal=('PORT_NEW_GOAL_FIRST_TURN: '+('Use the current approved project to implement and verify the requested product. '*3)).strip()
+        before=len(ModelFixture.calls)
+        self.bridge.call('chat',{'message':goal,'mode':'goal','max_turns':1})
+        self.wait_job()
+        # Discovery/token probes and the auxiliary judge are not agent turns.
+        calls=[call for call in ModelFixture.calls[before:] if call.get('tools')]
+        self.assertTrue(calls)
+        users=[m.get('content') for m in calls[0].get('messages',[]) if m.get('role')=='user']
+        self.assertIn(goal,users)
+
+    def test_16_native_terminal_rebinds_workspace_in_same_session(self):
+        prior=self.bridge.call('settings')['toolsets']
+        selected=self.workspace/'selected-project';selected.mkdir(exist_ok=True)
+        sid=self.bridge.call('session/create',{'title':'CWD regression'})['session']['id']
+        try:
+            self.bridge.call('settings/save',{'toolsets':['terminal','file']})
+            for index,folder in enumerate((self.workspace,selected),1):
+                self.bridge.call('chat',{'session_id':sid,'message':f'PORT_CWD_{index} report actual cwd','workspace':str(folder)})
+                deadline=time.monotonic()+35
+                while time.monotonic()<deadline:
+                    job=self.bridge.call('status')['job']
+                    if job.get('approval'):self.bridge.call('answer',{'allow':True})
+                    if job['state'] not in ('starting','running','stopping'):break
+                    time.sleep(.15)
+                self.assertEqual(job['state'],'complete',str(job)[-1800:])
+                messages=self.bridge.call('session',{'id':sid})['messages']
+                results=[json.loads(m['content']) for m in messages if m.get('role')=='tool' and m.get('tool_call_id')==f'port_cwd_{index}']
+                self.assertTrue(results,messages)
+                self.assertEqual(Path(results[-1]['output'].strip()).resolve(),folder.resolve())
+        finally:
+            if self.bridge.call('status')['job']['state'] in ('starting','running','stopping'):
+                self.bridge.call('stop',{'session_id':sid});self.wait_job()
+            self.bridge.call('settings/save',{'toolsets':prior})
+
+    def test_14_company_uses_native_persistent_session_tools_and_context(self):
+        payload={'id':'fixture_company','title':'Native CEO','workspace':str(self.workspace),
+                 'url':self.base.removesuffix('/v1')+'/api','token':'company-fixture-token',
+                 'messages':[{'id':'old-owner','speaker':'owner','body':'HISTORICAL_OWNER_CONTEXT'},
+                             {'id':'old-ceo','speaker':'ceo','body':'Historical CEO reply'}]}
+        first=self.bridge.call('company/session',payload)['session_id']
+        self.assertEqual(self.bridge.call('company/session',payload)['session_id'],first)
+        self.assertEqual(len(self.bridge.call('session',{'id':first})['messages']),2)
+        start=len(ModelFixture.calls)
+        self.bridge.call('chat',{'session_id':first,'message':'PORT_COMPANY_RECORDS: inspect actual records, then answer.'})
+        job=self.wait_job();self.assertEqual(job['state'],'complete',job.get('error'))
+        self.assertFalse(job['application']);self.assertEqual(job['session_id'],first)
+        calls=[c for c in ModelFixture.calls[start:] if 'messages' in c];self.assertTrue(calls)
+        self.assertTrue(any('HISTORICAL_OWNER_CONTEXT' in json.dumps(c['messages']) for c in calls))
+        names={t['function']['name'] for c in calls for t in c.get('tools',[])}
+        self.assertIn('company_records',names);self.assertIn('project_npm',names);self.assertIn('write_file',names)
+        self.assertTrue(any('persistent native Hermes session' in json.dumps(c['messages']) for c in calls))
+        self.assertEqual(ModelFixture.company_requests[-1]['payload']['session_id'],first)
+        history=self.bridge.call('session',{'id':first})['messages']
+        self.bridge.close()
+        self.assertEqual(self.bridge.call('session',{'id':first})['messages'],history)
+        self.assertEqual(self.bridge.call('company/session',payload)['session_id'],first)
+        self.assertEqual(self.bridge.call('session',{'id':first})['messages'],history)
+
+    def test_15_user_output_limit_reaches_native_request_without_changing_thinking(self):
+        original=self.bridge.call('settings')
+        self.bridge.call('settings/save',{'max_output_tokens':4096})
+        start=len(ModelFixture.calls)
+        try:
+            self.bridge.call('chat',{'message':'Check selected native output settings.'})
+            self.assertEqual(self.wait_job()['state'],'complete')
+            self.assertTrue(any(c.get('max_tokens')==4096 or c.get('max_completion_tokens')==4096 for c in ModelFixture.calls[start:]))
+            self.assertEqual(self.bridge.call('settings')['thinking_mode'],original['thinking_mode'])
+            for invalid in (-1,1,True,999999):
+                with self.assertRaises(RuntimeError):self.bridge.call('settings/save',{'max_output_tokens':invalid})
+        finally:self.bridge.call('settings/save',{'max_output_tokens':original.get('max_output_tokens',0)})
+
     @classmethod
     def setUpClass(cls):
         checks = ROOT / 'runtime/ai_agent/Hermes/verification/port'

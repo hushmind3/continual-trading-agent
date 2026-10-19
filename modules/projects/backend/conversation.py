@@ -2,6 +2,9 @@
 import base64
 import json
 import re
+import secrets
+import uuid
+from urllib.parse import urlsplit
 from . import runtime, store
 
 
@@ -22,22 +25,51 @@ def call(key, payload, origin=None):
 
     token = invoke('/api/local/session')['token']
     action = payload.get('action', 'state')
+    native_id = uuid.uuid5(uuid.NAMESPACE_URL, 'platform-company:' + key).hex
+    if action == 'session':
+        from ai_agent.Hermes.engine.bridge import bridge
+        with store.LOCK:
+            record = store.read(key)
+            native = record.setdefault('workspace_ui', {}).setdefault('native', {})
+            native.setdefault('token', secrets.token_urlsafe(32))
+            store.save(record)
+        workspace = store.project_folder(record) / 'workspaces'
+        workspace.mkdir(parents=True, exist_ok=True)
+        root = str(origin.base_url) if origin is not None else 'http://127.0.0.1:8766/'
+        parsed = urlsplit(root)
+        if parsed.hostname not in ('127.0.0.1', 'localhost', '::1'): raise ValueError('로컬 플랫폼 연결만 사용할 수 있습니다.')
+        history = invoke('/api/admin/ceo', token=token)
+        return bridge.call('company/session', {'id': key, 'title': 'AI 총괄 · ' + record.get('name', key),
+            'workspace': str(workspace), 'url': root.rstrip('/') + '/api', 'token': native['token'],
+            'messages': history['messages']})
+    if action == 'tool':
+        native = record.get('workspace_ui', {}).get('native', {})
+        if not native.get('token') or not secrets.compare_digest(str(payload.get('token', '')), native['token']) or payload.get('session_id') != native_id:
+            raise ValueError('회사 도구의 네이티브 세션 인증에 실패했습니다.')
+        command = dict(payload.get('command', {}))
+        if command.get('action') not in ('overview', 'propose', 'begin', 'finish', 'meeting', 'run_start', 'run_finish') or '_owner' in command:
+            raise ValueError('허용하지 않은 회사 도구 요청입니다.')
+        command['_session'] = native_id
+        return invoke('/api/admin/hermes/records', 'POST', command, token)
     if action == 'send':
-        message = str(payload.get('message', '')).strip()
-        if not message or len(message) > 12000: raise ValueError('메시지는 1~12,000자입니다.')
-        return invoke('/api/admin/ceo/chat/submit', 'POST', {'message': message}, token)
+        raise ValueError('AI 총괄은 Hermes 영구 세션의 chat/goal/loop를 사용합니다.')
     if action == 'decision':
         venture = str(payload.get('venture_id', ''))
         if not re.fullmatch('[A-Za-z0-9_-]{1,100}', venture) or not isinstance(payload.get('approve'), bool):
             raise ValueError('사업안과 승인 여부를 확인하세요.')
-        return invoke('/api/admin/ventures/' + venture + '/decision', 'POST', {'approve': payload['approve']}, token)
+        result = invoke('/api/admin/hermes/records', 'POST', {'action': 'decision', '_owner': True, 'venture_id': venture, 'approve': payload['approve']}, token)
+        return {**result, 'session_id': native_id}
     if action != 'state': raise ValueError('지원하지 않는 대화 요청입니다.')
-    history = invoke('/api/admin/ceo', token=token)
     control = invoke('/api/admin/control', token=token)
-    result = {'messages': history['messages'], 'ventures': control['ventures'],
+    result = {'session_id': native_id, 'ventures': control['ventures'],
               'progress': invoke('/api/store/info')}
-    if request_id := payload.get('request_id'):
-        if not re.fullmatch('[a-f0-9]{32}', str(request_id)): raise ValueError('대화 요청 ID를 확인하세요.')
-        try: result['request'] = invoke('/api/admin/ceo/chat/status/' + request_id, token=token)
-        except ValueError as exc: result['request'] = {'status': 'failed', 'error': str(exc)}
+    approved = [v for v in control['ventures'] if v.get('status') == 'approved']
+    result['progress']['approved'] = len(approved)
+    for venture in approved:
+        key = str(venture.get('id', ''))
+        if not re.fullmatch('[A-Za-z0-9_-]{1,100}', key): continue
+        product = store.owned(store.project_folder(record), 'workspaces/' + key + '/dist/index.html')
+        if product.is_file():
+            result['progress'].update(preview_url='/_platform-output/' + key + '/dist/index.html', product_name=venture.get('name', key))
+            break
     return result

@@ -43,7 +43,7 @@ export function ChatComposer(props: Props) {
    {active ? <Button data-composer-action="send" tone="danger" aria-label="작업 중지" busy={pending} disabled={pending||stopping} onClick={stop}><Square size={16}/><span>{stopping?'중지 중':'중지'}</span></Button>
     : <Button data-composer-action="send" type="submit" aria-label="메시지 보내기" title="보내기" tone="primary" busy={pending} disabled={pending||uploading||(!text.trim()&&!attachments.length)}><ArrowUp size={19}/></Button>}
   </>}
-  options={props.company?undefined:<RunModeOptions {...props}/>}
+  options={<RunModeOptions {...props}/>}
  >
   <Input ref={fileInput} type="file" multiple className="hidden" aria-label="첨부 파일 선택" onChange={event => {upload(Array.from(event.target.files??[])); event.target.value='';}}/>
   <Textarea ref={composer} aria-label="헤르메스에게 보낼 메시지" placeholder={active?'다음 작업을 작성하세요…':'무엇을 함께 해볼까요?'} value={text} onChange={event => draft(event.target.value)} rows={1}

@@ -8,7 +8,7 @@
 - 실행기: 프로젝트 `runtime/shared/engines/llama.cpp/llama-server.exe`.
 - 문맥은 플랫폼의 해당 모델별 실행 설정을 우선하고, 없으면 원본 config.yaml의 해당 model.context_length를 따릅니다. 미지정 시 llama.cpp의 모델 기본 문맥(--ctx-size 0)을 사용하며 고정 65,536을 강제하지 않습니다. 선택한 모델·주소·명시 문맥은 원본 설정에도 일치시킵니다. 동시 슬롯 1개·GPU 레이어 우선·CPU 보조 스레드 2개는 실행기 자원 설정입니다.
 - 연결 준비 전 또는 모델을 내린 뒤에는 대화를 시작하지 않고 불러오기를 안내합니다.
-- AIAgent의 출력 한도·reasoning에는 어댑터 고정값을 전달하지 않습니다. 원본 엔진의 기본 정책과 모델·서버의 지원에 따릅니다.
+- AIAgent의 출력 한도는 모델 설정의 max_output_tokens로 제어합니다. 0이면 원본 기본값이고, 양수이면 원본 agent.max_tokens로 다음 요청부터 전달합니다. 컨텍스트/Thinking과 별도이며 숨겨진 고정 한도는 없습니다. reasoning은 원본 정책과 사용자의 Thinking 설정을 따릅니다.
 - 외부 실행기를 사용하려면 OpenAI 호환 주소·모델을 저장합니다. 키는 로컬 설정에 저장하며 응답에 반환하지 않습니다.
 
 2026-10-16: Qwen3.5-0.8B GGUF를 실제로 불러와 RTX 3070의 Vulkan 백엔드에서 파일 도구 호출·파일 생성·한국어 응답을 확인했습니다. 이 결과가 모든 모델의 도구 사용 능력을 보증하지는 않습니다.
@@ -69,7 +69,7 @@ Thinking 제어층은 원본 agent/reasoning_params.py·reasoning_effort.py에 �
 - runtime_policy.py가 모델별 context_length·thinking_mode(auto/on/off)를 검증·보존합니다. settings API로 저장하며 다른 모델에 해당 값이 전파되지 않습니다. 로컬 로더는 선택 모델의 문맥을 사용하고 원본 config.yaml과 일치시킵니다. 0은 모델 기본값입니다.
 - 어댑터가 강제로 넣던 defer: []를 제거했습니다. tool_loading은 native(원본 기본값)·lazy(필요한 설명 검색)·eager(처음부터 모두 제공)를 지원합니다. lazy는 원본 registry와 tool_search/tool_describe/tool_call을 사용하며 사용 가능한 도구를 삭제하지 않습니다. 읽기 모드는 기존 허용 목록의 두 읽기 도구를 직접 제공하고 원본 권한 차단을 유지합니다.
 - 모델 화면의 ModelRuntimeControls.tsx에서 문맥·도구 설명 전달 방식을 저장·적용합니다. Thinking은 대화 입력창의 읽기 모드 옆에서 선택하고 다음 전송·재개 직전에 기존 settings API로 저장합니다. 문맥/Thinking은 현재 모델별, 도구 전달은 작업 환경 공통 설정입니다. 실행 중 API 저장은 기존 idle 보호로 거절하며, 채팅의 다음 Thinking 선택은 브라우저에만 보관합니다. 문맥 적용은 로컬 모델 재적재가 필요하지만 Thinking 선택은 모델을 다시 불러오지 않습니다.
-- Thinking은 로컬 서버의 chat_template_kwargs.enable_thinking에 원본 request_overrides로 연결하며 기존 다른 요청값을 보존합니다. auto는 덮어쓰지 않습니다. 외부 제공자의 thinking 설정을 이 로컬 전용 필드로 강제하지 않습니다.
+- Thinking은 로컬 서버의 chat_template_kwargs.enable_thinking에 원본 request_overrides로 연결하며 기존 다른 요청값을 보존합니다. 같은 로컬 모델을 사용하는 압축·Goal 판정도 원본 auxiliary.<task>.extra_body로 같은 값을 받습니다. auto로 돌아가면 적용 전 native 값을 복원하며 별도로 지정된 보조 모델/제공자는 덮어쓰지 않습니다. 복원용 소유 정보는 config.yaml의 _platform_aux_thinking에 두며 별도 실행기나 보조 기능 비활성화가 아닙니다.
 
 적용 당시 이 PC의 Ornith에 65,536 문맥·Thinking auto·도구 전달 lazy를 저장했습니다. 이후 사용자가 화면에서 변경할 수 있습니다. 직접 생성 59.77 tok/s, 실제 플랫폼 채팅 60.5 tok/s, 실제 파일 작업 60.7 tok/s를 확인했습니다. 새 작업 요청을 실제 tokenizer로 다시 센 값은 사용자/형식 15토큰 → 시스템 포함 3,411토큰 → 도구 포함 4,549토큰입니다. 모델에 처음 제공하는 도구 스키마는 검색·설명·호출의 3개이며 나머지는 검색 가능합니다. 원본 지침·스킬 기능을 강제로 끄지 않았습니다.
 

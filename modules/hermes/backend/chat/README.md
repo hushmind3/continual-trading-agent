@@ -8,15 +8,18 @@ HTTP start/status/stop adapters call the original AIAgent in the isolated worker
 
 `application_response_format=json_object`는 OpenAI 호환 chat_completions 전송에만 JSON 제약을 요청합니다. runtime_policy.py가 기존 request_overrides와 병합하므로 thinking 옵션을 지우지 않습니다. 다른 전송의 JSON 계약은 앱 반환 시 검증하며 지원하지 않는 형식을 임의 변환하지 않습니다.
 
-`application_plan_only=true`인 Project Zero 계획 요청은 JSON 문법과 도구 문법의 Ollama 충돌을 피하도록 해당 요청의 도구 전송만 비웁니다. 실제 `agent_task` 실행은 이 플래그 없이 일반 도구 경로를 사용합니다. 저장된 사용자 도구 목록/권한은 변경하지 않습니다.
+`application_plan_only=true`인 외부 호환 계획 요청은 JSON 문법과 도구 문법의 Ollama 충돌을 피하도록 해당 요청의 도구 전송만 비웁니다. 실제 `agent_task` 실행은 이 플래그 없이 일반 도구 경로를 사용합니다. 저장된 사용자 도구 목록/권한은 변경하지 않습니다.
 
 `application_generation`은 원본 앱의 출력 한도(max_tokens 1~65,536 정수)와 temperature(0~2 숫자)를 실행별로 전달합니다. 원본 provider의 인수를 보존하기 위한 경로이며 전역 기본 제한이 아닙니다. runtime_policy에서 검증하고 원본 agent의 해당 실행에만 적용합니다.
 
-Project Zero 회의/CEO 종합도 application_plan_only를 사용하지만 일반 문장으로 답하므로 JSON 형식을 강제하지 않습니다. 원본 회의의 의견 작성과 실제 직원 agent_task 도구 실행을 구분합니다. 해당 호출의 단계·역할은 projects 하네스 상태로 전달됩니다.
+현재 native 총괄은 application_plan_only/application_request/focused_discussion을 사용하지 않습니다. 외부 provider 호환 경로는 다른 앱을 위해 유지합니다.
 
 Frontend modes: one turn, work toward a goal, recurring task. /goal <task>, /goal resume, /loop <interval> <task>, /loop resume and /stop also use the same paths. Tool approval and user-question callbacks remain interactive.
 
 Goals stop when judged done, blocked, interrupted or budget-limited. Loops stop on the native completion marker, requested count, until criterion or native backstop. Intervals are clamped to the original minimum (30 seconds by default); self-paced mode starts at 60 seconds and backs off on unchanged responses. A model can signal completion before the requested count. Zero count uses the native 100-tick backstop, rather than implying unlimited work.
+
+Goal 첫 턴은 원본 goal_kick_prompt에 실제 이전 대화의 마지막 사용자 메시지를 넘깁니다. 아직 모델에 전달하지 않은 새 요청을 이전 메시지처럼 넘겨 긴 목표 원문이 '이미 전달됨'으로 생략되던 어댑터 오류를 수정했습니다. test_hermes_port.test_17에서 실제 첫 모델 요청의 사용자 메시지에 긴 목표 전체가 포함되는지 확인합니다.
+Goal 판정의 provider/model 경로를 갱신할 때 기존 auxiliary.goal_judge 옵션을 병합해 출력/추론 등 사용자 설정을 보존합니다. 같은 로컬 모델의 압축/판정에는 현재 Thinking 선택도 전달하며 원본 auxiliary_client의 실제 HTTP 요청으로 확인합니다(test_18). 압축 기능·요약 출력 자체를 끄거나 새 압축 루프로 대체하지 않습니다.
 
 State lives in the native session DB. Stop pauses autonomous work. After a worker restart, opening a formerly active session marks it paused and offers Resume; it does not silently restart work. The platform backend must stay running for recurring execution. This is in-session /loop, not an OS scheduler or the standalone Hermes cron gateway. Status polling alone never starts a model or task.
 
@@ -30,8 +33,18 @@ A native failed/incomplete/budget-exhausted result becomes paused with an explic
 
 읽기 전용 분석은 설정의 read_only 권한으로 켭니다. 선택 작업 폴더 안의 read_file·search_files만 실행 전 허용하며 편집·명령·코드 실행·위임·MCP·컴퓨터 도구는 차단합니다. 원본 AIAgent는 유지하고 로컬 배치 실행 경계에 권한 검사를 둡니다. 대화 DB·로그 저장은 계속하며, 이 기능은 전체 프로세스를 OS 샌드박스에 넣는 기능은 아닙니다. 각 자동 실행 턴의 failed/completed 상태를 목표 판정 전에 확인하고 미완료 시 일시정지합니다.
 
-application_context_scope=focused_discussion은 외부 앱의 순수 사업 검토용 요청입니다. 해당 agent에만 skip_context_files/skip_memory/skip_background_review와 빈 도구 목록을 적용하고, 앱 역할·사용자 시스템 지침·Thinking·출력 옵션은 유지합니다. 기본 native 범위와 직원 실행은 그대로입니다. Project Zero 화면의 공유 맥락 스위치로 native 범위를 선택할 수 있습니다.
+application_context_scope=focused_discussion은 외부 앱의 순수 사업 검토용 요청입니다. 해당 agent에만 skip_context_files/skip_memory/skip_background_review와 빈 도구 목록을 적용하고, 앱 역할·사용자 시스템 지침·Thinking·출력 옵션은 유지합니다. 기본 native 범위와 직원 실행은 그대로입니다. native 총괄은 이 호환 모드를 사용하지 않습니다.
 
 2026-10-19 문맥 격리 보정: skip_context_files/skip_memory만으로는 원본 시스템 프롬프트의 호스트·현재 경로·코딩 맥락·플러그인 구간이 없어지지 않았습니다. focused_discussion은 실행별 프롬프트 빌더를 앱 역할+사용자 지정 지침으로 교체하고 압축 재생성에도 같은 경계를 유지합니다. 일반 native/직원 도구 실행은 변경하지 않습니다. 기존 회의/앱 대화에 저장된 잘못된 추정은 삭제하지 않으며, 과거 기록과 사용자 지정 공유 맥락의 영향은 별개입니다. 회귀는 test_project_harness의 원본 빌더 미호출·캐시 재생성·native 보존 검사로 확인합니다. 수정 후 실제 모델 답변의 주제 혼동 재발 여부는 별도 확인 대상입니다.
 
 2026-10-20 확인: test_hermes_telemetry의 이전 작업 제외·부분 로그·prompt/decoder 구분 회귀와 원본 Hermes 경계 13개 통과. 실제 짧은 총괄 응답의 61.7/62.3 tok/s는 해당 llama.cpp decoder receipt를 사용했습니다. 모델/문맥/Thinking 설정은 변경하지 않았습니다.
+
+company.py는 기존 SessionDB의 영구 총괄 세션과 원본 도구 registry를 연결합니다. 대화·장기 기억·컨텍스트 파일·Goal/Loop·권한/질문 처리는 일반 Hermes와 같습니다. 회사 기능은 조회·초안·역할별 기록·회의록 도구이며 별도 agent/provider/DB 대화 루프가 없습니다. 최초 과거 CEO 메시지를 native DB에 한 번 가져오고 이후 동일 세션을 재사용합니다. 기존 데이터는 삭제하지 않습니다. 세션별 내부 토큰은 모델 지침/브라우저 응답에 포함하지 않습니다.
+
+총괄의 기본 작업 폴더는 연결된 조직의 workspaces입니다. 호출자가 workspace를 명시하면 일반 Hermes의 기존 디렉터리 검증을 거쳐 그 선택을 유지하며 기본 폴더로 덮어쓰지 않습니다. project_npm의 실행 범위는 연결된 조직 작업 폴더입니다.
+일반/총괄 요청 시작 시 원본 register_task_env_overrides로 해당 native task의 터미널 CWD도 갱신합니다. 같은 세션에서 이전 cd로 기록된 Temp 경로가 새 작업 폴더 선택을 덮어쓰지 않도록 합니다. 모델이 이후 명시적으로 다른 곳으로 cd하는 행동을 강제로 차단하는 기능은 아닙니다.
+
+project_commands.py는 같은 native registry의 project_npm 도구입니다. 회사 작업 폴더 경계를 확인하고 Node/npm CLI를 인수 목록으로 직접 실행하므로 셸 인용/cd가 필요 없습니다. 실제 종료 코드·출력을 반환하고 test/build는 담당 작업 폴더 verification/에 영수증을 남깁니다. 전역 설치 플래그·임의 명령은 허용하지 않으며 별도 agent 루프가 아닙니다. 기존 terminal/file 도구는 유지합니다.
+자식 npm 프로세스의 stdin은 닫아 부모 worker의 IPC 입력을 읽지 못하게 합니다. 사용자 질문·권한 승인은 기존 Hermes 대화 경로에서 처리합니다.
+npm 시간 초과와 소유자 중지를 구분하며, 중지된 명령도 실제 종료 코드·부분 출력·오류를 test/build 영수증에 남깁니다. company_records의 HTTP 오류는 내부 토큰을 지운 서버 검증 사유를 반환해 잘못된 업무 ID 등을 수정할 수 있게 합니다.
+모델의 성공 문장이 error 필드에 들어가 업무가 실패로 저장된 실제 오류를 방지하도록 native 도구는 finish(성공)/fail(실패)와 body만 받습니다. 모호한 error 인수는 기록 전에 거절합니다. fail은 기존 단일 API의 실패 기록으로 변환하며 원래 서버의 실제 실패 보존 계약은 유지합니다.

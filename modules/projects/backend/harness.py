@@ -4,9 +4,11 @@ import json
 from pathlib import Path
 import threading
 import time
+import uuid
 from collections import Counter
 from . import store
 from .harness_prompt import message_for, requires_json, stage_for
+from .execution_watch import ProgressWindow, wait_owned
 
 SERIAL = threading.Lock()
 ACTIVE = Counter()
@@ -49,7 +51,16 @@ def configure(record, enabled):
 
 
 def busy_reason():
-    with store.LOCK: return '외부 앱에서 실행 중인 Hermes 하네스' if ACTIVE else ''
+    with store.LOCK:
+        if ACTIVE:return '외부 앱에서 실행 중인 Hermes 하네스'
+    from ai_agent.Hermes.engine.bridge import bridge
+    if bridge.process and bridge.process.poll() is None:
+        try:
+            job=bridge.call('status')['job']
+            if (job.get('company_id') or job.get('company_job_id')) and job.get('state') in ('starting','running','stopping'):
+                return '연결된 조직에서 실행 중인 Hermes 작업'
+        except (RuntimeError,ValueError):return 'Hermes 실행 상태 확인 실패; 변경 보류'
+    return ''
 
 
 def measured_job(job):
@@ -78,18 +89,19 @@ def execute(key, payload, cancelled):
         ACTIVE[key] += 1
         CANCELS.setdefault(key, []).append(cancelled)
     session = None
-    deadline = time.monotonic() + 900
     try:
         phase = {**stage_for(system, user), 'started_at': time.time()}
         if ACTIVE[key] == 1: update(key, state='waiting', error='', session_id=None, last_job=None, phase=phase)
         while not SERIAL.acquire(timeout=.25):
-            if cancelled.is_set() or time.monotonic() > deadline: raise ValueError('하네스 대기를 중단했습니다.')
+            if cancelled.is_set(): raise ValueError('하네스 대기를 중단했습니다.')
         try:
             if cancelled.is_set(): raise ValueError('하네스 요청을 중단했습니다.')
-            if bridge.busy_reason(): raise ValueError('Hermes가 다른 작업을 실행 중입니다. 완료 후 다시 요청하세요.')
-            from .company_context import grounded_system, grounded_user
-            system = grounded_system(record, system)
-            user = grounded_user(record, user)
+            waiting = ProgressWindow()
+            while bridge.busy_reason():
+                if cancelled.is_set(): raise ValueError('하네스 대기를 중단했습니다.')
+                if waiting.observe(bridge.call('status')['job']):
+                    raise ValueError('다른 Hermes 작업의 진행을 기다리는 시간이 초과됐습니다. 해당 작업은 중지하지 않았습니다.')
+                cancelled.wait(.4)
             plan_only = requires_json(system)
             generation = {}
             workspace = record['active_source']
@@ -106,20 +118,14 @@ def execute(key, payload, cancelled):
                 'application_response_format': 'json_object' if plan_only else '', 'message': message_for(user)})
             session = result['job']['session_id']
             update(key, state='running', session_id=session, phase={**phase, 'started_at': time.time()})
-            while True:
-                job = bridge.call('status')['job']
-                if job.get('session_id') != session: raise ValueError('하네스 작업의 세션이 바뀌었습니다.')
-                if cancelled.is_set() or time.monotonic() > deadline:
-                    bridge.call('stop'); raise ValueError('앱의 하네스 실행을 중단했습니다.')
-                if job['state'] not in ('starting', 'running', 'stopping'):
-                    if job['state'] != 'complete' or job.get('error'):
-                        raise ValueError(job.get('error') or '하네스가 작업을 완료하지 못했습니다.')
-                    text = job.get('text', '').strip()
-                    if not text: raise ValueError('하네스의 최종 응답이 비었습니다.')
-                    text = format_response(text, system)
-                    update(key, state='complete', last_job=measured_job(job), finished_at=time.time())
-                    return text
-                cancelled.wait(.4)
+            job = wait_owned(bridge, session, cancelled, payload.get('execution') is True)
+            if job['state'] != 'complete' or job.get('error'):
+                raise ValueError(job.get('error') or '하네스가 작업을 완료하지 못했습니다.')
+            text = job.get('text', '').strip()
+            if not text: raise ValueError('하네스의 최종 응답이 비었습니다.')
+            text = format_response(text, system)
+            update(key, state='complete', last_job=measured_job(job), finished_at=time.time())
+            return text
         finally: SERIAL.release()
     except Exception as exc:
         update(key, state='failed', error=str(exc), finished_at=time.time())
@@ -134,6 +140,14 @@ def execute(key, payload, cancelled):
 
 def status(key):
     record = store.read(key); state = record.get('harness', {})
+    if record.get('stage') == 'ready' and state.get('enabled') and record.get('workspace_ui', {}).get('native'):
+        from ai_agent.Hermes.engine.bridge import bridge
+        session = uuid.uuid5(uuid.NAMESPACE_URL, 'platform-company:' + key).hex
+        job = bridge.call('status')['job']
+        owned = job.get('session_id') == session
+        return {'enabled': True, 'native': True, 'session_id': session,
+                'state': job['state'] if owned else 'idle', 'job': job if owned else None,
+                'phase': {'kind': 'task', 'role': 'CEO', 'label': 'Hermes 총괄'}}
     if state.get('state') in ('running', 'waiting') and key not in ACTIVE:
         update(key, state='failed', error='플랫폼 연결이 중단됐습니다. 앱에서 다시 요청하세요.')
         state = store.read(key)['harness']
@@ -153,6 +167,16 @@ def status(key):
 def control(key, request):
     from ai_agent.Hermes.engine.bridge import bridge
     state = status(key)
+    if state.get('native'):
+        job = state.get('job')
+        active = job and job.get('state') in ('starting','running','stopping')
+        if request.get('action') == 'stop':
+            if not active:return {'requested':False}
+            bridge.call('stop', {'session_id': state['session_id']})
+            return {'requested':True}
+        if request.get('action') == 'answer' and active and job.get('approval'):
+            return bridge.call('answer', {'allow': request.get('allow') is True, 'text': str(request.get('text') or '')})
+        raise ValueError('이 조직에서 응답할 실행 요청이 없습니다.')
     if request.get('action') == 'stop':
         with store.LOCK:
             for event in CANCELS.get(key, []): event.set()

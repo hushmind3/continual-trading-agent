@@ -15,11 +15,13 @@ def run(worker,agent,cfg,session_id,prompt,history,request):
     mode=request.get('mode','chat')
     if mode=='chat':return agent.run_conversation(prompt,conversation_history=history,task_id=session_id)
     if mode not in ('goal','loop'):raise ValueError('지원하지 않는 실행 방식입니다.')
-    from hermes_cli.goals import GoalManager,goal_kick_prompt
+    from hermes_cli.goals import GoalManager,goal_kick_prompt,last_user_message_content
     from hermes_cli.loops import LoopManager
     native=worker.native_config()
-    native.setdefault('auxiliary',{})['goal_judge']={'provider':'custom','model':cfg['model'],
-        'base_url':cfg['base_url'],'api_key':cfg.get('api_key') or 'local'}
+    native.setdefault('auxiliary',{}).setdefault('goal_judge',{}).update({'provider':'custom','model':cfg['model'],
+        'base_url':cfg['base_url'],'api_key':cfg.get('api_key') or 'local'})
+    from ai_agent.Hermes.engine.runtime_policy import auxiliary_thinking, model_options
+    auxiliary_thinking(native,cfg,model_options(cfg,native))
     worker.write_config(native)
     manager=GoalManager(session_id) if mode=='goal' else LoopManager(session_id)
     other=LoopManager(session_id) if mode=='goal' else GoalManager(session_id)
@@ -36,7 +38,9 @@ def run(worker,agent,cfg,session_id,prompt,history,request):
     def publish():
         state=asdict(manager.state) if manager.state else {}
         with worker.lock:worker.job['autonomy']={**state,'mode':mode,'cadence':state.get('mode')}
-    current=goal_kick_prompt(manager.state.goal,prompt) if mode=='goal' else None
+    # The new request has not been sent to the agent or persisted yet. Passing
+    # `prompt` as prior history suppresses long goals as "already seen".
+    current=goal_kick_prompt(manager.state.goal,last_user_message_content(history)) if mode=='goal' else None
     result={}
     try:
         while manager.is_active() and not worker.stopping:

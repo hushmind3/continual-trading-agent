@@ -38,28 +38,25 @@ harness.py는 현재 Hermes의 모델·도구·읽기 권한을 사용하고 사
 
 API: projects/settings(use_harness), projects/harness(GET/POST). 아직 이 함수 규격이 없는 임의 앱까지 자동 변환하지 않습니다. 끄거나 독립 분리/내보내기로 실행하면 원본 provider가 작동하며 독립 앱에 Hermes가 자동 포함되는 기능은 아닙니다. 회귀: development.tests.test_project_harness, 실제 모델 검증 결과는 아래 검증 기록과 구분합니다.
 
-현재 상태(2026-10-19): Project Zero 전용 화면·실행 보정·검사기는 폐기했습니다. 재설치한 앱은 일반 설치 경로로 원본 UI/API를 사용하며 저장소 이름에 따른 전용 처리를 적용하지 않습니다. 공통 설치·실행·선택형 Hermes 연결은 유지합니다.
+일반 설치 경로는 저장소 이름에 따른 전용 처리를 적용하지 않습니다. 명시적인 company-v1 연결은 현재 Hermes 영구 세션과 원본 회사 UI/기록 어댑터를 사용합니다. 별도 회사 planner/provider/직원 scheduler는 실행하지 않습니다. 현재 구조와 검사는 backend/README.md 및 integrations/README.md를 따릅니다.
 
 정리 확인: Project Zero 내부 세션 35개·메시지 123개를 원본 SessionDB 삭제 기능으로 제거하고 나머지 29개 세션 보존을 확인했습니다. 전용 소스·검사 자료와 대상 대화 백업은 프로젝트 휴지통에 보관하며 Git에 포함하지 않습니다.
 
 정리 후 검증: 공통 프로젝트 관리 회귀 62개·TypeScript 통과. 실제 서버 화면에 모의 재설치 정보를 제공해 원본 iframe 표시·전용 경영실 미적용·JavaScript 오류 0건을 확인했습니다. 실제 GitHub 재설치와 모델 추론은 실행하지 않았습니다.
 
-## 설치 앱 화면과 헤르메스 통합 대화
+## Hermes 총괄과 회사 기록 통합
 
-workspaces.py·workspace_embed.js는 명시적으로 연결한 고정 Git 커밋 HTML을 앱 소유 integrations/hermes/owner.html에 저장하고 해시를 확인합니다. projects/workspace/connect는 커밋·HTML·data-tab·탭 규격을 검증합니다. projects/workspace-tabs는 ready 앱에만 화면 목록과 명시적 company-v1 대화 연결 여부를 제공합니다. 분리/제거/연결 해제 시 대화 연결도 사라집니다. 저장소 이름에 따른 전용 처리는 없습니다.
+용도: Project Zero 원본 UI와 회사 기록을 유지하면서 대화·기억·판단·실행은 기존 Hermes에 맡깁니다.
 
-company-v1의 AI 총괄 대화는 별도 iframe 탭 대신 Hermes 기존 채팅을 사용합니다. conversation.py의 projects/conversation(GET/POST)은 원본 앱의 local/session 인증을 내부에서 받아 원래 ceo 조회·async chat/submit·상태 조회·ventures decision을 호출합니다. 토큰은 응답/브라우저 저장소에 반환하지 않습니다. 허용한 동작과 ID만 받아 임의 API 경로를 전달하지 않으며 꺼진/제거된 앱은 접근할 수 없습니다. 기록은 원본 앱 DB를 유지하고 복사본을 만들지 않습니다. 서버 재시작 뒤 없는 요청 ID는 failed 상태로 반환해 중복 제출 없이 UI를 복구합니다.
+- `workspaces.py` / `workspace_embed.js`: 명시적인 company-v1 연결의 고정 원본 HTML(회사 현황·업무 실행 기록)을 유지합니다. 모델 표시와 설정 이동은 실제 Hermes 상태를 사용합니다.
+- `conversation.py`: `action=session`은 원본 CEO 과거 기록을 최초 한 번만 native SessionDB로 이관하고, 설치 ID에 대응하는 영구 세션을 재사용합니다. 이후 대화는 원본 CEO DB에 이중 저장하지 않습니다. 원본 DB는 과거 기록과 사업안·승인·업무·회의록을 보존합니다.
+- `integrations/company_records.py`: 앱 소유 `integrations/hermes/workflow.py`에 설치되는 기록 어댑터입니다. 기존 파일 해시를 확인한 뒤 원자적으로 갱신하고 저장 실패 시 복원합니다. 원본 planner/provider/직원 scheduler는 실행하지 않습니다. 회사 API 인증은 유지합니다.
+- `projects/company-tool`: 세션별 내부 capability로 회사 조회·초안·업무 시작/종료·회의록을 연결합니다. 모델 도구로 사업 승인을 위조할 수 없습니다. 소유자 결정은 별도 `projects/conversation action=decision`으로 받습니다.
+- `modules/hermes/backend/chat/company.py`: 원본 도구 registry에 회사 도구를 추가합니다. 일반 파일·터미널·기억·delegation과 원본 chat/Goal/Loop를 그대로 사용합니다. 고정된 CPO→CTO→QA 파이프라인은 없습니다. 대표가 직접 맡긴 작업은 사업안 없이 기록할 수 있습니다.
+- `harness.py` / `harness_hook.py`의 provider 실행은 다른 설치 앱 호환용입니다. 회사 탭의 status/control은 같은 native 작업의 상태·측정·승인·소유 중지만 전달하고, 실행 중 제거/적용을 보호합니다. native 총괄 대화는 이 경로, SERIAL, application_request, focused_discussion을 거치지 않습니다.
 
-현황·업무 실행 기록은 고정 원본 HTML을 유지합니다. 현황의 CEO 대화 버튼은 네이티브 Hermes 채팅으로 이동하고 모델 설정은 기존 Hermes 설정을 엽니다. 모델/API 키/Thinking/출력 한도는 복제하지 않습니다. harness.py는 사용자 세션을 생성하지 않는 앱 요청을 사용하며 계획/회의는 앱 문맥만 읽고 직원 실행은 실제 도구를 사용합니다.
+현재 검증: 관련 백엔드 회귀 37개·TypeScript 통과. 원본 Hermes 경계 검사에서 기존 13개 통과와 새 native 회사 세션 검사의 성공을 각각 확인했습니다. 새 검사는 동일 ID 재사용·원본 과거 문맥·native 회사 도구/파일 도구·재시작 후 SessionDB 보존을 실제 원본 엔진과 모형 HTTP 모델로 확인합니다. 이것은 실제 사업 제작 성공을 뜻하지 않습니다.
 
-명시적인 workspace/connect(recipe=company-v1)는 integrations/company.py를 앱 소유 폴더로 복사하고 해시를 검증합니다. 승인→CPO 요구사항→CTO 로컬 MVP→QA 실제 npm test/빌드를 순차 실행하고 실패/검증 자료 부재 시 완료하지 않습니다. 앱 작업 동안 application_activity로 서버 재시작·제거를 보호합니다. 기존 승인 사업은 인증된 ventures/{id}/build로 재개하며 실행 중 호출은 중복 생성하지 않습니다. 로컬 산출물은 앱 소유 workspaces에 저장하고 제거와 함께 처리합니다. 자세한 실제 실행 상태는 integrations/README.md를 따릅니다.
+실제 선택 모델의 제작 수행·브라우저 확인 결과는 Hermes chat README와 runtime/ai_agent/Hermes/verification/workspace-tabs 자료에 구분합니다. 외부 공개·결제 연동·매출·파인튜닝·강화학습은 별도 확인 대상입니다. 과거 승인 견적서 작업은 요구사항 작성 뒤 CTO 시간 초과/QA 미실행 상태였으며 그 실패 기록을 지우지 않습니다.
 
-검사: development.tests.test_company_conversation, test_project_workspaces, test_project_harness(28개 통과). 원본 조회·비동기 전송 계약·인증 유지·명시적 승인·삭제/연결 해제 차단·재시작 후 복구를 검증합니다. 실제 모델 답변/사업 실행은 별도입니다. 실제 원본 모델 왕복 자료는 runtime/ai_agent/Hermes/verification/workspace-tabs/live-chat.json에서 구분합니다.
-
-conversation.py의 앱 요청 body는 원본 ASGI 규격에 맞는 JSON 문자열이며 응답 body만 base64로 해석합니다. 잘못된 요청 인코딩으로 발생했던 FastAPI JSON decode error를 실제 호출로 재현하고 수정했습니다. 회귀에는 runtime.invoke→실제 ASGI 자식→FastAPI body 검증→원본 JSON 수신까지 포함하며 모델/인증 응답만 흉내 내는 검사와 구분합니다. 일반 Hermes의 chat/goal/loop를 총괄 API로 전달하지 않고 기존 경로로 유지합니다.
-
-사업 관리/측정 연결: conversation.py는 원본 /api/store/info의 실제 공개 상태·고객 요청·결제 연결·제품 경로를 반환합니다. harness.py는 실행 소유 ID에 해당하는 마지막 실제 측정값만 기록하며 다른 Hermes 작업의 수치를 노출하지 않습니다. 새 대기 요청에는 과거 측정값을 비웁니다. CompanyConversation은 기록과 측정을 독립적으로 조회합니다.
-
-company_context.py는 명시적 company-v1 실행에만 현재 연결 사실과 원본 dashboard의 최근 직원 작업 오류·누적 건수를 읽기 전용으로 제공합니다. 대화와 직원은 같은 모델이며 로컬 승인 제작과 외부 배포/결제 연동을 구분합니다. 과거 assistant의 모델 미연결 주장만 이번 모델 참고 문맥에서 제외하고 원본 DB/화면 기록과 소유자 메시지는 보존합니다. 일반 앱 지침은 변경하지 않습니다. workspace_embed.js는 원본 team 응답을 재사용해 최근 상태/누적 완료/선행 실패로 미실행을 구분하고 원본 작업 상태·건수는 수정하지 않습니다.
-
-현재 검증: 관련 회귀 35개, 원본 Hermes 경계 13개 통과. 실제 선택 모델이 별도 실행 모델이 필요 없다는 설명과 CTO 시간 초과/QA 선행 실패를 구분해 답하고 tasks=0을 반환했습니다. 실제 제품 제작 실패는 해결 완료로 기록하지 않습니다. 상세 수치는 Hermes chat/README.md 및 해당 verification 자료를 따릅니다.
+workspace/connect는 설치 모듈의 workspace_host를 기록해 별도 실행 메뉴를 Hermes 탭으로 통합합니다. conversation state는 승인된 사업의 실제 dist/index.html 존재를 확인해 preview_url을 제공합니다. 공개/결제 상태를 완료로 바꾸지 않습니다.

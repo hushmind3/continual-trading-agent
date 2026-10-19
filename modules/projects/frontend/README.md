@@ -27,3 +27,5 @@ CliApp.tsx·GeneratedFieldInput.tsx: 원본 메타데이터를 받아 선택/숫
 현재 상태(2026-10-19): Project Zero 전용 화면·실행 보정·검사기는 폐기했습니다. 재설치한 앱은 일반 설치 경로로 원본 UI/API를 사용하며 저장소 이름에 따른 전용 처리를 적용하지 않습니다. 공통 설치·실행·선택형 Hermes 연결은 유지합니다.
 
 명시적 원본 화면 연결은 [백엔드 안내](../backend/README.md)의 workspace/connect를 사용합니다. 앱 소유의 고정 HTML을 Hermes 대화 상단 탭에 표시하며 일반 ProjectApp의 원본 UI 선택을 저장소명으로 변경하지 않습니다.
+
+Hermes 상위 탭에 명시적으로 연결한 설치 앱은 별도 GitHub 실행 메뉴를 만들지 않습니다. 설치 목록의 열기는 Hermes로 이동하며 프로그램·사업 기록·결과 파일은 앱 소유 폴더에 유지합니다.

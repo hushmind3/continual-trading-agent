@@ -1,125 +1,55 @@
-"""Unified chat forwards original records/actions without model execution."""
-import base64
-import json
+"""Native company session routing, capability separation and adapter upgrades."""
+import base64,hashlib,json,sys,tempfile,unittest,uuid
 from pathlib import Path
-import sys
-import tempfile
-import unittest
-from unittest.mock import patch
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'backend'))
+from unittest.mock import patch,Mock
+ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
-from platform_plugins.projects import conversation, runtime, python_packages, company_context
-
-
+from platform_plugins.projects import conversation,workspaces
 class ConversationTests(unittest.TestCase):
-    def setUp(self):
-        self.record = {'id': 'demo', 'stage': 'ready', 'workspace_ui': {'recipe': 'company-v1'}, 'harness': {'enabled': True}}
-        self.calls = []
-        self.lookup = patch.object(conversation.store, 'read', return_value=self.record)
-        self.lookup.start(); self.addCleanup(self.lookup.stop)
-        self.bridge = patch.object(conversation.runtime, 'invoke', side_effect=self.invoke)
-        self.bridge.start(); self.addCleanup(self.bridge.stop)
-
-    def invoke(self, record, payload, origin=None):
-        self.calls.append(payload)
-        path = payload['path']; status = 200
-        if path == '/api/local/session': result = {'token': 'test-local-token'}
-        elif path == '/api/admin/ceo': result = {'messages': [{'speaker': 'ceo', 'body': '**원본 기록**'}]}
-        elif path == '/api/admin/control': result = {'ventures': [{'id': 'venture_demo', 'status': 'pending'}]}
-        elif path == '/api/store/info': result = {'published': False, 'payment_connected': False, 'usage': {'requests': 7}, 'product_url': None}
-        elif path == '/api/admin/dashboard': result = {'counts': {'jobs_done': 2, 'jobs_pending': 0}, 'jobs': [{'role': 'CTO', 'status': 'failed', 'error': 'TimeoutError', 'mode': 'incomplete'}]}
-        elif '/status/' in path: status, result = 404, {'detail': '서버 재시작으로 요청이 없습니다.'}
-        elif path.endswith('/submit'): result = {'accepted': True, 'request_id': 'a' * 32}
-        else: result = {'status': 'approved'}
-        return {'status': status, 'body': base64.b64encode(json.dumps(result).encode()).decode()}
-
-    def test_history_is_original_and_auth_is_not_returned(self):
-        result = conversation.call('demo', {})
-        self.assertEqual(result['messages'][0]['body'], '**원본 기록**')
-        self.assertEqual(result['progress']['usage']['requests'], 7)
-        self.assertNotIn('test-local-token', json.dumps(result))
-        self.assertTrue(all(c['method'] == 'GET' for c in self.calls))
-        self.assertEqual(self.calls[1]['headers']['X-Project-Zero-Token'], 'test-local-token')
-
-    def test_submit_uses_async_original_api_once(self):
-        result = conversation.call('demo', {'action': 'send', 'message': '함께 기획하자'})
-        self.assertTrue(result['accepted'])
-        writes = [c for c in self.calls if c['method'] == 'POST']
-        self.assertEqual(len(writes), 1)
-        self.assertEqual(json.loads(writes[0]['body']), {'message': '함께 기획하자'})
-        self.assertTrue(writes[0]['path'].endswith('/chat/submit'))
-
-    def test_approval_is_explicit_and_rejects_path_injection(self):
-        conversation.call('demo', {'action': 'decision', 'venture_id': 'venture_demo', 'approve': False})
-        self.assertEqual(json.loads(self.calls[-1]['body']), {'approve': False})
-        with self.assertRaises(ValueError): conversation.call('demo', {'action': 'decision', 'venture_id': '../other', 'approve': True})
-
-    def test_removed_or_disconnected_apps_are_not_accessible(self):
-        for change in ({'stage': 'removed'}, {'harness': {'enabled': False}}, {'workspace_ui': {}}):
-            with patch.object(conversation.store, 'read', return_value={**self.record, **change}), self.assertRaises(ValueError):
-                conversation.call('demo', {})
-        self.assertEqual(self.calls, [])
-
-    def test_restart_clears_pending_request_without_losing_history(self):
-        result = conversation.call('demo', {'request_id': 'a' * 32})
-        self.assertEqual(result['request']['status'], 'failed')
-        self.assertEqual(len(result['messages']), 1)
-
-    def test_company_prompt_uses_actual_job_errors_and_one_shared_model(self):
-        with patch.dict(runtime.WORKERS, {'demo': object()}):
-            system=company_context.grounded_system(self.record,'original company rules')
-        self.assertIn('"separate_execution_model_required": false',system)
-        self.assertIn('TimeoutError',system)
-        self.assertIn('"jobs_done": 2',system)
-        self.assertNotIn('test-local-token',system)
-        self.assertTrue(all(c['method']=='GET' for c in self.calls))
-
-    def test_other_application_prompts_are_unchanged(self):
-        self.assertEqual(company_context.grounded_system({'workspace_ui':{}},'original'),'original')
-        self.assertEqual(self.calls,[])
-
-    def test_obsolete_assistant_connection_claims_are_not_current_model_evidence(self):
-        rows=[{'speaker':'owner','body':'모델 연결 안 됐다고 했는데 왜 대답하나?'},
-              {'speaker':'ceo','body':'실행 모델은 연결 안 됐습니다. 연결해 주세요.'},
-              {'speaker':'ceo','body':'견적서 제품 요구사항을 작성했습니다.'}]
-        user=json.dumps({'recent_chat':rows,'owner_instruction':'현재 상태 확인'},ensure_ascii=False)
-        data=json.loads(company_context.grounded_user(self.record,user))
-        self.assertEqual(data['recent_chat'],[rows[0],rows[2]])
-        self.assertEqual(data['historical_connection_claims_omitted'],1)
-        self.assertEqual(json.loads(user)['recent_chat'],rows)
-
-    def test_real_asgi_child_receives_json_for_chat_and_approval(self):
-        verification = Path(__file__).resolve().parents[2] / 'runtime/projects/manage/verification'
-        verification.mkdir(parents=True, exist_ok=True)
-        self.bridge.stop()
-        with tempfile.TemporaryDirectory(dir=verification, prefix='conversation-ipc-') as directory:
-            source = Path(directory) / 'source'
-            source.mkdir()
-            self.record['harness']['entry']=''
-            (source / 'server.py').write_text('''from fastapi import FastAPI,Header,HTTPException
-app=FastAPI()
-@app.get('/api/local/session')
-def session(): return {'token':'fixture-token'}
-@app.post('/api/admin/ceo/chat/submit')
-def submit(body:dict,x_project_zero_token:str=Header('')):
-    if x_project_zero_token!='fixture-token':raise HTTPException(401)
-    return {'accepted':True,'request_id':'a'*32,'received':body}
-@app.post('/api/admin/ventures/{venture_id}/decision')
-def decision(venture_id:str,body:dict,x_project_zero_token:str=Header('')):
-    if x_project_zero_token!='fixture-token':raise HTTPException(401)
-    return {'id':venture_id,'received':body}
-''', encoding='utf-8')
-            self.record.update(active_source=str(source), adapter={'kind':'fastapi','app':'server:app'})
-            with patch.dict(runtime.WORKERS, clear=True), patch.object(conversation.store,'project_folder',return_value=source), patch.object(python_packages,'folder',return_value=source/'packages'):
-                try:
-                    sent=conversation.call('demo',{'action':'send','message':'한글 실제 전송'})
-                    self.assertEqual(sent['received'],{'message':'한글 실제 전송'})
-                    decision=conversation.call('demo',{'action':'decision','venture_id':'venture_fixture','approve':False})
-                    self.assertEqual(decision['received'],{'approve':False})
-                finally:
-                    for worker in runtime.WORKERS.values(): worker.close()
-
-
-if __name__ == '__main__': unittest.main()
+ def setUp(self):
+  self.record={'id':'demo','name':'Demo','stage':'ready','workspace_ui':{'recipe':'company-v1','native':{'token':'secret'}},'harness':{'enabled':True}}
+  self.calls=[];p=patch.object(conversation.store,'read',return_value=self.record);p.start();self.addCleanup(p.stop)
+  p=patch.object(conversation.runtime,'invoke',side_effect=self.invoke);p.start();self.addCleanup(p.stop)
+ def invoke(self,record,data,origin):
+  self.calls.append(data);path=data['path']
+  if path=='/api/local/session':value={'token':'app-token'}
+  elif path=='/api/admin/ceo':value={'messages':[{'id':'old1','speaker':'owner','body':'원본 대화'}]}
+  elif path=='/api/admin/control':value={'ventures':[{'id':'approved','status':'approved'}]}
+  elif path=='/api/store/info':value={'published':False}
+  else:value={'ok':True}
+  return {'status':200,'body':base64.b64encode(json.dumps(value).encode()).decode()}
+ def test_native_session_created_once_by_original_worker_and_original_history_imported(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(conversation.store,'project_folder',return_value=Path(d)),patch.object(conversation.store,'save'),patch('ai_agent.Hermes.engine.bridge.bridge') as bridge:
+   bridge.call.return_value={'session_id':'native'}
+   self.assertEqual(conversation.call('demo',{'action':'session'})['session_id'],'native')
+   operation,payload=bridge.call.call_args.args;self.assertEqual(operation,'company/session');self.assertEqual(payload['messages'][0]['body'],'원본 대화');self.assertEqual(payload['token'],'secret')
+   self.assertTrue(all(c['method']=='GET' for c in self.calls))
+ def test_state_reads_business_records_never_calls_another_planner(self):
+  result=conversation.call('demo',{});self.assertEqual(result['progress']['approved'],1)
+  self.assertNotIn('messages',result);self.assertNotIn('token',json.dumps(result));self.assertNotIn('/api/admin/ceo',[c['path'] for c in self.calls])
+  with self.assertRaisesRegex(ValueError,'영구 세션'):conversation.call('demo',{'action':'send','message':'hello'})
+ def test_tools_cannot_approve_and_capability_does_not_leak(self):
+  sid=uuid.uuid5(uuid.NAMESPACE_URL,'platform-company:demo').hex
+  for token,command in [('wrong',{'action':'overview'}),('secret',{'action':'decision'}),('secret',{'action':'overview','_owner':True})]:
+   with self.assertRaises(ValueError):conversation.call('demo',{'action':'tool','session_id':sid,'token':token,'command':command})
+  conversation.call('demo',{'action':'tool','session_id':sid,'token':'secret','command':{'action':'overview'}})
+  self.assertEqual(json.loads(self.calls[-1]['body']),{'action':'overview','_session':sid});self.assertEqual(self.calls[-1]['headers']['X-Project-Zero-Token'],'app-token')
+ def test_owner_decision_is_json_and_does_not_run_legacy_queue(self):
+  conversation.call('demo',{'action':'decision','venture_id':'venture_demo','approve':True})
+  self.assertEqual(self.calls[-1]['path'],'/api/admin/hermes/records');self.assertEqual(json.loads(self.calls[-1]['body']),{'action':'decision','_owner':True,'venture_id':'venture_demo','approve':True})
+ def test_removed_or_disconnected_apps_are_rejected(self):
+  self.record['stage']='removed'
+  with self.assertRaises(ValueError):conversation.call('demo',{})
+  self.assertEqual(self.calls,[])
+ def test_owned_adapter_upgrade_and_failed_save_rollback(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(workspaces.store,'project_folder',return_value=Path(d)):
+   path=Path(d)/'workflow.py';old=b'# old owned adapter';path.write_bytes(old)
+   self.record['workspace_ui'].update(adapter='workflow.py',adapter_sha256=hashlib.sha256(old).hexdigest())
+   with patch.object(workspaces.store,'save',side_effect=OSError('save failed')),self.assertRaises(OSError):workspaces.adapter(self.record)
+   self.assertEqual(path.read_bytes(),old)
+   with patch.object(workspaces.store,'save'):workspaces.adapter(self.record)
+   self.assertEqual(path.read_bytes(),(ROOT/'modules/projects/backend/integrations/company_records.py').read_bytes())
+   path.write_text('# tampered',encoding='utf-8')
+   with self.assertRaisesRegex(ValueError,'무결성'):workspaces.adapter(self.record)
+if __name__=='__main__':unittest.main()

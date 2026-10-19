@@ -215,8 +215,9 @@ class HarnessTests(unittest.TestCase):
 
     def test_another_users_active_agent_is_not_started_or_stopped(self):
         fake=Mock();fake.busy_reason.return_value='user task'
-        with patch('ai_agent.Hermes.engine.bridge.bridge',fake),self.assertRaisesRegex(ValueError,'다른 작업'):
-            harness.execute('p_demo',{'system':'system','user':'request'},threading.Event())
+        cancelled=threading.Event();cancelled.set()
+        with patch('ai_agent.Hermes.engine.bridge.bridge',fake),self.assertRaisesRegex(ValueError,'중단'):
+            harness.execute('p_demo',{'system':'system','user':'request'},cancelled)
         fake.call.assert_not_called()
         self.assertFalse(harness.ACTIVE)
 

@@ -30,7 +30,9 @@ class ProviderHook:
         key = uuid.uuid4().hex
         future = asyncio.get_running_loop().create_future(); self.pending[key] = future
         self.send({'harness_request': {'id': key, **payload}})
-        try: return await asyncio.wait_for(future, 900)
+        # The parent owns queueing, observed-progress deadlines and native cancellation.
+        # An independent wall-clock timeout here can abandon a still-running agent.
+        try: return await future
         finally:
             self.pending.pop(key, None)
             if future.cancelled(): self.send({'harness_cancel': key})

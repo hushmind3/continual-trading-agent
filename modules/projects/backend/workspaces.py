@@ -2,6 +2,9 @@
 import hashlib
 import json
 import re
+import ast
+import os
+import uuid
 from pathlib import Path, PurePosixPath
 from urllib.request import urlopen
 from . import store
@@ -40,11 +43,15 @@ def connect(key, config):
         if recipe is not None:
             if recipe != 'company-v1': raise ValueError('지원하지 않는 업무 연결 규격입니다.')
             adapter = store.owned(store.project_folder(record), 'integrations/hermes/workflow.py')
-            adapter.write_bytes(Path(__file__).with_name('integrations').joinpath('company.py').read_bytes())
+            adapter.write_bytes(Path(__file__).with_name('integrations').joinpath('company_records.py').read_bytes())
             record['workspace_ui'].update(recipe=recipe, adapter='integrations/hermes/workflow.py', adapter_sha256=hashlib.sha256(adapter.read_bytes()).hexdigest())
         worker = runtime.WORKERS.pop(key, None)
         if worker: worker.close()
         store.save(record)
+        manifest = store.owned(store.ROOT / 'modules', record['module_id']) / 'module.json'
+        metadata = json.loads(manifest.read_text(encoding='utf-8'))
+        metadata['workspace_host'] = 'hermes/chat'
+        manifest.write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf-8')
         return {'id': key, 'revision': revision, 'tabs': tabs, 'shared_settings': 'hermes'}
 
 
@@ -55,6 +62,7 @@ def tabs():
         if record.get('stage') != 'ready' or ui.get('host') != 'hermes/chat': continue
         if not store.owned(store.project_folder(record), ui.get('document', '')).is_file(): continue
         result.extend({'id': record['id'] + ':' + t['id'], 'view': t['id'], 'title': t['title'],
+            'session_id': uuid.uuid5(uuid.NAMESPACE_URL, 'platform-company:' + record['id']).hex,
             'src': '/assets/projects/' + record['id'] + '/_platform-workspace.html', 'revision': ui['revision'],
             'conversation': ui.get('recipe') == 'company-v1' and record.get('harness', {}).get('enabled', False)}
             for t in ui.get('tabs', []))
@@ -77,4 +85,19 @@ def adapter(record):
     if not record.get("harness",{}).get("enabled") or not ui.get("adapter"): return None
     path=store.owned(store.project_folder(record),ui["adapter"])
     if hashlib.sha256(path.read_bytes()).hexdigest()!=ui["adapter_sha256"]: raise ValueError("업무 연결 파일 무결성 오류")
+    if ui.get('recipe') == 'company-v1':
+        bundled = Path(__file__).with_name('integrations').joinpath('company_records.py').read_bytes()
+        content = path.read_bytes()
+        if content != bundled:
+            ast.parse(bundled)
+            previous = ui['adapter_sha256']
+            temporary = path.with_suffix('.updating')
+            try:
+                temporary.write_bytes(bundled); os.replace(temporary, path)
+                ui['adapter_sha256'] = hashlib.sha256(bundled).hexdigest()
+                store.save(record)
+            except BaseException:
+                path.write_bytes(content); ui['adapter_sha256'] = previous
+                raise
+            finally: temporary.unlink(missing_ok=True)
     return path

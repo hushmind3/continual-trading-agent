@@ -57,13 +57,15 @@ async def main():
     os.chdir(folder); sys.path.insert(0, folder)
     module, name = target.split(':')
     app = getattr(importlib.import_module(module), name)
-    hook = ProviderHook(sys.argv[4], protocol) if len(sys.argv) > 4 and sys.argv[4] else None
+    # Company integration is a records facade. It must not create another AI provider.
+    integrated = len(sys.argv) > 6
+    hook = ProviderHook(sys.argv[4], protocol) if not integrated and len(sys.argv) > 4 and sys.argv[4] else None
     application_active=0
     def activity(delta):
         nonlocal application_active
         application_active=max(0,application_active+delta)
         protocol.write(json.dumps({'application_activity':application_active})+'\n');protocol.flush()
-    if hook and len(sys.argv)>6:
+    if integrated:
         from importlib import util
         spec=util.spec_from_file_location('application_workflow',sys.argv[5])
         integration=util.module_from_spec(spec);spec.loader.exec_module(integration)

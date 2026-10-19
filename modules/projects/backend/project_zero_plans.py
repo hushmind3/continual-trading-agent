@@ -20,7 +20,7 @@ def parse(raw):
     summary=value.get('summary');tasks=value.get('tasks')
     if not isinstance(summary,str) or not 1<=len(summary.strip())<=1200:raise ValueError('CEO 실행안 요약을 확인하세요.')
     if not isinstance(tasks,list) or not 1<=len(tasks)<=8:raise ValueError('승인할 구체적인 업무가 없습니다.')
-    clean=[];seen=set()
+    clean=[];seen=set();has_build=any(isinstance(t,dict) and t.get('phase')=='implementation' for t in tasks)
     for task in tasks:
         phase=task.get('phase');role=task.get('role')
         if phase not in PHASES or role not in ROLES or PHASES[phase] and PHASES[phase]!=role:
@@ -32,7 +32,7 @@ def parse(raw):
             if not isinstance(text,str) or not 1<=len(text.strip())<=(160 if key=='title' else 1800):raise ValueError('업무의 산출물·완료 기준이 없습니다.')
             fields[key]=text.strip()
         if phase=='implementation' and not {'requirements','design'}<=seen:raise ValueError('제작 전에 기획·설계가 필요합니다.')
-        if phase=='verification' and 'implementation' not in seen:raise ValueError('제작 결과 없이 검증할 수 없습니다.')
+        if phase=='verification' and (not seen or has_build and 'implementation' not in seen):raise ValueError('검토할 선행 결과가 없거나 제작 순서가 잘못됐습니다.')
         seen.add(phase);clean.append({'phase':phase,'role':role,**fields})
     if 'implementation' in seen and 'verification' not in seen:raise ValueError('제작 업무에는 QA 검증이 필요합니다.')
     return summary.strip(),clean
@@ -97,3 +97,12 @@ def advance(db):
                         con.execute("UPDATE jobs SET status='queued',arguments=? WHERE id=?",(json.dumps(args,ensure_ascii=False),j['id']))
                         break
     for text in notices:db.save_ceo_message('ceo',text)
+
+
+def cache_draft(db,mid,raw):
+    with db.LOCK,db.connect() as con:
+        con.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('platform_meeting_draft:'+mid,raw))
+
+def cached_draft(db,mid):
+    row=db.one('SELECT value FROM settings WHERE key=?',('platform_meeting_draft:'+mid,))
+    return row['value'] if row else ''

@@ -239,3 +239,25 @@ def test_existing_meeting_can_prepare_a_plan_without_repeating_specialists(live,
     assert db.one('SELECT status FROM platform_meeting_plans WHERE meeting_id=?',(mid,))['status']=='pending'
     assert db.one('SELECT count(*) AS n FROM jobs')['n']==0
     mock.assert_awaited_once()
+
+
+def test_cached_real_business_review_can_be_recovered_without_another_model_call(live,monkeypatch):
+    import ai_provider,meeting_engine,time
+    from platform_plugins.projects import project_zero_plans as plans
+    client,headers,db=live
+    monkeypatch.setattr(ai_provider,'status',AsyncMock(return_value={'mode':'hermes'}))
+    mock=AsyncMock(side_effect=AssertionError('Cached recovery must not call model'))
+    monkeypatch.setattr(ai_provider,'compose',mock)
+    mid=meeting_engine.start('사업 검증 실험 설계')
+    meeting_engine._finish(mid,'completed','기존 회의')
+    value=plan_fixture();value['tasks']=[value['tasks'][0],value['tasks'][1],value['tasks'][3]]
+    plans.cache_draft(db,mid,json.dumps(value,ensure_ascii=False))
+    response=client.post('/api/admin/platform/meeting-plans/'+mid+'/prepare',headers=headers)
+    assert response.status_code==200
+    for _ in range(50):
+        if db.one('SELECT meeting_id FROM platform_meeting_plans WHERE meeting_id=?',(mid,)):break
+        time.sleep(.01)
+    row=plans.latest(db)[0]
+    assert row['status']=='pending' and row['report_message_id']
+    assert db.one('SELECT count(*) AS n FROM jobs')['n']==0
+    mock.assert_not_awaited()

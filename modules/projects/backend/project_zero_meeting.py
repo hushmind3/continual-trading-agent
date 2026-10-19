@@ -45,6 +45,7 @@ def install(app):
             '지출·외부 공개·메일 발송은 별도 승인이 필요합니다. '
             '형식: {"summary":"추천안...","tasks":[{"phase":"research","role":"CMO","title":"...","brief":"...","deliverable":"...","acceptance":"..."}]}')
         raw=await original_compose(system,user,max_tokens=2200)
+        plans.cache_draft(db,mid,raw)
         summary,tasks=plans.parse(raw)
         plans.save(db,mid,summary,tasks)
         return summary
@@ -66,7 +67,13 @@ def install(app):
         async def work():
             token=CURRENT.set(mid)
             try:
-                summary=await ai_provider.compose('CEO 회의 종합',json.dumps({'topic':row['topic'],'minutes':row['minutes']},ensure_ascii=False),max_tokens=2200)
+                cached=plans.cached_draft(db,mid)
+                try:reviewed=plans.parse(cached) if cached else None
+                except (ValueError,TypeError,AttributeError):reviewed=None
+                if reviewed:
+                    summary,tasks=reviewed;plans.save(db,mid,summary,tasks)
+                else:
+                    summary=await ai_provider.compose('CEO 회의 종합',json.dumps({'topic':row['topic'],'minutes':row['minutes']},ensure_ascii=False),max_tokens=2200)
                 message_id=db.save_ceo_message('ceo','[팀 회의 완료] '+summary)
                 plans.attach_report(db,mid,message_id)
             except Exception as exc:

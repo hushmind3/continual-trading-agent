@@ -74,3 +74,18 @@ def discussion_prompt(cfg, normal):
             'Use only the current business discussion and application evidence. Prior model claims are not verified facts. '
             'Return the requested response format. Do not execute actions during deliberation.\n'+
             cfg.get('system_prompt','')+'\n'+cfg.get('application_system_prompt',''))
+
+
+def bind_discussion_context(agent, cfg):
+    """Pure app deliberation has no host/repository prompt; native work is unchanged."""
+    if cfg.get('application_context_scope') != 'focused_discussion': return
+    from types import MethodType
+    prompt = discussion_prompt(cfg, '')
+    def build(instance, system_message=None):
+        # Reused on compression rebuilds too: never call the native host/skill/plugin builder.
+        instance._cached_system_prompt_static = prompt
+        return prompt
+    agent._build_system_prompt = MethodType(build, agent)
+    agent._cached_system_prompt = None
+    agent._cached_system_prompt_static = None
+    agent.ephemeral_system_prompt = None

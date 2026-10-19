@@ -52,7 +52,7 @@ from run_agent import AIAgent
 from hermes_state import SessionDB
 from ruamel.yaml import YAML
 from ai_agent.Hermes.engine.execution import bind_model, context_window, request_policy, settle_review
-from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, apply_response_contract, application_generation, apply_application_generation, discussion_prompt
+from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, apply_response_contract, application_generation, apply_application_generation, discussion_prompt, bind_discussion_context
 
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
@@ -321,6 +321,7 @@ class HermesWorker:
                 tool_complete_callback=lambda *args, **kw: self.event('tool_complete', args),
                 clarify_callback=self.clarify,
             )
+            bind_discussion_context(self.agent,cfg)
             apply_thinking(self.agent,model_options(cfg,self.native_config()),bool(cfg.get('local_model')))
             apply_response_contract(self.agent, cfg.get('application_response_format'), cfg.get('application_plan_only', False))
             apply_application_generation(self.agent, cfg.get('application_generation', {}))

@@ -21,3 +21,5 @@ Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to 
 현재 실행 제어: runtime_policy.py가 모델별 문맥/Thinking과 원본 도구 검색 제공 방식을 연결합니다. defer: [] 강제 생성은 제거했습니다. Thinking auto는 원본/모델 기본값을 보존합니다. 설정·실측·남은 제한은 [모델 안내](../models/README.md)의 설정 복구 항목을 봅니다.
 
 앱 하네스의 실행별 시스템 지침·JSON 응답 계약은 [대화 안내](../chat/README.md)를 따릅니다. 사용자 모델 설정은 저장 변경하지 않으며 JSON 제약은 원본 chat_completions 전송의 request_overrides를 사용합니다.
+
+2026-10-19 문맥 격리 보정: skip_context_files/skip_memory만으로는 원본 시스템 프롬프트의 호스트·현재 경로·코딩 맥락·플러그인 구간이 없어지지 않았습니다. focused_discussion은 실행별 프롬프트 빌더를 앱 역할+사용자 지정 지침으로 교체하고 압축 재생성에도 같은 경계를 유지합니다. 일반 native/직원 도구 실행은 변경하지 않습니다. 기존 회의/앱 대화에 저장된 잘못된 추정은 삭제하지 않으며, 과거 기록과 사용자 지정 공유 맥락의 영향은 별개입니다. 회귀는 test_project_harness의 원본 빌더 미호출·캐시 재생성·native 보존 검사로 확인합니다. 수정 후 실제 모델 답변의 주제 혼동 재발 여부는 별도 확인 대상입니다.

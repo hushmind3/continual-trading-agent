@@ -132,3 +132,110 @@ def test_discussion_context_switch_is_explicit_and_locked_during_meeting(live):
     assert client.get('/api/admin/platform/workspace',headers=headers).json()['include_engine_context'] is True
     meeting_engine.start('진행 중에는 설정이 바뀌지 않아야 합니다')
     assert client.post(url,headers=headers,json={'include_engine_context':False}).status_code==409
+
+
+def plan_fixture():
+    return {'summary':'추천안: 홈페이지 제작\n이유: 고객 검증\n산출물: 로컬 홈페이지와 검증 결과\n승인 범위: 로컬 제작만',
+        'tasks':[{'phase':phase,'role':role,'title':title,'brief':title+'을 실제 수행','deliverable':title+' 문서/파일','acceptance':'실제 결과를 확인'} for phase,role,title in [
+        ('requirements','CPO','요구사항 정리'),('design','CTO','구조 설계'),('implementation','CTO','홈페이지 제작'),('verification','QA','동작 검증')]]}
+
+
+def test_meeting_plan_approval_is_atomic_and_dependencies_receive_results(live,monkeypatch):
+    from platform_plugins.projects import project_zero_plans as plans
+    import ai_provider,meeting_engine
+    client,headers,db=live
+    monkeypatch.setattr(ai_provider,'status',AsyncMock(return_value={'mode':'hermes'}))
+    mid=meeting_engine.start('로컬 홈페이지를 만들 실행안 검토')
+    summary,tasks=plans.parse(json.dumps(plan_fixture(),ensure_ascii=False))
+    plans.save(db,mid,summary,tasks)
+    url='/api/admin/platform/meeting-plans/'+mid+'/decision'
+    assert db.one('SELECT count(*) AS n FROM jobs')['n']==0
+    assert client.post(url,json={'approve':True}).status_code==401
+    assert client.post(url,headers=headers,json={'approve':True}).status_code==409
+    meeting_engine._finish(mid,'completed',summary)
+    assert client.post(url,headers=headers,json={'approve':'true'}).status_code==409
+    result=client.post(url,headers=headers,json={'approve':True})
+    assert result.status_code==200 and len(result.json()['jobs'])==4
+    assert client.post(url,headers=headers,json={'approve':True}).status_code==409
+    ids=[j['id'] for j in result.json()['jobs']]
+    assert [db.one('SELECT status FROM jobs WHERE id=?',(jid,))['status'] for jid in ids]==['queued','blocked','blocked','blocked']
+    db.finish_job(ids[0],'요구사항 실제 산출물','llm');plans.advance(db)
+    design=db.one('SELECT * FROM jobs WHERE id=?',(ids[1],))
+    assert design['status']=='queued' and '요구사항 실제 산출물' in json.loads(design['arguments'])['brief']
+    db.finish_job(ids[1],'설계 실패','llm','검증 실패');plans.advance(db)
+    assert db.one('SELECT status FROM platform_meeting_plans WHERE meeting_id=?',(mid,))['status']=='failed'
+    assert all(db.one('SELECT status FROM jobs WHERE id=?',(jid,))['status']=='failed' for jid in ids[2:])
+
+
+def test_meeting_plan_success_handoff_and_rejection_never_starts_work(live):
+    from platform_plugins.projects import project_zero_plans as plans
+    import meeting_engine
+    client,headers,db=live
+    summary,tasks=plans.parse(json.dumps(plan_fixture(),ensure_ascii=False))
+    mid=meeting_engine.start('기획 설계 제작 검증');plans.save(db,mid,summary,tasks);meeting_engine._finish(mid,'completed',summary)
+    jobs=plans.decide(db,mid,True)['jobs']
+    for index,job in enumerate(jobs):
+        claimed=db.claim_job();assert claimed['id']==job['id']
+        if index:assert '실제 산출물 0' in json.loads(claimed['arguments'])['brief']
+        db.finish_job(job['id'],'실제 산출물 '+str(index),'llm')
+    plans.advance(db)
+    assert plans.latest(db)[0]['status']=='completed'
+    mid2=meeting_engine.start('보류 검토');plans.save(db,mid2,summary,tasks);meeting_engine._finish(mid2,'completed',summary)
+    before=db.one('SELECT count(*) AS n FROM jobs')['n'];plans.decide(db,mid2,False)
+    assert db.one('SELECT count(*) AS n FROM jobs')['n']==before
+
+
+def test_invalid_role_or_missing_build_verification_never_becomes_approvable(live):
+    from platform_plugins.projects import project_zero_plans as plans
+    import pytest
+    value=plan_fixture();value['tasks'][0]['role']='CTO'
+    with pytest.raises(ValueError):plans.parse(json.dumps(value))
+    value=plan_fixture();value['tasks'].pop()
+    with pytest.raises(ValueError):plans.parse(json.dumps(value))
+    value=plan_fixture();value['tasks']=value['tasks'][2:]
+    with pytest.raises(ValueError):plans.parse(json.dumps(value))
+
+
+def test_real_meeting_synthesis_hook_reports_plan_without_auto_execution(live,monkeypatch):
+    import asyncio,ai_provider,meeting_engine
+    from platform_plugins.projects.project_zero_meeting import install
+    from platform_plugins.projects import project_zero_plans as plans
+    client,headers,db=live
+    monkeypatch.setattr(ai_provider,'status',AsyncMock(return_value={'mode':'hermes'}))
+    calls=[]
+    async def compose(system,user,max_tokens=500):
+        context=json.loads(user);calls.append(context)
+        return json.dumps(plan_fixture(),ensure_ascii=False) if 'minutes' in context else '고객 요구와 검증할 가설입니다.'
+    monkeypatch.setattr(ai_provider,'compose',compose)
+    import server
+    install(server.app)
+    mid=meeting_engine.start('홈페이지 구축을 검토')
+    asyncio.run(meeting_engine.run(mid))
+    assert meeting_engine._meeting_row(mid)['status']=='completed'
+    assert len(calls)==6 and len(plans.latest(db))==1
+    assert plans.latest(db)[0]['report_message_id']
+    assert plans.latest(db)[0]['status']=='pending'
+    assert db.one('SELECT count(*) AS n FROM jobs')['n']==0
+    assert db.one("SELECT body FROM ceo_messages WHERE speaker='ceo' ORDER BY rowid DESC LIMIT 1")['body'].endswith(plan_fixture()['summary'])
+
+
+def test_existing_meeting_can_prepare_a_plan_without_repeating_specialists(live,monkeypatch):
+    import ai_provider,meeting_engine,server,time
+    from platform_plugins.projects.project_zero_meeting import install
+    client,headers,db=live
+    monkeypatch.setattr(ai_provider,'status',AsyncMock(return_value={'mode':'hermes'}))
+    mock=AsyncMock(return_value=json.dumps(plan_fixture(),ensure_ascii=False))
+    monkeypatch.setattr(ai_provider,'compose',mock);install(server.app)
+    mid=meeting_engine.start('로컬 홈페이지 검토')
+    meeting_engine._append(mid,{'role':'CPO','name':'제품','statement':'고객 가설을 검토'})
+    meeting_engine._finish(mid,'completed','이전 요약')
+    url='/api/admin/platform/meeting-plans/'+mid+'/prepare'
+    assert client.post(url).status_code==401
+    assert client.post(url,headers=headers).status_code==200
+    for _ in range(50):
+        if db.one('SELECT meeting_id FROM platform_meeting_plans WHERE meeting_id=?',(mid,)):break
+        time.sleep(.01)
+    assert client.post(url,headers=headers).status_code==409
+    assert db.one('SELECT status FROM platform_meeting_plans WHERE meeting_id=?',(mid,))['status']=='pending'
+    assert db.one('SELECT count(*) AS n FROM jobs')['n']==0
+    mock.assert_awaited_once()

@@ -15,11 +15,19 @@ def install(app):
     import meeting_engine as meetings
     import server
     import venture_engine
+    if __package__:
+        from . import project_zero_plans as plans
+        from .project_zero_meeting import install as install_meeting,PREPARING
+    else:
+        import project_zero_plans as plans
+        from project_zero_meeting import install as install_meeting,PREPARING
+    install_meeting(app)
     life = app.router.lifespan_context
     @asynccontextmanager
     async def managed_life(instance):
         async with life(instance):
             # Native meeting tasks are in-memory and cannot survive a worker restart.
+            plans.initialize(db)
             recover(db, meetings)
             yield
     app.router.lifespan_context = managed_life
@@ -41,7 +49,7 @@ def install(app):
         ventures = db.many('SELECT * FROM ventures ORDER BY rowid DESC LIMIT 20')
         for row in ventures: row['proposal'] = json.loads(row.pop('proposal_json'))
         ceo = await server.ceo_state(x_project_zero_token)
-        return {'ceo': {'messages': ceo['messages']}, 'include_engine_context':db.settings().get('platform_meeting_engine_context','false')=='true',
+        return {'plan_preparing':sorted(PREPARING),'plans': plans.latest(db), 'ceo': {'messages': ceo['messages']}, 'include_engine_context':db.settings().get('platform_meeting_engine_context','false')=='true',
                 'team': await server.team_state(x_project_zero_token), 'meetings': meetings.latest(20),
                 'ventures': ventures, 'active_product': venture_engine.live(),
                 'jobs': db.many('SELECT id,role,type,title,status,result,error,mode,created_at,started_at,finished_at FROM jobs ORDER BY rowid DESC LIMIT 60'),

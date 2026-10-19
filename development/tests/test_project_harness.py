@@ -30,6 +30,27 @@ class HarnessTests(unittest.TestCase):
         self.assertNotIn('desktop launch',prompt);self.assertIn('사용자 지침',prompt)
         self.assertEqual(discussion_context('ROLE',context,'native'),('ROLE',context))
 
+    def test_focused_prompt_rebuild_never_calls_native_host_or_repository_builder(self):
+        from types import SimpleNamespace
+        from ai_agent.Hermes.engine.runtime_policy import bind_discussion_context
+        native=Mock(return_value='Current working directory: C:/금융매매모델')
+        agent=SimpleNamespace(_build_system_prompt=native,_cached_system_prompt='old host prompt',
+                              _cached_system_prompt_static='old',ephemeral_system_prompt='host rules')
+        cfg={'application_context_scope':'focused_discussion','application_system_prompt':'당신은 CPO입니다.',
+             'system_prompt':'사용자 지정 지침'}
+        bind_discussion_context(agent,cfg)
+        self.assertIsNone(agent._cached_system_prompt)
+        for _ in range(2):
+            prompt=agent._build_system_prompt('ignored native caller context')
+            self.assertIn('CPO',prompt);self.assertIn('사용자 지정 지침',prompt)
+            self.assertNotIn('금융',prompt);self.assertNotIn('working directory',prompt)
+            self.assertNotIn('ignored native',prompt)
+        native.assert_not_called();self.assertIsNone(agent.ephemeral_system_prompt)
+        self.assertEqual(agent._cached_system_prompt_static,prompt)
+        regular=SimpleNamespace(_build_system_prompt=native)
+        bind_discussion_context(regular,{'application_context_scope':'native'})
+        self.assertIs(regular._build_system_prompt,native)
+
     def test_call_stage_separates_meeting_summary_and_employee_execution(self):
         from platform_plugins.projects.harness_prompt import stage_for
         self.assertEqual(stage_for('PROJECT ZERO (CFO)',json.dumps({'topic':'가격','prior_colleagues':[]})),{'kind':'meeting','role':'CFO','label':'회의 발언 작성'})

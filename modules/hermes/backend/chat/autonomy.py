@@ -67,7 +67,7 @@ def run(worker,agent,cfg,session_id,prompt,history,request):
                 current=decision.get('continuation_prompt') or manager.next_continuation_prompt()
             else:decision=manager.complete_tick(response)
             worker.event('autonomy_decision',decision);publish()
-            history=worker.session(session_id)['messages']
+            history=worker.db.get_resume_conversations(session_id)[0]
         return result
     except Exception:
         manager.pause(reason='실행 오류')

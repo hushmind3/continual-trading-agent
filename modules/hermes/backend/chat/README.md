@@ -48,3 +48,7 @@ project_commands.py는 같은 native registry의 project_npm 도구입니다. �
 자식 npm 프로세스의 stdin은 닫아 부모 worker의 IPC 입력을 읽지 못하게 합니다. 사용자 질문·권한 승인은 기존 Hermes 대화 경로에서 처리합니다.
 npm 시간 초과와 소유자 중지를 구분하며, 중지된 명령도 실제 종료 코드·부분 출력·오류를 test/build 영수증에 남깁니다. company_records의 HTTP 오류는 내부 토큰을 지운 서버 검증 사유를 반환해 잘못된 업무 ID 등을 수정할 수 있게 합니다.
 모델의 성공 문장이 error 필드에 들어가 업무가 실패로 저장된 실제 오류를 방지하도록 native 도구는 finish(성공)/fail(실패)와 body만 받습니다. 모호한 error 인수는 기록 전에 거절합니다. fail은 기존 단일 API의 실패 기록으로 변환하며 원래 서버의 실제 실패 보존 계약은 유지합니다.
+
+총괄의 일반 대화는 기본 1~3문장으로 답하고, 현재 요청에 필요하지 않은 회의·위임·현황 조회를 시작하지 않도록 지침을 축소했습니다. 기록 보존과 모델 입력을 분리해 원본 SessionDB.get_resume_conversations의 display/model 이력을 각각 사용합니다. 원본 무모델 도구 로그 정리는 compression.proactive_prune_tokens=8192, proactive_prune_min_result_chars=2000, proactive_prune_min_reclaim_tokens=1024를 누락된 설정의 기본값으로 연결합니다. 명시한 값(0 포함)이 우선이며 최대 컨텍스트·Thinking·출력 한도는 변경하지 않습니다. 최근 도구 결과와 원문 보관은 원본 compressor의 보호·archive_and_compact 규칙을 따릅니다.
+
+실제 확인: 유휴 총괄 세션에 원본 prune_tool_results_only를 적용해 도구 결과 14개를 입력용 요약으로 정리했습니다. 모델 이력 내용은 JSON 문자 기준 113,862→79,715자(약30% 감소)였고 화면용 원본 도구 내용은 모두 보존됨을 검사했습니다. 추가 모델 호출은 0회입니다. 이는 실제 입력 토큰 수나 응답 시간 측정값이 아닙니다. 짧은 말투·회의 억제 지침의 실제 모델 응답은 아직 재실행하지 않았습니다.

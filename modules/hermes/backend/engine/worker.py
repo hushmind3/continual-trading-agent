@@ -174,7 +174,13 @@ class HermesWorker:
 
     def native_config(self):
         path = HOME / 'config.yaml'
-        return (self.yaml.load(path.read_text(encoding='utf-8')) or {}) if path.exists() else {}
+        config = (self.yaml.load(path.read_text(encoding='utf-8')) or {}) if path.exists() else {}
+        # Native no-LLM compaction; explicit user settings (including 0) win.
+        compression = config.setdefault('compression', {})
+        compression.setdefault('proactive_prune_tokens', 8192)
+        compression.setdefault('proactive_prune_min_result_chars', 2000)
+        compression.setdefault('proactive_prune_min_reclaim_tokens', 1024)
+        return config
 
     def write_config(self, cfg):
         path = HOME / 'config.yaml'
@@ -191,7 +197,7 @@ class HermesWorker:
         row = self.db.get_session(session_id)
         if not row:
             raise ValueError('세션을 찾을 수 없습니다.')
-        return {'session': row, 'messages': self.db.get_messages_as_conversation(session_id)}
+        return {'session': row, 'messages': self.db.get_resume_conversations(session_id)[1]}
 
     def create_session(self, request):
         session_id = uuid.uuid4().hex
@@ -261,7 +267,7 @@ class HermesWorker:
             session_id = row['session']['id']
             if str(row['session'].get('title') or '').startswith('새 대화'):
                 self.db.set_session_title(session_id, self.db.get_next_title_in_lineage(prompt[:60]))
-            history = row['messages']
+            history = self.db.get_resume_conversations(session_id)[0]
         from ai_agent.Hermes.chat.company import prepare
         self.company_links_path = HOME / 'company-links.json'
         cfg['company_instructions'] = prepare(self, cfg, session_id, request.get('workspace'))
@@ -366,6 +372,11 @@ class HermesWorker:
             if self.stopping:
                 self.agent.interrupt(hard_cancel=True)
             from ai_agent.Hermes.chat.autonomy import run
+            # Use Hermes' archived tool-result projection, never trim the DB transcript ourselves.
+            prune = getattr(self.agent.context_compressor, 'prune_tool_results_only', None)
+            if cfg.get('company_instructions') and callable(prune):
+                history, pruned = prune(history)
+                if pruned: self.event('context_pruned', {'tool_results': pruned, 'llm_calls': 0})
             result = run(self,self.agent,cfg,session_id,prompt,history,request or {})
             if result.get('error'):
                 raise RuntimeError(str(result['error']))

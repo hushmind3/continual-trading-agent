@@ -54,4 +54,6 @@ company-v1의 AI 총괄 대화는 별도 iframe 탭 대신 Hermes 기존 채팅�
 
 명시적인 workspace/connect(recipe=company-v1)는 integrations/company.py를 앱 소유 폴더로 복사하고 해시를 검증합니다. 승인→CPO 요구사항→CTO 로컬 MVP→QA 실제 npm test/빌드를 순차 실행하고 실패/검증 자료 부재 시 완료하지 않습니다. 앱 작업 동안 application_activity로 서버 재시작·제거를 보호합니다. 기존 승인 사업은 인증된 ventures/{id}/build로 재개하며 실행 중 호출은 중복 생성하지 않습니다. 로컬 산출물은 앱 소유 workspaces에 저장하고 제거와 함께 처리합니다. 자세한 실제 실행 상태는 integrations/README.md를 따릅니다.
 
-검사: development.tests.test_company_conversation, test_project_workspaces, test_project_harness(27개 통과). 원본 조회·비동기 전송 계약·인증 유지·명시적 승인·삭제/연결 해제 차단·재시작 후 복구를 검증합니다. 실제 모델 답변/사업 실행은 별도이며 이번 통합 검사에서는 호출하지 않았습니다.
+검사: development.tests.test_company_conversation, test_project_workspaces, test_project_harness(28개 통과). 원본 조회·비동기 전송 계약·인증 유지·명시적 승인·삭제/연결 해제 차단·재시작 후 복구를 검증합니다. 실제 모델 답변/사업 실행은 별도입니다. 실제 원본 모델 왕복 자료는 runtime/ai_agent/Hermes/verification/workspace-tabs/live-chat.json에서 구분합니다.
+
+conversation.py의 앱 요청 body는 원본 ASGI 규격에 맞는 JSON 문자열이며 응답 body만 base64로 해석합니다. 잘못된 요청 인코딩으로 발생했던 FastAPI JSON decode error를 실제 호출로 재현하고 수정했습니다. 회귀에는 runtime.invoke→실제 ASGI 자식→FastAPI body 검증→원본 JSON 수신까지 포함하며 모델/인증 응답만 흉내 내는 검사와 구분합니다. 일반 Hermes의 chat/goal/loop를 총괄 API로 전달하지 않고 기존 경로로 유지합니다.

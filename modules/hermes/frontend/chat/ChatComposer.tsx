@@ -9,7 +9,7 @@ import {ThinkingControl} from './ThinkingControl';
 import type {ThinkingMode} from './useThinking';
 export type Attachment = AttachedFile;
 interface Props {
- company?:boolean;
+ company?:boolean;companyAvailable?:boolean;onCompany?:()=>void;
  attachments: Attachment[]; uploading: boolean; upload: (files: File[]) => void; removeAttachment: (path: string) => void;
  composer: RefObject<HTMLTextAreaElement|null>; text: string; draft: (value: string) => void; send: () => void; stop: () => void;
  active: boolean; pending: boolean; stopping: boolean; mode: string; setMode: (value: string) => void;
@@ -36,7 +36,7 @@ export function ChatComposer(props: Props) {
   attachments={<FileChips files={attachments} remove={removeAttachment}/>}
   toolbar={<>
    <Button type="button" variant="ghost" data-composer-action="attach" aria-label="파일 첨부" title="파일 첨부 · 끌어놓기와 붙여넣기도 가능" busy={uploading} disabled={uploading} onClick={() => fileInput.current?.click()}><Paperclip size={18}/></Button>
-   {props.company?<span className="text-xs text-slate-500">AI 총괄 · 승인 후 실행</span>:<label className="ha-mode-select"><Sparkles size={14}/><Select aria-label="실행 방식" title={active?'다음 요청의 실행 방식':'실행 방식'} disabled={pending} value={mode} onChange={event => setMode(event.target.value)}><option value="chat">한 번 실행</option><option value="goal">목표 달성까지</option><option value="loop">반복 실행</option></Select></label>}
+   <label className="ha-mode-select"><Sparkles size={14}/><Select aria-label="실행 방식" title={active?'다음 요청의 실행 방식':'실행 방식'} disabled={pending} value={props.company?'company':mode} onChange={event => event.target.value==='company'?props.onCompany?.():setMode(event.target.value)}><option value="chat">한 번 실행</option><option value="goal">목표 달성까지</option><option value="loop">반복 실행</option>{props.companyAvailable&&<option value="company">AI 총괄 · 승인 후 실행</option>}</Select></label>
    <ToggleSwitch label="읽기 모드" checked={readOnly} onChange={setReadOnly} title={active?'다음 요청부터 적용 · 켜면 파일 읽기·검색만 허용합니다':'켜면 파일 읽기·검색만 허용합니다. 끄면 선택한 도구를 사용할 수 있습니다.'}/>
    <ThinkingControl value={props.thinking} change={props.setThinking} local={props.localThinking} active={active}/>
    <span className="ui-composer-key-hint">{active?'다음 요청을 작성할 수 있습니다':'Enter 전송 · Shift+Enter 줄바꿈'}</span>

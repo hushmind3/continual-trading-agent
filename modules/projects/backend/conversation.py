@@ -13,7 +13,7 @@ def call(key, payload, origin=None):
     def invoke(path, method='GET', body=None, token=None):
         value = {'path': path, 'method': method, 'headers': {'X-Project-Zero-Token': token} if token else {}}
         if body is not None:
-            value['body'] = base64.b64encode(json.dumps(body, ensure_ascii=False).encode()).decode()
+            value['body'] = json.dumps(body, ensure_ascii=False)
             value['headers']['Content-Type'] = 'application/json'
         response = runtime.invoke(record, value, origin)
         result = json.loads(base64.b64decode(response['body']))

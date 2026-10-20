@@ -122,7 +122,7 @@ class HermesWorker:
             if name == 'status' and isinstance(data, (list, tuple)) and data and data[0] == 'lifecycle' and 'Tool guardrail halted' in str(data):
                 self.job['guardrail_halt'] = True
             if name == 'tool_start':
-                self.job['live_text'] = ''
+                self.job['_next_text_block'] = True
                 self.job['phase'] = 'tool'
             elif name == 'tool_complete':self.job['phase'] = 'generating'
 
@@ -130,6 +130,7 @@ class HermesWorker:
         if isinstance(text, str):
             with self.lock:
                 self.job['text'] += text
+                if self.job.pop('_next_text_block', False): self.job['live_text'] = ''
                 self.job['live_text'] = self.job.get('live_text','') + text
                 self.job['phase'] = 'generating'
 
@@ -373,7 +374,8 @@ class HermesWorker:
             focused=cfg.get('application_context_scope')=='focused_discussion'
             if focused:toolsets=[]
             configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'),
-                            direct_surfaces=not bool(cfg.get('company_instructions')))
+                            direct_surfaces=not bool(cfg.get('company_instructions')),
+                            direct_tools=('web_search','web_extract') if cfg.get('company_instructions') else ())
             from ai_agent.Hermes.models.codex import runtime as model_runtime
             self.agent = AIAgent(
                 model=cfg['model'], **model_runtime(cfg), quiet_mode=True,
@@ -397,7 +399,8 @@ class HermesWorker:
                     'When asked to open visible Chrome/Edge, your FIRST tool call MUST be desktop_browser, which launches detached without shell quoting. '
                     'For other visible desktop apps, use PowerShell Start-Process with its exact executable path and return immediately. '
                     'Do not launch GUI apps as blocking terminal commands or wrap them in timeout; terminal cleanup can close their windows. '
-                    'Use computer_use capture in ax mode to verify the visible window once. '
+                    'Only when opening a user-requested visible app, use computer_use capture in ax mode to verify that window once. '
+                    'For web research or reading a URL, use web_search/web_extract first; do not launch a visible app merely to read a page. '
                     'Once the requested app is open, leave it open and finish. Do not close, relaunch or keep polling it. '
                     'If the user closes the app, do not reopen it without a new request. '
                     'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'

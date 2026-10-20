@@ -5,6 +5,7 @@
 - ModelSettings.tsx: 로컬/서버 공통 탭, 실제 적재 상태와 명령 연결.
 - LocalModelPicker.tsx: 이름 검색·모델 선택·파일 경로와 크기 표시. 검색해도 선택을 잃지 않습니다.
 - ModelServerForm.tsx: 서버 주소·키·모델 입력. settings 저장 시 연결 필드만 전달합니다.
+- CodexModelForm.tsx: ChatGPT · Codex 탭의 로그인 코드·완료 상태·모델 목록과 선택을 담당합니다. 원본 Hermes 인증을 사용하는 codex/status·codex/login·codex/models API에 연결하며 ‘이 모델 사용’에서만 provider/model을 저장합니다. 로그인 토큰은 프론트에 전달하지 않습니다. 실제 첫 응답 완료 전 모델 목록만으로 추론 성공을 표시하지 않습니다.
 - ../useAgentSettings.ts: 설정 조회·실패 후 다시 불러오기.
 - 공통 ui/SettingsSection·Primitives: 패널·읽기 실패·입력·키보드 탭.
 

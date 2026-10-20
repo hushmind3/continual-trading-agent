@@ -11,6 +11,15 @@
 - AIAgent의 출력 한도는 모델 설정의 max_output_tokens로 제어합니다. 0이면 원본 기본값이고, 양수이면 원본 agent.max_tokens로 다음 요청부터 전달합니다. 컨텍스트/Thinking과 별도이며 숨겨진 고정 한도는 없습니다. reasoning은 원본 정책과 사용자의 Thinking 설정을 따릅니다.
 - 외부 실행기를 사용하려면 OpenAI 호환 주소·모델을 저장합니다. 키는 로컬 설정에 저장하며 응답에 반환하지 않습니다.
 
+## ChatGPT · Codex 연결
+
+`codex.py`는 이식된 원본 Hermes의 `openai-codex` 인증·모델 목록·Responses 전송을 연결합니다. 모델 화면의 ChatGPT 로그인은 원본 device-code 흐름을 사용하고 `runtime/ai_agent/Hermes/auth.json`에 독립 인증을 보관합니다. Codex 앱의 인증 파일이나 회전용 refresh token을 복사하지 않습니다. 코드 입력·계정 승인은 사용자가 브라우저에서 완료합니다. 별도 API 키를 요구하지 않으며 계정의 이용 한도와 모델 접근 권한을 따릅니다.
+
+단일 `/api`의 `ai_agent/Hermes/codex/status`(GET), `codex/login`(POST), `codex/models`(POST)를 사용합니다. settings의 provider는 기존 `custom` 또는 `openai-codex`이며 후자는 원본 `codex_responses`를 선택합니다. 조회/로그인만으로 현재 모델은 바뀌지 않고 ‘이 모델 사용’에서 적용합니다. 로컬 GGUF를 다시 불러오면 custom 연결로 복귀합니다. 대화·회사 기록·기억·도구·승인·Goal/Loop는 기존 Hermes 경로를 사용하고 판정용 보조 호출도 선택 제공자를 따릅니다. 모델 목록의 캐시/후보 여부와 실제 첫 추론 성공을 구분합니다.
+
+확인: `modules/hermes/.venv/Scripts/python.exe -X utf8 -B -m unittest development.tests.test_hermes_codex -q`로 제공자 전송·인증 호스트·토큰 비노출·원본 인증 저장 경계를 확인합니다. 실제 로그인과 계정 모델의 응답 성공은 별도 실사용 단계입니다.
+2026-10-20 확인: 위 연결 검사 7개, 회사/텔레메트리 회귀 28개, TypeScript를 통과했습니다. 원본 엔진 검사 18개 중 기존 총괄 지침의 옛 문구를 기대하던 1개를 현재 native 세션 의미에 맞게 정정하고 해당 항목 재실행을 통과했습니다. 브라우저의 연결 탭을 확인했고 JS 오류/가로 넘침은 없었습니다(상태 응답은 픽스처). 이후 실행 중 작업 종료 뒤 실제 서버에 적용하고 독립 worker의 인증 상태 조회 및 실제 OpenAI device-code 요청 응답까지 확인했습니다. 계정 승인은 대기 중이며 실제 GPT 추론·9B와 결과물 비교는 아직 실행하지 않았습니다. 인증 코드·토큰은 문서/검사 출력에 보관하지 않습니다.
+
 2026-10-16: Qwen3.5-0.8B GGUF를 실제로 불러와 RTX 3070의 Vulkan 백엔드에서 파일 도구 호출·파일 생성·한국어 응답을 확인했습니다. 이 결과가 모든 모델의 도구 사용 능력을 보증하지는 않습니다.
 
 ## Ornith 실제 추론 측정 (2026-10-16)

@@ -32,10 +32,10 @@ def context_window(native: dict, model: str) -> int:
     return configured or 0
 
 
-def bind_model(native: dict, model: str, base_url: str, context: int) -> dict:
+def bind_model(native: dict, model: str, base_url: str, context: int, provider: str = 'custom') -> dict:
     section = native.get('model') or {}
     config = {**native, 'model': dict(section) if isinstance(section, dict) else {}}
-    config['model'].update(default=model, provider='custom', base_url=base_url)
+    config['model'].update(default=model, provider=provider, base_url=base_url)
     if context:
         config['model']['context_length'] = context
     else:

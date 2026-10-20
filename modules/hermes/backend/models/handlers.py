@@ -3,6 +3,15 @@ from ai_agent.Hermes.engine.http_adapter import invoke
 
 router = APIRouter(prefix='/api/ai_agent/Hermes')
 
+@router.get('/codex/status')
+def codex_status(): return invoke('codex/status')
+
+@router.post('/codex/login')
+def codex_login(): return invoke('codex/login')
+
+@router.post('/codex/models')
+def codex_models(): return invoke('codex/models')
+
 @router.get('/settings')
 def settings(): return invoke('settings')
 

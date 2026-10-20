@@ -40,7 +40,8 @@ def update(worker):
         if context:
             metrics['context_limit']=getattr(context,'context_length',None)
             metrics['context_tokens']=max(0,getattr(context,'last_prompt_tokens',0) or 0) or metrics.get('context_tokens')
-    if worker.model_process and worker.model_process.poll() is None and now-getattr(worker,'_slot_checked',0)>.8:
+    local = worker.job.get('local_inference', True)
+    if local and worker.model_process and worker.model_process.poll() is None and now-getattr(worker,'_slot_checked',0)>.8:
         worker._slot_checked=now
         try:
             with urlopen(worker.model_base.removesuffix('/v1')+'/slots',timeout=.35) as response:
@@ -56,7 +57,7 @@ def update(worker):
                     worker._slot_sample=(slot.get('id_task'),decoded,now)
                 else:worker._slot_sample=None
         except (OSError,ValueError,TypeError,KeyError):pass
-    if worker.model_process and worker.model_process.poll() is None:
+    if local and worker.model_process and worker.model_process.poll() is None:
         try:
             rate = local_timing(worker)
             if rate is not None: metrics['generation_tps'] = rate

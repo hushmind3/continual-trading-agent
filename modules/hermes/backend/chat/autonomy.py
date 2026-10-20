@@ -18,8 +18,9 @@ def run(worker,agent,cfg,session_id,prompt,history,request):
     from hermes_cli.goals import GoalManager,goal_kick_prompt,last_user_message_content
     from hermes_cli.loops import LoopManager
     native=worker.native_config()
-    native.setdefault('auxiliary',{}).setdefault('goal_judge',{}).update({'provider':'custom','model':cfg['model'],
-        'base_url':cfg['base_url'],'api_key':cfg.get('api_key') or 'local'})
+    provider=cfg.get('provider','custom')
+    native.setdefault('auxiliary',{}).setdefault('goal_judge',{}).update({'provider':provider,'model':cfg['model'],
+        'base_url':cfg['base_url'],'api_key':'' if provider=='openai-codex' else cfg.get('api_key') or 'local'})
     from ai_agent.Hermes.engine.runtime_policy import auxiliary_thinking, model_options
     auxiliary_thinking(native,cfg,model_options(cfg,native))
     worker.write_config(native)

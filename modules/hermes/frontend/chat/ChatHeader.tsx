@@ -14,7 +14,7 @@ interface Props {
 }
 export function ChatHeader(props:Props){
  const {sessionsOpen,sessionButton,title,shownModel,modelReady,modelState,metrics,onModels,toggleSessions}=props;
- const state=modelReady?'실행 중':modelState==='loading'?'불러오는 중':modelState==='error'?'연결 오류':'미실행';
+ const state=modelReady?'실행 중':modelState==='remote'?'외부 모델':modelState==='login_required'?'로그인 필요':modelState==='loading'?'불러오는 중':modelState==='error'?'연결 오류':'미실행';
  return <header className="hermes-chat-heading">
   <IconButton ref={sessionButton} title="대화 기록" aria-label={sessionsOpen?'대화 기록 접기':'대화 기록 열기'} aria-expanded={sessionsOpen} aria-controls="hermes-session-sidebar" onClick={toggleSessions}><PanelLeft size={19}/></IconButton>
   <div className="hermes-chat-title"><h2>헤르메스</h2><p title={title}>{title}</p></div>

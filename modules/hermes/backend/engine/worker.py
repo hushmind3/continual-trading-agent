@@ -55,7 +55,7 @@ from ai_agent.Hermes.engine.execution import bind_model, context_window, request
 from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, auxiliary_thinking, apply_response_contract, application_generation, apply_application_generation, discussion_prompt, bind_discussion_context
 
 SETTINGS = HOME / 'platform-settings.json'
-DEFAULTS = {'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
+DEFAULTS = {'provider': 'custom', 'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
             'workspace': str(ROOT), 'max_iterations': 100,
             'toolsets': ['terminal', 'file', 'todo', 'skills'], 'local_model': '', 'system_prompt': '', 'read_only': False,
             'model_options': {}, 'tool_loading': 'native'}
@@ -92,6 +92,8 @@ class HermesWorker:
         self.approval_lock = threading.Lock()
         from ai_agent.Hermes.mcp.catalog import Catalog
         self.catalog = Catalog(self)
+        from ai_agent.Hermes.models.codex import CodexConnection
+        self.codex = CodexConnection()
         # AX results work with local text/tool models without a separate vision projector.
         cfg = self.native_config()
         cfg.setdefault('computer_use', {}).setdefault('capture_after_mode', 'ax')
@@ -162,6 +164,20 @@ class HermesWorker:
         if not isinstance(cfg['toolsets'], list) or any(t not in self.public_settings()['available_toolsets'] for t in cfg['toolsets']):
             raise ValueError('지원하지 않는 도구 묶음입니다.')
         cfg=save_options(cfg,request)
+        if cfg.get('provider') not in ('custom', 'openai-codex'):
+            raise ValueError('지원하지 않는 모델 제공자입니다.')
+        if cfg.get('provider') == 'openai-codex':
+            if not self.codex.status()['connected']:
+                raise ValueError('모델 설정에서 ChatGPT 로그인을 완료하세요.')
+            cfg['local_model'] = ''
+            from hermes_cli.auth_constants import DEFAULT_CODEX_BASE_URL
+            cfg['base_url'] = DEFAULT_CODEX_BASE_URL
+        if any(key in request for key in ('provider', 'model', 'base_url')):
+            native = self.native_config()
+            if cfg.get('provider') == 'openai-codex':
+                native.setdefault('auth', {})['adopt_external_logins'] = False
+            self.write_config(bind_model(native, cfg['model'], cfg['base_url'],
+                model_options(cfg, native)['context_length'], cfg.get('provider', 'custom')))
         atomic_json(SETTINGS, cfg)
         return self.public_settings()
 
@@ -272,7 +288,8 @@ class HermesWorker:
         self.company_links_path = HOME / 'company-links.json'
         cfg['company_instructions'] = prepare(self, cfg, session_id, request.get('workspace'))
         with self.lock:
-            self.job = {'state': 'starting', 'application': internal, 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time()}
+            self.job = {'state': 'starting', 'application': internal, 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time(),
+                        'local_inference': bool(cfg.get('local_model')) and cfg['base_url'] == self.model_base}
             if getattr(self, 'company_link', None): self.job['company_id'] = self.company_link['id']
         self.thread = threading.Thread(target=self.run_chat, args=(cfg, session_id, prompt, history, request), daemon=True)
         from ai_agent.Hermes.chat.telemetry import begin
@@ -322,9 +339,9 @@ class HermesWorker:
             focused=cfg.get('application_context_scope')=='focused_discussion'
             if focused:toolsets=[]
             configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'))
+            from ai_agent.Hermes.models.codex import runtime as model_runtime
             self.agent = AIAgent(
-                model=cfg['model'], base_url=cfg['base_url'], api_key=cfg.get('api_key') or 'local',
-                provider='custom', api_mode='chat_completions', quiet_mode=True,
+                model=cfg['model'], **model_runtime(cfg), quiet_mode=True,
                 session_id=session_id, session_db=None if cfg.get('application_request') else self.db, platform='application' if cfg.get('application_request') else 'platform',
                 enabled_toolsets=toolsets, max_iterations=cfg['max_iterations'], cwd=cfg['workspace'],
                 # Read-only and focused app discussions avoid unrelated shared-memory review writes.
@@ -434,7 +451,10 @@ class HermesWorker:
             model['state'] = 'failed'
             model['error'] = '로컬 모델 프로세스가 종료됐습니다. local-model.log를 확인하세요.'
         installing=getattr(getattr(self,'catalog',None),'thread',None)
-        return {'job': job, 'local_model': model,
+        cfg = load_settings()
+        connection = ('remote' if self.codex.status()['connected'] else 'login_required') if cfg.get('provider') == 'openai-codex' else ('remote' if cfg.get('model') and not cfg.get('local_model') else model['state'])
+        return {'job': job, 'local_model': model, 'codex_login': dict(self.codex.login),
+            'model_connection': {'provider': cfg.get('provider', 'custom'), 'state': connection},
             'mcp_installation':{'state':'running' if installing and installing.is_alive() else 'idle'}}
 
     def stop(self, session_id=None):
@@ -500,7 +520,7 @@ class HermesWorker:
         self._slot_sample=None
         with self.lock:self.job.pop('metrics',None)
         self.write_config(bind_model(native, alias, self.model_base, context_length))
-        self.save_settings({'base_url': self.model_base, 'model': alias, 'local_model': str(path)})
+        self.save_settings({'provider': 'custom', 'base_url': self.model_base, 'model': alias, 'local_model': str(path)})
         return self.status()
 
     def unload_model(self):
@@ -565,6 +585,9 @@ class HermesWorker:
                 and name.split('.')[0] in {'agent', 'tools', 'hermes_cli', 'run_agent', 'model_tools', 'pm', 'gateway'}}}
         if operation == 'settings': return self.public_settings()
         if operation == 'settings/save': return self.save_settings(payload)
+        if operation == 'codex/status': return self.codex.status()
+        if operation == 'codex/login': return self.codex.start()
+        if operation == 'codex/models': return self.codex.models()
         if operation == 'models':
             with self.model_client(payload) as client:
                 return {'models': [{'id': row.id} for row in client.models.list().data]}

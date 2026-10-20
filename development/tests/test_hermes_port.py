@@ -179,7 +179,7 @@ class HermesPortTests(unittest.TestCase):
         self.assertTrue(any('HISTORICAL_OWNER_CONTEXT' in json.dumps(c['messages']) for c in calls))
         names={t['function']['name'] for c in calls for t in c.get('tools',[])}
         self.assertIn('company_records',names);self.assertIn('project_npm',names);self.assertIn('write_file',names)
-        self.assertTrue(any('persistent native Hermes session' in json.dumps(c['messages']) for c in calls))
+        self.assertTrue(any('native Hermes session' in json.dumps(c['messages']) for c in calls))
         self.assertEqual(ModelFixture.company_requests[-1]['payload']['session_id'],first)
         history=self.bridge.call('session',{'id':first})['messages']
         self.bridge.close()

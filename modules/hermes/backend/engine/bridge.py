@@ -36,6 +36,7 @@ class WorkerBridge:
             if state.get('mcp_installation',{}).get('state') in ('starting','running'):
                 return '실행 중인 헤르메스 MCP 설치'
             if state.get('local_model',{}).get('state')=='loading':return '헤르메스 로컬 모델 불러오는 중'
+            if state.get('codex_login',{}).get('state')=='pending':return 'ChatGPT 로그인 진행 중'
         except (RuntimeError,ValueError):return '헤르메스 실행 상태 확인 실패; 재시작 보류'
         return ''
 

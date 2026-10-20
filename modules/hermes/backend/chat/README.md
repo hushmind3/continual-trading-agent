@@ -15,6 +15,7 @@ HTTP start/status/stop adapters call the original AIAgent in the isolated worker
 현재 native 총괄은 application_plan_only/application_request/focused_discussion을 사용하지 않습니다. 외부 provider 호환 경로는 다른 앱을 위해 유지합니다.
 
 Frontend modes: one turn, work toward a goal, recurring task. /goal <task>, /goal resume, /loop <interval> <task>, /loop resume and /stop also use the same paths. Tool approval and user-question callbacks remain interactive.
+모델 제공자는 모델 설정의 custom/OpenAI 호환 또는 openai-codex/ChatGPT 연결을 따릅니다. 같은 native 세션·도구·기억을 유지하며 Goal 판정도 선택 제공자로 연결합니다. 별도 Codex 실행 루프나 회사 DB를 만들지 않습니다. 연결/검증 범위는 [모델 안내](../models/README.md)를 참고합니다.
 
 Goals stop when judged done, blocked, interrupted or budget-limited. Loops stop on the native completion marker, requested count, until criterion or native backstop. Intervals are clamped to the original minimum (30 seconds by default); self-paced mode starts at 60 seconds and backs off on unchanged responses. A model can signal completion before the requested count. Zero count uses the native 100-tick backstop, rather than implying unlimited work.
 

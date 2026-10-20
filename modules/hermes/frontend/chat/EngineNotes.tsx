@@ -16,6 +16,7 @@ export function EngineNotes({messages}: {messages: Message[]}) {
 }
 
 export function displayEngineResponse(text:string){
+ if(text.startsWith('Model output entered a repetition loop'))return '모델이 같은 출력을 반복해 응답 생성을 중단했습니다. 요청 처리는 완료되지 않았습니다. 저장된 발언과 작업 기록은 유지됩니다.';
  const stopped=/^I stopped retrying because I kept running ([\w.-]+) (\d+) times without making progress\./.exec(text);
  return stopped?`${toolLabel(stopped[1])} 요청이 같은 원인으로 ${stopped[2]}회 반복 실패해 멈췄습니다. 작업은 완료되지 않았습니다. 실행 과정을 펼쳐 오류를 확인하고 요청 내용을 수정해 주세요.`:text;
 }

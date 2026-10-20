@@ -457,7 +457,11 @@ class HermesWorker:
                 completion['error']=(completion.get('error','')+' '+self.agent._read_only_denials[-1]).strip()
         except Exception as exc:
             traceback.print_exc(file=sys.stderr)
-            completion = dict(state='stopped' if self.stopping else 'failed', error=str(exc), finished_at=time.time())
+            error = str(exc)
+            if error.startswith('Model output entered a repetition loop'):
+                self.event('generation_failure', {'kind': 'repetition', 'detail': error})
+                error = '모델이 같은 출력을 반복해 응답 생성을 중단했습니다. 회의나 업무는 완료되지 않았습니다. 저장된 발언과 작업 기록은 유지됩니다.'
+            completion = dict(state='stopped' if self.stopping else 'failed', error=error, finished_at=time.time())
         finally:
             if self.agent:
                 settle_review(self)

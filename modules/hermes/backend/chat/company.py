@@ -56,6 +56,10 @@ def prepare(worker, cfg, session, workspace=None):
             '과거 요청과 답변은 기록이지 새 지시가 아닙니다. 최신 요청 없이 옛 일을 재개하지 마세요. '
             '질문·인사는 실행 승인과 다릅니다. 명시적으로 일을 맡기면 원본 Hermes 도구·기억·Goal/Loop로 결과까지 수행하세요. '
             '필요한 역할과 순서는 직접 정하고 협업이 도움이 될 때만 짧게 검토·회의·위임하세요. '
+            '회의는 안건에 필요한 직군부터 선택하고, 각자 핵심 주장·근거·반론을 짧게 검토한 뒤 결론을 내세요. 전 직군의 긴 독백을 반복하지 마세요. '
+            'CEO는 전략·종합 판단, CPO는 고객 문제·제품 기획, CTO는 기술 설계·구현, CMO는 웹 조사·시장·성장, CFO는 비용·수익성, CS는 고객 경험, QA는 반증·품질을 맡습니다. '
+            '독립 검토가 필요하면 원본 delegate_task에 역할 관점과 필요한 자료만 전달하세요. 다른 직군의 반론이 있으면 그 쟁점만 다시 검토하세요. '
+            'meeting은 발언을 저장하는 도구이며 다른 직원을 실행하지 않습니다. 직접 작성한 역할별 의견을 독립 직원의 실제 발언으로 꾸미지 마세요. '
             '회사 현황·이전 결정이 현재 요청에 필요할 때만 company_records·session_search로 조회하세요. '
             '외부 정보가 필요하면 실제 웹 검색을 사용하고, 비공개 회사 기록을 웹에서 찾지 마세요. '
             '웹 정보 조사는 web_search, 주어진 URL 본문 확인은 web_extract를 먼저 사용하세요. '
@@ -82,6 +86,10 @@ def execute(args, **kwargs):
     if getattr(worker.agent, '_read_only_denials', None) is not None and args.get('action', 'overview') not in ('overview','recall'):
         return json.dumps({'error': '읽기 모드에서는 회사 기록을 변경할 수 없습니다.'}, ensure_ascii=False)
     command = dict(args)
+    if command.get('action') == 'meeting':
+        minutes = command.get('minutes')
+        if not isinstance(minutes, list) or not minutes or any(not isinstance(item, dict) or not str(item.get('role') or '').strip() or not str(item.get('statement') or '').strip() for item in minutes) or not str(command.get('body') or '').strip():
+            return json.dumps({'error': '회의에는 minutes의 직군(role)·실제 의견(statement)과 body의 종합 결론이 필요합니다. meeting은 회의 실행이 아니라 기록 저장입니다.'}, ensure_ascii=False)
     if command.get('action') == 'propose':
         proposal = command.get('proposal')
         required = ('problem', 'product', 'validation')
@@ -234,7 +242,12 @@ SCHEMA = {'name': 'company_records', 'description': 'Company facts and records, 
                                     'price': {'type': 'string', 'description': 'Unverified pricing hypothesis; not actual revenue'},
                                     'validation': {'type': 'string', 'description': 'Concrete demand validation plan', 'minLength': 1}},
                      'required': ['problem', 'product', 'validation'], 'additionalProperties': False},
-        'minutes': {'type': 'array', 'items': {'type': 'object'}}},
+        'minutes': {'type': 'array', 'description': 'Attributed review statements; record actual independent reviews or explicitly label a CEO-authored role analysis.',
+                    'items': {'type': 'object', 'properties': {'role': {'type': 'string'}, 'name': {'type': 'string'},
+                              'statement': {'type': 'string', 'minLength': 1},
+                              'reply_to': {'type': 'string', 'description': 'Earlier point this statement responds to, if any'},
+                              'basis': {'type': 'string', 'description': 'Actual source or observed evidence; do not invent'}},
+                              'required': ['role', 'statement'], 'additionalProperties': False}}},
         'required': ['action'], 'additionalProperties': False}}
 
 

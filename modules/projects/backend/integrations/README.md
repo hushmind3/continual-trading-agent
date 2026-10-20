@@ -15,3 +15,7 @@
 recall/remember 기존 기록 재사용: 새 DB·새 테이블·별도 임베딩 서버 없이 기존 ventures/jobs/ceo_meetings/ceo_experiences/ceo_lessons를 조회합니다. remember는 원래 record_lesson을 사용하며 origin에 종류·사업 ID·주제 키를 저장합니다. 같은 키의 새 결정이 이전 결정을 대체해 회상되지만 원문은 삭제하지 않습니다. 조회는 관련 사업과 조직 공통 결정/제약으로 제한하며 4,200자 이하로 반환합니다. finish는 원래 경험 기록 함수를 사용해 실제 성공/실패를 남깁니다. 기존 레코드 인증과 단일 /api는 그대로입니다.
 
 확인: 원본 회사 ASGI/DB 및 native 연결 관련 26개 검사로 오래된 결정 조회·정정 우선·사업 범위 분리·미완료/실패 계승·새 테이블 없음·원문 보존·직접 Git 승인·활성 문맥 중복 제외를 확인합니다. 실제 서버의 기존 견적서 사업 회상도 추가 모델 호출 없이 확인했습니다. 실제 9B 응답의 길이/회의 빈도와 모든 자연어의 회상 정확도를 보장하는 검사는 아닙니다.
+
+회의 탭 연결(2026-10-21): ../conversation.py의 읽기 전용 meetings 액션이 기존 앱의 인증된 /api/admin/meetings, /api/admin/hermes/records(overview), /api/admin/team을 단일 플랫폼 API로 조회합니다. 기존 ceo_meetings와 jobs를 그대로 사용하며 원본 회의 실행 API를 호출하지 않습니다. 직군 정의는 원본 앱에서 취합하고 프론트에 직원 목록을 복제하지 않습니다.
+
+회의 조회 실제 확인: 기존 설치본의 meetings 응답으로 회의 1개와 원본 role/statement, TEAM_ROLES 7개, 기존 jobs 12개를 반환했습니다. 설치본 원본·DB를 재생성하거나 회의 실행 API를 호출하지 않았습니다.

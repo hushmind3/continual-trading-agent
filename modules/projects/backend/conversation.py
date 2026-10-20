@@ -53,6 +53,11 @@ def call(key, payload, origin=None):
         return invoke('/api/admin/hermes/records', 'POST', command, token)
     if action == 'send':
         raise ValueError('AI 총괄은 Hermes 영구 세션의 chat/goal/loop를 사용합니다.')
+    if action == 'meetings':
+        meetings = invoke('/api/admin/meetings', token=token)
+        records = invoke('/api/admin/hermes/records', 'POST', {'action': 'overview'}, token)
+        team = invoke('/api/admin/team', token=token)
+        return {**meetings, **team, 'session_id': native_id, 'jobs': records.get('jobs', [])}
     if action == 'decision':
         venture = str(payload.get('venture_id', ''))
         if not re.fullmatch('[A-Za-z0-9_-]{1,100}', venture) or not isinstance(payload.get('approve'), bool):

@@ -38,14 +38,17 @@ def configure_tools(worker, mode, *, direct_surfaces=True):
     from hermes_cli.config_defaults import DEFAULT_CONFIG
     from tools.registry import registry
     from tools.tool_search import _DIRECT_SURFACE_TOOLSETS
+    from copy import deepcopy
     native=worker.native_config()
+    before=deepcopy(native)
     search=native.setdefault('tools',{}).setdefault('tool_search',{})
     search['enabled']='off' if mode=='eager' else 'auto'
     # Explicitly direct surfaces remain callable without discovery round trips.
     search['defer']=sorted(name for name, toolset in registry.get_tool_to_toolset_map().items()
                            if not direct_surfaces or toolset not in _DIRECT_SURFACE_TOOLSETS) if mode=='lazy' else (
         list(DEFAULT_CONFIG['tools']['tool_search']['defer']) if mode=='native' else [])
-    worker.write_config(native)
+    if native!=before:
+        worker.write_config(native)
 
 def apply_thinking(agent, options, local):
     if not local or options['thinking_mode']=='auto':return

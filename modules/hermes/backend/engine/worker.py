@@ -417,8 +417,8 @@ class HermesWorker:
                 history, pruned = prune(history)
                 if pruned: self.event('context_pruned', {'tool_results': pruned, 'llm_calls': 0})
             if cfg.get('company_instructions'):
-                from ai_agent.Hermes.chat.company import prime_context
-                history = prime_context(self, self.agent, history, prompt)
+                from ai_agent.Hermes.chat.company import prepare_history
+                history = prepare_history(self, self.agent, history)
             result = run(self,self.agent,cfg,session_id,prompt,history,request or {})
             if result.get('error'):
                 raise RuntimeError(str(result['error']))

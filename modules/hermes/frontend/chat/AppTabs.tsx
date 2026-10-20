@@ -17,8 +17,6 @@ export function AppTabs({children,onModels,modelName,modelState,status}:{status?
  const shareEngine=()=>frame.current?.contentWindow?.postMessage({type:'hermes-engine-state',modelName,modelState},location.origin);
  useEffect(()=>{shareEngine()},[modelName,modelState,selected]);
  const companies=tabs.filter(t=>t.conversation&&t.view==='talk').map(t=>({id:t.id.split(':')[0],session_id:t.session_id,title:'AI 총괄 · '+t.title.replace('AI 총괄 대화','회사 운영')}));
- const openedMeeting=useRef('');
- useEffect(()=>{const meeting=status?.job.meeting;if(meeting?.id&&meeting.status==='running'&&openedMeeting.current!==meeting.id+':'+meeting.run_id&&companies.some(item=>item.id===meeting.company_id)){openedMeeting.current=meeting.id+':'+meeting.run_id;setSelected('meetings')}},[status?.job.meeting?.id,status?.job.meeting?.run_id,status?.job.meeting?.status,tabs]);
  const shownTabs=tabs.filter(t=>!(t.conversation&&t.view==='talk'));
  const select=(view:string)=>frame.current?.contentWindow?.postMessage({type:'platform:workspace-select',view},location.origin);
  useEffect(()=>{if(tab){setMounted(true);select(tab.view)}else if(selected!=='chat'&&selected!=='meetings')setSelected('chat')},[selected,tabs]);

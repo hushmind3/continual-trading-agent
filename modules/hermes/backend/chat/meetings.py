@@ -38,7 +38,7 @@ def run(worker, args):
                 publish(worker, id=item['meeting_id'], company_id=worker.company_link['id'], topic=item['topic'], run_id=worker.job.get('owner_request_id',''), status='running', role='', text='', turn_id='', turn_status='', venture_id='')
                 owner_message(worker, worker.job.get('owner_message',''), 'owner-'+worker.job.get('owner_request_id',uuid.uuid4().hex))
                 worker.event('meeting_started', {'id':item['meeting_id'], 'topic':item['topic']})
-                return json.dumps({'meeting_id':item['meeting_id'], 'topic':item['topic'], 'roles':item['roles'], 'instruction':'Choose a relevant role and call speak. Do not call company_records meeting or generate minutes yourself.'}, ensure_ascii=False)
+                return json.dumps({'meeting_id':item['meeting_id'], 'topic':item['topic'], 'roles':item['roles'], 'instruction':'당신은 회의를 맡은 총괄입니다. 대표의 참석이나 다음 진행 지시를 기다리지 말고 필요한 직군을 speak로 호출해 토론을 진행한 뒤 finish로 보고를 제출하세요. 회사 기록 도구로 회의를 중복 생성하거나 직원 발언을 지어내지 마세요.'}, ensure_ascii=False)
             key = args.get('meeting_id') or worker.job.get('meeting', {}).get('id')
             item = records(worker, {'action':'meeting_read', 'meeting_id':key})
             if item['status'] != 'running': raise ValueError('종료된 회의입니다. 새 안건은 start로 등록하세요.')
@@ -56,7 +56,7 @@ def run(worker, args):
             publish(worker, status='completed', role='CEO', text=summary, turn_id='', turn_status='', source_session_id='', venture_id=venture)
             worker.event('meeting_finished', {'id':key, 'venture_id':venture})
             return json.dumps({'meeting_id':key, 'status':result['status'], 'summary':summary, 'venture_id':venture, 'approval':'pending' if venture else None,
-                               'instruction':'대표에게 핵심 결론과 승인할 사항만 한국어 두세 문장으로 보고하세요. 발언 전문·기록 ID·상태 코드를 나열하지 마세요.'}, ensure_ascii=False)
+                               'instruction':'총괄 대화에 대표가 검토할 요약 보고를 바로 제출하세요. 결론·핵심 근거·남은 위험·승인할 사항만 짧게 종합하고 대표에게 회의 참석이나 진행을 요구하지 마세요. 직원 발언 전문·기록 ID·상태 코드를 나열하지 마세요.'}, ensure_ascii=False)
     except Exception as exc:
         return json.dumps({'error':str(exc)}, ensure_ascii=False)
 
@@ -70,13 +70,14 @@ def speak(worker, item, args):
     if not person: raise ValueError('start가 반환한 직군 중에서 발언자를 선택하세요.')
     key = item['meeting_id']; turn_id = uuid.uuid4().hex
     focus = str(args.get('focus') or '안건의 핵심 쟁점을 검토하고 앞선 의견의 빈틈이나 개선점을 답하세요.')
-    previous = '\n'.join(turn.get('role','')+': '+turn.get('statement','') for turn in item['minutes'] if turn.get('statement'))
+    previous = '\n'.join(turn.get('role','')+': '+turn.get('statement','') for turn in item['minutes'] if turn.get('statement') and turn.get('role') != 'OWNER')
+    directives = '\n'.join(turn.get('statement','') for turn in item['minutes'] if turn.get('role') == 'OWNER')
     goal = (f"당신은 {person['role']}({person['title']})입니다. 담당 관점: {person['description']}\n"
             f"현재 회의 안건: {item['topic']}\n이번 쟁점: {focus}\n"
             '동료에게 말하듯 쉬운 한국어로 2~3문장만 답하세요. 보고서 목차와 불필요한 외국어를 쓰지 마세요. 앞선 의견을 받아 동의·반론·수정안을 구체적으로 말하세요. '
             '근거가 없으면 불확실성을 밝히고 필요할 때만 웹으로 확인하세요. 회의록/보고서를 쓰거나 다른 역할을 연기하지 마세요. '
             '파일 수정·제품 제작·Git·결제·외부 공개·추가 직원 위임은 하지 마세요.')
-    child = _build_child_agent(task_index=len(item['minutes']), goal=goal, context='앞선 실제 발언:\n'+(previous or '아직 없습니다.'),
+    child = _build_child_agent(task_index=len(item['minutes']), goal=goal, context='대표 지시(참가 발언이 아님):\n'+directives+'\n앞선 직원 발언:\n'+(previous or '아직 없습니다.'),
                                toolsets=['web'], model=None, max_iterations=worker.agent.max_iterations, task_count=1, parent_agent=worker.agent)
     turn = {'id':turn_id, 'role':person['role'], 'name':person['title'], 'statement':'', 'status':'speaking',
             'source':'hermes_delegate', 'source_session_id':child.session_id, 'reply_to':focus, 'created_at':time.time()}
@@ -104,7 +105,7 @@ def speak(worker, item, args):
         records(worker, {'action':'meeting_turn', 'meeting_id':key, 'turn':turn})
         publish(worker, text=final, turn_status='completed')
         return json.dumps({'meeting_id':key, 'role':person['role'], 'statement':final, 'source_session_id':child.session_id,
-                           'instruction':'Choose the next role or ask a previous role to respond to this statement. Finish when the issue is resolved; do not force every role to speak.'}, ensure_ascii=False)
+                           'instruction':'총괄이 직접 다음 담당자나 재반론을 선택해 이어가세요. 대표에게 다음 발언자·순서·참석을 묻지 마세요. 충분히 검토했으면 finish로 결론을 제출하세요. 모든 직군의 발언을 강제하지 마세요.'}, ensure_ascii=False)
     except Exception as exc:
         publish(worker, turn_status='failed', error=str(exc))
         turn.update(status='failed', error=str(exc))
@@ -135,7 +136,7 @@ def owner_message(worker, message, turn_id=None):
     if not message or not item.get('id') or item.get('status') != 'running': return
     try:
         records(worker, {'action':'meeting_turn', 'meeting_id':item['id'], 'turn':{
-            'id':turn_id or uuid.uuid4().hex, 'role':'OWNER', 'name':'대표', 'statement':message,
-            'status':'completed', 'source':'owner', 'source_session_id':worker.job['session_id'], 'created_at':time.time()}})
+            'id':turn_id or uuid.uuid4().hex, 'role':'OWNER', 'name':'대표 지시', 'statement':message,
+            'status':'completed', 'source':'owner_instruction', 'source_session_id':worker.job['session_id'], 'created_at':time.time()}})
     except Exception as exc:
         worker.event('meeting_record_error', {'error':str(exc)})

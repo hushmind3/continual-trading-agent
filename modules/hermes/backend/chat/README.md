@@ -2,6 +2,8 @@
 
 HTTP start/status/stop adapters call the original AIAgent in the isolated worker. Chat runs once. Goal and recurring modes use the original hermes_cli.goals.GoalManager and hermes_cli.loops.LoopManager; autonomy.py only drives these managers and forwards progress. The original auxiliary goal judge uses the selected model endpoint.
 
+조직 회의는 대표가 총괄에게 맡기는 업무입니다. 총괄이 조사·직군 선택·토론·결론 작성을 추가 진행 지시 없이 이어가고, 기존 총괄 대화에 결론·근거·위험·승인할 사항을 짧게 보고합니다. 직원 토론은 선택적으로 관찰하며 대표 지시는 참가 발언과 구분합니다. 초안 승인·보류·수정은 기존 경로를 사용하고 승인 전 실행하지 않습니다. 일반 대화의 실행 방식은 변경하지 않습니다.
+
 총괄은 대표의 비서·CEO라는 한국어 역할 지침으로 질문에 짧게 답하고, 명시적으로 맡긴 작업·승인에만 실행·회의·위임을 사용합니다. 역할은 공통 사용자 지침을 보존한 뒤 적용하며 호칭을 현황 요약 명령으로 혼동하지 않도록 구분합니다. 회사 overview·제품 진행·과거 기억을 매 요청에 자동 조회하거나 시스템 지침에 넣지 않습니다. 현재 질문에 회사 기록이나 이전 결정이 필요할 때만 기존 company_records·session_search로 조회합니다. 특정 한국어 인사 목록으로 분기하지 않으며 원본 도구·기억 기능은 유지합니다.
 큰 총괄 문맥은 원본 ContextCompressor의 작업 예산·보호된 최근 대화·도구 묶음 경계를 재사용해 모델에 전달할 범위만 줄입니다. 원문 SessionDB의 행을 지우거나 별도 DB/요약 모델/새 에이전트 루프를 만들지 않습니다. 과거 업무 발췌·자동 요약을 새 요청 앞에 주입하지 않습니다. 시스템 지침을 재작성하지 않으며 필요한 이전 내용은 기존 조회 도구로 읽습니다. 오래된 내용은 같은 DB의 session_search 및 범위가 지정된 recall로 읽습니다. 일반 대화의 이력은 이 경로를 사용하지 않습니다. company_context 이벤트의 token 값은 추정치이며 실제 입력량·응답 시간과 구분합니다.
 총괄의 lazy 도구 설정은 도구 설명도 필요할 때 검색해 불러옵니다. 도구 실행 기능은 유지하며 일반 대화의 직접 노출 설정은 바꾸지 않습니다.

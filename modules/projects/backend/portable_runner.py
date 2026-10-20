@@ -41,12 +41,14 @@ def npm():
 def prepare(source, spec):
     work = inside(source, spec.get('directory', '.'))
     kind = spec['kind']
+    if kind == 'node-http' and spec.get('ui', {}).get('kind') == 'vite' and spec['ui'].get('directory', '.') == spec.get('directory', '.'):
+        prepare(source, spec['ui']); return
     if kind == 'node-mcp':
         target = source / '.platform-runtime'; target.mkdir(exist_ok=True)
         execute([*npm(), 'install', '--prefix', target, '--no-audit', '--no-fund', '--save-exact', spec['package'] + '@' + spec['version']], source)
-    elif kind == 'vite':
+    elif kind in ('vite', 'node-http'):
         execute([*npm(), 'ci' if (work / 'package-lock.json').is_file() else 'install', '--no-audit', '--no-fund'], work)
-        execute([*npm(), 'run', 'build', '--', '--base=./'], work)
+        if kind == 'vite': execute([*npm(), 'run', 'build', '--', '--base=./'], work)
     elif kind in ('fastapi', 'python-cli'):
         if not python().is_file(): venv.EnvBuilder(with_pip=True).create(python().parent.parent)
         requirements = next((path for path in (work / 'requirements.txt', source / 'requirements.txt') if path.is_file()), None)
@@ -83,6 +85,8 @@ def main():
         if kind in ('static', 'vite') and not inside(work, spec.get('output', '.')).joinpath('index.html').is_file():
             raise ValueError('빌드된 웹 화면이 없습니다. setup을 실행하세요.')
         if kind == 'node-mcp': node_command(source, spec)
+        if kind == 'node-http' and not inside(work, spec['entry']).is_file():
+            raise ValueError('원본 Node 서버 진입점이 없습니다.')
         if kind=='python-cli' and spec.get('script'):
             if not inside(source,spec['script']).is_file():raise ValueError('원본 실행 파일이 없습니다.')
         elif kind in ('fastapi', 'python-cli'):
@@ -90,7 +94,9 @@ def main():
             target = spec.get('app') or spec['entry']
             execute([python(), '-c', 'import importlib,sys,site;site.addsitedir(sys.argv.pop(1));getattr(importlib.import_module(sys.argv[1]),sys.argv[2])', str(source/'.platform-runtime/python'), *target.split(':')], work)
         print('실행 파일 확인 완료'); return
-    if kind == 'node-mcp':
+    if kind == 'node-http':
+        execute([shutil.which('node') or 'node', inside(work, spec['entry']), *extra], work)
+    elif kind == 'node-mcp':
         command = node_command(source, spec)
         if args.command == 'mcp-config':
             print(json.dumps({'mcpServers': {metadata['id']: {'command': command[0], 'args': command[1:], 'cwd': str(work)}}}, ensure_ascii=False, indent=2))

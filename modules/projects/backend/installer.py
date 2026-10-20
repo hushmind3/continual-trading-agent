@@ -203,7 +203,7 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
             spec = adapters.generate_with_hermes(source, '자동 탐지로 실행 진입점을 확인하지 못했습니다.', cancelled, progress, key)
         progress('dependencies', '설치된 실행 환경을 재사용하고 필요한 의존성과 화면을 준비합니다.', detected=spec['kind'])
         def prepare_and_verify():
-            adapters.prepare(source, spec, run)
+            adapters.prepare(source, spec, run, reuse=resume_source is not None)
             progress('verify', '원본 실행 결과를 확인합니다. 성공한 설치본만 연결합니다.')
             runtime.verify(source, spec, record.get('environment', {}))
             if spec['kind'] == 'python-cli': runtime.run_cli({**record, 'active_source': str(source), 'adapter': spec}, ['--help'])
@@ -262,7 +262,7 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
             record['agent_connection'] = link_when_idle({**record, 'active_source': str(source), 'adapter': spec}, cancelled, progress)
         # The common watcher performs guarded application after the install transaction releases its busy hook.
         record.update(active_source=str(source), source_commit=source_commit, adapter=spec, module_id=module_id, install_revision=version.name, menu='projects/app/' + key,
-            verification={'entry_executed': spec['kind'] in ('fastapi', 'python-cli', 'node-mcp'), 'original_ui_rendered': ui_verified,'installer_syntax_checked':spec['kind']=='powershell'},
+            verification={'entry_executed': spec['kind'] in ('fastapi', 'python-cli', 'node-mcp', 'node-http'), 'original_ui_rendered': ui_verified,'installer_syntax_checked':spec['kind']=='powershell'},
             stage='ready' if reuse else 'awaiting_activation', detail='앱 업데이트 완료 · 플랫폼 재시작 없이 적용했습니다.' if reuse else '실행 확인 완료 · 공통 실행기가 메뉴 연결을 적용합니다.', published_at=time.time())
         save(record)
     except Exception as exc:

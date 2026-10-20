@@ -17,6 +17,16 @@ def detect(source):
         return {'kind': 'native', 'directory': '.'}
     from . import node_mcp
     if spec := node_mcp.detect(source): return spec
+    # A Vite frontend can belong to a Node HTTP app; do not discard its server.
+    package = source / 'package.json'
+    node_app = None
+    if package.is_file():
+        scripts = json.loads(package.read_text(encoding='utf8')).get('scripts', {})
+        for name in ('start', 'server'):
+            match = re.fullmatch(r'node\s+[\"\']?([\w./-]+\.(?:js|mjs|cjs))[\"\']?', scripts.get(name, '').strip())
+            if match and owned(source, match[1]).is_file():
+                node_app = {'kind': 'node-http', 'directory': '.', 'entry': match[1]}
+                break
     candidates = [source, *(source / name for name in ('frontend', 'web', 'client', 'app', 'ui', 'site', 'public', 'docs'))]
     ui = None
     for folder in candidates:
@@ -50,6 +60,9 @@ def detect(source):
                         if server_home: result['ui'] = {'kind': 'asgi'}
                         elif ui: result['ui'] = ui
                         return validate(source, result)
+    if node_app:
+        if ui: node_app['ui'] = ui
+        return validate(source, node_app)
     if ui:
         return validate(source, ui)
     from . import powershell_app
@@ -69,10 +82,13 @@ def validate(source, spec):
     if spec.get('kind') == 'node-mcp':
         from .node_mcp import validate as validate_mcp
         return validate_mcp(source, spec)
-    if spec.get('kind') not in ('static', 'vite', 'fastapi', 'python-cli', 'native','powershell'):
+    if spec.get('kind') not in ('static', 'vite', 'fastapi', 'python-cli', 'native','powershell', 'node-http'):
         raise ValueError('생성된 실행 어댑터 종류를 지원하지 않습니다.')
     folder = owned(source, spec.get('directory', '.'))
     if not folder.is_dir(): raise ValueError('실행 폴더가 없습니다.')
+    if spec['kind'] == 'node-http':
+        entry = owned(folder, spec.get('entry', ''))
+        if not entry.is_file() or entry.suffix not in ('.js', '.mjs', '.cjs'): raise ValueError('Node 서버 진입점이 없습니다.')
     if spec['kind']=='powershell':
         script=owned(source,spec.get('script',''))
         if not script.is_file() or script.suffix.lower()!='.ps1':raise ValueError('원본 설치 스크립트가 없습니다.')
@@ -91,29 +107,34 @@ def validate(source, spec):
     return spec
 
 
-def prepare(source, spec, run):
+def prepare(source, spec, run, reuse=False):
     folder = owned(source, spec.get('directory', '.'))
     kind = spec['kind']
+    if kind == 'node-http' and spec.get('ui', {}).get('directory', '.') == spec.get('directory', '.') and spec.get('ui', {}).get('kind') == 'vite':
+        prepare(source, spec['ui'], run, reuse=reuse)
+        return
     if kind=='powershell':
         from .powershell_app import inspect
         inspect(source,spec)
     if kind == 'node-mcp':
         from .node_mcp import prepare as prepare_mcp
         prepare_mcp(source, spec, run)
-    elif kind == 'vite':
+    elif kind in ('vite', 'node-http'):
         node = shutil.which('node')
         npm = Path(node or '').parent / 'node_modules/npm/bin/npm-cli.js'
         if not node or not npm.is_file(): raise ValueError('설치된 Node.js/npm을 찾지 못했습니다.')
         lock = folder / 'package-lock.json'
-        run([node, str(npm), 'ci' if lock.is_file() else 'install', '--no-audit', '--no-fund'], folder, 900)
-        run([node, str(npm), 'run', 'build', '--', '--base=./'], folder, 900)
+        if not (reuse and (folder / 'node_modules').is_dir()):
+            run([node, str(npm), 'ci' if lock.is_file() else 'install', '--no-audit', '--no-fund'], folder, 900)
+        if kind == 'vite' and not (reuse and (folder / spec.get('output', 'dist') / 'index.html').is_file()):
+            run([node, str(npm), 'run', 'build', '--', '--base=./'], folder, 900)
     elif kind in ('fastapi', 'python-cli', 'native'):
         from .python_packages import prepare as prepare_python
         prepare_python(source, spec, run)
     if kind in ('static', 'vite'):
         index = owned(owned(folder, spec.get('output', '.')), 'index.html')
         if not index.is_file(): raise ValueError('빌드 결과에 index.html이 없습니다.')
-    if spec.get('ui') and spec['ui'].get('kind') != 'asgi': prepare(source, spec['ui'], run)
+    if spec.get('ui') and spec['ui'].get('kind') != 'asgi': prepare(source, spec['ui'], run, reuse=reuse)
 
 
 def generate_with_hermes(source, note, cancelled, progress, project_id='verification'):

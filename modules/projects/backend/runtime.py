@@ -32,6 +32,11 @@ class AppWorker:
             python = ROOT / 'modules/hermes/.venv/Scripts/python.exe'
             if not python.is_file(): raise ValueError('공유 MCP Python 실행 환경이 없습니다.')
             arguments = [str(python), '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('mcp_worker.py')), json.dumps(command(source, spec))]
+        elif spec['kind'] == 'node-http':
+            import shutil
+            node = shutil.which('node')
+            if not node: raise ValueError('Node.js 실행 환경이 없습니다.')
+            arguments = [node, str(Path(__file__).with_name('node_http_worker.cjs')), str(folder), spec['entry']]
         else:
             from .python_packages import folder as packages
             arguments = [sys.executable, '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('app_worker.py')), str(folder), spec['app'], str(packages(source))]
@@ -108,7 +113,7 @@ def busy_reason():
 def invoke(record, payload, origin=None):
     global ACTIVE
     source = Path(record['active_source']); spec = record['adapter']
-    if spec['kind'] not in ('fastapi', 'node-mcp'): raise ValueError('이 프로젝트는 API/MCP 앱이 아닙니다.')
+    if spec['kind'] not in ('fastapi', 'node-mcp', 'node-http'): raise ValueError('이 프로젝트는 API/MCP 앱이 아닙니다.')
     with LOCK:
         if RESTARTING: raise ValueError('서버 적용 중입니다. 잠시 뒤 다시 실행하세요.')
         from .installer import JOBS
@@ -132,6 +137,12 @@ def invoke(record, payload, origin=None):
 
 
 def verify(source, spec, environment=None):
+    if spec['kind'] == 'node-http':
+        worker = AppWorker(source, spec, environment or {})
+        try:
+            result = worker.call({'path': '/'})
+            if result['status'] >= 500: raise ValueError('Node 서버 실행 확인에 실패했습니다.')
+        finally: worker.close()
     if spec['kind']=='powershell':
         from .powershell_app import inspect
         inspect(source,spec)
@@ -166,7 +177,7 @@ def render_html(text, identifier, has_api, korean=False):
 
 
 def verify_ui(source, spec, environment, run, project_id='verification'):
-    ui = spec.get('ui') if spec['kind'] == 'fastapi' else spec
+    ui = spec.get('ui') if spec['kind'] in ('fastapi', 'node-http') else spec
     if not ui or ui['kind'] not in ('static', 'vite', 'asgi'): return False
     import shutil
     root = owned(owned(source, ui.get('directory', '.')), ui.get('output', '.'))
@@ -182,7 +193,9 @@ def verify_ui(source, spec, environment, run, project_id='verification'):
     else: index = (root / 'index.html').read_text(encoding='utf8')
     config = {'root': str(root), 'project_id': project_id, 'server_ui': server_ui,
         'python': sys.executable, 'environment': environment, 'screenshot': str(source.parent / 'ui-verification.png'),
-        'index_html': render_html(index, project_id, spec['kind'] == 'fastapi')}
+        'index_html': render_html(index, project_id, spec['kind'] in ('fastapi', 'node-http'))}
+    if spec['kind'] == 'node-http':
+        config['node_app'] = {'folder': str(owned(source, spec.get('directory', '.'))), 'entry': spec['entry']}
     if spec['kind'] == 'fastapi':
         from .python_packages import folder as packages
         config['app'] = {'folder': str(owned(source, spec.get('directory', '.'))), 'target': spec['app'], 'packages': str(packages(source))}
@@ -245,7 +258,7 @@ def register_host(app):
         try:
             record = read(identifier)
             if not record.get('active_source'): raise ValueError('아직 실행 가능한 설치본이 없습니다.')
-            spec = record['adapter']; ui = spec.get('ui') if spec['kind'] == 'fastapi' else spec
+            spec = record['adapter']; ui = spec.get('ui') if spec['kind'] in ('fastapi', 'node-http') else spec
             if not ui or ui['kind'] not in ('static', 'vite', 'asgi'): raise ValueError('원본 웹 화면이 없습니다.')
             if path.startswith('_platform-output/'):
                 from .store import project_folder
@@ -279,7 +292,7 @@ def register_host(app):
             if not file.is_file() and '.' not in file.name: file = base / 'index.html'
             if not file.is_file(): raise HTTPException(404, '프로젝트 화면 파일이 없습니다.')
             if file.suffix.lower() == '.html':
-                text = render_html(file.read_text(encoding='utf8'), identifier, spec['kind'] == 'fastapi', korean=True)
+                text = render_html(file.read_text(encoding='utf8'), identifier, spec['kind'] in ('fastapi', 'node-http'), korean=True)
                 return HTMLResponse(text, headers={'Cache-Control': 'no-store'})
             return FileResponse(file, headers={'Cache-Control': 'no-store'})
         except ValueError as exc: raise HTTPException(404, str(exc)) from exc

@@ -33,3 +33,5 @@ ChatGPT device-code 로그인이 진행 중인 worker도 재시작에서 보호�
 앱 실행은 application_request=true와 실행별 시스템 지침을 사용합니다. worker는 사용자 대화를 생성하지 않고 별도 실행 ID/빈 이력을 사용하며 원본 AIAgent의 _persist_disabled를 적용합니다. 앱 DB가 업무/대화 이력을 소유하며 Hermes 모델·API·Thinking은 기존 설정을 공유합니다. 앱 실행은 사용자 Goal/Loop나 기존 세션 ID와 섞을 수 없습니다. 백그라운드 경험 정리는 내부 요청에서 수행하지 않습니다. 일반 Hermes 대화의 저장·재개는 유지합니다.
 
 실행 수치: worker.py는 작업 스레드 시작 직전 chat.telemetry.begin으로 소유 모델 로그의 현재 위치를 잡습니다. telemetry가 이후 decoder timing만 읽어 짧은 응답의 실제 속도를 보완합니다. 원본 agent loop/출력 한도/Thinking 설정은 변경하지 않습니다. 관련 검증은 ../chat/README.md를 따릅니다.
+
+로컬 모델의 기존 llama-server 실행기는 --checkpoint-min-step 기본값을 1,024로 전달합니다. LLAMA_ARG_CHECKPOINT_MIN_SPACING_NT 환경변수가 있으면 그 값을 우선하며 최대 문맥·GPU 적재·Thinking·체크포인트 개수는 바꾸지 않습니다. 중간 문맥 변경 후 공통 접두부가 있어도 전체 입력이 다시 처리되던 기존 설치본에서, 변경 후 후속 대화의 신규 처리 32토큰·입력 처리 0.154초를 관측했습니다. 모델 기동 직후에는 캐시가 없으므로 첫 입력 비용은 남습니다. 옵션은 설치된 실행기 --help와 [공식 체크포인트 안내](https://github.com/ggml-org/llama.cpp/pull/15293)를 기준으로 사용합니다. 실제 응답 수치는 [대화 안내](../chat/README.md)에 모읍니다.

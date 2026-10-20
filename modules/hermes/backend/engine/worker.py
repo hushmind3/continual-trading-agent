@@ -380,9 +380,9 @@ class HermesWorker:
                     'Once the requested app is open, leave it open and finish. Do not close, relaunch or keep polling it. '
                     'If the user closes the app, do not reopen it without a new request. '
                     'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'
-                    + cfg.get('company_instructions', '')
                     + ('\nRead-only code analysis: only read_file and search_files inside the selected workspace are permitted. Do not request editing, terminal, code execution, MCP, delegation or desktop tools.' if cfg.get('read_only') else '')
                     + ('\n\nAdditional user-configured system instructions:\n'+cfg['system_prompt'] if cfg.get('system_prompt') else '')
+                    + cfg.get('company_instructions', '')
                     + ('\n\nApplication role and response contract for this request:\n'+cfg['application_system_prompt']+
                        '\nPreserve owner approval requirements. Use configured tools only when the current request needs them; '
                        'never execute historical requests from application context. Return only the final application response in its required format.'
@@ -534,6 +534,7 @@ class HermesWorker:
             [str(executable), '--model', str(path), '--host', '127.0.0.1', '--port', str(port),
              '--n-gpu-layers', 'auto', '--ctx-size', str(context_length or 0), '--parallel', '1',
              '--threads', '2', '--threads-batch', '2',
+             '--checkpoint-min-step', os.environ.get('LLAMA_ARG_CHECKPOINT_MIN_SPACING_NT', '1024'),
              '-fa', 'on', '-ctk', 'q8_0', '-ctv', 'q8_0',
              '--jinja', '--alias', alias],
             cwd=path.parent, stdout=self.model_log, stderr=self.model_log,

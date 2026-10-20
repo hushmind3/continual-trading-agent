@@ -7,6 +7,8 @@ runtime_policy.configure_tools의 lazy 설정은 원본 direct surface 범주까
 
 Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to `runtime/ai_agent/Hermes/`. All runtime paths resolve from this project. The original checkout must not appear on PYTHONPATH or be used as a symlink target.
 
+중지 시 원본 agent.interrupt(hard_cancel=True)를 제어 스레드 밖에서 한 번만 호출합니다. 압축 HTTP 스트림 종료가 지연돼도 IPC 상태 조회를 막지 않으며 실제 실행 스레드가 끝나기 전에는 중지 완료로 표시하지 않습니다.
+
 프로젝트 자동 연결은 `mcp/project` 명령을 `../mcp/project_links.py`로 전달합니다. 다른 MCP 설정을 보존하면서 프로젝트 전용 서버만 추가·해제하며, 원본 discovery와 도구 등록 결과를 확인합니다. 로컬 모델 로더는 설치된 llama.cpp의 `--n-gpu-layers auto`를 사용합니다. 기존 999 고정값이 자동 메모리 맞춤을 막아 Vulkan KV 캐시 할당에 실패한 것을 확인했으며, 문맥 크기는 사용자/원본 설정을 유지하고 GPU 계층만 가용 VRAM에 맞춥니다.
 
 브라우저 실행기는 모듈 자체 backend/engine/browser/node_modules의 agent-browser 0.26.0이며 설치된 Chrome/Edge를 재사용합니다. 기본 native 설정에서 browser.backend=off는 browser-use CLI만 끄고 원본 agent-browser 도구를 사용한다는 뜻입니다. 채팅은 원본 interactive approval context를 사용해 프론트 허용/거절에 연결합니다. AX 캡처의 전체 텍스트를 제한 길이로 보존하는 로컬 패치는 provider-provenance.json에 기록합니다.

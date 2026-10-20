@@ -480,12 +480,16 @@ class HermesWorker:
                 raise ValueError('다른 실행의 중지를 요청할 수 없습니다.')
             running = self.thread and self.thread.is_alive()
             agent = self.agent
+            interrupt_required = running and not self.stopping
             if running:
                 self.stopping = True
                 self.approval_result = False
                 self.approval_waiter.set()
                 self.job['state'] = 'stopping'
-        if running and agent: agent.interrupt(hard_cancel=True)
+        if interrupt_required and agent:
+            # Native cancellation can wait for an auxiliary HTTP stream to close.
+            # Keep the IPC control thread available for status and approvals.
+            threading.Thread(target=agent.interrupt, kwargs={'hard_cancel': True}, daemon=True).start()
         return self.status()
 
     def approve(self, *args, **kwargs):

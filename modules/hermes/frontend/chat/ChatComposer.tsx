@@ -10,7 +10,7 @@ import type {ThinkingMode} from './useThinking';
 import type {ReasoningSelection} from '../settings/models/ReasoningSelect';
 export type Attachment = AttachedFile;
 interface Props {
- company?:boolean;companyAvailable?:boolean;onCompany?:()=>void;
+ company?:boolean;conversationId?:string;companySources?:{session_id:string;title:string}[];onConversation?:(id:string)=>void;
  attachments: Attachment[]; uploading: boolean; upload: (files: File[]) => void; removeAttachment: (path: string) => void;
  composer: RefObject<HTMLTextAreaElement|null>; text: string; draft: (value: string) => void; send: () => void; stop: () => void;
  active: boolean; pending: boolean; stopping: boolean; mode: string; setMode: (value: string) => void;
@@ -38,7 +38,8 @@ export function ChatComposer(props: Props) {
   attachments={<FileChips files={attachments} remove={removeAttachment}/>}
   toolbar={<>
    <Button type="button" variant="ghost" data-composer-action="attach" aria-label="파일 첨부" title="파일 첨부 · 끌어놓기와 붙여넣기도 가능" busy={uploading} disabled={uploading} onClick={() => fileInput.current?.click()}><Paperclip size={18}/></Button>
-   <label className="ha-mode-select"><Sparkles size={14}/><Select aria-label="실행 방식" title={active?'다음 요청의 실행 방식':'실행 방식'} disabled={pending} value={props.company?'company':mode} onChange={event => event.target.value==='company'?props.onCompany?.():setMode(event.target.value)}><option value="chat">한 번 실행</option><option value="goal">목표 달성까지</option><option value="loop">반복 실행</option>{props.companyAvailable&&<option value="company">AI 총괄 · 승인 후 실행</option>}</Select></label>
+   {!!props.companySources?.length&&<label className="ha-mode-select ha-conversation-select"><span>대상</span><Select aria-label="대화 대상" disabled={pending} value={props.company?props.conversationId:''} onChange={event=>props.onConversation?.(event.target.value)}><option value="">일반 대화</option>{props.companySources.map(source=><option key={source.session_id} value={source.session_id}>{source.title}</option>)}</Select></label>}
+   <label className="ha-mode-select"><Sparkles size={14}/><Select aria-label="실행 방식" title={active?'다음 요청의 실행 방식':'실행 방식'} disabled={pending} value={mode} onChange={event=>setMode(event.target.value)}><option value="chat">한 번 실행</option><option value="goal">목표 달성까지</option><option value="loop">반복 실행</option></Select></label>
    <ToggleSwitch label="읽기 모드" checked={readOnly} onChange={setReadOnly} title={active?'다음 요청부터 적용 · 켜면 파일 읽기·검색만 허용합니다':'켜면 파일 읽기·검색만 허용합니다. 끄면 선택한 도구를 사용할 수 있습니다.'}/>
    <ThinkingControl value={props.thinking} change={props.setThinking} local={props.localThinking} active={active} reasoning={props.reasoning}/>
    <span className="ui-composer-key-hint">{active?'다음 요청을 작성할 수 있습니다':'Enter 전송 · Shift+Enter 줄바꿈'}</span>
@@ -48,7 +49,7 @@ export function ChatComposer(props: Props) {
   options={<RunModeOptions {...props}/>}
  >
   <Input ref={fileInput} type="file" multiple className="hidden" aria-label="첨부 파일 선택" onChange={event => {upload(Array.from(event.target.files??[])); event.target.value='';}}/>
-  <Textarea ref={composer} aria-label="헤르메스에게 보낼 메시지" placeholder={active?'다음 작업을 작성하세요…':'무엇을 함께 해볼까요?'} value={text} onChange={event => draft(event.target.value)} rows={1}
+  <Textarea ref={composer} aria-label="헤르메스에게 보낼 메시지" placeholder={active?'다음 작업을 작성하세요…':props.company?'AI 총괄에게 질문하거나 업무를 지시하세요…':'무엇을 함께 해볼까요?'} value={text} onChange={event => draft(event.target.value)} rows={1}
    onPaste={event => {const files=Array.from(event.clipboardData.files); if (files.length) {event.preventDefault(); upload(files);}}}
    onKeyDown={event => {if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing) {event.preventDefault(); if(!active)send();}}}/>
  </ComposerFrame>;

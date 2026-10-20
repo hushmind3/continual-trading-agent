@@ -965,6 +965,8 @@
 .ui-settings-actions{@apply flex flex-wrap items-center gap-2}
 .ha-reasoning-select{@apply gap-2 rounded-xl bg-brand-50 px-3 py-1 text-brand-700}
 .ha-reasoning-select select{@apply font-medium text-brand-800}
+.hermes-composer .ha-conversation-select{@apply gap-2 rounded-xl bg-brand-50 px-3 py-1}
+.hermes-composer .ha-conversation-select select{@apply max-w-64 font-medium text-brand-800}
 .ui-settings-notice{@apply rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800}
 .ui-settings-load{@apply grid justify-items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500}
 .ui-field-hint{@apply text-sm leading-relaxed text-slate-500}

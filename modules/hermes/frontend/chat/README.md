@@ -2,6 +2,10 @@
 
 용도: Hermes 대화 소메뉴의 화면 구성·설정 전달·검사 인수인계입니다.
 
+2026-10-20 실제 기존 설치본 확인: 총괄 대상 선택·새로고침 유지·EstimateAI 기존 미리보기 HTTP 200 확인. 기존 총괄 세션의 회사 기록 조회는 GPT-6-Luna/low에서 13초·모델 3회로 완료됐습니다. 로컬 Ornith의 동일 누적 세션은 자동 압축 장기 대기로 완료 확인하지 못했습니다. 생성해 확인하던 검사 전용 HTML/스크립트는 휴지통으로 옮겼고, 설치본을 다시 받거나 새 조직/제품을 만들지 않았습니다. TypeScript·Vite 빌드는 통과했으며 로컬 모델은 ready로 복구했습니다. 이 확인은 전체 사업 실행·배포 완료를 뜻하지 않습니다.
+
+대화 대상(일반/조직별 AI 총괄)은 실행 방식(한 번/목표/반복)과 별도 선택입니다. 대상은 현재 native session_id로 판단해 상단·입력창에 계속 표시하며 전송으로 일반 대화로 바꾸지 않습니다. 일반 대화 복귀 시 마지막 일반 세션과 개별 초안을 복원합니다. 대상 전환 중 전송을 막고 늦은 전환 응답을 무시합니다. 회사 상태·승인 패널과 동일 Hermes DB/실행 경로는 유지합니다.
+
 RuntimeMetrics의 ‘전체 작업’은 모든 모델 요청·검색·도구 실행·대기를 합한 시간이며 API 한 번의 응답 시간이 아닙니다. 컨텍스트 안내에는 이전 대화·지침·도구 결과가 포함됨을 표시합니다. 생성 속도 미측정은 기존처럼 빈 값이며 전체 시간으로 추정하지 않습니다. 공통 테마와 이름이 표시된 추론 선택을 재사용합니다.
 
 Chat.tsx owns sessions, search, per-session drafts, send/stop/approval/resume, panel controls and scroll following. ChatStream.tsx groups adjacent tool-only turns and matches results by ID; ActivityTimeline pairs real start/complete events and retains errors. MessageBody.tsx renders Markdown/GFM with raw HTML disabled and provides copy controls.
@@ -28,7 +32,7 @@ ChatHeader, SessionSidebar, ActivityPanel, ChatComposer and ChatWelcome are cont
 
 파일 첨부 버튼·클립보드 파일 붙여넣기를 지원합니다. 파일당 8 MiB·요청당 8개이며 runtime/ai_agent/Hermes/artifacts/uploads에 저장한 경로를 메시지와 함께 전달합니다. 파일 등록은 모델의 이미지 이해를 뜻하지 않습니다. 실행 중에도 다음 요청의 모드·횟수·첨부는 준비할 수 있고, 현재 실행은 중지 버튼으로 제어합니다.
 
-문서를 연 상태에서는 대화·입력창이 같은 왼쪽 열에 남고 문서가 오른쪽 높이를 모두 사용합니다. 화면 폭이 좁으면 실행 수치는 가로로 읽는 한 줄이며, 엔진 압축 요약·출력 한도 메모는 EngineNotes를 통해 작업 내역에서만 펼칩니다(원본 기록은 유지).
+문서를 연 상태에서는 대화·입력창이 같은 왼쪽 열에 남고 문서가 오른쪽 높이를 모두 사용합니다. 화면 폭이 좁으면 실행 수치는 3열 격자로 접히며, 엔진 압축 요약·출력 한도 메모는 EngineNotes를 통해 작업 내역에서만 펼칩니다(원본 기록은 유지).
 
 대화 기록은 임시 선택 패널입니다. 대화 선택 후 닫히고, 열 때 작업 내역·문서와 동시에 본문 공간을 나누지 않습니다. 데스크톱에서도 Escape·키보드 초점 순환을 지원합니다. 대화 보관은 기록 패널에 두며 작업 중인 대화는 보관할 수 없습니다. 본문 문서 링크는 공통 텍스트 링크 스타일로 표시합니다.
 

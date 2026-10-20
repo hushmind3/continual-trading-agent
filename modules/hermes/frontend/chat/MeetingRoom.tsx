@@ -1,48 +1,49 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {request} from '@platform/data/api';
-import {Button,Select,ErrorMessage} from '@platform/ui/Primitives';
-import {Panel} from '@platform/ui/Panel';
+import {Button,Select,Textarea,ErrorMessage} from '@platform/ui/Primitives';
+import {ArrowUp,ArrowLeft,Square,MessageCircle} from 'lucide-react';
 import {MarkdownContent} from '@platform/ui/MarkdownContent';
 import {failure,prefix,working,type AgentStatus} from '../types';
-import {MessagesSquare,ArrowRight,Users} from 'lucide-react';
-import {ActivityTimeline} from './ChatStream';
 import {displayEngineResponse} from './EngineNotes';
 
-type Speech={role?:string;name?:string;statement?:string;content?:string;reply_to?:string;basis?:string};
-type Meeting={id:string;topic:string;status:string;created_at:string;summary?:string;minutes?:Speech[]};
-type Staff={role:string;name:string;title:string;description:string;status:string;latest?:{title:string;status:string}};
-type Job={id:string;role:string;title:string;status:string;result?:string;summary?:string;error?:string;mode?:string};
-type Room={session_id:string;meetings:Meeting[];roles:Staff[];jobs:Job[]};
+type Speech={id?:string;role?:string;name?:string;statement?:string;content?:string;status?:string;error?:string;source?:string;source_session_id?:string;reply_to?:string};
+type Meeting={id:string;topic:string;status:string;created_at:string;summary?:string;venture_id?:string;minutes?:Speech[]};
+type Staff={role:string;name:string;title:string;description:string};
+type Room={session_id:string;meetings:Meeting[];roles:Staff[];ventures?:{id:string;status:string}[]};
 type Company={id:string;title:string};
-const stateLabel=(state:string)=>({running:'진행 중',queued:'대기',completed:'완료',complete:'완료',failed:'실패',paused:'중단',stopped:'중지',idle:'배정 없음'}[state]||state);
+const label=(value:string)=>({running:'토론 중',completed:'토론 완료',failed:'토론 중단',paused:'보류',stopped:'중지'}[value]||value);
 
-export function MeetingRoom({companies,onTalk}:{companies:Company[];onTalk:(id:string)=>void}){
- const [company,setCompany]=useState(companies[0]?.id??''),[room,setRoom]=useState<Room>(),[meetingId,setMeetingId]=useState(''),[role,setRole]=useState('all'),[status,setStatus]=useState<AgentStatus>(),[error,setError]=useState('');
- useEffect(()=>{if(!companies.some(item=>item.id===company))setCompany(companies[0]?.id??'')},[companies,company]);
+export function MeetingRoom({companies,onTalk,onReview,engineStatus}:{companies:Company[];onTalk:(id:string)=>void;onReview:(id:string)=>void;engineStatus?:AgentStatus}){
+ const preferred=engineStatus?.job.meeting;
+ const [company,setCompany]=useState(preferred?.company_id||companies[0]?.id||''),[room,setRoom]=useState<Room>(),[meetingId,setMeetingId]=useState(preferred?.id||''),[role,setRole]=useState('all'),[message,setMessage]=useState(''),[pending,setPending]=useState(false),[error,setError]=useState('');
+ const thread=useRef<HTMLDivElement>(null),follow=useRef(true);
+ useEffect(()=>{if(!companies.some(item=>item.id===company))setCompany(companies[0]?.id||'')},[companies,company]);
+ useEffect(()=>{if(preferred?.id){setCompany(preferred.company_id);setMeetingId(preferred.id);setRole('all');follow.current=true}},[preferred?.id,preferred?.run_id,preferred?.company_id]);
  useEffect(()=>{if(!company)return;let live=true;let timer:ReturnType<typeof setTimeout>;
-  setRoom(undefined);setMeetingId('');setRole('all');setStatus(undefined);setError('');
-  const refresh=async()=>{try{const [records,next]=await Promise.all([request<Room>('projects/conversation',{id:company,action:'meetings'}),request<AgentStatus>(prefix+'status',{},'GET')]);if(live){setRoom(records);setStatus(next.job.session_id===records.session_id?next:undefined);setError('')}}catch(e){if(live)setError(failure(e))}finally{if(live)timer=setTimeout(()=>{void refresh()},2500)}};
+  setRoom(undefined);setError('');const refresh=async()=>{try{const next=await request<Room>('projects/conversation',{id:company,action:'meetings'});if(live){setRoom(next);setError('')}}catch(e){if(live)setError(failure(e))}finally{if(live)timer=setTimeout(()=>void refresh(),1200)}};
   void refresh();return()=>{live=false;clearTimeout(timer)};
  },[company]);
- const meetings=room?.meetings??[],selected=meetings.find(item=>item.id===meetingId)??meetings[0],staff=room?.roles??[],speeches=selected?.minutes??[],shown=role==='all'?speeches:speeches.filter(item=>item.role===role),jobs=(room?.jobs??[]).filter(item=>role==='all'||item.role===role),active=working(status);
- const person=staff.find(item=>item.role===role),participants=staff.filter(item=>speeches.some(speech=>speech.role===item.role));
- const date=selected?new Date(selected.created_at).toLocaleString('ko-KR',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
- return <section className="ha-meeting-room" aria-label="회의실">
-  <header className="ha-meeting-heading"><div><p className="ha-meeting-eyebrow">조직 · 협업</p><h2>회의실</h2><p className="ha-meeting-subtitle">직군별 판단과 협업 과정을 살펴보세요.</p></div><div className="flex flex-wrap items-center gap-2">{companies.length>1&&<Select aria-label="회의 조직" value={company} onChange={event=>setCompany(event.target.value)}>{companies.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</Select>}<Button tone="primary" onClick={()=>onTalk(company)} disabled={!company}><MessagesSquare size={16}/>총괄과 대화<ArrowRight size={15}/></Button></div></header>
+ const meetings=room?.meetings??[],selected=meetings.find(item=>item.id===meetingId)??meetings[0],staff=room?.roles??[];
+ const live=preferred?.id===selected?.id?preferred:undefined;
+ const speeches=[...(selected?.minutes??[])];
+ if(live?.turn_id&&live.status==='running'){const i=speeches.findIndex(item=>item.id===live.turn_id);const turn={...(i<0?{}:speeches[i]),id:live.turn_id,role:live.role,name:staff.find(item=>item.role===live.role)?.title,statement:live.text??'',status:live.turn_status,source:'hermes_delegate',source_session_id:live.source_session_id};if(i<0)speeches.push(turn);else speeches[i]=turn}
+ const shown=role==='all'?speeches:speeches.filter(item=>item.role===role),status=engineStatus?.job.session_id===room?.session_id?engineStatus:undefined,active=working(status),state=live?.status||selected?.status||'';
+ const draftKey='hermes.meeting-draft:'+company+':'+(selected?.id||'');
+ useEffect(()=>{setMessage(localStorage.getItem(draftKey)||'')},[draftKey]);
+ useLayoutEffect(()=>{if(follow.current&&thread.current)thread.current.scrollTop=thread.current.scrollHeight},[JSON.stringify(shown)]);
+ const submit=async()=>{if(pending||!message.trim()||!room)return;setPending(true);setError('');try{if(active)await request(prefix+'chat/steer',{session_id:room.session_id,message:message.trim()});else await request(prefix+'chat',{session_id:room.session_id,message:message.trim(),meeting_id:selected?.id,mode:'chat'});setMessage('');localStorage.removeItem(draftKey);follow.current=true}catch(e){setError(failure(e))}finally{setPending(false)}};
+ return <section className="ha-discussion-room" aria-label="회의실">
+  <header className="ha-discussion-heading"><div className="min-w-0"><h2><MessageCircle size={20}/>회의</h2><p className="truncate" title={selected?.topic}>{selected?.topic||(preferred?.topic||'새 회의가 시작되면 여기에 표시됩니다.')}</p></div><div className="flex shrink-0 items-center gap-2">{state&&<span className="ha-meeting-badge">{label(state)}</span>}<Button variant="ghost" onClick={()=>onTalk(company)}><ArrowLeft size={15}/>총괄 대화</Button></div></header>
+  <div className="ha-discussion-toolbar">{companies.length>1&&<Select aria-label="회의 조직" value={company} onChange={event=>{setCompany(event.target.value);setMeetingId('')}}>{companies.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</Select>}{meetings.length>1&&<Select aria-label="회의 안건" value={selected?.id||''} onChange={event=>{setMeetingId(event.target.value);setRole('all');follow.current=true}}>{meetings.map(item=><option key={item.id} value={item.id}>{item.topic} · {label(item.status)}</option>)}</Select>}<nav aria-label="회의 직군"><Button variant="ghost" tone={role==='all'?'primary':'neutral'} onClick={()=>setRole('all')}>전체</Button>{staff.map(person=><Button key={person.role} variant="ghost" tone={role===person.role?'primary':'neutral'} aria-label={person.role+' · '+person.name} title={person.description} onClick={()=>setRole(person.role)}>{person.role} · {person.name}</Button>)}</nav></div>
   {error&&<ErrorMessage message={error}/>}
-  {!room&&!error&&<p className="text-sm text-copy">회의와 직원 정보를 불러오고 있습니다…</p>}
-  {room&&<>
-   <Panel title="회의 안건" collapsible={false} className="ha-meeting-agenda" actions={<span className="ha-meeting-badge">{selected?stateLabel(selected.status):'기록 없음'}</span>}>
-    {selected?<><h3 className="ha-meeting-topic" title={selected.topic}>{selected.topic}</h3><div className="ha-meeting-meta"><span>{date}</span><span><Users size={14}/>{participants.length}개 직군 발언</span><span>저장된 회의</span></div>{meetings.length>1&&<Select className="mt-3 w-full" aria-label="회의 안건" value={selected.id} onChange={event=>{setMeetingId(event.target.value);setRole('all')}}>{meetings.map(item=><option key={item.id} value={item.id}>{item.topic}</option>)}</Select>}</>:<p className="text-sm text-copy">회의가 기록되면 참여 직군과 의견이 여기에 표시됩니다.</p>}
-   </Panel>
-   {status&&(active||status.job.error)&&<div className="ha-meeting-run" role="status"><b>총괄 실행 · {stateLabel(status.job.state)}</b>{status.job.error&&<p className="mt-1 text-sm text-red-700">{displayEngineResponse(status.job.error)}</p>}<details className="mt-2"><summary className="cursor-pointer text-sm text-brand-700">실행 내역 펼치기</summary><ActivityTimeline job={status.job}/></details></div>}
-   <div className="ha-meeting-grid">
-    <aside className="ha-meeting-roster"><Panel title="직군" collapsible={false}><nav aria-label="회의 직군" className="ha-meeting-people"><Button variant="ghost" tone={role==='all'?'primary':'neutral'} aria-pressed={role==='all'} className="ha-meeting-person" onClick={()=>setRole('all')}><Users size={18}/><span className="min-w-0 flex-1 text-left">전체 발언</span><span className="text-xs">{speeches.length}</span></Button>{staff.map(item=>{const count=speeches.filter(speech=>speech.role===item.role).length;return <Button key={item.role} variant="ghost" tone={role===item.role?'primary':'neutral'} aria-pressed={role===item.role} aria-label={item.role+' · '+item.name} className="ha-meeting-person" onClick={()=>setRole(item.role)}><span className="ha-meeting-avatar">{item.role}</span><span className="min-w-0 flex-1 text-left"><b className="block truncate">{item.name}</b><small className="block font-normal opacity-70">{count?count+'개 발언':'발언 없음'}</small></span></Button>})}</nav></Panel></aside>
-    <main className="ha-meeting-discussion" aria-label="회의 발언"><div className="ha-meeting-section-heading"><h3>{person?person.name+'의 의견':'발언 흐름'}</h3><span>{shown.length}개 발언</span></div><div className="space-y-3">{shown.map((item,index)=>{const text=item.statement||item.content||'',speaker=staff.find(member=>member.role===item.role);return <article key={selected?.id+'-'+index+'-'+item.role} className="ha-meeting-speech"><header><span className="ha-meeting-avatar">{item.role}</span><div className="min-w-0"><b>{item.role} · {item.name||speaker?.title||'의견'}</b><small>발언 {speeches.indexOf(item)+1}</small></div></header>{item.reply_to&&<p className="ha-meeting-reply">응답한 쟁점 · {item.reply_to}</p>}<div className="ha-meeting-excerpt"><MarkdownContent text={text.split(/\n\s*\n/)[0]||'발언 내용이 없습니다.'}/></div><details className="ha-meeting-full"><summary>발언 전문 · 근거 보기</summary><div className="mt-3 text-sm leading-relaxed"><MarkdownContent text={text}/>{item.basis&&<p className="mt-3 text-copy">근거 · {item.basis}</p>}</div></details></article>})}{selected&&!shown.length&&<div className="ha-meeting-empty"><MessagesSquare size={24}/><p>이 직군의 저장된 발언이 없습니다.</p></div>}</div>
-     {selected?.summary&&<Panel title="회의 결론" collapsible defaultCollapsed description="총괄의 보고 내용과 합의·쟁점을 확인합니다."><div className="text-sm leading-relaxed"><MarkdownContent text={selected.summary}/></div></Panel>}
-    </main>
-    <aside className="ha-meeting-inspector">{person?<Panel title={person.role+' · 담당 역할'} collapsible={false}><h3 className="font-semibold text-ink">{person.title}</h3><p className="mt-2 text-sm leading-relaxed text-copy">{person.description}</p>{person.latest&&<div className="ha-meeting-latest"><span>최근 담당 업무 · {stateLabel(person.latest.status)}</span><p>{person.latest.title}</p></div>}<Panel title="업무 기록" collapsible defaultCollapsed className="ha-meeting-job-panel"><div className="divide-y divide-slate-100">{jobs.map(item=><details key={item.id} className="py-3"><summary className="cursor-pointer text-sm"><span className="text-copy">{stateLabel(item.status)}</span><span className="mt-1 block">{item.title}</span></summary><div className="mt-2 text-sm"><MarkdownContent text={displayEngineResponse(item.error||item.result||item.summary||'최종 결과가 아직 기록되지 않았습니다.')}/></div></details>)}{!jobs.length&&<p className="text-sm text-copy">배정 기록이 없습니다.</p>}</div></Panel></Panel>:<Panel title="배치 살펴보기" collapsible={false}><p className="text-sm leading-relaxed text-copy">직군을 선택하면 발언과 담당 업무를 함께 볼 수 있습니다.</p><p className="mt-3 text-sm leading-relaxed text-copy">역할이 겹치거나 빠진 곳, 근거가 부족한 의견을 살펴보고 총괄에게 조정을 요청하세요.</p></Panel>}</aside>
-   </div>
-  </>}
+  <div ref={thread} className="ha-discussion-thread" aria-live="polite" onScroll={()=>{const el=thread.current;if(el)follow.current=el.scrollHeight-el.scrollTop-el.clientHeight<90}}>
+   {!room&&!error&&<p className="ha-discussion-empty">회의에 연결하고 있습니다…</p>}
+   {room&&!shown.length&&<p className="ha-discussion-empty">{state==='running'?'안건이 등록됐습니다. 첫 발언을 기다리고 있습니다…':'이 회의의 발언이 아직 없습니다.'}</p>}
+   {shown.map((speech,index)=><article key={speech.id||selected?.id+'-'+index+'-'+speech.role} className={'ha-discussion-line '+(speech.role==='OWNER'?'is-owner':speech.source==='failure'?'is-failure':'')}><span className="ha-meeting-avatar">{speech.role==='OWNER'?'대표':speech.role||'직원'}</span><div className="ha-discussion-message"><header><b>{speech.role==='OWNER'?'대표':speech.name||staff.find(person=>person.role===speech.role)?.title||speech.role}</b>{speech.source==='hermes_delegate'&&<small>독립 검토</small>}{speech.status==='speaking'&&<small>답변 중…</small>}{speech.status==='failed'&&<small>발언 중단</small>}</header><div className="ha-discussion-bubble">{speech.statement||speech.content?<MarkdownContent text={displayEngineResponse(speech.statement||speech.content||'')}/>:<span className="ha-typing" aria-label="발언 준비 중">생각을 정리하고 있습니다…</span>}{speech.error&&<p className="mt-2 text-sm text-red-700">{displayEngineResponse(speech.error)}</p>}</div>{speech.source_session_id&&<details className="ha-discussion-source"><summary>발언 정보</summary><p>{speech.role} · Hermes 원본 위임 세션</p><p className="break-all">{speech.source_session_id}</p>{speech.reply_to&&<p>검토 쟁점 · {speech.reply_to}</p>}</details>}</div></article>)}
+   {selected?.summary&&!speeches.some(item=>item.source==='moderator'||item.source==='failure')&&<article className="ha-discussion-line"><span className="ha-meeting-avatar">CEO</span><div className="ha-discussion-message"><header><b>총괄 · 저장된 결론</b></header><div className="ha-discussion-bubble"><MarkdownContent text={selected.summary}/></div></div></article>}
+   {live?.error&&!speeches.some(item=>item.source==='failure')&&<p className="ha-discussion-empty text-red-700">{displayEngineResponse(live.error)}</p>}
+   {selected?.venture_id&&room?.ventures?.some(item=>item.id===selected.venture_id&&item.status==='pending')&&<div className="ha-discussion-proposal"><b>승인 대기 초안이 제출됐습니다.</b><p>총괄 대화의 사업관리에서 검토·수정·승인할 수 있습니다. 아직 실행하지 않습니다.</p><Button onClick={()=>onReview(company)}>사업 초안 검토</Button></div>}
+  </div>
+  <form className="ha-discussion-composer" onSubmit={event=>{event.preventDefault();void submit()}}><Textarea aria-label="회의에 보낼 메시지" rows={1} placeholder="의견을 남기거나, 더 조사할 내용과 수정 방향을 말하세요…" value={message} onChange={event=>{setMessage(event.target.value);localStorage.setItem(draftKey,event.target.value)}} onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();void submit()}}}/><div><span>Enter 전송 · Shift+Enter 줄바꿈</span>{active&&<Button tone="danger" aria-label="회의 실행 중지" disabled={pending} onClick={()=>void request(prefix+'stop',{}).catch(e=>setError(failure(e)))}><Square size={14}/></Button>}<Button type="submit" tone="primary" aria-label="회의 메시지 보내기" disabled={pending||!message.trim()||!room||active&&status?.job.can_steer===false}><ArrowUp size={18}/></Button></div></form>
  </section>;
 }

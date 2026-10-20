@@ -1,5 +1,6 @@
 """Platform adapter around the transplanted Hermes engine; no replacement agent loop."""
 from __future__ import annotations
+import re
 
 import atexit
 import contextlib
@@ -223,7 +224,7 @@ class HermesWorker:
         # Native load_config caches by file signature; atomic replacement invalidates it.
 
     def sessions(self):
-        return self.db.list_sessions_rich(limit=100, min_message_count=0, order_by_last_active=True)
+        return [row for row in self.db.list_sessions_rich(limit=100, min_message_count=0, order_by_last_active=True) if row.get('source') != 'subagent']
 
     def session(self, session_id):
         row = self.db.get_session(session_id)
@@ -255,6 +256,8 @@ class HermesWorker:
             raise ValueError('작업 단계가 바뀌고 있습니다. 입력은 유지되니 다시 보내세요.')
         with self.lock:
             self.job['live_text'] = ''
+        from ai_agent.Hermes.chat.meetings import owner_message
+        owner_message(self, message)
         self.event('owner_steer', {'message': message})
         return self.status()
 
@@ -291,6 +294,10 @@ class HermesWorker:
         scope=request.get('application_context_scope','native')
         if scope not in ('native','focused_discussion'):raise ValueError('앱 맥락 범위를 확인하세요.')
         cfg['application_context_scope']=scope
+        meeting_id = request.get('meeting_id')
+        if meeting_id:
+            if not isinstance(meeting_id,str) or not re.fullmatch('[A-Za-z0-9_-]{1,100}',meeting_id): raise ValueError('회의 ID를 확인하세요.')
+            cfg['meeting_id'] = meeting_id
         if request.get('workspace'):
             selected = Path(str(request['workspace'])).expanduser().resolve()
             if not selected.is_dir():raise ValueError('선택한 프로젝트 폴더가 없습니다.')
@@ -326,6 +333,8 @@ class HermesWorker:
             self.job = {'state': 'starting', 'application': internal, 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time(),
                         'local_inference': bool(cfg.get('local_model')) and cfg['base_url'] == self.model_base}
             if getattr(self, 'company_link', None): self.job['company_id'] = self.company_link['id']
+        self.job['owner_message'] = raw
+        self.job['owner_request_id'] = uuid.uuid4().hex
         self.thread = threading.Thread(target=self.run_chat, args=(cfg, session_id, prompt, history, request), daemon=True)
         from ai_agent.Hermes.chat.telemetry import begin
         begin(self)
@@ -375,7 +384,7 @@ class HermesWorker:
             if focused:toolsets=[]
             configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'),
                             direct_surfaces=not bool(cfg.get('company_instructions')),
-                            direct_tools=('web_search','web_extract') if cfg.get('company_instructions') else ())
+                            direct_tools=('web_search','web_extract','team_meeting') if cfg.get('company_instructions') else ())
             from ai_agent.Hermes.models.codex import runtime as model_runtime
             self.agent = AIAgent(
                 model=cfg['model'], **model_runtime(cfg), quiet_mode=True,
@@ -407,6 +416,7 @@ class HermesWorker:
                     + ('\nRead-only code analysis: only read_file and search_files inside the selected workspace are permitted. Do not request editing, terminal, code execution, MCP, delegation or desktop tools.' if cfg.get('read_only') else '')
                     + ('\n\nAdditional user-configured system instructions:\n'+cfg['system_prompt'] if cfg.get('system_prompt') else '')
                     + cfg.get('company_instructions', '')
+                    + (f'\n대표가 기존 회의 {cfg["meeting_id"]}에 추가 지시했습니다. team_meeting start의 meeting_id로 이 회의를 재개하고 실제 직원 검토를 이어가세요.' if cfg.get('meeting_id') else '')
                     + ('\n\nApplication role and response contract for this request:\n'+cfg['application_system_prompt']+
                        '\nPreserve owner approval requirements. Use configured tools only when the current request needs them; '
                        'never execute historical requests from application context. Return only the final application response in its required format.'
@@ -471,6 +481,8 @@ class HermesWorker:
             self.agent = None
             if self.stopping:
                 completion['state'] = 'stopped'
+            from ai_agent.Hermes.chat.meetings import settle as settle_meeting
+            settle_meeting(self, completion)
             if self.job.get('company_job_id'):
                 from ai_agent.Hermes.chat.company import lifecycle
                 lifecycle(self, 'run_finish', outcome=completion)

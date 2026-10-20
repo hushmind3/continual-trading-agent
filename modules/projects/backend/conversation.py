@@ -47,7 +47,7 @@ def call(key, payload, origin=None):
         if not native.get('token') or not secrets.compare_digest(str(payload.get('token', '')), native['token']) or payload.get('session_id') != native_id:
             raise ValueError('회사 도구의 네이티브 세션 인증에 실패했습니다.')
         command = dict(payload.get('command', {}))
-        if command.get('action') not in ('overview', 'recall', 'remember', 'propose', 'begin', 'finish', 'meeting', 'run_start', 'run_finish') or '_owner' in command:
+        if command.get('action') not in ('overview', 'recall', 'remember', 'propose', 'begin', 'finish', 'meeting', 'meeting_start', 'meeting_resume', 'meeting_proposal', 'meeting_read', 'meeting_turn', 'meeting_finish', 'run_start', 'run_finish') or '_owner' in command:
             raise ValueError('허용하지 않은 회사 도구 요청입니다.')
         command['_session'] = native_id
         return invoke('/api/admin/hermes/records', 'POST', command, token)
@@ -57,7 +57,7 @@ def call(key, payload, origin=None):
         meetings = invoke('/api/admin/meetings', token=token)
         records = invoke('/api/admin/hermes/records', 'POST', {'action': 'overview'}, token)
         team = invoke('/api/admin/team', token=token)
-        return {**meetings, **team, 'session_id': native_id, 'jobs': records.get('jobs', [])}
+        return {**meetings, **team, 'session_id': native_id, 'jobs': records.get('jobs', []), 'ventures': records.get('ventures', [])}
     if action == 'decision':
         venture = str(payload.get('venture_id', ''))
         if not re.fullmatch('[A-Za-z0-9_-]{1,100}', venture) or not isinstance(payload.get('approve'), bool):

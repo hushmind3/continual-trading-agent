@@ -34,9 +34,11 @@ def update(worker):
     metrics=dict(worker.job.get('metrics') or {})
     agent=worker.agent
     if agent:
-        context=getattr(agent,'context_compressor',None)
+        speaker=getattr(worker,'meeting_agent',None)
+        usage=worker.job.get('meeting_usage') or {}
+        context=getattr(speaker or agent,'context_compressor',None)
         for key,attr in [('input_tokens','session_input_tokens'),('output_tokens','session_output_tokens'),('api_calls','session_api_calls')]:
-            metrics[key]=getattr(agent,attr,0)
+            metrics[key]=getattr(agent,attr,0)+usage.get(key,0)+(getattr(speaker,attr,0) if speaker else 0)
         if context:
             metrics['context_limit']=getattr(context,'context_length',None)
             metrics['context_tokens']=max(0,getattr(context,'last_prompt_tokens',0) or 0) or metrics.get('context_tokens')

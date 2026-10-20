@@ -92,6 +92,68 @@ def install(app, data_root, activity=lambda delta: None):
 
     def records(command, owner=False):
         action = command.get('action', 'overview')
+        if action == 'meeting_start':
+            topic = str(command.get('title') or '').strip()
+            if not topic: raise ValueError('회의 안건이 필요합니다.')
+            current = db.one("SELECT * FROM ceo_meetings WHERE topic=? AND status='running' ORDER BY rowid DESC LIMIT 1", (topic,))
+            key = current['id'] if current else db.uid('meeting')
+            if not current:
+                with db.LOCK, db.connect() as c:
+                    c.execute('INSERT INTO ceo_meetings(id,created_at,topic,venture_id,status,minutes_json,summary) VALUES(?,?,?,?,?,?,?)',
+                              (key, db.now(), topic, '', 'running', '[]', ''))
+            command = {**command, 'action': 'meeting_read', 'meeting_id': key}
+            action = 'meeting_read'
+        if action == 'meeting_proposal':
+            proposal = command.get('proposal')
+            if not isinstance(proposal,dict) or any(not str(proposal.get(key) or '').strip() for key in ('problem','product','validation')):
+                raise ValueError('초안에는 고객 문제·제품·검증 계획이 필요합니다.')
+            with db.LOCK, db.connect() as c:
+                row = c.execute('SELECT * FROM ceo_meetings WHERE id=?',(str(command.get('meeting_id') or ''),)).fetchone()
+                if not row or row['status']!='running': raise ValueError('진행 중인 회의가 아닙니다.')
+                key = row['venture_id'] or db.uid('venture')
+                existing = c.execute('SELECT status FROM ventures WHERE id=?',(key,)).fetchone()
+                if existing:
+                    if existing['status'] not in ('pending','revising'): raise ValueError('승인/보류된 초안은 덮어쓸 수 없습니다. 새 안건으로 제안하세요.')
+                    c.execute("UPDATE ventures SET proposal_json=?,status='pending' WHERE id=?",(json.dumps(proposal,ensure_ascii=False),key))
+                else:
+                    c.execute('INSERT INTO ventures(id,created_at,name,proposal_json,status,mode) VALUES(?,?,?,?,?,?)',(key,db.now(),row['topic'][:200],json.dumps(proposal,ensure_ascii=False),'pending','hermes'))
+                c.execute('UPDATE ceo_meetings SET venture_id=? WHERE id=?',(key,row['id']))
+            return {'venture_id':key,'status':'pending'}
+        if action in ('meeting_read', 'meeting_resume', 'meeting_turn', 'meeting_finish'):
+            key = str(command.get('meeting_id') or '')
+            with db.LOCK, db.connect() as c:
+                row = c.execute('SELECT * FROM ceo_meetings WHERE id=?', (key,)).fetchone()
+                if not row: raise ValueError('회의를 찾을 수 없습니다.')
+                row = dict(row); minutes = json.loads(row['minutes_json'])
+                if action == 'meeting_resume':
+                    c.execute("UPDATE ceo_meetings SET status='running' WHERE id=?", (key,))
+                    row['status'] = 'running'
+                    if row['venture_id']: c.execute("UPDATE ventures SET status='revising' WHERE id=? AND status='pending'",(row['venture_id'],))
+                if action == 'meeting_turn':
+                    if row['status'] != 'running': raise ValueError('진행 중인 회의가 아닙니다.')
+                    turn = dict(command.get('turn') or {})
+                    if not turn.get('id') or not turn.get('role'): raise ValueError('발언 식별자와 직군이 필요합니다.')
+                    old = next((i for i, item in enumerate(minutes) if item.get('id') == turn['id']), None)
+                    if old is None: minutes.append(turn)
+                    else: minutes[old] = {**minutes[old], **turn}
+                    c.execute('UPDATE ceo_meetings SET minutes_json=? WHERE id=?', (json.dumps(minutes, ensure_ascii=False), key))
+                if action == 'meeting_finish':
+                    state = command.get('status', 'completed')
+                    if state not in ('completed', 'failed', 'paused', 'stopped'): raise ValueError('회의 상태를 확인하세요.')
+                    if state == 'completed' and len({item.get('role') for item in minutes if item.get('status') == 'completed' and item.get('source') == 'hermes_delegate'}) < 2:
+                        raise ValueError('서로 다른 직군의 실제 검토가 두 개 이상 필요합니다.')
+                    candidate = command.get('venture_id') or row['venture_id']
+                    if state=='completed' and candidate:
+                        proposal_state = c.execute('SELECT status FROM ventures WHERE id=?',(candidate,)).fetchone()
+                        if proposal_state and proposal_state['status']=='revising': raise ValueError('수정 중인 초안을 먼저 다시 제출하세요.')
+                    summary = str(command.get('body') or '').strip()
+                    if not summary: raise ValueError('회의 결론 또는 중단 사유가 필요합니다.')
+                    minutes.append({'id': 'conclusion-'+db.uid('turn'), 'role': 'CEO' if state=='completed' else 'SYSTEM', 'name':'총괄' if state=='completed' else '안내', 'statement':summary, 'status':state, 'source':'moderator' if state=='completed' else 'failure', 'created_at':db.now()})
+                    c.execute('UPDATE ceo_meetings SET minutes_json=? WHERE id=?', (json.dumps(minutes,ensure_ascii=False),key))
+                    c.execute('UPDATE ceo_meetings SET status=?,summary=?,venture_id=? WHERE id=?', (state, summary, command.get('venture_id') or row['venture_id'], key))
+                    row.update(status=state, summary=summary)
+            return {'meeting_id': key, 'topic': row['topic'], 'status': row['status'], 'minutes': minutes,
+                    'venture_id': row['venture_id'], 'roles': [{'role': role, 'name': name, 'title': title, 'description': description} for role,name,title,description,icon in server.TEAM_ROLES], 'summary': row['summary']}
         if action == 'recall': return recall(db, command)
         if action == 'remember':
             kind = command.get('kind'); body = str(command.get('body', '')).strip()
@@ -140,6 +202,7 @@ def install(app, data_root, activity=lambda delta: None):
         if action == 'decision':
             if not owner or type(command.get('approve')) is not bool: raise ValueError('소유자 승인 경로만 사용할 수 있습니다.')
             row = venture(command.get('venture_id'))
+            if row['status'] != 'pending': raise ValueError('초안이 수정 중이거나 이미 결정됐습니다. 최신 초안을 확인하세요.')
             status = 'approved' if command['approve'] else 'rejected'
             with db.LOCK, db.connect() as c:
                 c.execute('UPDATE ventures SET status=?,decided_at=? WHERE id=?', (status, db.now(), row['id']))

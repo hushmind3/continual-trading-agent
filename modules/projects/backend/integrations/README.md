@@ -19,3 +19,5 @@ recall/remember 기존 기록 재사용: 새 DB·새 테이블·별도 임베딩
 회의 탭 연결(2026-10-21): ../conversation.py의 읽기 전용 meetings 액션이 기존 앱의 인증된 /api/admin/meetings, /api/admin/hermes/records(overview), /api/admin/team을 단일 플랫폼 API로 조회합니다. 기존 ceo_meetings와 jobs를 그대로 사용하며 원본 회의 실행 API를 호출하지 않습니다. 직군 정의는 원본 앱에서 취합하고 프론트에 직원 목록을 복제하지 않습니다.
 
 회의 조회 실제 확인: 기존 설치본의 meetings 응답으로 회의 1개와 원본 role/statement, TEAM_ROLES 7개, 기존 jobs 12개를 반환했습니다. 설치본 원본·DB를 재생성하거나 회의 실행 API를 호출하지 않았습니다.
+
+실시간 회의: 기존 ceo_meetings/ventures를 재사용하는 meeting_start/read/resume/turn/proposal/finish 요청을 제공합니다. 설치본은 원래 workspaces.adapter의 해시 검사와 원자 교체로 갱신하므로 재설치하지 않습니다. 부분 발언은 ID로 갱신하고 출처·자식 세션 ID를 보존합니다. 재검토는 기존 pending 초안을 revising으로 잠그고 같은 ID를 pending으로 갱신합니다. 원래 소유자 승인 API도 pending만 허용합니다. 새 테이블·회사 planner·재다운로드는 없습니다.

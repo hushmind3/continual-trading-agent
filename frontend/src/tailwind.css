@@ -1104,38 +1104,37 @@
 .ha-tool-summary[open]>summary{@apply border-b border-slate-200}
 .ha-tool-summary>.ha-activity-timeline{@apply p-3}
 
-/* Meeting workspace: shared platform theme and reading hierarchy. */
-.ha-meeting-room{@apply flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto bg-slate-50 p-4 text-ink md:p-6}
-.ha-meeting-heading{@apply flex shrink-0 flex-wrap items-center justify-between gap-4}
-.ha-meeting-heading h2{@apply mt-1 text-2xl font-semibold tracking-tight}
-.ha-meeting-eyebrow{@apply text-xs font-semibold tracking-wide text-brand-700}
-.ha-meeting-subtitle{@apply mt-1 text-sm text-copy}
-.ha-meeting-agenda{@apply shrink-0}
-.ha-meeting-agenda>header{@apply mb-3}
-.ha-meeting-topic{@apply line-clamp-2 text-base font-semibold leading-relaxed}
 .ha-meeting-badge{@apply rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700}
-.ha-meeting-meta{@apply mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-copy}
-.ha-meeting-meta>span{@apply inline-flex items-center gap-1}
-.ha-meeting-run{@apply rounded-xl border border-slate-200 bg-white p-4 text-sm}
-.ha-meeting-grid{@apply grid min-w-0 gap-4 lg:grid-cols-12}
-.ha-meeting-roster{@apply min-w-0 lg:col-span-3}
-.ha-meeting-discussion{@apply min-w-0 space-y-4 lg:col-span-6}
-.ha-meeting-inspector{@apply min-w-0 lg:col-span-3}
-.ha-meeting-people{@apply flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible}
-.ha-meeting-person{@apply shrink-0 gap-3 rounded-xl p-3 lg:w-full}
 .ha-meeting-avatar{@apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xs font-semibold text-brand-700}
-.ha-meeting-section-heading{@apply flex items-center justify-between gap-3 text-sm}
-.ha-meeting-section-heading h3{@apply font-semibold}
-.ha-meeting-section-heading>span{@apply text-xs text-copy}
-.ha-meeting-speech{@apply rounded-2xl border border-slate-200 bg-white p-4 sm:p-5}
-.ha-meeting-speech>header{@apply mb-3 flex items-center gap-3 text-sm}
-.ha-meeting-speech>header small{@apply mt-1 block text-xs text-copy}
-.ha-meeting-excerpt{@apply line-clamp-3 text-sm leading-relaxed text-copy}
-.ha-meeting-full{@apply mt-3 border-t border-slate-100 pt-3 text-sm}
-.ha-meeting-full>summary{@apply cursor-pointer font-medium text-brand-700}
-.ha-meeting-reply{@apply mb-3 border-l-2 border-brand-200 pl-3 text-sm text-copy}
-.ha-meeting-empty{@apply flex items-center gap-3 rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-copy}
-.ha-meeting-latest{@apply mt-4 rounded-xl bg-slate-50 p-3 text-sm}
-.ha-meeting-latest>span{@apply text-xs text-copy}
-.ha-meeting-latest>p{@apply mt-1 leading-relaxed}
-.ha-meeting-job-panel{@apply mt-4 !p-0 !shadow-none !ring-0}
+
+/* Live meeting conversation shares the platform typography and composer primitives. */
+.ha-discussion-room{@apply flex min-h-0 min-w-0 flex-1 flex-col bg-white text-ink}
+.ha-discussion-heading{@apply flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 md:px-6}
+.ha-discussion-heading h2{@apply flex items-center gap-2 text-lg font-semibold}
+.ha-discussion-heading p{@apply mt-1 text-sm text-copy}
+.ha-discussion-toolbar{@apply flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2}
+.ha-discussion-toolbar>select{@apply min-w-0 max-w-full flex-1 text-sm}
+.ha-discussion-toolbar nav{@apply flex min-w-0 max-w-full flex-1 gap-1 overflow-x-auto}
+.ha-discussion-toolbar nav .ui-button{@apply shrink-0 text-xs}
+.ha-discussion-thread{@apply min-h-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto px-4 py-5 md:px-6;overflow-anchor:none}
+.ha-discussion-line{@apply mx-auto flex w-full max-w-conversation items-start gap-3}
+.ha-discussion-message{@apply min-w-0 flex-1}
+.ha-discussion-message>header{@apply mb-2 flex flex-wrap items-center gap-2 text-sm}
+.ha-discussion-message>header small{@apply text-xs text-copy}
+.ha-discussion-bubble{@apply rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-copy}
+.ha-discussion-line.is-owner{@apply flex-row-reverse}
+.ha-discussion-line.is-owner .ha-discussion-message{@apply flex-none;max-width:85%}
+.ha-discussion-line.is-owner header{@apply justify-end}
+.ha-discussion-line.is-owner .ha-discussion-bubble{@apply bg-brand-50}
+.ha-discussion-line.is-failure .ha-discussion-bubble{@apply bg-red-50 text-red-800}
+.ha-discussion-source{@apply mt-2 text-xs text-slate-400}
+.ha-discussion-source summary{@apply cursor-pointer}
+.ha-discussion-source p{@apply mt-1}
+.ha-discussion-empty{@apply mx-auto max-w-conversation py-8 text-sm text-copy}
+.ha-discussion-composer{@apply mx-auto mb-3 flex w-full max-w-conversation shrink-0 flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3}
+.ha-discussion-composer textarea{@apply w-full resize-none border-0 bg-transparent text-sm shadow-none focus:ring-0}
+.ha-discussion-composer>div{@apply flex items-center justify-end gap-2}
+.ha-discussion-composer>div>span{@apply mr-auto text-xs text-slate-400}
+.ha-discussion-proposal{@apply mx-auto max-w-conversation rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm}
+.ha-discussion-proposal p{@apply my-2 text-copy}
+.ha-typing{@apply text-sm text-copy}

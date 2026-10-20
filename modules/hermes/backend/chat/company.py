@@ -59,7 +59,7 @@ def prepare(worker, cfg, session, workspace=None):
             '회의는 안건에 필요한 직군부터 선택하고, 각자 핵심 주장·근거·반론을 짧게 검토한 뒤 결론을 내세요. 전 직군의 긴 독백을 반복하지 마세요. '
             'CEO는 전략·종합 판단, CPO는 고객 문제·제품 기획, CTO는 기술 설계·구현, CMO는 웹 조사·시장·성장, CFO는 비용·수익성, CS는 고객 경험, QA는 반증·품질을 맡습니다. '
             '독립 검토가 필요하면 원본 delegate_task에 역할 관점과 필요한 자료만 전달하세요. 다른 직군의 반론이 있으면 그 쟁점만 다시 검토하세요. '
-            'meeting은 발언을 저장하는 도구이며 다른 직원을 실행하지 않습니다. 직접 작성한 역할별 의견을 독립 직원의 실제 발언으로 꾸미지 마세요. '
+            '회의를 지시받으면 최신 요청의 안건으로 team_meeting start를 먼저 호출하세요. overview나 옛 사업 검토부터 하지 마세요. 이어 speak로 필요한 직군을 실제 호출하고, 서로의 의견을 받아 다음 직군이나 재반론을 선택한 뒤 finish로 결론을 내세요. 기존 회의 ID가 주어지면 start에 meeting_id를 전달해 그 회의를 재검토하세요. 사업 초안이 필요한 안건은 finish의 proposal로 승인 대기안을 제출하세요. 직접 회의록을 꾸며 쓰지 마세요. '
             '회사 현황·이전 결정이 현재 요청에 필요할 때만 company_records·session_search로 조회하세요. '
             '외부 정보가 필요하면 실제 웹 검색을 사용하고, 비공개 회사 기록을 웹에서 찾지 마세요. '
             '웹 정보 조사는 web_search, 주어진 URL 본문 확인은 web_extract를 먼저 사용하세요. '
@@ -87,9 +87,8 @@ def execute(args, **kwargs):
         return json.dumps({'error': '읽기 모드에서는 회사 기록을 변경할 수 없습니다.'}, ensure_ascii=False)
     command = dict(args)
     if command.get('action') == 'meeting':
-        minutes = command.get('minutes')
-        if not isinstance(minutes, list) or not minutes or any(not isinstance(item, dict) or not str(item.get('role') or '').strip() or not str(item.get('statement') or '').strip() for item in minutes) or not str(command.get('body') or '').strip():
-            return json.dumps({'error': '회의에는 minutes의 직군(role)·실제 의견(statement)과 body의 종합 결론이 필요합니다. meeting은 회의 실행이 아니라 기록 저장입니다.'}, ensure_ascii=False)
+        from .meetings import run
+        return run(worker, {'action':'start', 'topic':command.get('title') or command.get('body')})
     if command.get('action') == 'propose':
         proposal = command.get('proposal')
         required = ('problem', 'product', 'validation')
@@ -157,7 +156,7 @@ def prepare_history(worker, agent, history):
     # Keep the latest user/assistant anchors and atomic tool groups using native boundaries.
     projector = copy(compressor)
     projector.protect_first_n = 0
-    projector.min_tail_user_messages = 1
+    projector.min_tail_user_messages = 2
     projector.tail_mode = 'lean'
     before = estimate_messages_tokens_rough(history)
     budget = max(1, int(compressor.max_summary_tokens * compressor.summary_target_ratio))
@@ -227,7 +226,7 @@ def lifecycle(worker, action, *, prompt='', outcome=None):
         worker.job['company_job_id'] = result['job_id']
 
 
-SCHEMA = {'name': 'company_records', 'description': 'Company facts and records, not a separate AI engine. recall searches scoped past decisions/tasks/failures; remember stores a short durable note in existing records; overview reads status; propose submits a business for owner approval; begin records a role assignment and returns the REAL job_id/workspace. Use that returned job_id. finish records SUCCESS with evidence in body; fail records an ACTUAL FAILURE with reason in body. There is no error argument. meeting saves minutes and a concise summary. Roles: CPO product/design, CTO implementation, CMO marketing, CFO finance, CS customers, QA verification. You choose roles/order.',
+SCHEMA = {'name': 'company_records', 'description': 'Company facts and records, not a separate AI engine. recall searches scoped past decisions/tasks/failures; remember stores a short durable note in existing records; overview reads status; propose submits a business for owner approval; begin records a role assignment and returns the REAL job_id/workspace. Use that returned job_id. finish records SUCCESS with evidence in body; fail records an ACTUAL FAILURE with reason in body. There is no error argument. meeting starts a live discussion; use team_meeting to call actual speakers and conclude. Roles: CPO product/design, CTO implementation, CMO marketing, CFO finance, CS customers, QA verification. You choose roles/order.',
     'parameters': {'type': 'object', 'properties': {
         'action': {'type': 'string', 'enum': ['overview', 'recall', 'remember', 'propose', 'begin', 'finish', 'fail', 'meeting']},
         'venture_id': {'type': 'string'}, 'job_id': {'type': 'string'},
@@ -254,8 +253,10 @@ SCHEMA = {'name': 'company_records', 'description': 'Company facts and records, 
 def register():
     from tools.registry import registry
     from toolsets import TOOLSETS, _resolve_toolset_memo
+    from .meetings import SCHEMA as MEETING_SCHEMA, run as run_meeting
+    registry.register(name='team_meeting', toolset='platform_company', schema=MEETING_SCHEMA, handler=lambda args,**kw:run_meeting(_worker,args))
     registry.register(name='company_records', toolset='platform_company', schema=SCHEMA, handler=execute)
     from ai_agent.Hermes.chat.project_commands import SCHEMA as NPM_SCHEMA, run
     registry.register(name='project_npm', toolset='platform_company', schema=NPM_SCHEMA, handler=lambda args,**kw:run(_worker,args))
-    TOOLSETS['platform_company'] = {'description': 'Connected company records', 'tools': ['company_records','project_npm']}
+    TOOLSETS['platform_company'] = {'description': 'Connected company records', 'tools': ['company_records','project_npm','team_meeting']}
     _resolve_toolset_memo.clear()

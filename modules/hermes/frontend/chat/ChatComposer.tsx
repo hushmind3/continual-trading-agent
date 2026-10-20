@@ -13,7 +13,7 @@ interface Props {
  company?:boolean;conversationId?:string;companySources?:{session_id:string;title:string}[];onConversation?:(id:string)=>void;
  attachments: Attachment[]; uploading: boolean; upload: (files: File[]) => void; removeAttachment: (path: string) => void;
  composer: RefObject<HTMLTextAreaElement|null>; text: string; draft: (value: string) => void; send: () => void; stop: () => void;
- canSteer?:boolean;active: boolean; pending: boolean; stopping: boolean; mode: string; setMode: (value: string) => void;
+ blocked?:boolean;canSteer?:boolean;active: boolean; pending: boolean; stopping: boolean; mode: string; setMode: (value: string) => void;
  turns: number; setTurns: (value: number) => void; interval: number; setIntervalSeconds: (value: number) => void;
  times: number; setTimes: (value: number) => void;
  readOnly:boolean;setReadOnly:(value:boolean)=>void;
@@ -44,7 +44,7 @@ export function ChatComposer(props: Props) {
    <ThinkingControl value={props.thinking} change={props.setThinking} local={props.localThinking} active={active} reasoning={props.reasoning}/>
    <span className="ui-composer-key-hint">{active?'Enter로 작업 중 메시지 전달':'Enter 전송 · Shift+Enter 줄바꿈'}</span>
    {active&&<Button data-composer-action="stop" tone="danger" aria-label="작업 중지" busy={pending} disabled={pending||stopping} onClick={stop}><Square size={16}/><span>{stopping?'중지 중':'중지'}</span></Button>}
-   <Button data-composer-action="send" type="submit" aria-label="메시지 보내기" title={active?'작업 중 메시지 전달':'보내기'} tone="primary" busy={pending} disabled={pending||stopping||active&&props.canSteer===false||uploading||(!text.trim()&&!attachments.length)}><ArrowUp size={19}/></Button>
+   <Button data-composer-action="send" type="submit" aria-label="메시지 보내기" title={active?'작업 중 메시지 전달':'보내기'} tone="primary" busy={pending} disabled={props.blocked||pending||stopping||active&&props.canSteer===false||uploading||(!text.trim()&&!attachments.length)}><ArrowUp size={19}/></Button>
   </>}
   options={<RunModeOptions {...props}/>}
  >

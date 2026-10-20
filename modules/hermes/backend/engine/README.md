@@ -39,3 +39,5 @@ ChatGPT device-code 로그인이 진행 중인 worker도 재시작에서 보호�
 현재 native 실행 중 메시지는 steer_chat→AIAgent.redirect/steer로 전달하며 stop과 구분합니다. 같은 세션·현재 살아 있는 실행만 허용합니다. 원본 lifecycle의 Tool guardrail halted 이벤트를 감지하면 결과를 complete로 표시하지 않고 paused와 한국어 오류로 남깁니다. 원본의 동일 실패 반복 차단 기능은 유지합니다.
 
 반복 생성 중단은 실패 상태를 유지하며 한국어 원인과 미완료 사실을 반환합니다. 원본 영문 오류는 generation_failure 이벤트에 보존하고 성공/회의 완료로 바꾸거나 자동 무한 재시도하지 않습니다.
+
+실시간 team_meeting은 총괄의 직접 노출 도구입니다. 자식은 원본 위임 실행기·같은 모델·기존 SessionDB를 사용하고 일반 대화 목록에서 숨기며 회의의 실제 발언 출처로 연결합니다. meeting_id는 요청별 재검토 지침이며 다른 대화에 전역 주입하지 않습니다. finally에서 미결/실패를 기존 기록에 남깁니다.

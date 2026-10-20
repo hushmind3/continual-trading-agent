@@ -10,7 +10,7 @@ interface Props {
  pending:boolean;create:()=>void;activityButton:Ref<HTMLButtonElement>;
  activityOpen:boolean;toggleActivity:()=>void;focused:boolean;onFocus:()=>void;
  onModels:()=>void;onSettings:()=>void;toggleSessions:()=>void;
- company?:{open:boolean;toggle:()=>void;product?:string};companyTitle?:string;
+ company?:{open:boolean;toggle:()=>void};companyTitle?:string;
 }
 export function ChatHeader(props:Props){
  const {sessionsOpen,sessionButton,title,shownModel,modelReady,modelState,metrics,onModels,toggleSessions}=props;

@@ -13,7 +13,7 @@ import {ChatComposer,type Attachment} from './ChatComposer';
 import {ChatWelcome} from './ChatWelcome';
 import {useThinking} from './useThinking';
 import {AppTabs} from './AppTabs';
-import {CompanyPanel} from './CompanyPanel';
+import {CompanyPanel,CompanyProduct} from './CompanyPanel';
 import {companySession,useCompanyConversation} from './CompanyConversation';
 
 interface Props {status?:AgentStatus;modelName:string;focused:boolean;onFocus:()=>void;onStatus:(s:AgentStatus)=>void;onModels:()=>void;onSettings:()=>void;onRefresh:()=>void}
@@ -31,14 +31,12 @@ function ChatWorkspace({status,modelName,focused,onFocus,onStatus,onModels,onSet
  const [sessions,setSessions]=useState<Session[]>([]),[selected,setSelected]=useState(''),[messages,setMessages]=useState<Message[]>([]),[text,setText]=useState(()=>localStorage.getItem(draftKey(''))||''),[error,setError]=useState(''),[pending,setPending]=useState(false),[optimistic,setOptimistic]=useState('');
  const [sessionsOpen,setSessionsOpen]=useState(false),[activityOpen,setActivityOpen]=useState(false),[query,setQuery]=useState(''),[showLatest,setShowLatest]=useState(false);
  const [switching,setSwitching]=useState(false),switchVersion=useRef(0);
- const [companyOpen,setCompanyOpen]=useState(()=>!mobile());
+ const [companyOpen,setCompanyOpen]=useState(false);
  const companyPanel=useRef<HTMLElement>(null);
  const viewport=useRef<HTMLDivElement>(null),follow=useRef(true),selection=useRef(''),optimisticAfter=useRef(0),composer=useRef<HTMLTextAreaElement>(null);
  const sessionPanel=useRef<HTMLElement>(null),activityPanel=useRef<HTMLElement>(null),sessionButton=useRef<HTMLButtonElement>(null),activityButton=useRef<HTMLButtonElement>(null);
  const [answer,setAnswer]=useState(''),[mode,setMode]=useState('chat'),[turns,setTurns]=useState(20),[interval,setIntervalSeconds]=useState(60),[times,setTimes]=useState(5),[savedAutonomy,setSavedAutonomy]=useState<AutonomousState>();
  const company=useCompanyConversation(selected);
- const pendingDrafts=company.ventures.map(v=>v.id).join(',');
- useEffect(()=>{if(company.enabled&&pendingDrafts){setCompanyOpen(true);setActivityOpen(false);setSessionsOpen(false)}},[company.enabled,pendingDrafts]);
  const active=working(status),thisJob=status?.job.session_id===selected?status.job:undefined,auto=thisJob?.autonomy??savedAutonomy;
  const shownMessages=messages;
  const toggleCompany=()=>{setCompanyOpen(value=>{localStorage.setItem('hermes.company.open',String(!value));return !value});setActivityOpen(false);setSessionsOpen(false);documents?.close()};
@@ -83,11 +81,12 @@ function ChatWorkspace({status,modelName,focused,onFocus,onStatus,onModels,onSet
  const empty=!shownMessages.length&&!optimistic&&!(thisJob?.live_text&&active);
  return <div className={'hermes-chat-layout '+(sessionsOpen?'sessions-open':'sessions-closed')}>
  {sessionsOpen&&<><IconButton className="ha-panel-backdrop ha-session-backdrop" aria-label="대화 목록 배경 닫기" tabIndex={-1} onClick={()=>setSessionsOpen(false)}/><SessionSidebar sessionPanel={sessionPanel} toggleSessions={toggleSessions} create={()=>void create()} pending={pending} query={query} setQuery={setQuery} visible={visible} selected={selected} choose={id=>void choose(id)} archive={()=>void archive()} archiveDisabled={company.enabled||active&&!!thisJob} rename={async(id,title)=>{await request(prefix+'session/rename',{id,title});await list()}}/></>}
- <section className="hermes-chat"><ChatHeader companyTitle={company.enabled?company.sources.find(source=>source.session_id===selected)?.title:undefined} sessionsOpen={sessionsOpen} sessionButton={sessionButton} title={title} shownModel={shownModel} modelReady={connectionState(status)==='ready'} modelState={connectionState(status)} metrics={thisJob?.metrics??{context_limit:status?.job.metrics?.context_limit}} pending={pending||switching||company.pending} create={()=>void create()} activityButton={activityButton} activityOpen={activityOpen} company={company.id?{open:companyOpen,toggle:toggleCompany,product:(()=>{const path=company.progress?.preview_url||company.progress?.product_url;return path?.startsWith('/')&&!path.startsWith('//')?'/assets/projects/'+company.id+path:undefined})()}:undefined} toggleActivity={()=>{documents?.close();setCompanyOpen(false);setActivityOpen(v=>!v);setSessionsOpen(false)}} focused={focused} onFocus={onFocus} onModels={onModels} onSettings={onSettings} toggleSessions={toggleSessions}/>
+ <section className="hermes-chat"><ChatHeader companyTitle={company.enabled?company.sources.find(source=>source.session_id===selected)?.title:undefined} sessionsOpen={sessionsOpen} sessionButton={sessionButton} title={title} shownModel={shownModel} modelReady={connectionState(status)==='ready'} modelState={connectionState(status)} metrics={thisJob?.metrics??{context_limit:status?.job.metrics?.context_limit}} pending={pending||switching||company.pending} create={()=>void create()} activityButton={activityButton} activityOpen={activityOpen} company={company.id?{open:companyOpen,toggle:toggleCompany}:undefined} toggleActivity={()=>{documents?.close();setCompanyOpen(false);setActivityOpen(v=>!v);setSessionsOpen(false)}} focused={focused} onFocus={onFocus} onModels={onModels} onSettings={onSettings} toggleSessions={toggleSessions}/>
 
  <div className="hermes-chat-body"><div className="ha-chat-main"><div className="ha-transcript-viewport"><div ref={viewport} className={'hermes-messages '+(empty?'is-empty':'')} onScroll={()=>{const el=viewport.current;if(el){follow.current=el.scrollHeight-el.scrollTop-el.clientHeight<90;setShowLatest(!follow.current)}}}><div className="ha-conversation" aria-live="polite">
  {empty&&!company.enabled&&<ChatWelcome onPick={value=>{draft(value);composer.current?.focus()}}/>}
  <Transcript messages={shownMessages}/>
+ {company.enabled&&company.id&&company.progress&&(company.progress.preview_url||company.progress.published&&company.progress.product_url)&&<CompanyProduct id={company.id} progress={company.progress}/>}
  {optimistic&&!shownMessages.slice(optimisticAfter.current).some(m=>m.role==='user'&&contentText(m.content)===optimistic)&&<article className="hermes-message user"><div className="ha-message-content"><MessageBody text={optimistic} user/></div></article>}
  {thisJob?.live_text&&active&&contentText(messages.at(-1)?.content)!==thisJob.live_text&&<article className="hermes-message assistant is-streaming"><div className="ha-assistant-mark">✳</div><div className="ha-message-content"><MessageBody text={thisJob.live_text}/><span className="ha-stream-dot" aria-label="답변 작성 중"/></div></article>}
  </div></div>{showLatest&&<IconButton className="ha-scroll-latest" type="button" aria-label="최신 메시지로 이동" onClick={()=>{follow.current=true;setShowLatest(false);viewport.current?.scrollTo({top:viewport.current.scrollHeight,behavior:'smooth'})}}><ArrowDown size={17}/>최신 메시지</IconButton>}
@@ -104,5 +103,5 @@ function ChatWorkspace({status,modelName,focused,onFocus,onStatus,onModels,onSet
   const linked=await request<{session_id:string}>('projects/conversation',{id:source.id,action:'session'});
   const result=await company.decide(id,approve);if(!approve||!result)return;
   await choose(linked.session_id);await thinking.prepare();onStatus(await request<AgentStatus>(prefix+'chat',{session_id:linked.session_id,message:'소유자가 사업안 '+result.name+' ('+id+')의 로컬 제작을 승인했습니다. company_records로 승인된 초안과 기존 진행을 확인하고 필요한 역할·순서를 직접 정해 미완성 작업을 이어가세요. 외부 공개·지출은 별도 승인 대상입니다.',mode:'goal',max_turns:turns,read_only:readOnly}));
- }catch(e){setError(failure(e))}})()} onClose={()=>{setCompanyOpen(false);localStorage.setItem('hermes.company.open','false')}}/></>}</div></section></div>;
+ }catch(e){setError(failure(e))}})()}/></>}</div></section></div>;
 }

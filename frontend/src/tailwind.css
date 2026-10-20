@@ -612,7 +612,7 @@
 .hermes-chat-heading{@apply flex;@apply items-center;@apply min-h-14.5;@apply pt-2.25 pr-4 pb-2.25 pl-4;@apply gap-3;border-bottom:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply bg-white;@apply shrink-0}
 .hermes-chat-heading .ui-button{@apply flex;@apply items-center;@apply justify-center;@apply min-w-9;@apply h-9;@apply p-1.75;@apply border-0;border-radius:calc(var(--spacing) * 2.25);@apply bg-transparent;@apply text-slate-500;@apply shadow-none}
 .hermes-chat-heading .ui-button:hover{@apply bg-slate-100;@apply text-slate-700}
-.hermes-chat-heading .ui-button[aria-pressed=true]{@apply text-brand-600;@apply bg-brand-50}
+.hermes-chat-heading .ui-button[aria-pressed=true],.hermes-chat-heading .ui-button[aria-expanded=true]{@apply text-brand-600;@apply bg-brand-50}
 .hermes-chat-title{@apply min-w-0;@apply max-w-55}
 .hermes-chat-title h2{@apply text-base;@apply leading-dense;@apply font-bold;letter-spacing:-.calc(var(--spacing) * 1)}
 .hermes-chat-title p{@apply text-xs;@apply leading-label;@apply text-slate-400;@apply mt-1;@apply overflow-hidden;@apply whitespace-nowrap;@apply text-ellipsis}
@@ -1083,6 +1083,14 @@
 /* Shared side-panel geometry; values belong to the theme, user widths to storage. */
 :root{--panel-min-percent:20;--panel-max-percent:80;--panel-resize-step:2}
 .hermes-chat-body>.hermes-log{@apply relative;width:var(--side-panel-width,20rem)}
+.ha-company-panel{@apply bg-canvas font-sans text-copy}
+.ha-company-panel .ui-panel{@apply shadow-none ring-brand-100}
+.ha-company-panel .ui-panel-title{@apply text-ink}
+.ha-company-product{@apply my-3 flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-5 py-4 font-sans text-brand-800 no-underline transition-colors hover:bg-brand-100}
+.ha-company-product>span:first-child{@apply flex min-w-0 flex-1 flex-col gap-1}
+.ha-company-product small{@apply text-xs text-brand-600}
+.ha-company-product strong{@apply break-words text-sm font-semibold}
+.ha-company-product>span:last-child{@apply inline-flex shrink-0 items-center gap-2 text-sm font-semibold}
 .ui-panel-resizer{@apply absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none bg-transparent outline-none hover:bg-brand-100 focus-visible:bg-brand-100}
 .ui-panel-resizer::after{content:'';@apply absolute left-0 top-1/2 h-10 w-1 rounded-full bg-slate-300 transition-colors}
 .ui-panel-resizer:hover::after,.ui-panel-resizer:focus-visible::after{@apply bg-brand-500}

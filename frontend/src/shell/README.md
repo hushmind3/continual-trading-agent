@@ -20,7 +20,7 @@
 
 2026-10-16: React·Vite·공통 tailwind.css를 사용하며 버튼·입력·선택 요소는 src/ui/Primitives.tsx를 재사용합니다. 화면의 API·데이터 처리 계약은 유지합니다.
 
-AI 에이전트 → Hermes의 여섯 소메뉴는 modules/hermes의 module.json과 frontend/register.ts를 통해 등록합니다. 같은 지연 로딩 작업공간을 공유하고 주소로 화면을 구분하므로 이동 중 대화 상태를 중복 생성하지 않습니다.
+AI 에이전트 → 헤르메스는 왼쪽에 진입점 하나를 표시합니다. 모델·작업 환경·MCP·스킬·시스템 프롬프트는 설정 상단 탭으로 전환하고 기존 여섯 주소는 modules/hermes의 module.json과 frontend/register.ts를 통해 등록합니다. sidebar=false인 주소는 탐색에서만 숨깁니다. 같은 지연 로딩 작업공간을 공유하고 주소로 화면을 구분하므로 이동 중 대화 상태를 중복 생성하지 않습니다.
 
 메뉴가 mountKey를 지정하면 해당 작업공간 인스턴스를 공유합니다. AI 에이전트 소메뉴는 같은 mountKey를 사용해 주소 이동 때 작성 중인 화면을 새로 만들지 않습니다. 지정하지 않은 금융·REA 메뉴의 기존 전환 방식은 유지합니다.
 

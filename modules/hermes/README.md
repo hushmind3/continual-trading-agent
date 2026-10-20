@@ -2,7 +2,7 @@
 
 용도: 이식 Hermes의 소스·패키지·영속 데이터 소유와 플랫폼 연결 경계를 안내합니다.
 
-- `module.json`: AI 에이전트 대메뉴 → Hermes 중메뉴와 API의 자동 등록 정보입니다.
+- `module.json`: AI 에이전트 소속 Hermes 화면과 API의 자동 등록 정보입니다. 왼쪽에는 헤르메스 진입점 하나를 표시하며 설정 기능은 대화 오른쪽 톱니바퀴에서 여는 상단 탭으로 이동합니다.
 - `backend/`: 이식된 원본 엔진과 기능별 Python 코드입니다. 상세 실행 안내는 `backend/README.md`를 봅니다.
 - `frontend/`: 대화·모델·작업 환경·MCP·스킬·시스템 프롬프트 화면입니다. React/Vite/Tailwind와 플랫폼 공통 UI를 사용합니다.
 - `runtime/ai_agent/Hermes/`: 프로그램 밖에 보존하는 설정·대화 DB·작업 기록입니다. 모듈 제거 대상이 아닙니다.

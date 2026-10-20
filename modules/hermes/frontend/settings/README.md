@@ -1,11 +1,13 @@
 # AI 에이전트 설정 화면 연결
 
-모델·작업 환경·MCP·스킬·시스템 프롬프트의 기존 구현을 각 소메뉴에서 재사용합니다. `Settings.tsx`는 주소에 맞는 설정 기능만 표시하며, 중복 왼쪽 설정 메뉴를 만들지 않습니다. 상위 `../../agent_navigation.ts`가 화면 목록·이동을 관리합니다.
+용도: 대화 오른쪽 설정 버튼으로 여는 모델·작업 환경·MCP·스킬·시스템 프롬프트의 기존 구현을 상단 탭에서 재사용합니다. `Settings.tsx`는 주소에 맞는 설정 기능만 표시하며, 중복 왼쪽 설정 메뉴를 만들지 않습니다. 상위 `../../agent_navigation.ts`가 화면 목록·이동을 관리합니다.
 
-상위 대메뉴 주소는 [../../README.md](../../README.md)에 있습니다. 대화로 돌아가기·화면 선택·브라우저 뒤로가기·새로고침을 지원합니다. 대화는 숨겨 둔 채 유지하며 메뉴 이동 자체가 모델이나 도구를 실행하지 않습니다.
+상위 대메뉴 주소는 [../../README.md](../../README.md)에 있습니다. 상단의 대화 탭으로 복귀하며, 기존 드롭다운과 별도 대화로 돌아가기 버튼은 중복 표시하지 않습니다. 화면 선택·브라우저 뒤로가기·새로고침을 지원합니다. 대화는 숨겨 둔 채 유지하며 메뉴 이동 자체가 모델이나 도구를 실행하지 않습니다.
 
-기능 코드: models/ModelSettings.tsx, mcp/McpPage.tsx, skills/Skills.tsx, prompt/SystemPrompt.tsx. workspace/WorkspaceSettings.tsx는 작업 폴더·도구·반복 한도를 별도 소메뉴로 표시합니다. useAgentSettings.ts는 설정 조회·실패·재시도를 공유합니다. 모델 연결 저장은 서버 연결 필드만, 모델 화면의 실행 설정 저장은 context_length/tool_loading만, 작업 환경은 workspace/toolsets/max_iterations만 저장합니다. 각 기능 API와 권한·저장 위치는 각 README를 따릅니다.
+기능 코드: models/ModelSettings.tsx, mcp/McpPage.tsx, skills/Skills.tsx, prompt/SystemPrompt.tsx. workspace/WorkspaceSettings.tsx는 작업 폴더·도구·반복 한도를 작업 환경 탭에 표시합니다. useAgentSettings.ts는 설정 조회·실패·재시도를 공유합니다. 모델 연결 저장은 서버 연결 필드만, 모델 화면의 실행 설정 저장은 context_length/tool_loading만, 작업 환경은 workspace/toolsets/max_iterations만 저장합니다. 각 기능 API와 권한·저장 위치는 각 README를 따릅니다.
 
 방문한 설정 화면은 숨겨 유지해 소메뉴 이동과 대화 왕복 때 미저장 초안을 잃지 않습니다. 브라우저 새로고침까지 저장하는 기능은 아니며, 접속 키를 브라우저 저장소에 기록하지 않습니다. useAgentSettings는 활성 화면에서 현재 서버 설정을 다시 읽되 로컬에서 수정한 필드는 유지하고, 저장 응답은 새 기준값으로 받아들입니다.
 
 Thinking은 [대화 소메뉴](../chat/README.md)의 읽기 모드 옆에 있으며 다음 전송·재개 직전에 별도로 저장합니다. 모델 설정 화면을 열 필요가 없습니다.
+
+실제 확인(2026-10-21): 기존 서버에서 오른쪽 톱니바퀴 → 대화/모델/작업 환경/MCP/스킬/시스템 프롬프트 탭 이동, 같은 대화 입력 요소 유지, 기존 모델 주소 직접 접속과 좌측 헤르메스 선택 표시를 확인했습니다. 좌측 AI 에이전트 링크는 헤르메스 1개이며 JavaScript 오류 0건, 390px 화면 넘침 없음입니다. TypeScript 및 운영 빌드 통과 후 프론트만 적용했습니다. 모델·백엔드 재시작, 설정 저장, MCP 설치·실행은 하지 않았습니다.

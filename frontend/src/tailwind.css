@@ -948,6 +948,8 @@
 .ha-agent-page-switch .ui-select{@apply min-w-0 max-w-52}
 
 .ha-agent-page-switch>span{@apply whitespace-nowrap}
+.ha-settings-tabs{@apply m-0 min-w-0 w-full overflow-x-auto border-0 pt-2}
+.ha-settings-tabs .ui-button{@apply shrink-0 whitespace-nowrap}
 
 /* Shared settings surfaces: one section boundary, readable labels, compact facts. */
 .agent-settings-stack{@apply grid gap-5}

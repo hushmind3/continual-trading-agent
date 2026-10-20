@@ -6,6 +6,7 @@ interface Props {items:MenuItem[];active:string;compact?:boolean;onNavigate:()=>
 export function NavigationTree({items,active,compact=false,onNavigate,errorCount}:Props){
  const [closed,setClosed]=useState(new Set<string>());
  const toggle=(id:string)=>setClosed(old=>{const next=new Set(old);if(next.has(id))next.delete(id);else next.add(id);return next});
+ items=items.filter(item=>item.sidebar!==false);
  return <>{[...new Set(items.map(item=>item.group))].map(group=>{
   const members=items.filter(item=>item.group===group),sections=[...new Map(members.filter(item=>item.section).map(item=>[item.section!.id,item.section!])).values()];
   return <details key={group} open={compact||!closed.has(group)} className="workspace-menu-group">

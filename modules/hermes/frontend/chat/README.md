@@ -10,7 +10,7 @@ RuntimeMetrics의 ‘전체 작업’은 모든 모델 요청·검색·도구 �
 
 Chat.tsx owns sessions, search, per-session drafts, send/steer/stop/approval/resume, panel controls and scroll following. ChatStream.tsx groups adjacent tool-only turns and matches results by ID; ActivityTimeline pairs real start/complete events and retains errors. MessageBody.tsx renders Markdown/GFM with raw HTML disabled and provides copy controls.
 
-The message area fills the remaining viewport. Latest Message restores scroll following. Selected active sessions refresh every 2.5 seconds, retaining unchanged message arrays to avoid reparsing Markdown for metrics-only updates. Opening settings keeps chat mounted. Drafts survive settings navigation and page reload.
+The message area fills the remaining viewport. Latest Message restores scroll following. Selected active sessions refresh every 2.5 seconds, retaining unchanged message arrays to avoid reparsing Markdown for metrics-only updates. The rightmost settings button uses the shared Lucide Settings gear icon and opens the existing settings tabs. Opening settings keeps chat mounted. Drafts survive settings navigation and page reload.
 
 The conversation and composer share a centered 880px reading width on large screens. User bubbles align with that column rather than the monitor edge; the surrounding workspace and header still fill the available viewport. Smaller screens use the available width.
 

@@ -62,3 +62,5 @@ API: projects/settings(use_harness), projects/harness(GET/POST). 아직 이 함�
 workspace/connect는 설치 모듈의 workspace_host를 기록해 별도 실행 메뉴를 Hermes 탭으로 통합합니다. conversation state는 승인된 사업의 실제 dist/index.html 존재를 확인해 preview_url을 제공합니다. 공개/결제 상태를 완료로 바꾸지 않습니다.
 
 회사 기록 도구 recall/remember는 기존 회사 DB의 업무·사업·회의·경험·교훈을 재사용합니다. 새 DB나 별도 학습/검색 서버를 만들지 않습니다. 기존 conversation의 capability 인증 아래 동작하며 native CEO가 같은 조직 SessionDB 기록과 함께 제한된 문맥으로 조회합니다. 사업별 최신 결정의 정정·진행 중 업무·실패 근거는 integrations/README.md를 따릅니다.
+
+회사 대화 상태: conversation.py의 projects/conversation은 기존 승인 사업의 작업 폴더에서 dist/index.html을 확인해 progress.ready_products를 집계합니다. progress.approved는 승인 프로젝트 수이며 실제 실행 프로세스 수를 뜻하지 않습니다. 제품 준비 수는 모든 승인 사업을 확인하고 기존 첫 제품 미리보기 연결은 유지합니다.

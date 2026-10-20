@@ -7,7 +7,7 @@ import {failure} from '../types';
 export const CompanyConversations=createContext<{id:string;title:string;session_id:string}[]>([]);
 export const companySession=(id:string)=>'company:'+id;
 export type Venture={id:string;name:string;status:string;proposal_json:string};
-export type CompanyProgress={approved?:number;published?:boolean;free_trial?:boolean;payment_connected?:boolean;usage?:{requests?:number};product_url?:string;preview_url?:string;product_name?:string};
+export type CompanyProgress={approved?:number;ready_products?:number;published?:boolean;free_trial?:boolean;payment_connected?:boolean;usage?:{requests?:number};product_url?:string;preview_url?:string;product_name?:string};
 type State={session_id?:string;ventures:Venture[];progress?:CompanyProgress};
 export function useCompanyConversation(selected:string){
  const sources=useContext(CompanyConversations),source=sources.find(v=>v.session_id===selected),id=source?.id??sources[0]?.id;

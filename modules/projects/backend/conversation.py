@@ -65,11 +65,13 @@ def call(key, payload, origin=None):
               'progress': invoke('/api/store/info')}
     approved = [v for v in control['ventures'] if v.get('status') == 'approved']
     result['progress']['approved'] = len(approved)
+    result['progress']['ready_products'] = 0
     for venture in approved:
         key = str(venture.get('id', ''))
         if not re.fullmatch('[A-Za-z0-9_-]{1,100}', key): continue
         product = store.owned(store.project_folder(record), 'workspaces/' + key + '/dist/index.html')
         if product.is_file():
-            result['progress'].update(preview_url='/_platform-output/' + key + '/dist/index.html', product_name=venture.get('name', key))
-            break
+            result['progress']['ready_products'] += 1
+            if result['progress']['ready_products'] == 1:
+                result['progress'].update(preview_url='/_platform-output/' + key + '/dist/index.html', product_name=venture.get('name', key))
     return result

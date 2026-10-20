@@ -131,7 +131,14 @@ def invoke(record, payload, origin=None):
         forwarded = {**payload, '_host': origin.headers.get('host', '') if origin else '',
             '_client': [origin.client.host, origin.client.port] if origin and origin.client else ['platform-internal', 0],
             '_server': [origin.url.hostname, origin.url.port or 80] if origin else ['127.0.0.1', 8766]}
-        return worker.call(forwarded)
+        result = worker.call(forwarded)
+        if record.get('workspace_ui', {}).get('recipe') == 'company-v1' and 'application/json' in result.get('headers', {}).get('content-type', ''):
+            from ai_agent.Hermes.chat.prompt_profiles import display_records, read_settings
+            from .store import ROOT
+            value = json.loads(base64.b64decode(result['body']))
+            body = json.dumps(display_records(value, read_settings(ROOT)), ensure_ascii=False).encode('utf-8')
+            result = {**result, 'body':base64.b64encode(body).decode('ascii'), 'headers':{k:v for k,v in result.get('headers', {}).items() if k.lower() not in ('content-length','etag')}}
+        return result
     finally:
         with LOCK: ACTIVE -= 1
 

@@ -21,3 +21,7 @@ recall/remember 기존 기록 재사용: 새 DB·새 테이블·별도 임베딩
 회의 조회 실제 확인: 기존 설치본의 meetings 응답으로 회의 1개와 원본 role/statement, TEAM_ROLES 7개, 기존 jobs 12개를 반환했습니다. 설치본 원본·DB를 재생성하거나 회의 실행 API를 호출하지 않았습니다.
 
 실시간 회의: 기존 ceo_meetings/ventures를 재사용하는 meeting_start/read/resume/turn/proposal/finish 요청을 제공합니다. 설치본은 원래 workspaces.adapter의 해시 검사와 원자 교체로 갱신하므로 재설치하지 않습니다. 부분 발언은 ID로 갱신하고 출처·자식 세션 ID를 보존합니다. 재검토는 기존 pending 초안을 revising으로 잠그고 같은 ID를 pending으로 갱신합니다. 원래 소유자 승인 API도 pending만 허용합니다. 새 테이블·회사 planner·재다운로드는 없습니다.
+
+직원 이름은 Hermes prompt_profiles.py의 이름 행에서 결정하며 runtime.py가 기존 roles/회의/업무 JSON에 name·role_name을 투영합니다. 내부 CEO/CPO/CTO 등 ID와 저장 원문은 보존합니다. 기존 UI 어댑터는 카드의 이름 요소만 갱신하고 업무 상태·버튼 구조는 보존합니다.
+
+현재 직원 식별자는 프롬프트와 무관한 UUID입니다. 설치 소스의 직원 열과 조회 코드는 시작 시 백업 후 이관하며 기존 업무·회의·경험 건수를 보존합니다. company_records.py는 같은 설정의 staff_registry를 읽고 이름·전문성을 갱신합니다. API·도구·회의 발언은 staff_id, 직원 목록은 staff이며 총괄은 manager_staff_id로 지정합니다. 역할 코드 enum·고정 임원 순서를 실행 경로에 사용하지 않습니다. 이관 감사 자료는 Hermes의 migrations에 보관합니다.

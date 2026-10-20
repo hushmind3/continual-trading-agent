@@ -1,4 +1,4 @@
-"""Original company UI/DB as records for native Hermes; no provider or execution loop."""
+'Original company UI/DB as records for native Hermes; no provider or execution loop.'
 import json
 from pathlib import Path
 import re
@@ -6,10 +6,10 @@ from contextlib import contextmanager
 
 
 def recall(db, command):
-    """Search existing organization tables; no new database, index or model call."""
+    'Search existing organization tables; no new database, index or model call.'
     query = str(command.get('query', ''))[:512].lower()
     ignored = {'이어서', '계속', '이전', '지난번', '하던거', '진행', '작업', '해줘', '해주세요', '기억', '어디까지', '다시'}
-    words = [t for t in re.findall(r'[a-z0-9_가-힣]{2,}', query) if t not in ignored]
+    words = [t for t in re.findall('[a-z0-9_가-힣]{2,}', query) if t not in ignored]
     grams = [word[i:i+3] for word in words if re.fullmatch('[가-힣]{5,}',word) for i in range(len(word)-2)]
     terms = list(dict.fromkeys(t for t in words+grams if t not in ignored))[:16]
     scope = str(command.get('venture_id') or '')
@@ -73,7 +73,27 @@ def install(app, data_root, activity=lambda delta: None):
 
     base = Path(data_root).resolve() / 'workspaces'
     base.mkdir(parents=True, exist_ok=True)
-    roles = {'CEO', 'CPO', 'CTO', 'CMO', 'CFO', 'CS', 'QA'}
+    staff_ids = set()
+    root=next((parent for parent in Path(data_root).resolve().parents if (parent/'backend/platform_modules.py').is_file()),None)
+    if root is None:raise ValueError('직원 설정의 플랫폼 경로가 없습니다.')
+    def staff_config():
+        return json.loads((root/'runtime/ai_agent/Hermes/platform-settings.json').read_text(encoding='utf-8'))
+    def manager_id():return staff_config()['manager_staff_id']
+    def refresh_staff():
+        cfg=staff_config();overrides=cfg.get('agent_prompts',{});rows=[]
+        for item in cfg['staff_registry']:
+            prompt=overrides.get(item['id'],item['default_prompt'])
+            match=re.search(r'이름\s*[:：]\s*(.+)',prompt) or re.search(r'이름\s*[:：]\s*(.+)',item['default_prompt'])
+            name=match.group(1).strip().strip('*').strip()[:80] if match else '직원'
+            expertise=re.search(r'\*\*전문성:\*\*\s*(.+)',prompt)
+            rows.append((item['id'],name,name,expertise.group(1) if expertise else prompt[:320],'◇'))
+        server.STAFF=rows;staff_ids.clear();staff_ids.update(item[0] for item in rows)
+    refresh_staff()
+    @app.middleware('http')
+    async def staff_context(request,call_next):
+        refresh_staff()
+        response=await call_next(request)
+        return response
     async def retired_loop(shutdown):
         await shutdown.wait()
     async def retired_provider(*args, **kwargs):
@@ -132,7 +152,7 @@ def install(app, data_root, activity=lambda delta: None):
                 if action == 'meeting_turn':
                     if row['status'] != 'running': raise ValueError('진행 중인 회의가 아닙니다.')
                     turn = dict(command.get('turn') or {})
-                    if not turn.get('id') or not turn.get('role'): raise ValueError('발언 식별자와 직군이 필요합니다.')
+                    if not turn.get('id') or (turn.get('staff_id') not in staff_ids and turn.get('actor') not in ('owner','system')): raise ValueError('발언 식별자와 직군이 필요합니다.')
                     old = next((i for i, item in enumerate(minutes) if item.get('id') == turn['id']), None)
                     if old is None: minutes.append(turn)
                     else: minutes[old] = {**minutes[old], **turn}
@@ -140,7 +160,7 @@ def install(app, data_root, activity=lambda delta: None):
                 if action == 'meeting_finish':
                     state = command.get('status', 'completed')
                     if state not in ('completed', 'failed', 'paused', 'stopped'): raise ValueError('회의 상태를 확인하세요.')
-                    if state == 'completed' and len({item.get('role') for item in minutes if item.get('status') == 'completed' and item.get('source') == 'hermes_delegate'}) < 2:
+                    if state == 'completed' and len({item.get('staff_id') for item in minutes if item.get('status') == 'completed' and item.get('source') == 'hermes_delegate'}) < 2:
                         raise ValueError('서로 다른 직군의 실제 검토가 두 개 이상 필요합니다.')
                     candidate = command.get('venture_id') or row['venture_id']
                     if state=='completed' and candidate:
@@ -148,12 +168,12 @@ def install(app, data_root, activity=lambda delta: None):
                         if proposal_state and proposal_state['status']=='revising': raise ValueError('수정 중인 초안을 먼저 다시 제출하세요.')
                     summary = str(command.get('body') or '').strip()
                     if not summary: raise ValueError('회의 결론 또는 중단 사유가 필요합니다.')
-                    minutes.append({'id': 'conclusion-'+db.uid('turn'), 'role': 'CEO' if state=='completed' else 'SYSTEM', 'name':'총괄' if state=='completed' else '안내', 'statement':summary, 'status':state, 'source':'moderator' if state=='completed' else 'failure', 'created_at':db.now()})
+                    minutes.append({'id': 'conclusion-'+db.uid('turn'), 'staff_id': manager_id() if state=='completed' else None, 'actor':'staff' if state=='completed' else 'system', 'name':'총괄' if state=='completed' else '안내', 'statement':summary, 'status':state, 'source':'moderator' if state=='completed' else 'failure', 'created_at':db.now()})
                     c.execute('UPDATE ceo_meetings SET minutes_json=? WHERE id=?', (json.dumps(minutes,ensure_ascii=False),key))
                     c.execute('UPDATE ceo_meetings SET status=?,summary=?,venture_id=? WHERE id=?', (state, summary, command.get('venture_id') or row['venture_id'], key))
                     row.update(status=state, summary=summary)
             return {'meeting_id': key, 'topic': row['topic'], 'status': row['status'], 'minutes': minutes,
-                    'venture_id': row['venture_id'], 'roles': [{'role': role, 'name': name, 'title': title, 'description': description} for role,name,title,description,icon in server.TEAM_ROLES], 'summary': row['summary']}
+                    'venture_id': row['venture_id'], 'staff': [{'staff_id': staff_id, 'name': name, 'title': title, 'description': description} for staff_id,name,title,description,icon in server.STAFF], 'summary': row['summary']}
         if action == 'recall': return recall(db, command)
         if action == 'remember':
             kind = command.get('kind'); body = str(command.get('body', '')).strip()
@@ -163,13 +183,13 @@ def install(app, data_root, activity=lambda delta: None):
             if scope != 'owner': venture(scope)
             key = str(command.get('memory_key') or db.uid('topic'))[:80]
             origin = 'hermes-native|' + json.dumps({'kind':kind,'scope':scope,'key':key},ensure_ascii=False)
-            db.record_lesson('CEO',body,origin,0)
+            db.record_lesson(manager_id(),body,origin,0)
             return {'saved':True,'scope':scope,'kind':kind,'memory_key':key}
         if action == 'run_start':
             key = db.uid('job')
             with db.LOCK, db.connect() as c:
-                c.execute('INSERT INTO jobs(id,created_at,started_at,type,role,status,title,arguments,mode) VALUES(?,?,?,?,?,?,?,?,?)',
-                          (key, db.now(), db.now(), 'agent_task', 'CEO', 'running', str(command.get('body', ''))[:100], json.dumps({'native_session': command.get('_session')}, ensure_ascii=False), 'hermes-native'))
+                c.execute('INSERT INTO jobs(id,created_at,started_at,type,staff_id,status,title,arguments,mode) VALUES(?,?,?,?,?,?,?,?,?)',
+                          (key, db.now(), db.now(), 'agent_task', manager_id(), 'running', str(command.get('body', ''))[:100], json.dumps({'native_session': command.get('_session')}, ensure_ascii=False), 'hermes-native'))
             return {'job_id': key}
         if action == 'run_finish':
             row = db.one('SELECT * FROM jobs WHERE id=?', (str(command.get('job_id', '')),))
@@ -185,11 +205,13 @@ def install(app, data_root, activity=lambda delta: None):
         if action == 'overview':
             # A status query must not stuff every historical report into the model prompt.
             result = {'ventures': db.many('SELECT id,name,status,substr(proposal_json,1,4000) AS proposal_json FROM ventures ORDER BY rowid DESC LIMIT 8'),
-                    'jobs': db.many('SELECT id,role,title,status,mode,substr(error,1,1000) AS error,substr(result,1,600) AS summary FROM jobs ORDER BY rowid DESC LIMIT 12'),
+                    'jobs': db.many('SELECT id,staff_id,title,status,mode,substr(error,1,1000) AS error,substr(result,1,600) AS summary FROM jobs ORDER BY rowid DESC LIMIT 12'),
                     'meetings': db.many('SELECT id,topic,status,substr(summary,1,1200) AS summary FROM ceo_meetings ORDER BY rowid DESC LIMIT 4'),
                     'workspace': str(base),
                     'execution': 'native Hermes session; no separate model or fixed employee pipeline'}
             if command.get('venture_id'): result['selected_venture'] = venture(command['venture_id'])
+            result['staff']=[{'staff_id':sid,'name':name,'title':title,'description':description} for sid,name,title,description,icon in server.STAFF]
+            result['manager_staff_id']=manager_id()
             return result
         if action == 'propose':
             title = str(command.get('title', '')).strip(); proposal = command.get('proposal')
@@ -211,20 +233,20 @@ def install(app, data_root, activity=lambda delta: None):
             key = command.get('venture_id')
             row = venture(key) if key else None
             if row and row['status'] != 'approved': raise ValueError('승인된 사업의 작업만 시작할 수 있습니다.')
-            role, title = command.get('role'), str(command.get('title', '')).strip()
-            if role not in roles or not title: raise ValueError('담당 역할과 실제 작업 제목이 필요합니다.')
+            staff_id, title = command.get('staff_id'), str(command.get('title', '')).strip()
+            if staff_id not in staff_ids or not title: raise ValueError('담당 역할과 실제 작업 제목이 필요합니다.')
             scope = row['id'] if row else 'owner-tasks'
             target = base / scope; target.mkdir(exist_ok=True)
             # Native tasks start running immediately; the old app scheduler never claims them.
             with db.LOCK, db.connect() as c:
                 c.execute('BEGIN IMMEDIATE')
                 arguments = json.dumps({'venture_id': key or '', 'native_session': command.get('_session')}, ensure_ascii=False)
-                old = c.execute("SELECT id FROM jobs WHERE mode='hermes-native' AND status='running' AND role=? AND title=? AND arguments=?", (role, title, arguments)).fetchone()
+                old = c.execute("SELECT id FROM jobs WHERE mode='hermes-native' AND status='running' AND staff_id=? AND title=? AND arguments=?", (staff_id, title, arguments)).fetchone()
                 key = old['id'] if old else db.uid('job')
                 if not old:
-                    c.execute('INSERT INTO jobs(id,created_at,started_at,type,role,status,title,arguments,mode) VALUES(?,?,?,?,?,?,?,?,?)',
-                              (key, db.now(), db.now(), 'agent_task', role, 'running', title, arguments, 'hermes-native'))
-            return {'job_id': key, 'workspace': str(target), 'role': role, 'instruction': 'Use native Hermes tools to do this task; this call only records the assignment.'}
+                    c.execute('INSERT INTO jobs(id,created_at,started_at,type,staff_id,status,title,arguments,mode) VALUES(?,?,?,?,?,?,?,?,?)',
+                              (key, db.now(), db.now(), 'agent_task', staff_id, 'running', title, arguments, 'hermes-native'))
+            return {'job_id': key, 'workspace': str(target), 'staff_id': staff_id, 'instruction': 'Use native Hermes tools to do this task; this call only records the assignment.'}
         if action == 'finish':
             row = db.one('SELECT * FROM jobs WHERE id=?', (str(command.get('job_id', '')),))
             if not row or row['mode'] != 'hermes-native': raise ValueError('현재 Hermes 업무가 아닙니다.')
@@ -248,7 +270,7 @@ def install(app, data_root, activity=lambda delta: None):
         try: return records(command, owner=command.get('_owner') is True)
         except ValueError as exc: raise HTTPException(409, str(exc)) from exc
 
-    # The pinned company UI navigates into Hermes. Retire its second CEO planner.
+    # The pinned company UI navigates into Hermes. Retire its separate organization planner.
     for route in list(app.routes):
         if getattr(route, 'path', '').startswith('/api/admin/ceo/chat'):
             app.routes.remove(route)

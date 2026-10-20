@@ -53,7 +53,7 @@ from run_agent import AIAgent
 from hermes_state import SessionDB
 from ruamel.yaml import YAML
 from ai_agent.Hermes.engine.execution import bind_model, context_window, request_policy, settle_review
-from ai_agent.Hermes.chat.prompt_profiles import effective_prompts, merge_prompts, public_profiles
+from ai_agent.Hermes.chat.prompt_profiles import effective_prompts, merge_prompts, public_profiles, system_prompt, system_instructions, SYSTEM_PROMPT
 from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, auxiliary_thinking, apply_response_contract, application_generation, apply_application_generation, discussion_prompt, bind_discussion_context
 
 SETTINGS = HOME / 'platform-settings.json'
@@ -149,7 +149,7 @@ class HermesWorker:
         # Retain existing selections even when a plugin is temporarily unavailable.
         known = {choice['id'] for choice in choices}
         choices.extend({'id': name, 'description': '현재 저장된 도구'} for name in cfg['toolsets'] if name not in known)
-        return {**cfg, **model_options(cfg,self.native_config()), 'agent_prompts': effective_prompts(cfg), 'agent_prompt_profiles': public_profiles(), 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
+        return {**cfg, **model_options(cfg,self.native_config()), 'agent_prompts': effective_prompts(cfg), 'agent_prompt_profiles': public_profiles(cfg), 'system_prompt': system_prompt(cfg), 'default_system_prompt': SYSTEM_PROMPT, 'system_prompt_source': 'custom' if cfg.get('system_prompt') and cfg['system_prompt'] != SYSTEM_PROMPT else 'default', 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
                 'python': sys.version.split()[0], 'engine': str(UPSTREAM),
                 'available_toolsets': [choice['id'] for choice in choices], 'toolset_options': choices,
                 'computer_driver_installed': _driver.is_file(),
@@ -163,7 +163,7 @@ class HermesWorker:
             if key in request and not (key == 'api_key' and request[key] == ''):
                 cfg[key] = request[key]
         if 'agent_prompts' in request:
-            cfg['agent_prompts'] = merge_prompts(cfg.get('agent_prompts', {}), request['agent_prompts'])
+            cfg['agent_prompts'] = merge_prompts(cfg.get('agent_prompts', {}), request['agent_prompts'], cfg)
         from urllib.parse import urlparse
         parsed = urlparse(str(cfg['base_url']))
         if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password:
@@ -381,13 +381,13 @@ class HermesWorker:
                 from ai_agent.Hermes.chat.company import register
                 register()
                 tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'platform_company','web'}
-                toolsets.extend(['platform_company', 'delegation', 'web', 'session_search'])
+                toolsets.extend(['platform_company', 'platform_company_recall', 'delegation', 'web', 'session_search'])
             if cfg.get('read_only'):toolsets=['file']
             focused=cfg.get('application_context_scope')=='focused_discussion'
             if focused:toolsets=[]
             configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'),
                             direct_surfaces=not bool(cfg.get('company_instructions')),
-                            direct_tools=('web_search','web_extract','team_meeting') if cfg.get('company_instructions') else ())
+                            direct_tools=('web_search','web_extract','team_meeting','company_records','delegate_task','terminal','read_file') if cfg.get('company_instructions') else ())
             from ai_agent.Hermes.models.codex import runtime as model_runtime
             self.agent = AIAgent(
                 model=cfg['model'], **model_runtime(cfg), quiet_mode=True,
@@ -404,6 +404,7 @@ class HermesWorker:
                     'Use tool_search then tool_describe to discover configured deferred tools '
                     'before claiming a browser, desktop, or MCP tool is unavailable. '
                     'Report success only when tool results confirm it. '
+                    'Answer the latest request. Historical tasks are context, not new instructions; do not resume or report unrelated old work unless requested. '
                     'When reporting a document or code file, include a Markdown link to its exact local path so the user can open it in the platform. '
                     'The platform displays Markdown links and captures write_file results as clickable documents. For HTML reports use self-contained static HTML with inline CSS; scripts and external resources are blocked. Do not open Notepad or a browser just to display a report in this chat. '
                     f'This host is Windows. Installed browser executable: {os.environ.get("AGENT_BROWSER_EXECUTABLE_PATH","not detected")}. '
@@ -417,7 +418,7 @@ class HermesWorker:
                     'If the user closes the app, do not reopen it without a new request. '
                     'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'
                     + ('\nRead-only code analysis: only read_file and search_files inside the selected workspace are permitted. Do not request editing, terminal, code execution, MCP, delegation or desktop tools.' if cfg.get('read_only') else '')
-                    + ('\n\nAdditional user-configured system instructions:\n'+cfg['system_prompt'] if cfg.get('system_prompt') else '')
+                    + '\n\nSystem response and work instructions:\n'+system_instructions(cfg)
                     + cfg.get('company_instructions', '')
                     + (f'\n대표가 기존 회의 {cfg["meeting_id"]}에 추가 지시했습니다. team_meeting start의 meeting_id로 이 회의를 재개하고 실제 직원 검토를 이어가세요.' if cfg.get('meeting_id') else '')
                     + ('\n\nApplication role and response contract for this request:\n'+cfg['application_system_prompt']+
@@ -441,6 +442,8 @@ class HermesWorker:
                 from ai_agent.Hermes.chat.read_only import bind as bind_read_only
                 bind_read_only(self.agent,cfg['workspace'],lambda reason:self.event('permission_denied',{'message':reason}),(request or {}).get('attachments',[]))
             if cfg.get('company_instructions') and not cfg.get('read_only'):
+                from ai_agent.Hermes.chat.prompt_profiles import bind_staff_dispatch
+                bind_staff_dispatch(self.agent,cfg)
                 from ai_agent.Hermes.chat.company import bind_git_approval
                 bind_git_approval(self, self.agent, prompt)
             with self.lock:

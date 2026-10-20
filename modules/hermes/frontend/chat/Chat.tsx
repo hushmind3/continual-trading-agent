@@ -105,6 +105,6 @@ function ChatWorkspace({status,modelName,focused,onFocus,onStatus,onModels,onSet
   const source=company.sources.find(v=>v.id===company.id);if(!source)return;
   const linked=await request<{session_id:string}>('projects/conversation',{id:source.id,action:'session'});
   const result=await company.decide(id,approve);if(!approve||!result)return;
-  await choose(linked.session_id);await thinking.prepare();onStatus(await request<AgentStatus>(prefix+'chat',{session_id:linked.session_id,message:'소유자가 사업안 '+result.name+' ('+id+')의 로컬 제작을 승인했습니다. company_records로 승인된 초안과 기존 진행을 확인하고 필요한 역할·순서를 직접 정해 미완성 작업을 이어가세요. 외부 공개·지출은 별도 승인 대상입니다.',mode:'goal',max_turns:turns,read_only:readOnly}));
+  await choose(linked.session_id);await thinking.prepare();setMode('loop');setTimes(0);onStatus(await request<AgentStatus>(prefix+'chat',{session_id:linked.session_id,workspace:result.workspace,message:'대표가 사업안 '+result.name+' ('+id+')의 승인 범위 내 자율 제작·운영을 승인했습니다. company_records overview로 승인안·진행 상태·직원별 전문성을 확인하세요. 필요한 작업을 스스로 찾아 begin으로 배정하고, delegate_task의 staff_id에 해당 직원 고유 ID를 지정해 실제 도구와 현재 작업 공간으로 위임하세요. 실제 산출물 경로·실패 원인·검증 결과를 다음 직원에게 전달하고 finish/fail로 기록하세요. 이 반복의 각 주기에는 현재 가장 필요한 작업을 진행하고 결과에 따라 다음 일을 선택하세요. 제품이 준비되면 승인된 출시·고객 확보·운영·실제 매출과 비용 개선을 이어가세요. 외부 공개·계정 인증·결제·지출은 별도 승인이 필요하며 연결되지 않은 항목을 성공으로 보고하지 마세요. 막히면 필요한 결정·연결만 요청하고 같은 실패를 반복하지 마세요. 새 사업은 새 승인 대상입니다.',mode:'loop',times:0,interval_seconds:interval||null,read_only:readOnly}));
  }catch(e){setError(failure(e))}})()}/></>}</div></section></div>;
 }

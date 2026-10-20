@@ -81,6 +81,10 @@ def document(record):
 
 
 def adapter(record):
+    if record.get('workspace_ui',{}).get('recipe')=='company-v1' and record['workspace_ui'].get('staff_identity_version')!=3:
+        from ai_agent.Hermes.chat.staff_migration import migrate
+        migrate(store.ROOT)
+        refreshed=store.read(record['id']);record.clear();record.update(refreshed)
     ui=record.get("workspace_ui",{})
     if not record.get("harness",{}).get("enabled") or not ui.get("adapter"): return None
     path=store.owned(store.project_folder(record),ui["adapter"])

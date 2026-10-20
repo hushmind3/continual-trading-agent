@@ -5,9 +5,14 @@
  let nativeEngine;
  const annotateTeam=()=>{
   if(nativeEngine){for(const id of ['aiBadge','teamEngine','overviewModel']){const node=document.getElementById(id),text=(id==='teamEngine'?'공유 AI · ':'')+(nativeEngine.modelName||'모델 선택 전')+(id==='aiBadge'&&nativeEngine.modelState!=='ready'?' · '+({loading:'불러오는 중',failed:'연결 오류',idle:'미실행'}[nativeEngine.modelState]||'상태 확인 중'):'');if(node&&node.textContent!==text)node.textContent=text;}}
-  if(!companyTeam?.roles)return;
+  if(!companyTeam?.staff)return;
+  const names={...Object.fromEntries(companyTeam.staff.map(role=>[role.staff_id,role.name])),...(nativeEngine?.staffNames||{})};
+  const rootName=document.querySelector('.org-root .role-name,.org-root strong');if(rootName&&names[companyTeam.manager_staff_id||nativeEngine?.managerId]&&rootName.textContent!==names[companyTeam.manager_staff_id||nativeEngine?.managerId])rootName.textContent=names[companyTeam.manager_staff_id||nativeEngine?.managerId];
+  document.querySelectorAll('.recent-role,button[data-staff_id]:not(.team-card)').forEach(node=>{const key=node.dataset.staff_id||node.textContent.trim();if(names[key]&&node.textContent!==names[key])node.textContent=names[key]});
   document.querySelectorAll('#teamGrid .team-card').forEach(card=>{
-   const role=companyTeam.roles.find(row=>row.role===card.dataset.role);if(!role)return;
+   const role=companyTeam.staff.find(row=>row.staff_id===card.dataset.staff_id);if(!role)return;
+   const heading=card.querySelector('.role-name');if(heading&&names[role.staff_id]&&heading.textContent!==names[role.staff_id])heading.textContent=names[role.staff_id];
+   const title=names[role.staff_id]+' 최근 업무 보기';if(card.title!==title)card.title=title;
    const count=card.querySelector('.role-bottom b'),state=card.querySelector('.role-state');
    const countText='누적 완료 '+Number(role.completed||0).toLocaleString('ko-KR')+'건';
    if(count&&count.textContent!==countText)count.textContent=countText;

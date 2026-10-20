@@ -5,18 +5,20 @@ import {AppExecution} from '@platform/ui/AppExecution';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {MarkdownContent} from '@platform/ui/MarkdownContent';
 import {CompanyConversations} from './CompanyConversation';
-import type {AgentStatus} from '../types';
+import {prefix,type AgentStatus,type Settings} from '../types';
 import {MeetingRoom} from './MeetingRoom';
 
 type Tab={id:string;view:string;title:string;src:string;revision:string;conversation?:boolean;session_id:string};
 export function AppTabs({children,onModels,modelName,modelState,status}:{status?:AgentStatus;children:ReactNode;onModels:()=>void;modelName:string;modelState?:string}){
  const [tabs,setTabs]=useState<Tab[]>([]),[selected,setSelected]=useState('chat'),[mounted,setMounted]=useState(false);
  const frame=useRef<HTMLIFrameElement>(null),markdown=useRef(new Map<string,string>());
+ const [staffNames,setStaffNames]=useState<Record<string,string>>({}),[managerId,setManagerId]=useState('');
+ useEffect(()=>{let live=true;const update=(profiles:Settings['agent_prompt_profiles'])=>{if(live)setStaffNames(Object.fromEntries((profiles??[]).map(person=>[person.id,person.name])))};void request<Settings>(prefix+'settings',{},'GET').then(cfg=>{setManagerId(cfg.manager_staff_id||'');update(cfg.agent_prompt_profiles)}).catch(()=>{});const changed=(event:Event)=>update((event as CustomEvent<Settings['agent_prompt_profiles']>).detail);window.addEventListener('hermes:prompts-changed',changed);return()=>{live=false;window.removeEventListener('hermes:prompts-changed',changed)}},[]);
  useEffect(()=>{let live=true;const refresh=()=>void request<{items:Tab[]}>('projects/workspace-tabs',{},'GET').then(r=>{if(live)setTabs(previous=>JSON.stringify(previous)===JSON.stringify(r.items)?previous:r.items)}).catch(()=>{if(live)setTabs([])});refresh();window.addEventListener('focus',refresh);const timer=setInterval(refresh,10000);return()=>{live=false;clearInterval(timer);window.removeEventListener('focus',refresh)}},[]);
  const tab=tabs.find(t=>t.id===selected),source=tab?.src||tabs[0]?.src;
- const shareEngine=()=>frame.current?.contentWindow?.postMessage({type:'hermes-engine-state',modelName,modelState},location.origin);
- useEffect(()=>{shareEngine()},[modelName,modelState,selected]);
- const companies=tabs.filter(t=>t.conversation&&t.view==='talk').map(t=>({id:t.id.split(':')[0],session_id:t.session_id,title:'AI 총괄 · '+t.title.replace('AI 총괄 대화','회사 운영')}));
+ const shareEngine=()=>frame.current?.contentWindow?.postMessage({type:'hermes-engine-state',modelName,modelState,staffNames,managerId},location.origin);
+ useEffect(()=>{shareEngine()},[modelName,modelState,staffNames,managerId,selected]);
+ const companies=tabs.filter(t=>t.conversation&&t.view==='talk').map(t=>({id:t.id.split(':')[0],session_id:t.session_id,title:(staffNames[managerId]||'총괄')+' · '+t.title.replace('AI 총괄 대화','회사 운영')}));
  const shownTabs=tabs.filter(t=>!(t.conversation&&t.view==='talk'));
  const select=(view:string)=>frame.current?.contentWindow?.postMessage({type:'platform:workspace-select',view},location.origin);
  useEffect(()=>{if(tab){setMounted(true);select(tab.view)}else if(selected!=='chat'&&selected!=='meetings')setSelected('chat')},[selected,tabs]);

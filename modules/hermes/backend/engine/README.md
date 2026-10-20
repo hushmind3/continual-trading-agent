@@ -42,4 +42,10 @@ ChatGPT device-code 로그인이 진행 중인 worker도 재시작에서 보호�
 
 실시간 team_meeting은 총괄의 직접 노출 도구입니다. 자식은 원본 위임 실행기·같은 모델·기존 SessionDB를 사용하고 일반 대화 목록에서 숨기며 회의의 실제 발언 출처로 연결합니다. meeting_id는 요청별 재검토 지침이며 다른 대화에 전역 주입하지 않습니다. finally에서 미결/실패를 기존 기록에 남깁니다.
 
-개별 프롬프트는 기존 settings GET/POST의 agent_prompts 부분 갱신으로 같은 platform-settings.json에 저장합니다. 허용 직군·문자열 길이를 검사하고 미지정 역할은 기본 지침을 사용합니다. public_profiles의 서버 메타데이터로 개별 설정 화면을 구성합니다. 총괄·회의 적용은 ../chat/README.md 및 ../../frontend/settings/agent-prompts/README.md에 설명합니다.
+개별 프롬프트는 기존 settings GET/POST의 agent_prompts 부분 갱신으로 같은 platform-settings.json에 저장합니다. 등록된 직원 ID·문자열 길이를 검사하고 미지정 직원은 기본 지침을 사용합니다. public_profiles의 서버 메타데이터로 개별 설정 화면을 구성합니다. 총괄·회의 적용은 ../chat/README.md 및 ../../frontend/settings/agent-prompts/README.md에 설명합니다.
+
+시스템 기본 지침은 chat/prompt_profiles.py의 전체 원문을 사용하고 기존 system_prompt는 추가 지침으로 보존합니다. public settings는 default_system_prompt·설정 출처·직원 표시 이름을 반환하며 API 키·모델·권한은 함께 변경하지 않습니다. 직원 위임은 원본 delegate_task의 실제 _dispatch_delegate_task와 동적 schema를 연결해 staff_id에 대응하는 지침을 자식 문맥에 추가합니다. 원본 실행 종류(role)는 직원 직함과 별개인 native worker/orchestrator 계약입니다. ToolEntry는 슬롯 객체이므로 중복 등록 표시는 래퍼 함수에 보관합니다.
+
+조직 대화는 현재 선택한 도구 중 terminal·read_file·delegate_task·company_records를 직접 노출하여 파일/실행 도구 탐색 왕복을 줄입니다. 일반 대화의 도구 노출과 사용자 선택은 유지합니다.
+
+조직 위임의 결과 전달: 플랫폼 worker에는 원본 CLI/gateway의 백그라운드 결과 재주입 소비자가 없으므로, 회사 직원 위임은 원본 delegate_task의 동기 batch를 호출합니다. 원본 자식 병렬 실행·도구·중단·깊이/일시정지 guard는 유지하며 총괄은 실제 반환 결과를 받은 뒤 보고합니다. 일반 대화의 원본 background 위임은 변경하지 않습니다.

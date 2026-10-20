@@ -1,9 +1,9 @@
 # 시스템 프롬프트 설정
 
-Hermes 설정의 시스템 프롬프트 입력·저장 화면입니다. `SystemPrompt.tsx`는 공통 Textarea·Button을 사용하며 단일 `/api`의 `ai_agent/Hermes/settings`를 읽고 `{system_prompt}`만 저장합니다. 모델·인증·MCP 설정을 함께 덮어쓰지 않습니다.
+용도: Hermes 전체의 대화·업무·기억 기본 지침과 사용자의 추가 지침을 편집합니다.
 
-저장 위치는 `runtime/ai_agent/Hermes/platform-settings.json`입니다. 백엔드 `engine/worker.py`가 원본 AIAgent의 `ephemeral_system_prompt`에 사용자 지침을 추가합니다. 기본 도구 안내는 유지하고 다음 대화 요청부터 적용합니다. 빈 문자열을 저장하면 추가 지침을 제거합니다. 작업 중 변경은 서버와 화면 양쪽에서 거부합니다.
+`SystemPrompt.tsx`는 공통 Textarea/Button과 단일 `/api`의 `ai_agent/Hermes/settings` GET/POST를 사용합니다. `system_prompt`만 저장하며 모델·인증 설정을 덮어쓰지 않습니다. 저장은 기존 `runtime/ai_agent/Hermes/platform-settings.json`을 사용합니다.
 
-확인: 시스템 프롬프트 저장 UI 검사 통과. 별도의 원본 엔진 프로토콜 검사에서 저장 지침이 실제 모델 요청의 system 메시지에 포함되는 것을 확인했습니다. 이 검사는 가짜 모델 API를 사용하며 실제 GGUF 추론은 실행하지 않습니다.
+`backend/chat/prompt_profiles.py`의 SYSTEM_PROMPT는 사용자가 제공한 전체 기본 지침입니다. 기본 지침은 원본 Hermes 필수 도구 지침을 보존한 채 모든 요청에 적용합니다. 기존 사용자 지정 문자열은 삭제하지 않고 추가 지침으로 전달합니다. 설정 화면은 기본·사용자 설정 여부를 구분하고 기본 지침 불러오기 후 저장할 수 있습니다. 빈 문자열 저장은 사용자 추가 지침을 비우며 기본 지침은 유지합니다. 실행 중 저장은 기존 유휴 검사로 거절합니다.
 
-읽기 모드는 시스템 프롬프트와 분리된 채팅 입력창의 스위치입니다. 프롬프트 저장은 실행 권한을 바꾸지 않습니다.
+직원별 지침·이름은 ../agent-prompts/README.md에서 설명합니다. 실제 모델 출력의 자연스러움은 선택 모델과 대화 맥락에도 영향을 받으므로 코드 구현·실제 관찰 결과를 구분합니다.

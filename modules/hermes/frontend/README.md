@@ -29,3 +29,5 @@
 Markdown API: https://github.com/remarkjs/react-markdown / https://github.com/remarkjs/remark-gfm
 
 현재 대화·Thinking 제어와 최신 UI 검사 범위는 [대화 안내](chat/README.md)를 따릅니다. 모델 추론 속도·도구 실측은 [백엔드 모델 안내](../backend/models/README.md)에 별도 기록합니다. 과거 UI 검사 개수를 현재 전체 기능 확인으로 취급하지 않습니다.
+
+개별 프롬프트는 기존 공통 시스템 지침·조직·직원 원문 기본값과 사용자 설정을 구분해 표시합니다. 이름 행을 바꿔 저장하면 settings 이벤트를 통해 기존 회사 iframe도 이름을 갱신하며 회의는 같은 서버 이름 투영을 사용합니다. 상세 적용 범위는 settings/agent-prompts/README.md에 정리합니다.

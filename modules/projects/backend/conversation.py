@@ -63,7 +63,9 @@ def call(key, payload, origin=None):
         if not re.fullmatch('[A-Za-z0-9_-]{1,100}', venture) or not isinstance(payload.get('approve'), bool):
             raise ValueError('사업안과 승인 여부를 확인하세요.')
         result = invoke('/api/admin/hermes/records', 'POST', {'action': 'decision', '_owner': True, 'venture_id': venture, 'approve': payload['approve']}, token)
-        return {**result, 'session_id': native_id}
+        workspace=store.owned(store.project_folder(record),'workspaces/'+venture)
+        if payload['approve']:workspace.mkdir(parents=True,exist_ok=True)
+        return {**result,'session_id':native_id,'workspace':str(workspace)}
     if action != 'state': raise ValueError('지원하지 않는 대화 요청입니다.')
     control = invoke('/api/admin/control', token=token)
     result = {'session_id': native_id, 'ventures': control['ventures'],

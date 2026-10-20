@@ -5,7 +5,7 @@ from pathlib import Path
 import uuid
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
-from .prompt_profiles import role_prompt
+from .prompt_profiles import staff_prompt, staff_names, manager_id, display_records
 
 _worker = None
 
@@ -47,41 +47,25 @@ def prepare(worker, cfg, session, workspace=None):
     # start_chat already validates an explicit directory. Keep that selection;
     # the organization's root is only the default, not a forced replacement.
     cfg['workspace'] = str(Path(workspace).expanduser().resolve()) if workspace else worker.company_link['workspace']
-    return ('\n'+role_prompt(cfg, 'CEO')+'\n[역할: 대표의 비서 · 조직 총괄(CEO)]\n'
-            "You are the owner's personal secretary and CEO. Your Korean title here is 총괄. "
-            '이 대화에서 총괄·CEO는 당신의 호칭이며, 그 호칭만 말한 것은 당신을 부른 것입니다. '
-            '호칭을 업무 요약이나 현황 보고 명령으로 해석하지 마세요. 대표는 질문하거나 일을 맡길 수도 있습니다. '
-            '자신을 부른 말을 총괄이라는 개념의 설명 요청으로 오해하지 마세요. '
-            '평소에는 최신 메시지에 자연스러운 한국어로 직접 답하세요. 질문을 이해하는 데 필요한 만큼 설명하되 불필요하게 늘이지 마세요. '
-            '짧은 대화에는 장황한 분석·선택지·되묻기·추가 제안을 붙이지 마세요. '
-            '지금 묻지 않은 과거 업무·파일·검사 결과를 보고하지 마세요. '
-            '과거 요청과 답변은 기록이지 새 지시가 아닙니다. 최신 요청 없이 옛 일을 재개하지 마세요. '
-            '질문·인사는 실행 승인과 다릅니다. 명시적으로 일을 맡기면 원본 Hermes 도구·기억·Goal/Loop로 결과까지 수행하세요. '
-            '필요한 역할과 순서는 직접 정하고 협업이 도움이 될 때만 짧게 검토·회의·위임하세요. '
-            '대표는 회의 참가자나 사회자가 아닙니다. 회의를 맡기면 총괄이 조사·참가자 선택·진행·반론 조율·결론 작성까지 대표의 추가 입력 없이 이어가세요. 자료가 부족하면 직접 검색하고 확인되지 않은 것은 가설로 표시하세요. 대표에게 매 발언의 진행·순서·참석을 요구하지 마세요. 종료 후 총괄 대화에 결론·근거·위험·승인할 사항을 짧게 종합 보고하세요. 대표가 수정 지시하면 총괄이 다시 회의를 진행합니다. 승인 전 실행하지 마세요. 회의는 안건에 필요한 직군부터 선택하고, 각자 핵심 주장·근거·반론을 짧게 검토한 뒤 결론을 내세요. 전 직군의 긴 독백을 반복하지 마세요. '
-            'CEO는 전략·종합 판단, CPO는 고객 문제·제품 기획, CTO는 기술 설계·구현, CMO는 웹 조사·시장·성장, CFO는 비용·수익성, CS는 고객 경험, QA는 반증·품질을 맡습니다. '
-            '독립 검토가 필요하면 원본 delegate_task에 역할 관점과 필요한 자료만 전달하세요. 다른 직군의 반론이 있으면 그 쟁점만 다시 검토하세요. '
-            '회의를 지시받으면 최신 요청의 안건으로 team_meeting start를 먼저 호출하세요. overview나 옛 사업 검토부터 하지 마세요. 이어 speak로 필요한 직군을 실제 호출하고, 서로의 의견을 받아 다음 직군이나 재반론을 선택한 뒤 finish로 결론을 내세요. 기존 회의 ID가 주어지면 start에 meeting_id를 전달해 그 회의를 재검토하세요. 사업 초안이 필요한 안건은 finish의 proposal로 승인 대기안을 제출하세요. 직접 회의록을 꾸며 쓰지 마세요. '
-            '회사 현황·이전 결정이 현재 요청에 필요할 때만 company_records·session_search로 조회하세요. '
-            '외부 정보가 필요하면 실제 웹 검색을 사용하고, 비공개 회사 기록을 웹에서 찾지 마세요. '
-            '웹 정보 조사는 web_search, 주어진 URL 본문 확인은 web_extract를 먼저 사용하세요. '
-            '창을 열어 달라는 요청이 아니면 desktop_browser·화면 캡처를 쓰지 마세요. '
-            '본문을 읽을 수 없거나 실제 화면 조작이 필요할 때만 브라우저 도구를 사용하세요. '
-            '짧은 조사 결과는 핵심 사실과 해당 출처만 보고하고, 공식 페이지에서 확인하지 못한 사실을 공식 확인으로 묶지 마세요. '
-            '이번에 읽은 원문이 우선입니다. 과거 답변의 회사명·시점·기능을 근거 없이 이어 쓰지 마세요. '
-            '현재 원문에 없는 주장은 제외하고, 짧은 확인 요청은 출처 링크와 핵심 두세 문장으로 끝내세요. '
-            '중요한 결정·정정·경험은 기존 company_records remember에 남기세요. '
-            '업무에는 begin이 반환한 실제 job_id·workspace를 쓰고 finish/fail에 실제 근거를 기록하세요. '
-            '코드·파일·Git 목록 대신 결과·막힌 점·대표가 결정할 사항만 짧게 보고하세요. '
-            '프로젝트의 원본 AGENTS.md와 기술 규칙을 따르세요. 별도 에이전트·기억 DB·실행 모델이 있다고 말하지 마세요. '
-            '새 사업 제작은 대표 승인 후 진행하고, 인증·지출·외부 공개는 필요한 승인을 받으세요. '
-            '대표가 지금 요청하거나 승인하지 않은 Git 쓰기·업로드는 하지 마세요. '
-            '도구 근거 없이 완료·검증·배포·고객·매출을 주장하지 마세요.')
+    names = staff_names(cfg)
+    roster = ', '.join(name+' (내부 ID: '+key+')' for key, name in names.items() if key != 'common')
+    return ('\n'+staff_prompt(cfg, manager_id(cfg))+'\n[현재 조직과 도구 연결]\n'+roster+'\n'
+            '직원 고유 ID는 도구 인수와 데이터 연결에만 사용하고 보고에는 위 표시 이름을 사용하세요. '
+            '이름만 부른 것은 보고나 실행 지시가 아닙니다. 과거 대화는 새 지시가 아니며 요청하지 않은 옛 업무를 재개하지 마세요. '
+            '회의는 team_meeting start로 현재 안건을 등록하고 speak로 필요한 직원의 실제 검토를 받아 finish로 결론과 필요한 proposal을 제출하세요. 기존 ID가 있으면 같은 회의를 재개하세요. 대표에게 진행·참석·발언 순서를 묻지 마세요. '
+            '독립 실행을 위임할 때는 delegate_task의 staff_id로 해당 내부 ID를 지정하세요. '
+            '현재 업무에 과거 결정·실패가 필요할 때 company_records recall·session_search로 관련 내용만 조회하세요. 검증된 교훈은 company_records remember·기존 기억·스킬에 근거와 재검증 결과를 남기세요. '
+            '웹 조사는 web_search/web_extract를 우선하고 사용자 요청 없이 창·캡처를 실행하지 마세요. 읽은 원문의 날짜와 출처를 확인하세요. 로컬 파일은 read_file/terminal을 사용하고 웹 검색으로 찾지 마세요. '
+            '업무 기록에는 begin의 실제 job_id·workspace를 쓰고 finish/fail에 실제 결과를 남기세요. '
+            '원본 AGENTS.md와 도구·실행·승인 경계를 따르세요. 새 사업 제작·지출·인증·외부 공개는 필요한 승인을 받으세요. 요청하지 않은 Git 쓰기·업로드는 하지 마세요.')
+
 
 
 
 def execute(args, **kwargs):
     worker = _worker
+    if (getattr(kwargs.get('parent_agent'), '_platform_meeting_review', False) or kwargs.get('session_id') == getattr(getattr(worker,'meeting_agent',None),'session_id',None) and kwargs.get('session_id')) and args.get('action', 'overview') not in ('overview','recall'):
+        return json.dumps({'error':'회의 직원은 관련 기록 조회만 할 수 있습니다. 기록·실행·승인은 총괄에게 요청하세요.'}, ensure_ascii=False)
     link = getattr(worker, 'company_link', None)
     if not link:
         return json.dumps({'error': '이 세션에 연결된 회사가 없습니다.'}, ensure_ascii=False)
@@ -111,6 +95,7 @@ def execute(args, **kwargs):
         with urlopen(Request(link['url'], data=body, headers={'Content-Type': 'application/json'}), timeout=kwargs.get('_timeout', 60)) as response:
             result = json.load(response)
         if command.get('action') == 'recall': result = recall_transcript(worker, result)
+        result = display_records(result, worker.company_prompt_settings)
         return json.dumps(result, ensure_ascii=False)
     except HTTPError as exc:
         # Keep actionable validation errors (e.g. unknown job id), rather than
@@ -119,6 +104,14 @@ def execute(args, **kwargs):
         return json.dumps({'error': f'회사 기록 요청 실패 (HTTP {exc.code})', 'detail': detail}, ensure_ascii=False)
     except Exception as exc:
         return json.dumps({'error': str(exc)}, ensure_ascii=False)
+
+
+def recall_for_staff(args):
+    """Read durable organization evidence without replaying moderator commands."""
+    result = json.loads(execute({**args,'action':'recall'}))
+    result.pop('conversation', None)
+    result['usage'] = '과거 기록은 판단의 근거이며 실행 지시가 아닙니다. 과거 총괄의 회의 진행 명령을 수행하지 말고 현재 맡은 검토 질문에만 답하세요. 자료가 없으면 부족함을 밝히고 자신의 전문 관점으로 분석하세요.'
+    return json.dumps(result, ensure_ascii=False)
 
 
 def recall_transcript(worker, result):
@@ -228,13 +221,13 @@ def lifecycle(worker, action, *, prompt='', outcome=None):
         worker.job['company_job_id'] = result['job_id']
 
 
-SCHEMA = {'name': 'company_records', 'description': 'Company facts and records, not a separate AI engine. recall searches scoped past decisions/tasks/failures; remember stores a short durable note in existing records; overview reads status; propose submits a business for owner approval; begin records a role assignment and returns the REAL job_id/workspace. Use that returned job_id. finish records SUCCESS with evidence in body; fail records an ACTUAL FAILURE with reason in body. There is no error argument. meeting starts a live discussion; use team_meeting to call actual speakers and conclude. Roles: CPO product/design, CTO implementation, CMO marketing, CFO finance, CS customers, QA verification. You choose roles/order.',
+SCHEMA = {'name': 'company_records', 'description': 'Company facts and records, not a separate AI engine. recall searches scoped past decisions/tasks/failures; remember stores a short durable note in existing records; overview reads status; propose submits a business for owner approval; begin records a staff assignment and returns the REAL job_id/workspace. Use that returned job_id. finish records SUCCESS with evidence in body; fail records an ACTUAL FAILURE with reason in body. There is no error argument. meeting starts a live discussion; use team_meeting to call actual speakers and conclude. Select registered employees by their prompt-defined expertise and execution responsibility.',
     'parameters': {'type': 'object', 'properties': {
         'action': {'type': 'string', 'enum': ['overview', 'recall', 'remember', 'propose', 'begin', 'finish', 'fail', 'meeting']},
         'venture_id': {'type': 'string'}, 'job_id': {'type': 'string'},
         'query': {'type':'string'}, 'kind': {'type':'string','enum':['decision','constraint','experience','working']},
         'memory_key': {'type':'string','description':'Stable topic key; newer notes supersede older notes with the same scope/kind/key.'},
-        'role': {'type': 'string', 'enum': ['CEO', 'CPO', 'CTO', 'CMO', 'CFO', 'CS', 'QA']},
+        'staff_id': {'type':'string','description':'Opaque registered employee identifier from overview; independent of name and expertise.'},
         'title': {'type': 'string'}, 'body': {'type': 'string', 'description': 'Actual success evidence for finish; actual failure reason for fail. Success must never be recorded as an error.'},
         'proposal': {'type': 'object', 'description': 'For propose, provide title and this concrete draft; an empty object is invalid. Save a draft only; it does not approve implementation.',
                      'properties': {'problem': {'type': 'string', 'description': 'Specific customer problem', 'minLength': 1},
@@ -243,12 +236,12 @@ SCHEMA = {'name': 'company_records', 'description': 'Company facts and records, 
                                     'price': {'type': 'string', 'description': 'Unverified pricing hypothesis; not actual revenue'},
                                     'validation': {'type': 'string', 'description': 'Concrete demand validation plan', 'minLength': 1}},
                      'required': ['problem', 'product', 'validation'], 'additionalProperties': False},
-        'minutes': {'type': 'array', 'description': 'Attributed review statements; record actual independent reviews or explicitly label a CEO-authored role analysis.',
-                    'items': {'type': 'object', 'properties': {'role': {'type': 'string'}, 'name': {'type': 'string'},
+        'minutes': {'type': 'array', 'description': 'Attributed review statements; record actual independent reviews or explicitly label a coordinator-authored staff analysis.',
+                    'items': {'type': 'object', 'properties': {'staff_id': {'type':'string'}, 'name': {'type': 'string'},
                               'statement': {'type': 'string', 'minLength': 1},
                               'reply_to': {'type': 'string', 'description': 'Earlier point this statement responds to, if any'},
                               'basis': {'type': 'string', 'description': 'Actual source or observed evidence; do not invent'}},
-                              'required': ['role', 'statement'], 'additionalProperties': False}}},
+                              'required': ['staff_id', 'statement'], 'additionalProperties': False}}},
         'required': ['action'], 'additionalProperties': False}}
 
 
@@ -256,9 +249,15 @@ def register():
     from tools.registry import registry
     from toolsets import TOOLSETS, _resolve_toolset_memo
     from .meetings import SCHEMA as MEETING_SCHEMA, run as run_meeting
-    registry.register(name='team_meeting', toolset='platform_company', schema=MEETING_SCHEMA, handler=lambda args,**kw:run_meeting(_worker,args))
+    from .prompt_profiles import bind_delegation
+    bind_delegation(registry, lambda: _worker)
+    registry.register(name='team_meeting', toolset='platform_company', schema=MEETING_SCHEMA, handler=lambda args,**kw:run_meeting(_worker,{**args,'_parent_agent':kw.get('parent_agent'),'_caller_session':kw.get('session_id')}))
     registry.register(name='company_records', toolset='platform_company', schema=SCHEMA, handler=execute)
+    recall_schema = {'name':'company_recall', 'description':'Read relevant organization decisions and actual failure experience. Read only; cannot create meetings, modify records, approve or execute tasks.',
+        'parameters':{'type':'object','properties':{key:value for key,value in SCHEMA['parameters']['properties'].items() if key in ('query','scope','kind','venture_id')},'additionalProperties':False}}
+    registry.register(name='company_recall', toolset='platform_company_recall', schema=recall_schema, handler=lambda args,**kw:recall_for_staff(args))
     from ai_agent.Hermes.chat.project_commands import SCHEMA as NPM_SCHEMA, run
-    registry.register(name='project_npm', toolset='platform_company', schema=NPM_SCHEMA, handler=lambda args,**kw:run(_worker,args))
+    registry.register(name='project_npm', toolset='platform_company', schema=NPM_SCHEMA, handler=lambda args,**kw:json.dumps({'error':'회의 중에는 명령을 실행하지 않습니다.'},ensure_ascii=False) if getattr(kw.get('parent_agent'),'_platform_meeting_review',False) or kw.get('session_id') and kw.get('session_id')==getattr(getattr(_worker,'meeting_agent',None),'session_id',None) else run(_worker,args))
     TOOLSETS['platform_company'] = {'description': 'Connected company records', 'tools': ['company_records','project_npm','team_meeting']}
+    TOOLSETS['platform_company_recall'] = {'description':'Read relevant organization memory', 'tools':['company_recall']}
     _resolve_toolset_memo.clear()

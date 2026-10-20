@@ -7,6 +7,11 @@ from ai_agent.Hermes.mcp.handlers import router as mcp
 from ai_agent.Hermes.skills.handlers import router as skills
 from ai_agent.Hermes.artifacts.handlers import router as artifacts
 
+# Run before serving any app/engine request; migration preserves and checks every row.
+from ai_agent.Hermes.engine.locations import ROOT
+from ai_agent.Hermes.chat.staff_migration import migrate
+migrate(ROOT)
+
 MENU = {'id': 'ai_agent/Hermes', 'title': '헤르메스', 'operations': ['ai_agent/Hermes/'],
         'views': [], 'frontend': 'modules/hermes/frontend/Hermes.tsx', 'manager': 'ai_agent.Hermes.manager'}
 router = APIRouter()

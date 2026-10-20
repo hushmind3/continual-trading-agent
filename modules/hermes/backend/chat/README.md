@@ -92,3 +92,5 @@ npm 시간 초과와 소유자 중지를 구분하며, 중지된 명령도 실�
 기존 meeting_id로 재검토하며 직전 두 사용자 턴을 원본 경계로 보호합니다. 대표 지시는 원본 steer에 전달하고 회의 발언에 투영합니다. finish는 실제 두 직군 이상 검토가 있어야 완료됩니다. proposal은 기존 ventures에 pending으로 제출하며 승인하지 않습니다. 재검토는 같은 ID를 수정하고 revising 동안 승인을 거절합니다. 미결/중단/실패는 저장 발언을 보존한 채 실패로 기록합니다. telemetry.py는 총괄과 실제 자식의 원본 사용량을 합산합니다. 새 DB/모델/하네스/고정 회의 파이프라인은 없습니다.
 
 실제 실행 확인: 기존 조직/기존 총괄/선택된 로컬 모델로 실시간 비서 사업 첫 토론 6개 직군(132.8초), 동일 안건의 수정 토론 CPO→CTO(63.2초)를 완료했습니다. 각 자식은 원본 SessionDB에서 source=subagent 및 부모 총괄 ID가 확인됐습니다. 초안 ID를 바꾸지 않고 네 필드를 수정해 pending으로 재제출했고 실행 승인은 하지 않았습니다. 위임 일시정지/깊이 한도는 원본 guard를 그대로 확인합니다. 별도 테스트 프로젝트/검사 파일/설치본을 만들지 않았습니다.
+
+개별 프롬프트: prompt_profiles.py는 기존 platform-settings.json의 agent_prompts를 조직 공통·CEO·6개 직원 기본 지침과 합칩니다. company.prepare에서 총괄에게 적용하고 meetings.speak의 실제 자식 목표에는 기존 시스템 프롬프트도 함께 전달합니다. 임의 delegate_task는 자동 직군 매칭 대상이 아닙니다. 고정 2~3문장 제한을 없애고 쟁점에 필요한 만큼 자연스럽게 설명하도록 합니다. 편집 화면/API/적용 범위는 ../../frontend/settings/agent-prompts/README.md를 참고하세요.

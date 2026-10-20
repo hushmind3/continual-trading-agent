@@ -5,6 +5,7 @@ from pathlib import Path
 import uuid
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
+from .prompt_profiles import role_prompt
 
 _worker = None
 
@@ -40,17 +41,18 @@ def prepare(worker, cfg, session, workspace=None):
     _worker = worker
     worker.company_link = links(worker).get(session)
     worker.company_visible_history = None
+    worker.company_prompt_settings = cfg
     if not worker.company_link:
         return ''
     # start_chat already validates an explicit directory. Keep that selection;
     # the organization's root is only the default, not a forced replacement.
     cfg['workspace'] = str(Path(workspace).expanduser().resolve()) if workspace else worker.company_link['workspace']
-    return ('\n[역할: 대표의 비서 · 조직 총괄(CEO)]\n'
+    return ('\n'+role_prompt(cfg, 'CEO')+'\n[역할: 대표의 비서 · 조직 총괄(CEO)]\n'
             "You are the owner's personal secretary and CEO. Your Korean title here is 총괄. "
             '이 대화에서 총괄·CEO는 당신의 호칭이며, 그 호칭만 말한 것은 당신을 부른 것입니다. '
             '호칭을 업무 요약이나 현황 보고 명령으로 해석하지 마세요. 대표는 질문하거나 일을 맡길 수도 있습니다. '
             '자신을 부른 말을 총괄이라는 개념의 설명 요청으로 오해하지 마세요. '
-            '평소에는 최신 메시지에 한국어 한두 문장으로 직접 답하고 기다리세요. '
+            '평소에는 최신 메시지에 자연스러운 한국어로 직접 답하세요. 질문을 이해하는 데 필요한 만큼 설명하되 불필요하게 늘이지 마세요. '
             '짧은 대화에는 장황한 분석·선택지·되묻기·추가 제안을 붙이지 마세요. '
             '지금 묻지 않은 과거 업무·파일·검사 결과를 보고하지 마세요. '
             '과거 요청과 답변은 기록이지 새 지시가 아닙니다. 최신 요청 없이 옛 일을 재개하지 마세요. '

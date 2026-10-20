@@ -53,13 +53,14 @@ from run_agent import AIAgent
 from hermes_state import SessionDB
 from ruamel.yaml import YAML
 from ai_agent.Hermes.engine.execution import bind_model, context_window, request_policy, settle_review
+from ai_agent.Hermes.chat.prompt_profiles import effective_prompts, merge_prompts, public_profiles
 from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, auxiliary_thinking, apply_response_contract, application_generation, apply_application_generation, discussion_prompt, bind_discussion_context
 
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'provider': 'custom', 'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
             'workspace': str(ROOT), 'max_iterations': 100,
             'toolsets': ['terminal', 'file', 'todo', 'skills'], 'local_model': '', 'system_prompt': '', 'read_only': False,
-            'model_options': {}, 'tool_loading': 'native'}
+            'model_options': {}, 'tool_loading': 'native', 'agent_prompts': {}}
 
 
 def atomic_json(path, value):
@@ -148,7 +149,7 @@ class HermesWorker:
         # Retain existing selections even when a plugin is temporarily unavailable.
         known = {choice['id'] for choice in choices}
         choices.extend({'id': name, 'description': '현재 저장된 도구'} for name in cfg['toolsets'] if name not in known)
-        return {**cfg, **model_options(cfg,self.native_config()), 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
+        return {**cfg, **model_options(cfg,self.native_config()), 'agent_prompts': effective_prompts(cfg), 'agent_prompt_profiles': public_profiles(), 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
                 'python': sys.version.split()[0], 'engine': str(UPSTREAM),
                 'available_toolsets': [choice['id'] for choice in choices], 'toolset_options': choices,
                 'computer_driver_installed': _driver.is_file(),
@@ -158,9 +159,11 @@ class HermesWorker:
         self.idle_required()
         cfg = load_settings()
         for key in DEFAULTS:
-            if key=='model_options':continue
+            if key in ('model_options', 'agent_prompts'):continue
             if key in request and not (key == 'api_key' and request[key] == ''):
                 cfg[key] = request[key]
+        if 'agent_prompts' in request:
+            cfg['agent_prompts'] = merge_prompts(cfg.get('agent_prompts', {}), request['agent_prompts'])
         from urllib.parse import urlparse
         parsed = urlparse(str(cfg['base_url']))
         if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password:

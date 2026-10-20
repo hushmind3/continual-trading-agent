@@ -62,6 +62,7 @@ def run(worker, args):
 
 
 def speak(worker, item, args):
+    from .prompt_profiles import role_prompt
     from tools.delegate_tool import _build_child_agent, _run_single_child, is_spawn_paused, _get_max_spawn_depth
     if is_spawn_paused(): raise ValueError('Hermes 직원 위임이 일시정지돼 있습니다. 위임을 재개한 뒤 다시 요청하세요.')
     if getattr(worker.agent, '_delegate_depth', 0) >= _get_max_spawn_depth():
@@ -72,9 +73,10 @@ def speak(worker, item, args):
     focus = str(args.get('focus') or '안건의 핵심 쟁점을 검토하고 앞선 의견의 빈틈이나 개선점을 답하세요.')
     previous = '\n'.join(turn.get('role','')+': '+turn.get('statement','') for turn in item['minutes'] if turn.get('statement') and turn.get('role') != 'OWNER')
     directives = '\n'.join(turn.get('statement','') for turn in item['minutes'] if turn.get('role') == 'OWNER')
-    goal = (f"당신은 {person['role']}({person['title']})입니다. 담당 관점: {person['description']}\n"
+    goal = (role_prompt(worker.company_prompt_settings, person['role'], include_system=True)+'\n'
+            f"당신은 {person['role']}({person['title']})입니다. 담당 관점: {person['description']}\n"
             f"현재 회의 안건: {item['topic']}\n이번 쟁점: {focus}\n"
-            '동료에게 말하듯 쉬운 한국어로 2~3문장만 답하세요. 보고서 목차와 불필요한 외국어를 쓰지 마세요. 앞선 의견을 받아 동의·반론·수정안을 구체적으로 말하세요. '
+            '동료에게 말하듯 쉬운 한국어로 쟁점 해결에 필요한 만큼 설명하세요. 같은 내용을 반복하거나 불필요하게 늘이지 마세요. 앞선 의견을 받아 동의·반론·수정안을 구체적으로 말하세요. '
             '근거가 없으면 불확실성을 밝히고 필요할 때만 웹으로 확인하세요. 회의록/보고서를 쓰거나 다른 역할을 연기하지 마세요. '
             '파일 수정·제품 제작·Git·결제·외부 공개·추가 직원 위임은 하지 마세요.')
     child = _build_child_agent(task_index=len(item['minutes']), goal=goal, context='대표 지시(참가 발언이 아님):\n'+directives+'\n앞선 직원 발언:\n'+(previous or '아직 없습니다.'),

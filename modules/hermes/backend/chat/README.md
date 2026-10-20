@@ -2,6 +2,12 @@
 
 HTTP start/status/stop adapters call the original AIAgent in the isolated worker. Chat runs once. Goal and recurring modes use the original hermes_cli.goals.GoalManager and hermes_cli.loops.LoopManager; autonomy.py only drives these managers and forwards progress. The original auxiliary goal judge uses the selected model endpoint.
 
+총괄은 기본적으로 소유자의 비서처럼 질문에 짧게 답하고, 명시적으로 맡긴 작업·승인에만 실행·회의·위임을 사용합니다. prime_context가 기존 회사 overview/진행 API를 먼저 읽어 제한된 최신 현황과 실제 제품 URL을 전달합니다. 내부 현황에 불필요한 외부 검색이나 중복 조회를 지시하지 않습니다. 정보가 부족하면 기존 도구를 사용할 수 있으며 도구 실행을 막지는 않습니다.
+큰 총괄 문맥은 원본 ContextCompressor의 작업 예산·대화 경계·추출형 연속성 앵커를 재사용해 모델에 전달할 범위만 줄입니다. 원문 SessionDB의 행을 지우거나 별도 DB/요약 모델/새 에이전트 루프를 만들지 않습니다. 오래된 내용은 같은 DB의 session_search 및 범위가 지정된 recall로 읽습니다. 일반 대화의 이력은 이 경로를 사용하지 않습니다. company_context 이벤트의 token 값은 추정치이며 실제 입력량·응답 시간과 구분합니다.
+총괄의 lazy 도구 설정은 도구 설명도 필요할 때 검색해 불러옵니다. 도구 실행 기능은 유지하며 일반 대화의 직접 노출 설정은 바꾸지 않습니다.
+
+2026-10-20 실제 확인: 기존 총괄 세션에서 기존 EstimateAI 현황을 질문했습니다. 로컬 Ornith는 15.1초·모델 1회·입력 20,051토큰, Luna low는 8.3초·모델 2회·누적 입력 21,280토큰이었습니다. Luna는 recall을 추가 호출하므로 즉시 응답 문제를 모두 해결한 상태는 아닙니다. 두 실행 모두 기존 SessionDB 원문 행이 그대로 보존됐으며 새 제품·회의·업무를 만들지 않았습니다. 이 수치는 해당 실행 관찰값이며 모든 질문의 속도를 보장하지 않습니다.
+
 프로젝트 설치기의 자동 변환 요청은 chat의 workspace 값으로 해당 내려받은 프로젝트를 작업 폴더로 지정합니다. 이 값은 해당 실행의 cfg에만 적용하고 저장된 기본 작업 환경을 바꾸지 않습니다. 모델 준비·도구 승인·중지 경로는 기존 대화 실행과 같습니다.
 
 원본 앱의 하네스 호출은 `application_system_prompt`로 역할과 응답 규격을 전달합니다(문자열 50,000자 이하). `engine/worker.py`가 실행별 ephemeral 시스템 지침에 추가하며 저장된 사용자 시스템 프롬프트는 변경하지 않습니다. 과거 앱 대화는 참고 자료로 구분하고 현재 요청만 수행합니다. 기존 모델·thinking·도구 권한·소유자 승인 경로를 그대로 사용합니다.

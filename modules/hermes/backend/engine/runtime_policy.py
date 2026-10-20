@@ -34,7 +34,7 @@ def save_options(settings, request):
         raise ValueError('도구 설명 불러오기 설정을 확인하세요.')
     return settings
 
-def configure_tools(worker, mode):
+def configure_tools(worker, mode, *, direct_surfaces=True):
     from hermes_cli.config_defaults import DEFAULT_CONFIG
     from tools.registry import registry
     from tools.tool_search import _DIRECT_SURFACE_TOOLSETS
@@ -43,7 +43,7 @@ def configure_tools(worker, mode):
     search['enabled']='off' if mode=='eager' else 'auto'
     # Explicitly direct surfaces remain callable without discovery round trips.
     search['defer']=sorted(name for name, toolset in registry.get_tool_to_toolset_map().items()
-                           if toolset not in _DIRECT_SURFACE_TOOLSETS) if mode=='lazy' else (
+                           if not direct_surfaces or toolset not in _DIRECT_SURFACE_TOOLSETS) if mode=='lazy' else (
         list(DEFAULT_CONFIG['tools']['tool_search']['defer']) if mode=='native' else [])
     worker.write_config(native)
 

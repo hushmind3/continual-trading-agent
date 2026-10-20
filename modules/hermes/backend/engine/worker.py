@@ -318,9 +318,6 @@ class HermesWorker:
             native=self.native_config()
             if auxiliary_thinking(native,cfg,model_options(cfg,native)):
                 self.write_config(native)
-            if cfg.get('company_instructions'):
-                from ai_agent.Hermes.chat.company import recall_context
-                cfg['company_instructions'] += recall_context(self, prompt)
             # Several upstream file/skill helpers use process cwd as their final fallback.
             # This worker owns a single active task, so pin all helpers to the selected workspace.
             os.chdir(cfg['workspace'])
@@ -350,11 +347,12 @@ class HermesWorker:
                 from ai_agent.Hermes.chat.company import register
                 register()
                 tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'platform_company','web'}
-                toolsets.extend(['platform_company', 'delegation', 'web'])
+                toolsets.extend(['platform_company', 'delegation', 'web', 'session_search'])
             if cfg.get('read_only'):toolsets=['file']
             focused=cfg.get('application_context_scope')=='focused_discussion'
             if focused:toolsets=[]
-            configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'))
+            configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'),
+                            direct_surfaces=not bool(cfg.get('company_instructions')))
             from ai_agent.Hermes.models.codex import runtime as model_runtime
             self.agent = AIAgent(
                 model=cfg['model'], **model_runtime(cfg), quiet_mode=True,
@@ -418,6 +416,9 @@ class HermesWorker:
             if cfg.get('company_instructions') and callable(prune):
                 history, pruned = prune(history)
                 if pruned: self.event('context_pruned', {'tool_results': pruned, 'llm_calls': 0})
+            if cfg.get('company_instructions'):
+                from ai_agent.Hermes.chat.company import prime_context
+                history = prime_context(self, self.agent, history, prompt)
             result = run(self,self.agent,cfg,session_id,prompt,history,request or {})
             if result.get('error'):
                 raise RuntimeError(str(result['error']))

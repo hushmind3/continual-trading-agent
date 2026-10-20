@@ -1,4 +1,5 @@
 import {contentText, type Message} from '../types';
+import {toolLabel} from '../labels';
 
 export function engineNote(message: Message) {
   const text = contentText(message.content).trimStart();
@@ -12,4 +13,9 @@ export function EngineNotes({messages}: {messages: Message[]}) {
     <p>긴 대화를 이어가기 위해 엔진이 남긴 내부 요약입니다. 사용자 메시지와 답변은 대화창에 유지됩니다.</p>
     {notes.map((message, index) => <pre key={index}>{contentText(message.content)}</pre>)}
   </details> : null;
+}
+
+export function displayEngineResponse(text:string){
+ const stopped=/^I stopped retrying because I kept running ([\w.-]+) (\d+) times without making progress\./.exec(text);
+ return stopped?`${toolLabel(stopped[1])} 요청이 같은 원인으로 ${stopped[2]}회 반복 실패해 멈췄습니다. 작업은 완료되지 않았습니다. 실행 과정을 펼쳐 오류를 확인하고 요청 내용을 수정해 주세요.`:text;
 }

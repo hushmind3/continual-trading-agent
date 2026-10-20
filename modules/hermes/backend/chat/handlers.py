@@ -17,6 +17,14 @@ def chat(request: dict):
     except ValueError as exc:raise HTTPException(400,str(exc)) from exc
     return invoke('chat', request)
 
+@router.post('/chat/steer')
+def steer(request: dict):
+    from ai_agent.Hermes.artifacts.handlers import uploaded_paths
+    from fastapi import HTTPException
+    try:request['attachments']=uploaded_paths(request.get('attachments',[]))
+    except ValueError as exc:raise HTTPException(400,str(exc)) from exc
+    return invoke('chat/steer', request)
+
 @router.post('/stop')
 def stop(): return invoke('stop')
 

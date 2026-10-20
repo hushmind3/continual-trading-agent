@@ -119,6 +119,8 @@ class HermesWorker:
         with self.lock:
             item = {'name': name, 'detail': json.dumps(data, ensure_ascii=False, default=str)[:2400] if data is not None else '', 'time': time.time()}
             self.job['events'] = (self.job['events'] + [item])[-100:]
+            if name == 'status' and isinstance(data, (list, tuple)) and data and data[0] == 'lifecycle' and 'Tool guardrail halted' in str(data):
+                self.job['guardrail_halt'] = True
             if name == 'tool_start':
                 self.job['live_text'] = ''
                 self.job['phase'] = 'tool'
@@ -235,6 +237,25 @@ class HermesWorker:
         title = str(request.get('title') or '새 대화')[:100]
         self.db.set_session_title(session_id, self.db.get_next_title_in_lineage(title))
         return self.session(session_id)
+
+    def steer_chat(self, request):
+        message = str(request.get('message') or '').strip()
+        if not message or len(message) > 50000:
+            raise ValueError('전달할 메시지는 1~50,000자로 입력하세요.')
+        with self.lock:
+            if request.get('session_id') != self.job.get('session_id'):
+                raise ValueError('작업 중인 대화에서 메시지를 보내세요.')
+            agent = self.agent
+            if self.stopping or not self.thread or not self.thread.is_alive() or not agent:
+                raise ValueError('현재 작업이 종료됐거나 준비 중입니다. 입력은 유지되니 다시 보내세요.')
+        # Native redirect cancels only the current model request; running tools yield
+        # into the native steer queue. Do not stop the task or create another agent.
+        if not agent.redirect(message):
+            raise ValueError('작업 단계가 바뀌고 있습니다. 입력은 유지되니 다시 보내세요.')
+        with self.lock:
+            self.job['live_text'] = ''
+        self.event('owner_steer', {'message': message})
+        return self.status()
 
     def start_chat(self, request):
         request = dict(request)
@@ -423,10 +444,12 @@ class HermesWorker:
             if result.get('error'):
                 raise RuntimeError(str(result['error']))
             autonomy = self.job.get('autonomy') or {}
-            incomplete = result.get('failed') or not result.get('completed', True)
+            incomplete = result.get('failed') or not result.get('completed', True) or self.job.get('guardrail_halt', False)
             state = 'stopped' if self.stopping else 'paused' if autonomy.get('status') == 'paused' or incomplete else 'complete'
             completion = dict(state=state, text=result.get('final_response') or self.job['text'], finished_at=time.time())
             if incomplete and not self.stopping:completion['error'] = '작업이 완료되지 않았습니다. '+str(result.get('turn_exit_reason') or '도구 실행 결과를 확인하세요.')
+            if self.job.get('guardrail_halt'):
+                completion['error'] = '같은 도구 요청이 반복 실패해 작업을 멈췄습니다. 실행 과정을 펼쳐 원인을 확인하세요.'
             if getattr(self.agent,'_read_only_denials',None):
                 completion['error']=(completion.get('error','')+' '+self.agent._read_only_denials[-1]).strip()
         except Exception as exc:
@@ -457,6 +480,9 @@ class HermesWorker:
             self.job['metrics'] = update(self)
         with self.lock:
             job = {**self.job, 'events': list(self.job['events'])}
+            active_request = getattr(self.agent, '_model_request_active', None)
+            job['can_steer'] = bool(not self.stopping and self.thread and self.thread.is_alive() and self.agent and
+                                    (getattr(self.agent, '_executing_tools', False) or active_request and active_request.is_set()))
         model = {'running': bool(self.model_process and self.model_process.poll() is None), 'base_url': self.model_base, 'state': 'idle'}
         if model['running']:
             from urllib.request import urlopen
@@ -637,6 +663,7 @@ class HermesWorker:
             self.session(payload['id'])
             self.db.set_session_archived(payload['id'], True)
             return self.sessions()
+        if operation == 'chat/steer': return self.steer_chat(payload)
         if operation == 'chat': return self.start_chat(payload)
         if operation == 'status': return self.status()
         if operation == 'stop': return self.stop(payload.get('session_id'))

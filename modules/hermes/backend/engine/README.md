@@ -35,3 +35,5 @@ ChatGPT device-code 로그인이 진행 중인 worker도 재시작에서 보호�
 실행 수치: worker.py는 작업 스레드 시작 직전 chat.telemetry.begin으로 소유 모델 로그의 현재 위치를 잡습니다. telemetry가 이후 decoder timing만 읽어 짧은 응답의 실제 속도를 보완합니다. 원본 agent loop/출력 한도/Thinking 설정은 변경하지 않습니다. 관련 검증은 ../chat/README.md를 따릅니다.
 
 로컬 모델의 기존 llama-server 실행기는 --checkpoint-min-step 기본값을 1,024로 전달합니다. LLAMA_ARG_CHECKPOINT_MIN_SPACING_NT 환경변수가 있으면 그 값을 우선하며 최대 문맥·GPU 적재·Thinking·체크포인트 개수는 바꾸지 않습니다. 중간 문맥 변경 후 공통 접두부가 있어도 전체 입력이 다시 처리되던 기존 설치본에서, 변경 후 후속 대화의 신규 처리 32토큰·입력 처리 0.154초를 관측했습니다. 모델 기동 직후에는 캐시가 없으므로 첫 입력 비용은 남습니다. 옵션은 설치된 실행기 --help와 [공식 체크포인트 안내](https://github.com/ggml-org/llama.cpp/pull/15293)를 기준으로 사용합니다. 실제 응답 수치는 [대화 안내](../chat/README.md)에 모읍니다.
+
+현재 native 실행 중 메시지는 steer_chat→AIAgent.redirect/steer로 전달하며 stop과 구분합니다. 같은 세션·현재 살아 있는 실행만 허용합니다. 원본 lifecycle의 Tool guardrail halted 이벤트를 감지하면 결과를 complete로 표시하지 않고 paused와 한국어 오류로 남깁니다. 원본의 동일 실패 반복 차단 기능은 유지합니다.

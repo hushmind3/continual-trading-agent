@@ -4,11 +4,11 @@
 
 2026-10-20 실제 기존 설치본 확인: 총괄 대상 선택·새로고침 유지·EstimateAI 기존 미리보기 HTTP 200 확인. 기존 총괄 세션의 회사 기록 조회는 GPT-6-Luna/low에서 13초·모델 3회로 완료됐습니다. 로컬 Ornith의 동일 누적 세션은 자동 압축 장기 대기로 완료 확인하지 못했습니다. 생성해 확인하던 검사 전용 HTML/스크립트는 휴지통으로 옮겼고, 설치본을 다시 받거나 새 조직/제품을 만들지 않았습니다. TypeScript·Vite 빌드는 통과했으며 로컬 모델은 ready로 복구했습니다. 이 확인은 전체 사업 실행·배포 완료를 뜻하지 않습니다.
 
-대화 대상(일반/조직별 AI 총괄)은 실행 방식(한 번/목표/반복)과 별도 선택입니다. 대상은 현재 native session_id로 판단해 상단·입력창에 계속 표시하며 전송으로 일반 대화로 바꾸지 않습니다. 일반 대화 복귀 시 마지막 일반 세션과 개별 초안을 복원합니다. 대상 전환 중 전송을 막고 늦은 전환 응답을 무시합니다. 회사 상태·승인 기능과 동일 Hermes DB/실행 경로는 유지합니다. 사업 관리는 기본으로 닫고 상단의 기존 버튼 하나로 열고 닫습니다. 패널의 중복 제목·닫기 줄은 없애되 사업 초안 카드와 승인·수정 안내는 항상 표시합니다. 사업 진행은 승인된 진행 프로젝트 수와 실제 dist/index.html이 있는 실행 가능한 제품 수를 표시하며 고객 요청·결제 매출은 표시하지 않습니다. 승인·보류 및 대화를 통한 초안 수정 흐름은 유지합니다. 실제 로컬 빌드 또는 공개 제품 경로가 있으면 총괄 대화 아래 결과물 카드에서 엽니다. 일반 대화에는 이 카드를 표시하지 않습니다. 색상·글꼴·카드는 공통 tailwind.css의 brand/ink/copy와 Pretendard 테마를 사용합니다.
+대화 대상(일반/조직별 AI 총괄)은 실행 방식(한 번/목표/반복)과 별도 선택입니다. 대상은 현재 native session_id로 판단해 상단·입력창에 계속 표시하며 전송으로 일반 대화로 바꾸지 않습니다. 일반 대화 복귀 시 마지막 일반 세션과 개별 초안을 복원합니다. 대상 전환 중 전송을 막고 늦은 전환 응답을 무시합니다. 회사 상태·승인 기능과 동일 Hermes DB/실행 경로는 유지합니다. 사업 관리는 기본으로 닫고 상단의 기존 버튼 하나로 열고 닫습니다. 패널의 중복 제목·닫기 줄은 없애되 사업 초안 카드와 승인·수정 안내는 항상 표시합니다. 사업 진행은 승인된 진행 프로젝트 수와 실제 dist/index.html이 있는 실행 가능한 제품 수를 표시하며 고객 요청·결제 매출은 표시하지 않습니다. 승인·보류 및 대화를 통한 초안 수정 흐름은 유지합니다. 제품 링크는 사업 관리에서 확인합니다. 총괄·일반 대화에는 기존 제품을 상시 배너로 붙이지 않습니다. 각 작업이 생성·수정한 파일은 해당 작업의 결과 파일 링크에서 엽니다. 색상·글꼴·카드는 공통 tailwind.css의 brand/ink/copy와 Pretendard 테마를 사용합니다.
 
 RuntimeMetrics의 ‘전체 작업’은 모든 모델 요청·검색·도구 실행·대기를 합한 시간이며 API 한 번의 응답 시간이 아닙니다. 컨텍스트 안내에는 이전 대화·지침·도구 결과가 포함됨을 표시합니다. 생성 속도 미측정은 기존처럼 빈 값이며 전체 시간으로 추정하지 않습니다. 공통 테마와 이름이 표시된 추론 선택을 재사용합니다.
 
-Chat.tsx owns sessions, search, per-session drafts, send/stop/approval/resume, panel controls and scroll following. ChatStream.tsx groups adjacent tool-only turns and matches results by ID; ActivityTimeline pairs real start/complete events and retains errors. MessageBody.tsx renders Markdown/GFM with raw HTML disabled and provides copy controls.
+Chat.tsx owns sessions, search, per-session drafts, send/steer/stop/approval/resume, panel controls and scroll following. ChatStream.tsx groups adjacent tool-only turns and matches results by ID; ActivityTimeline pairs real start/complete events and retains errors. MessageBody.tsx renders Markdown/GFM with raw HTML disabled and provides copy controls.
 
 The message area fills the remaining viewport. Latest Message restores scroll following. Selected active sessions refresh every 2.5 seconds, retaining unchanged message arrays to avoid reparsing Markdown for metrics-only updates. Opening settings keeps chat mounted. Drafts survive settings navigation and page reload.
 
@@ -24,13 +24,13 @@ ChatHeader, SessionSidebar, ActivityPanel, ChatComposer and ChatWelcome are cont
 
 동일한 문장을 다시 보내도 현재 전송 이후에 저장된 메시지만 대조합니다. 전송으로 새 세션이 생기면 sessionStorage에 즉시 기록합니다. 로컬 문서 링크·인라인 문서 경로는 공통 DocumentPreview로 열며 성공한 write_file/patch 결과 파일은 접힌 도구 기록 바깥에도 표시합니다. Markdown·텍스트와 샌드박스 HTML 미리보기를 지원합니다. HTML 스크립트·외부 리소스 요청·폼 전송은 차단합니다.
 
-대화 본문에는 사용자·에이전트 메시지와 결과 파일만 표시합니다. 도구 요청·결과·오류와 현재 실행 명령은 오른쪽 작업 내역에 모읍니다. 현재 이벤트가 없는 과거 세션은 저장된 도구 호출·결과를 작업 내역에서 확인합니다.
+대화 본문에는 사용자·에이전트 메시지와 결과 파일을 표시합니다. 도구 요청·결과·오류는 접힌 실행 과정과 오른쪽 작업 내역에서 확인합니다. 현재 이벤트가 없는 과거 세션은 저장된 도구 호출·결과를 작업 내역에서 확인합니다.
 
-작업 내역의 과거 기록도 단계별 단일 목록입니다. 명령·파일 경로를 접힌 상태에서 바로 보여주며 작업 기록 안에 작업 기록을 중첩하지 않습니다. 도구 호출을 포함한 assistant 진행 설명은 대화 본문에 반복 표시하지 않습니다.
+작업 내역의 과거 기록도 단계별 단일 목록입니다. 명령·파일 경로를 접힌 상태에서 바로 보여주며 작업 기록 안에 작업 기록을 중첩하지 않습니다. 도구 호출 전 assistant 진행 설명은 본문에 유지해 스트리밍 종료 후 사라지지 않도록 합니다.
 
 결과 문서는 데스크톱에서 대화 옆의 독립 패널로 열립니다. 대화 입력을 막지 않으며 문서·소스 전환과 Escape 닫기를 제공합니다. 모바일에서는 전체 폭 패널로 표시합니다. 작업 내역과 문서 패널은 같은 오른쪽 공간을 사용합니다.
 
-파일 첨부 버튼·클립보드 파일 붙여넣기를 지원합니다. 파일당 8 MiB·요청당 8개이며 runtime/ai_agent/Hermes/artifacts/uploads에 저장한 경로를 메시지와 함께 전달합니다. 파일 등록은 모델의 이미지 이해를 뜻하지 않습니다. 실행 중에도 다음 요청의 모드·횟수·첨부는 준비할 수 있고, 현재 실행은 중지 버튼으로 제어합니다.
+파일 첨부 버튼·클립보드 파일 붙여넣기를 지원합니다. 파일당 8 MiB·요청당 8개이며 runtime/ai_agent/Hermes/artifacts/uploads에 저장한 경로를 메시지와 함께 전달합니다. 파일 등록은 모델의 이미지 이해를 뜻하지 않습니다. 실행 중에도 메시지·첨부를 전달할 수 있습니다. 모드·횟수·모델 설정 변경은 다음 실행에 적용하며 현재 실행은 별도 중지 버튼으로 제어합니다.
 
 문서를 연 상태에서는 대화·입력창이 같은 왼쪽 열에 남고 문서가 오른쪽 높이를 모두 사용합니다. 화면 폭이 좁으면 실행 수치는 3열 격자로 접히며, 엔진 압축 요약·출력 한도 메모는 EngineNotes를 통해 작업 내역에서만 펼칩니다(원본 기록은 유지).
 
@@ -60,7 +60,7 @@ AppTabs.tsx는 원본 회사 현황·업무 실행 기록 UI를 유지하며 총
 
 회사 현황·업무 기록은 Hermes 상위 탭에만 연결합니다. 사업 관리의 독립 제품 보기는 승인된 작업 폴더의 dist/index.html이 있을 때 로컬 결과를 엽니다. 외부 공개·결제 연결 상태와 구분하며 제작되지 않은 제품 링크는 만들지 않습니다.
 
-Hermes 상위 탭은 대화 / 회사 현황 / 업무 실행 기록입니다. 총괄 전용 대화 탭은 제거했습니다. 마지막으로 고른 Hermes 대화를 유지하며 총괄 세션으로 강제 이동하지 않습니다. 입력창의 대화 대상 선택에서 AI 총괄을 선택할 수 있습니다. 실제 브라우저에서 일반 대화 선택 유지·입력창에서 총괄 선택·중복 탭 없음·결과물 버튼 유지를 확인했습니다. 기존 대화 기록은 보존합니다. 상단에는 사업 관리 열기·접기 버튼을 유지하고 결과물은 총괄 대화의 카드에서 엽니다. 데스크톱에서도 패널은 자동으로 열지 않습니다. 이전 확인의 두 헤더 버튼 구성은 현재 사용하지 않습니다. 2026-10-20 현재 TypeScript·Vite 빌드와 기존 설치 화면에서 사업 관리 버튼 하나로 열기·접기, 패널 내부 중복 제목·X 없음, 일반 대화의 결과물 카드 없음, 기존 총괄의 EstimateAI 결과물 카드 및 실제 링크 HTTP 200, Pretendard·공통 brand 배경 적용을 확인했습니다. 모델 호출·새 제품·검사 전용 파일은 만들지 않았습니다.
+Hermes 상위 탭은 대화 / 회사 현황 / 업무 실행 기록입니다. 총괄 전용 대화 탭은 제거했습니다. 마지막으로 고른 Hermes 대화를 유지하며 총괄 세션으로 강제 이동하지 않습니다. 입력창의 대화 대상 선택에서 AI 총괄을 선택할 수 있습니다. 실제 브라우저에서 일반 대화 선택 유지·입력창에서 총괄 선택·중복 탭 없음·결과물 버튼 유지를 확인했습니다. 기존 대화 기록은 보존합니다. 상단에는 사업 관리 열기·접기 버튼을 유지하고 기존 제품은 사업 관리에서 열고 대화 아래 상시 결과물 카드는 표시하지 않습니다. 데스크톱에서도 패널은 자동으로 열지 않습니다. 이전 확인의 두 헤더 버튼 구성은 현재 사용하지 않습니다. 2026-10-20 현재 TypeScript·Vite 빌드와 기존 설치 화면에서 사업 관리 버튼 하나로 열기·접기, 패널 내부 중복 제목·X 없음, 일반 대화의 결과물 카드 없음, 사업 관리의 EstimateAI 제품 링크 HTTP 200(대화 아래 상시 카드는 제거), Pretendard·공통 brand 배경 적용을 확인했습니다. 모델 호출·새 제품·검사 전용 파일은 만들지 않았습니다.
 
 CEO 보고는 기본적으로 결과·막힌 점·대표의 결정 요청으로 제한합니다. 개발 파일/폴더/Git 상태를 자동으로 나열하지 않습니다. 요청 없는 Git 쓰기 시도는 기존 도구 승인 UI를 사용하며 내부 업무 기록은 그대로 보존합니다.
 
@@ -72,3 +72,9 @@ ChatGPT · Codex 모델 선택은 기존 대화/총괄 공통 설정을 사용�
 ChatGPT 모델이면 입력창의 Thinking 위치에 서버가 광고한 추론 수준 선택을 표시합니다. useThinking이 현재 모델의 원본 카탈로그를 읽고 다음 요청 직전 기존 settings API에 모델별 선택을 저장합니다. 로컬 GGUF의 Thinking 자동/켜기/끄기 동작은 유지합니다. ReasoningSelect는 모델 설정 화면과 같은 컴포넌트입니다.
 
 사업 관리 수정 확인: 기존 설치 화면에서 사업 초안과 승인·수정 안내가 표시되고 고객 요청·결제 매출 항목이 없음을 확인했습니다. 기존 승인 프로젝트 1개·실제 결과물 1개를 표시하며 준비 수는 projects/conversation의 progress.ready_products를 사용합니다. TypeScript·Vite 빌드 및 서버 적용 완료. 새 초안·제품·검사 파일·모델 추론은 생성하지 않았습니다.
+
+진행 표시와 중간 메시지: 전송·중지 버튼을 분리하고 실행 중 Enter/전송은 기존 /chat/steer API로 전달합니다. native redirect가 현재 모델 요청만 전환하거나 도구 경계에서 steer로 전달하며 전체 작업을 중지하지 않습니다. 실행 방식·Thinking·읽기 모드의 변경은 기존처럼 다음 실행에 적용합니다. assistant의 중간 설명은 도구 호출이 붙어도 대화에 보존하고, 실제 도구 단계는 접을 수 있는 실행 과정으로 표시합니다. 검증된 파일 쓰기·수정 결과는 기존 GeneratedFiles→DocumentLink로 바로 열 수 있습니다. 레이아웃 단계에서 자동 스크롤을 맞추고 브라우저 자동 앵커와 충돌하지 않도록 합니다. 원본 영어 반복 실패 안내는 화면에서 한국어로 표시하되 원문 DB는 바꾸지 않습니다.
+
+2026-10-20 이번 수정 확인: 기존 총괄 대화에서 상시 제품 배너 0개, 사업관리 안의 기존 제품 카드 1개를 실제 화면에서 확인했습니다. TypeScript·Vite 빌드 및 백엔드 구문 확인 후 서버에 적용했습니다. 기존 총괄 세션의 실제 Instinct 확인 요청 중 추가 지시를 전송해 동일 실행의 owner_steer 이벤트 수신과 입력창 비움을 확인했습니다. 새 제품·설치본·검사 파일은 만들지 않았습니다. 새 사업 초안 생성과 반복 실패의 재발 동작은 이번 확인에서 실행하지 않았습니다.
+
+추가 지시는 원본 display_kind=steer인 사용자 메시지에서만 제어용 표식을 숨기며 원문 DB는 보존합니다. 위 실제 요청은 78초 뒤 완료됐습니다. 추가 지시 수신은 확인했으나 로컬 모델의 검색 효율과 답변 간결성이 해결됐다는 의미는 아닙니다.

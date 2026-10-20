@@ -1095,3 +1095,11 @@
 .ui-panel-resizer::after{content:'';@apply absolute left-0 top-1/2 h-10 w-1 rounded-full bg-slate-300 transition-colors}
 .ui-panel-resizer:hover::after,.ui-panel-resizer:focus-visible::after{@apply bg-brand-500}
 @media(max-width:760px){.ui-panel-resizer{@apply hidden}.hermes-chat-body>.hermes-log{@apply absolute inset-0 z-20 w-full}.hermes-chat-body>.hermes-document-panel{@apply w-full}}
+
+/* Native execution steps keep progress visible without replacing assistant text. */
+.hermes-messages{overflow-anchor:none}
+.ha-tool-summary{@apply my-3 rounded-xl border border-slate-200 bg-slate-50 text-copy}
+.ha-tool-summary>summary{@apply flex cursor-pointer items-center gap-2 px-4 py-3 text-sm}
+.ha-tool-summary>summary>span{@apply min-w-0 flex-1}
+.ha-tool-summary[open]>summary{@apply border-b border-slate-200}
+.ha-tool-summary>.ha-activity-timeline{@apply p-3}

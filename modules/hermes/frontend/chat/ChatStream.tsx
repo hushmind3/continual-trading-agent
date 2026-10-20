@@ -4,7 +4,7 @@ import {contentText,type Message,type Job} from '../types';
 import {toolLabel,eventSummary} from '../labels';
 import {MessageBody,CopyButton} from './MessageBody';
 import {GeneratedFiles} from './GeneratedFiles';
-import {engineNote} from './EngineNotes';
+import {engineNote,displayEngineResponse} from './EngineNotes';
 
 type Call={id?:string;function?:{name?:string;arguments?:string}};
 type Step={id:string;name:string;args:string;result?:unknown};
@@ -17,17 +17,19 @@ function blocks(messages:Message[]):Block[]{
   const m=messages[i];if(engineNote(m))continue;const text=contentText(m.content),calls=(m.tool_calls??[]) as Call[];
   if(m.role==='tool'){if(!steps.length)first=i;steps.push({id:'orphan-'+i,name:m.name??'도구',args:'',result:m.content});continue}
   if(!['user','assistant'].includes(m.role))continue;
-  if(text.trim()&&(m.role==='user'||!calls.length)){flush();output.push({kind:'message',index:i,message:m})}
+  if(text.trim()){flush();output.push({kind:'message',index:i,message:m})}
   if(calls.length){if(!steps.length)first=i;const results:Message[]=[];let j=i+1;for(;j<messages.length&&messages[j].role==='tool';j++)results.push(messages[j]);for(let n=0;n<calls.length;n++){const c=calls[n],r=results.find(r=>r.tool_call_id&&r.tool_call_id===c.id)??results[n];steps.push({id:c.id??i+'-'+n,name:c.function?.name??'도구',args:c.function?.arguments??'',result:r?.content})}i=j-1}
  }
  flush();return output;
 }
 export const Transcript=memo(function Transcript({messages}:{messages:Message[]}){
- return <>{blocks(messages).map(block=>block.kind==='tools'?<div key={'tools-'+block.index}><GeneratedFiles steps={block.steps}/></div>:<article key={'message-'+block.index} className={'hermes-message '+block.message.role}>{block.message.role==='assistant'&&<div className="ha-assistant-mark" aria-label="헤르메스">✳</div>}<div className="ha-message-content"><MessageBody text={contentText(block.message.content)} user={block.message.role==='user'}/>{block.message.role==='assistant'&&<div className="ha-message-actions"><CopyButton text={contentText(block.message.content)} label="답변 복사"/></div>}</div></article>)}</>;
+ return <>{blocks(messages).map(block=>block.kind==='tools'?<div key={'tools-'+block.index}><details className="ha-tool-summary"><summary><Wrench size={14}/><span>{toolLabel(block.steps.at(-1)?.name??'도구')} · {block.steps.length}단계{block.steps.some(step=>step.result!==undefined&&failed(step.result))?' · 오류 있음':''}</span><ChevronDown size={14}/></summary><ToolSteps steps={block.steps}/></details><GeneratedFiles steps={block.steps}/></div>:<article key={'message-'+block.index} className={'hermes-message '+block.message.role}>{block.message.role==='assistant'&&<div className="ha-assistant-mark" aria-label="헤르메스">✳</div>}<div className="ha-message-content"><MessageBody text={contentText(block.message.content)} user={block.message.role==='user'} steered={block.message.display_kind==='steer'}/>{block.message.role==='assistant'&&<div className="ha-message-actions"><CopyButton text={displayEngineResponse(contentText(block.message.content))} label="답변 복사"/></div>}</div></article>)}</>;
 });
 function stepInput(args:string){try{const value=JSON.parse(args);return String(value.command??value.path??value.url??value.action??'').replace(/^cd\s+(?:"[^"]+"|'[^']+'|[^;&\n]+)\s*(?:&&|;|\r?\n)\s*/i,'').split('\n')[0]}catch{return args.split('\n')[0]}}
 export function ToolHistory({messages}:{messages:Message[]}){
- const steps=blocks(messages).flatMap(block=>block.kind==='tools'?block.steps:[]);
+ return <ToolSteps steps={blocks(messages).flatMap(block=>block.kind==='tools'?block.steps:[])}/>;
+}
+function ToolSteps({steps}:{steps:Step[]}){
  return <div className="ha-activity-timeline">{steps.map((step,index)=>{const error=step.result!==undefined&&failed(step.result);return <details className={'ha-activity-item '+(error?'error':'received')} key={step.id+'-'+index}><summary><span className="ha-step-dot">{error?<TriangleAlert size={13}/>:<Check size={13}/>}</span><span className="min-w-0"><b>{toolLabel(step.name)}</b><small className="block truncate" title={stepInput(step.args)}>{stepInput(step.args)||'입력 없음'}</small></span><ChevronDown size={13}/></summary><div><small>요청</small><pre>{step.args||'별도 입력 없음'}</pre>{step.result!==undefined&&<><small>{error?'오류 결과':'결과'}</small><pre>{contentText(step.result)}</pre></>}</div></details>})}</div>;
 }
 export function CurrentActivity({job,active}:{job?:Job;active:boolean}){

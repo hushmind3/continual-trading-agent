@@ -3,6 +3,7 @@ import {Children,isValidElement,memo,useState,type ReactNode} from 'react';
 import Markdown,{defaultUrlTransform} from 'react-markdown';
 import {DocumentLink,documentPath} from './DocumentLink';
 import remarkGfm from 'remark-gfm';
+import {displayEngineResponse} from './EngineNotes';
 import {Check,Copy,TriangleAlert} from 'lucide-react';
 
 export function CopyButton({text,label='복사'}:{text:string;label?:string}){
@@ -16,13 +17,13 @@ function CodeBlock({children}:{children?:ReactNode}){
  const language=props?.className?.replace('language-','')??'코드';
  return <figure className="ha-code-block"><figcaption><span>{language}</span><CopyButton text={code} label="코드 복사"/></figcaption><pre>{children}</pre></figure>;
 }
-export const MessageBody=memo(function MessageBody({text,user=false}:{text:string;user?:boolean}){
- if(user)return <div className="ha-user-text">{text}</div>;
+export const MessageBody=memo(function MessageBody({text,user=false,steered=false}:{text:string;user?:boolean;steered?:boolean}){
+ if(user)return <div className="ha-user-text">{steered&&text.startsWith('[OUT-OF-BAND USER MESSAGE')&&text.endsWith('[/OUT-OF-BAND USER MESSAGE]')?text.split('\n').slice(1,-1).join('\n'):text}</div>;
  return <div className="ha-markdown"><Markdown remarkPlugins={[remarkGfm]} skipHtml urlTransform={url=>documentPath(url)?url:defaultUrlTransform(url)} components={{
   pre:({children})=><CodeBlock>{children}</CodeBlock>,
   table:({children})=><div className="ha-table-scroll"><table>{children}</table></div>,
   a:({children,href})=>href&&documentPath(href)?<DocumentLink path={href}>{children}</DocumentLink>:<a href={href} target="_blank" rel="noreferrer">{children}</a>,
   code:({children,className})=>!className&&typeof children==='string'&&documentPath(children)?<DocumentLink path={children}>{children}</DocumentLink>:<code className={className}>{children}</code>,
   img:({alt})=><span className="ha-image-reference">{alt||'이미지 참조'}</span>
- }}>{text}</Markdown></div>;
+ }}>{displayEngineResponse(text)}</Markdown></div>;
 });

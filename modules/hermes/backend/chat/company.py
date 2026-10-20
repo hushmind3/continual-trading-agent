@@ -76,6 +76,12 @@ def execute(args, **kwargs):
     if getattr(worker.agent, '_read_only_denials', None) is not None and args.get('action', 'overview') not in ('overview','recall'):
         return json.dumps({'error': '읽기 모드에서는 회사 기록을 변경할 수 없습니다.'}, ensure_ascii=False)
     command = dict(args)
+    if command.get('action') == 'propose':
+        proposal = command.get('proposal')
+        required = ('problem', 'product', 'validation')
+        missing = [key for key in required if not isinstance(proposal, dict) or not isinstance(proposal.get(key), str) or not proposal[key].strip()]
+        if not str(command.get('title') or '').strip() or missing:
+            return json.dumps({'error': '사업 초안의 제목과 고객 문제·제품·검증 계획을 구체적으로 작성하세요. 빈 제안을 그대로 반복하지 마세요.', 'required_fields': ['title'] + ['proposal.' + key for key in missing]}, ensure_ascii=False)
     if command.get('action') in ('finish', 'fail'):
         if 'error' in command:
             return json.dumps({'error': 'error 필드는 사용하지 마세요. 성공은 action=finish, 실패는 action=fail이며 설명은 body에 적으세요.'}, ensure_ascii=False)
@@ -215,7 +221,14 @@ SCHEMA = {'name': 'company_records', 'description': 'Company facts and records, 
         'memory_key': {'type':'string','description':'Stable topic key; newer notes supersede older notes with the same scope/kind/key.'},
         'role': {'type': 'string', 'enum': ['CEO', 'CPO', 'CTO', 'CMO', 'CFO', 'CS', 'QA']},
         'title': {'type': 'string'}, 'body': {'type': 'string', 'description': 'Actual success evidence for finish; actual failure reason for fail. Success must never be recorded as an error.'},
-        'proposal': {'type': 'object'}, 'minutes': {'type': 'array', 'items': {'type': 'object'}}},
+        'proposal': {'type': 'object', 'description': 'For propose, provide title and this concrete draft; an empty object is invalid. Save a draft only; it does not approve implementation.',
+                     'properties': {'problem': {'type': 'string', 'description': 'Specific customer problem', 'minLength': 1},
+                                    'product': {'type': 'string', 'description': 'Proposed product or service and scope', 'minLength': 1},
+                                    'target_customer': {'type': 'string'},
+                                    'price': {'type': 'string', 'description': 'Unverified pricing hypothesis; not actual revenue'},
+                                    'validation': {'type': 'string', 'description': 'Concrete demand validation plan', 'minLength': 1}},
+                     'required': ['problem', 'product', 'validation'], 'additionalProperties': False},
+        'minutes': {'type': 'array', 'items': {'type': 'object'}}},
         'required': ['action'], 'additionalProperties': False}}
 
 

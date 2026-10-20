@@ -10,6 +10,8 @@
 - ../useAgentSettings.ts: 설정 조회·실패 후 다시 불러오기.
 - 공통 ui/SettingsSection·Primitives: 패널·읽기 실패·입력·키보드 탭.
 
+모델·추론 선택은 공통 ui-settings-choice-grid로 배치하며 모바일에서는 한 열로 접힙니다. 대화 입력창의 동일한 ReasoningSelect에도 ‘추론’ 이름을 표시합니다. 폰트·색상·간격은 플랫폼 공통 tailwind.css를 사용합니다.
+
 단일 /api의 ai_agent/Hermes/settings, models/local, models, model/load, model/unload에 연결합니다. 화면 이동·검색·모델 선택만으로 로딩·다운로드·실행하지 않습니다. 실제 준비됨은 local_model.state를 따릅니다.
 
 확인: frontend/tests/hermes-workspace.local-browser.spec.ts의 모델 검색·요청 경로·설정 실패 복구 검사. 모델 API는 픽스처로 대체하며 실제 추론을 시작하지 않습니다.

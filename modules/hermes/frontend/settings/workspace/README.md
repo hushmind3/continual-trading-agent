@@ -6,4 +6,6 @@ WorkspaceSettings.tsx는 ../useAgentSettings.ts로 현재 설정을 읽고, 단�
 
 공통 ui/SettingsSection·SettingsLoadState·Primitives를 사용하고 tailwind.css에서 스타일을 공유합니다. 소메뉴 주소와 등록은 상위 ai_agent/agent_navigation.ts와 submenu_manager.ts에서 취합합니다.
 
+도구 목록은 settings의 toolset_options(원본 Hermes registry 등록 결과)를 사용합니다. 한글 라벨은 번역이며 도구 종류를 고정하지 않습니다. 웹 검색도 여기서 선택할 수 있으며 선택된 web은 일반 대화에서도 기존 DDGS 제공자를 등록합니다. 외부 인증·설치가 필요한 도구는 별도로 준비해야 합니다. 임시로 등록되지 않은 기존 선택은 저장 시 버리지 않습니다.
+
 검사: frontend/tests/hermes-workspace.local-browser.spec.ts의 작업 환경 필드 저장 검사. 설정 API는 픽스처를 사용하며 실제 사용자 권한·설정을 바꾸지 않습니다.

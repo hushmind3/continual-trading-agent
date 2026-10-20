@@ -19,7 +19,7 @@ export function Button({
       type="button"
       {...props}
       disabled={props.disabled || busy}
-      className={`ui-button ui-button-${tone} inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-150 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-45 ${variant === "ghost" ? "bg-transparent text-slate-600 hover:bg-slate-100" : tone === "primary" ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20" : tone === "danger" ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "bg-slate-100 text-slate-700 hover:bg-slate-200"} ${className}`}
+      className={`ui-button ui-button-${tone} inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-150 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-45 ${variant === "ghost" ? "bg-transparent text-slate-600 hover:bg-slate-100" : tone === "primary" ? "bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/20" : tone === "danger" ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "bg-slate-100 text-slate-700 hover:bg-slate-200"} ${className}`}
     >
       {busy && <LoaderCircle size={15} className="animate-spin" />}
       {children}
@@ -31,7 +31,7 @@ export function IconButton({className="",...props}:ComponentPropsWithRef<typeof 
   return <Button variant="ghost" {...props} className={`ui-icon-button shrink-0 p-2 ${className}`}/>;
 }
 export function Input({className="",...props}:ComponentPropsWithRef<'input'>){
-  return <input {...props} className={`${props.type==='checkbox'||props.type==='radio'?'ui-checkbox size-4 accent-blue-600':inputClass} ${className}`}/>;
+  return <input {...props} className={`${props.type==='checkbox'||props.type==='radio'?'ui-checkbox size-4 accent-brand-600':inputClass} ${className}`}/>;
 }
 export function Select({className="",...props}:ComponentPropsWithRef<'select'>){
   return <select {...props} className={`${inputClass} ${className}`}/>;
@@ -108,7 +108,7 @@ export function Meter({
   value,
   label,
   detail,
-  color = "bg-blue-500",
+  color = "bg-brand-500",
 }: {
   value: number;
   label?: string;
@@ -281,4 +281,4 @@ export function Sparkline({
   );
 }
 export const inputClass =
-  "ui-input w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:ring-3 focus:ring-blue-100";
+  "ui-input w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:ring-3 focus:ring-brand-100";

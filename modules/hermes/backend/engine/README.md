@@ -2,6 +2,9 @@
 
 `upstream/` contains copied upstream implementation, not a replacement agent loop. `provenance.json` records origins and bootstrap changes. `worker.py` calls upstream AIAgent, SessionDB, tool registry, MCP and skills in an isolated process. `bridge.py` provides JSON-line IPC to the existing FastAPI process; no additional public gateway is started.
 
+settings의 도구 선택지는 원본 registry의 등록된 범주와 toolsets 메타데이터에서 취합하며 클라이언트 전용·세션 제한 도구를 제외합니다. 기존 저장 선택은 일시적으로 플러그인이 빠져도 유지합니다. 프론트에 고정된 기능 목록으로 웹 검색이 누락되던 경계를 제거했습니다.
+runtime_policy.configure_tools의 lazy 설정은 원본 direct surface 범주까지 다시 defer하던 덮어쓰기를 제거했습니다. 선택한 web·컴퓨터 도구는 직접 노출하고 다른 도구는 지연 로딩합니다. native/eager는 원본 기본 목록/전체 노출 동작을 유지합니다.
+
 Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to `runtime/ai_agent/Hermes/`. All runtime paths resolve from this project. The original checkout must not appear on PYTHONPATH or be used as a symlink target.
 
 프로젝트 자동 연결은 `mcp/project` 명령을 `../mcp/project_links.py`로 전달합니다. 다른 MCP 설정을 보존하면서 프로젝트 전용 서버만 추가·해제하며, 원본 discovery와 도구 등록 결과를 확인합니다. 로컬 모델 로더는 설치된 llama.cpp의 `--n-gpu-layers auto`를 사용합니다. 기존 999 고정값이 자동 메모리 맞춤을 막아 Vulkan KV 캐시 할당에 실패한 것을 확인했으며, 문맥 크기는 사용자/원본 설정을 유지하고 GPU 계층만 가용 VRAM에 맞춥니다.

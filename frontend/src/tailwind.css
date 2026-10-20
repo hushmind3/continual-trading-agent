@@ -1,18 +1,38 @@
 @source "../../modules";
 @import "tailwindcss";
+@font-face {
+  font-family: "Pretendard Variable";
+  src: url("./assets/fonts/PretendardVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 @theme {
+  --color-brand-50: #eff9f5;
+  --color-brand-100: #d9f0e7;
+  --color-brand-200: #b5e0d1;
+  --color-brand-300: #83c9b4;
+  --color-brand-400: #4dad93;
+  --color-brand-500: #229379;
+  --color-brand-600: #0e806b;
+  --color-brand-700: #106654;
+  --color-brand-800: #145144;
+  --color-brand-900: #173e35;
+  --color-canvas: #f6f8f5;
+  --color-ink: #193c32;
+  --color-copy: #435f59;
   --container-conversation: 55rem;
   --container-composer: 56.5rem;
   --radius-composer: 1.5625rem;
   --text-tiny: .5rem;
   --text-small: .5625rem;
-  --text-caption: .625rem;
+  --text-caption: .75rem;
   --text-code-tiny: .65625rem;
-  --text-label: .6875rem;
+  --text-label: .75rem;
   --text-code-small: .71875rem;
   --text-code: .78125rem;
-  --text-compact: .8125rem;
-  --text-body: .9375rem;
+  --text-compact: .875rem;
+  --text-body: 1rem;
   --text-subtitle: 1.0625rem;
   --text-title: 1.3125rem;
   --text-heading: 1.5625rem;
@@ -26,17 +46,17 @@
   --leading-text: 1.75;
   --leading-code: 1.8;
   --leading-description: 1.9;
-  --font-sans: "Segoe UI", "Malgun Gothic", sans-serif;
+  --font-sans: "Pretendard Variable", "Segoe UI", "Malgun Gothic", sans-serif;
 }
 @layer base {
   body {
-    @apply m-0 bg-slate-50 font-sans text-slate-900 antialiased;
+    @apply m-0 bg-canvas font-sans text-slate-900 antialiased;
   }
   button {
     @apply cursor-pointer;
   }
   button:focus-visible {
-    @apply outline-2 outline-offset-2 outline-blue-400;
+    @apply outline-2 outline-offset-2 outline-brand-400;
   }
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -59,8 +79,8 @@
 
 /* Shared platform shell, pages and reusable UI. */
 /* One visual language for every registered workspace. */
-.workspace-app {--workspace-bg:var(--color-gray-100);--workspace-surface:var(--color-white);--workspace-ink:var(--color-gray-900);--workspace-muted:var(--color-gray-500);--workspace-line:var(--color-gray-200);--workspace-accent:var(--color-blue-600);background:var(--workspace-bg);color:var(--workspace-ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;@apply text-sm;@apply leading-relaxed;-webkit-font-smoothing:antialiased}
-.workspace-app :where(button,a,input,select,textarea,summary):focus-visible {outline:calc(var(--spacing) * 0.75) solid var(--color-blue-600);@apply outline-offset-3}
+.workspace-app {--workspace-bg:var(--color-canvas);--workspace-surface:var(--color-white);--workspace-ink:var(--color-ink);--workspace-muted:var(--color-gray-500);--workspace-line:var(--color-gray-200);--workspace-accent:var(--color-brand-600);background:var(--workspace-bg);color:var(--workspace-ink);font-family:var(--font-sans);@apply text-sm;@apply leading-relaxed;-webkit-font-smoothing:antialiased}
+.workspace-app :where(button,a,input,select,textarea,summary):focus-visible {outline:calc(var(--spacing) * 0.75) solid var(--color-brand-600);@apply outline-offset-3}
 .workspace-header {@apply h-17;position:sticky;@apply top-0;@apply z-30;@apply flex;@apply items-center;@apply justify-between;@apply gap-4;@apply pt-0 pr-6 pb-0 pl-6;background:rgba(255,255,255,.9);backdrop-filter:blur(calc(var(--spacing) * 5));border-bottom:calc(var(--spacing) * 0.25) solid var(--workspace-line)}
 .workspace-header-brand,.workspace-header-actions {@apply flex;@apply items-center;@apply gap-3}
 .workspace-brand {@apply flex;@apply items-center;@apply gap-2.75;@apply text-body;@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 8.75);@apply whitespace-nowrap}
@@ -73,7 +93,7 @@
 .workspace-notification-dot {@apply absolute;@apply top-1.5;@apply right-1.75;@apply w-1.5;@apply h-1.5;@apply bg-red-500;@apply border border-solid border-white;@apply rounded-full}
 .workspace-layout {@apply grid;grid-template-columns:calc(var(--spacing) * 57) minmax(0,1fr);min-height:calc(100dvh - calc(var(--spacing) * 17))}
 .workspace-layout-compact {grid-template-columns:calc(var(--spacing) * 18) minmax(0,1fr)}
-.workspace-sidebar {position:sticky;@apply top-17;height:calc(100dvh - calc(var(--spacing) * 17));@apply overflow-y-auto;@apply overscroll-contain;border-right:calc(var(--spacing) * 0.25) solid var(--workspace-line);background:rgba(250,250,252,.96);@apply pt-6 pr-3 pb-6 pl-3;scrollbar-width:thin;scrollbar-color:var(--color-gray-300) transparent}
+.workspace-sidebar {position:sticky;@apply top-17;height:calc(100dvh - calc(var(--spacing) * 17));@apply overflow-y-auto;@apply overscroll-contain;border-right:calc(var(--spacing) * 0.25) solid var(--workspace-line);background:var(--color-canvas);@apply pt-6 pr-3 pb-6 pl-3;scrollbar-width:thin;scrollbar-color:var(--color-gray-300) transparent}
 .workspace-menu-group {@apply mb-6}
 .workspace-menu-group>summary {@apply flex;@apply items-center;@apply gap-2;@apply list-none;@apply pt-0 pr-3 pb-2.5 pl-3;@apply text-label;@apply font-semibold;letter-spacing:.06em;@apply text-gray-500;@apply cursor-pointer}
 .workspace-menu-group>summary::-webkit-details-marker {@apply hidden}
@@ -106,14 +126,14 @@
 .workspace-app .ui-panel:has(>header button[aria-expanded="false"])>header {@apply mb-0}
 .workspace-app .ui-button {@apply min-h-10;@apply pt-2.25 pr-4 pb-2.25 pl-4;@apply gap-1.75;@apply border border-solid border-gray-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-white;@apply text-gray-700;@apply text-compact;@apply font-semibold;line-height:calc(var(--spacing) * 5);box-shadow:0 calc(var(--spacing) * 0.25) calc(var(--spacing) * 0.5) color-mix(in srgb, var(--color-black) 1%, transparent);@apply cursor-pointer;transition:background .18s,border-color .18s,box-shadow .18s,transform .12s}
 .workspace-app .ui-button:hover:not(:disabled) {@apply bg-gray-100;@apply border-gray-300}
-.workspace-app .ui-button-primary {@apply border-blue-600;@apply bg-blue-600;@apply text-white;box-shadow:0 calc(var(--spacing) * 0.5) calc(var(--spacing) * 1.25) color-mix(in srgb, var(--color-blue-600) 9%, transparent)}
-.workspace-app .ui-button-primary:hover:not(:disabled) {@apply bg-blue-600;@apply border-blue-600}
+.workspace-app .ui-button-primary {@apply border-brand-600;@apply bg-brand-600;@apply text-white;box-shadow:0 calc(var(--spacing) * 0.5) calc(var(--spacing) * 1.25) color-mix(in srgb, var(--color-brand-600) 9%, transparent)}
+.workspace-app .ui-button-primary:hover:not(:disabled) {@apply bg-brand-600;@apply border-brand-600}
 .workspace-app .ui-button-danger {@apply border-red-100;@apply bg-red-50;@apply text-red-600;@apply shadow-none}
 .workspace-app .ui-button-danger:hover:not(:disabled) {@apply bg-red-50;@apply border-gray-300}
 .workspace-app .ui-button:disabled {cursor:not-allowed;@apply opacity-45;@apply shadow-none}
 .workspace-app .ui-input {@apply min-h-10.5;@apply border-gray-200;border-radius:calc(var(--spacing) * 2.75);@apply pt-2.25 pr-3 pb-2.25 pl-3;@apply bg-white;@apply text-compact;@apply text-gray-700}
 .workspace-app .ui-input::placeholder {@apply text-gray-400}
-.workspace-app .ui-input:focus {@apply border-blue-600;box-shadow:0 0 0 calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-blue-600) 5%, transparent)}
+.workspace-app .ui-input:focus {@apply border-brand-600;box-shadow:0 0 0 calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-brand-600) 5%, transparent)}
 .workspace-app .ui-status {@apply text-label;@apply gap-1.5}
 .workspace-app .ui-status i {@apply w-1.25;@apply h-1.25}
 .workspace-app .ui-tabs {@apply max-w-full;overflow-x:auto;@apply gap-0.5;@apply p-1;@apply border border-solid border-gray-200;@apply rounded-xl;@apply bg-gray-200}
@@ -131,20 +151,20 @@
 .workspace-app th,.workspace-app td {@apply pt-3;@apply pb-3}
 .workspace-subnav {@apply flex;@apply items-center;@apply gap-1;@apply flex-wrap;border-bottom:calc(var(--spacing) * 0.25) solid var(--workspace-line);@apply mb-5;@apply pb-3}
 .workspace-subnav a {@apply pt-1.75 pr-3.25 pb-1.75 pl-3.25;border-radius:calc(var(--spacing) * 2.25);@apply text-xs;@apply font-semibold;@apply text-gray-500}
-.workspace-subnav a[aria-current="page"] {@apply text-blue-600;@apply bg-blue-50}
+.workspace-subnav a[aria-current="page"] {@apply text-brand-600;@apply bg-brand-50}
 .workspace-mobile-toggle {@apply hidden}
 .workspace-mobile-menu .workspace-menu-item {@apply min-h-12;@apply text-body}
 .workspace-mobile-menu .workspace-menu-group>summary {@apply text-xs}
 .operations-layout {@apply grid;@apply gap-6}
 .operations-overview {@apply block}
-.workspace-app .operations-hero {@apply p-7.5;background:radial-gradient(ellipse at 100% 0%,var(--color-blue-50),transparent 65%),var(--color-white);@apply border-blue-100;box-shadow:0 calc(var(--spacing) * 1.5) calc(var(--spacing) * 5.5) color-mix(in srgb, var(--color-slate-700) 2%, transparent)}
+.workspace-app .operations-hero {@apply p-7.5;background:radial-gradient(ellipse at 100% 0%,var(--color-brand-50),transparent 65%),var(--color-white);@apply border-brand-100;box-shadow:0 calc(var(--spacing) * 1.5) calc(var(--spacing) * 5.5) color-mix(in srgb, var(--color-slate-700) 2%, transparent)}
 .operations-command-row {@apply flex;@apply items-center;@apply justify-between;@apply gap-6;@apply flex-wrap}
 .operations-command-actions {@apply flex;@apply items-center;@apply gap-3;@apply flex-wrap;@apply w-full}
 .operations-command-actions .ui-button {@apply min-h-12;@apply pt-3 pr-5.5 pb-3 pl-5.5;@apply text-compact;@apply rounded-xl}
 .operations-command-actions select {@apply min-h-12;@apply min-w-32.5;@apply rounded-xl}
 .operations-command-note {max-width:65ch;@apply text-xs;@apply leading-code;@apply text-gray-500}
 .operations-hero-status {@apply flex;@apply items-center;@apply gap-2;@apply mt-5;@apply pt-4.5;@apply border-t border-solid border-slate-200;@apply text-xs}
-.operations-detail-summary {@apply flex;@apply items-center;@apply gap-1.5;@apply text-xs;@apply font-medium;@apply text-blue-600;@apply cursor-pointer;@apply list-none}
+.operations-detail-summary {@apply flex;@apply items-center;@apply gap-1.5;@apply text-xs;@apply font-medium;@apply text-brand-600;@apply cursor-pointer;@apply list-none}
 .operations-detail-summary::-webkit-details-marker {@apply hidden}
 .operations-detail-summary::after {content:'›';@apply ml-1;transform:rotate(90deg);@apply text-base}
 .operations-connection-status {@apply flex;@apply items-center;@apply gap-2;@apply mb-5;@apply text-compact}
@@ -160,7 +180,7 @@
 .operations-flow-heading {@apply flex;@apply justify-between;@apply items-center;@apply gap-4;@apply pt-5.5 pr-6 pb-5.5 pl-6;@apply border-b border-solid border-slate-100}
 .operations-flow-heading h2 {@apply text-subtitle;@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 8.75)}
 .operations-flow-heading p {@apply mt-1.25;@apply text-xs;@apply text-gray-500}
-.operations-flow-link {@apply text-xs;@apply text-blue-600;@apply whitespace-nowrap}
+.operations-flow-link {@apply text-xs;@apply text-brand-600;@apply whitespace-nowrap}
 .operations-flow-step {@apply relative;@apply flex;@apply gap-3;@apply min-w-0;@apply pt-6 pr-5 pb-6 pl-5}
 .operations-flow-step>svg {@apply mt-0.75;@apply text-gray-500;stroke-width:1.6}
 .operations-flow-step h3 {@apply text-compact;@apply font-semibold}
@@ -185,7 +205,7 @@
 .expert-browser-toolbar {@apply flex;@apply items-center;@apply justify-between;@apply gap-4;@apply flex-wrap;@apply pt-3 pr-0 pb-1 pl-0}
 .expert-search {@apply flex;@apply items-center;@apply gap-2;@apply w-55;@apply pt-2.25 pr-3 pb-2.25 pl-3;@apply border border-solid border-gray-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-white;@apply text-gray-500}
 .expert-search input {@apply min-w-0;@apply w-full;@apply text-xs;@apply text-gray-700;outline:none}
-.expert-search:focus-within {@apply border-blue-600;box-shadow:0 0 0 calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-blue-600) 5%, transparent)}
+.expert-search:focus-within {@apply border-brand-600;box-shadow:0 0 0 calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-brand-600) 5%, transparent)}
 .expert-family-card {@apply flex;@apply flex-1;@apply flex-col;@apply items-stretch;@apply gap-4.5;@apply pt-5.5 pr-6 pb-5.5 pl-6;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 4.25);@apply bg-white;transition:border-color .18s,box-shadow .18s}
 .expert-family-identity>b {@apply block;@apply text-body;@apply font-semibold;@apply leading-normal;letter-spacing:-.calc(var(--spacing) * 6.25);@apply wrap-anywhere}
 .expert-family-identity p {@apply text-label;@apply leading-copy}
@@ -194,15 +214,15 @@
 .expert-family-management>div {@apply mt-2.5}
 .expert-family-management .ui-button {@apply w-full;@apply text-label;@apply min-h-8.5;@apply pt-1.5 pr-2.5 pb-1.5 pl-2.5}
 .expert-version {flex:0 1 calc(var(--spacing) * 40);@apply min-w-33.75;@apply max-w-47.5;@apply pt-3.25 pr-3.5 pb-3.25 pl-3.5;@apply border border-solid border-slate-200;@apply rounded-xl;@apply bg-slate-50;transition:border-color .18s,background .18s}
-.expert-version-selected {@apply border-blue-400;@apply bg-blue-50;box-shadow:0 0 0 calc(var(--spacing) * 0.25) color-mix(in srgb, var(--color-blue-400) 9%, transparent)}
+.expert-version-selected {@apply border-brand-400;@apply bg-brand-50;box-shadow:0 0 0 calc(var(--spacing) * 0.25) color-mix(in srgb, var(--color-brand-400) 9%, transparent)}
 .expert-version-warning {@apply border-amber-100;@apply bg-amber-50}
 .expert-version-selection {@apply flex;@apply items-center;@apply gap-1.75;@apply mb-1.75;@apply text-label;@apply font-semibold;@apply text-gray-600;@apply cursor-pointer}
-.workspace-app input[type="checkbox"],.workspace-app input[type="radio"] {@apply accent-blue-600;@apply cursor-pointer}
+.workspace-app input[type="checkbox"],.workspace-app input[type="radio"] {@apply accent-brand-600;@apply cursor-pointer}
 .expert-version-detail {@apply block;@apply w-full;@apply text-left;@apply cursor-pointer}
 .expert-version-size {@apply block;@apply text-compact;@apply font-medium;@apply text-gray-700;@apply tabular-nums}
 .expert-version-meta {@apply block;@apply mt-1.25;@apply text-caption;@apply leading-message;@apply text-gray-500;@apply wrap-anywhere}
 .expert-version-state {@apply block;@apply mt-1.25;@apply text-caption;@apply leading-normal}
-.expert-version-link {@apply flex;@apply items-center;@apply justify-between;@apply mt-2;@apply text-caption;@apply text-blue-600}
+.expert-version-link {@apply flex;@apply items-center;@apply justify-between;@apply mt-2;@apply text-caption;@apply text-brand-600}
 .expert-champion-result>summary {@apply text-emerald-700}
 @media(max-width:75rem) {.expert-family-card {grid-template-columns:minmax(calc(var(--spacing) * 37.5),calc(var(--spacing) * 47.5)) minmax(0,1fr);@apply gap-4}.expert-family-management {grid-column:1 / -1;justify-self:end;@apply pt-0}.expert-family-management>div {@apply min-w-35}.expert-version {flex-basis:calc(var(--spacing) * 37.5)}}
 @media(max-width:47.5rem) {.expert-workspace-heading {@apply items-start;@apply gap-3}.expert-workspace-heading h2 {@apply text-xl}.expert-workspace-heading p {max-width:28ch;@apply text-label}.expert-workspace-heading .ui-button {@apply text-label;@apply pt-1.75 pr-2.5 pb-1.75 pl-2.5;@apply min-h-9;@apply whitespace-nowrap}.expert-toolbar {@apply p-4;@apply gap-2}.expert-toolbar>label {@apply w-full;@apply m-0}.expert-toolbar>.ui-button-primary {@apply flex-1}.expert-browser-toolbar {@apply gap-3}.expert-search {@apply w-full}.expert-family-card {grid-template-columns:minmax(0,1fr);@apply p-4.5;@apply gap-4}.expert-family-management {grid-column:auto}.expert-version {flex:1 1 calc(var(--spacing) * 32.5)}.workspace-app .workspace-disclosure {@apply pt-3.5 pr-4 pb-3.5 pl-4}}
@@ -211,7 +231,7 @@
 .policy-model-grid {@apply grid;grid-template-columns:repeat(4,minmax(0,1fr));@apply gap-3;@apply mb-5.5}
 .policy-model-card {@apply relative;@apply min-w-0;@apply p-4.5;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 3.5);@apply bg-slate-50;@apply text-left;transition:border-color .18s,background .18s,box-shadow .18s;@apply cursor-pointer}
 .policy-model-card:hover {@apply bg-slate-50;@apply border-slate-300;box-shadow:0 calc(var(--spacing) * 0.75) calc(var(--spacing) * 3) color-mix(in srgb, var(--color-slate-700) 3%, transparent)}
-.policy-model-card-selected {@apply bg-blue-50;@apply border-blue-400;box-shadow:0 0 0 calc(var(--spacing) * 0.25) color-mix(in srgb, var(--color-blue-400) 9%, transparent)}
+.policy-model-card-selected {@apply bg-brand-50;@apply border-brand-400;box-shadow:0 0 0 calc(var(--spacing) * 0.25) color-mix(in srgb, var(--color-brand-400) 9%, transparent)}
 .policy-model-card>p:first-child {@apply text-caption;@apply leading-copy}
 .policy-model-card>p:nth-child(2) {@apply text-sm;@apply leading-relaxed;letter-spacing:-.calc(var(--spacing) * 0.5);@apply text-slate-700}
 .policy-model-card>p:nth-child(3) {@apply text-label;@apply leading-copy}
@@ -222,7 +242,7 @@
 .policy-result-metrics strong {@apply block;@apply mt-1.75;@apply text-heading;@apply font-semibold;@apply leading-dense;letter-spacing:-.calc(var(--spacing) * 1.75);@apply tabular-nums;@apply text-gray-800;@apply wrap-anywhere}
 .policy-result-metrics strong.policy-result-time {@apply text-compact;@apply leading-text;letter-spacing:0}
 .policy-storage-details {@apply pt-4;@apply border-t border-solid border-gray-100;@apply text-xs;@apply text-gray-500}
-.policy-storage-details>summary {@apply text-blue-600;@apply text-label;@apply cursor-pointer}
+.policy-storage-details>summary {@apply text-brand-600;@apply text-label;@apply cursor-pointer}
 .policy-training-summary {@apply p-6;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 4.5);background:linear-gradient(120deg,var(--color-white),var(--color-slate-50))}
 .policy-summary-heading {@apply flex;@apply items-start;@apply justify-between;@apply gap-6}
 .policy-summary-heading>div>p {@apply flex;@apply items-center;@apply gap-1.5;@apply mb-2;@apply text-label;@apply text-gray-500}
@@ -238,8 +258,8 @@
 .workspace-app .rea-analysis-entry>header h2 {@apply text-title;letter-spacing:-.calc(var(--spacing) * 1.25)}
 .rea-target-grid {@apply grid;grid-template-columns:repeat(3,minmax(0,1fr));@apply gap-4}
 .workspace-app .ui-button.rea-target-card {@apply relative;@apply flex;@apply flex-col;@apply items-start;@apply justify-start;@apply gap-0;@apply min-h-45.5;@apply p-6;@apply border border-solid border-gray-200;border-radius:calc(var(--spacing) * 3.75);@apply bg-gray-50;@apply shadow-none;@apply text-left;@apply whitespace-normal}
-.workspace-app .ui-button.rea-target-card:hover:not(:disabled) {@apply border-blue-200;@apply bg-slate-50}
-.workspace-app .ui-button.rea-target-selected {@apply border-blue-200;@apply bg-slate-50}
+.workspace-app .ui-button.rea-target-card:hover:not(:disabled) {@apply border-brand-200;@apply bg-slate-50}
+.workspace-app .ui-button.rea-target-selected {@apply border-brand-200;@apply bg-slate-50}
 .rea-target-card>svg:first-child {@apply mb-5;@apply text-gray-500;stroke-width:1.5}
 .rea-target-card>b {@apply text-body;@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 0.5);@apply text-gray-800}
 .rea-target-card>span {@apply mt-1.75;@apply text-label;@apply font-normal;@apply leading-description;@apply text-gray-500}
@@ -251,7 +271,7 @@
 .rea-scope {@apply mt-5.5;@apply pt-4;@apply border-t border-solid border-gray-100;@apply text-label;@apply leading-code;@apply text-gray-500}
 .rea-scope>summary {@apply cursor-pointer;@apply font-medium}
 .rea-scope p {@apply mt-2.5;max-width:95ch;@apply leading-description;@apply text-gray-500}
-.rea-analysis-progress {@apply flex;@apply items-center;@apply justify-between;@apply gap-4;@apply mt-5;@apply pt-3.5 pr-4 pb-3.5 pl-4;@apply border border-solid border-blue-100;@apply rounded-xl;@apply bg-slate-50}
+.rea-analysis-progress {@apply flex;@apply items-center;@apply justify-between;@apply gap-4;@apply mt-5;@apply pt-3.5 pr-4 pb-3.5 pl-4;@apply border border-solid border-brand-100;@apply rounded-xl;@apply bg-slate-50}
 .rea-analysis-progress>span {@apply text-xs;@apply leading-text;@apply text-slate-500}
 .rea-analysis-progress .ui-button {@apply shrink-0}
 .rea-target-path {@apply mt-3.5;@apply text-label;@apply leading-code;@apply text-gray-500;@apply wrap-anywhere}
@@ -277,7 +297,7 @@
 .rea-breadcrumbs {@apply flex;@apply items-center;@apply flex-wrap;@apply gap-1.25;@apply text-xs;@apply leading-code;@apply text-gray-500}
 .rea-breadcrumbs>span {@apply flex;@apply items-center;@apply gap-1.25}
 .rea-breadcrumbs button {@apply pt-0.75 pr-0 pb-0.75 pl-0;@apply text-slate-500;@apply wrap-anywhere;@apply cursor-pointer}
-.rea-breadcrumbs button:hover {@apply text-blue-600}
+.rea-breadcrumbs button:hover {@apply text-brand-600}
 .rea-browser-actions {@apply flex;@apply items-center;@apply gap-2.5}
 .rea-browser-actions input {@apply w-55}
 .rea-browser-actions .ui-button {@apply text-label;@apply min-h-9;@apply pt-1.75 pr-2.75 pb-1.75 pl-2.75;@apply whitespace-nowrap}
@@ -290,7 +310,7 @@
 .rea-file-entry>span {@apply min-w-0;@apply flex-1;@apply overflow-hidden;@apply text-ellipsis;@apply whitespace-nowrap}
 .rea-file-entry>small {@apply shrink-0;@apply text-small;@apply text-gray-400}
 .rea-file-entry:hover {@apply bg-gray-100;@apply text-gray-700}
-.rea-file-entry-selected {@apply bg-blue-50;@apply text-slate-600}
+.rea-file-entry-selected {@apply bg-brand-50;@apply text-slate-600}
 .rea-file-entry-selected>svg {@apply text-slate-500}
 .rea-file-loading {@apply flex;@apply items-center;@apply gap-2;@apply pt-4 pr-2.5 pb-4 pl-2.5;@apply text-label;@apply text-gray-500}
 .rea-file-empty {@apply pt-5 pr-2.5 pb-5 pl-2.5;@apply text-label;@apply leading-code;@apply text-gray-500}
@@ -318,7 +338,7 @@
 .account-balance {@apply flex;@apply items-center;@apply justify-between;@apply gap-6;@apply pt-1.5 pr-0 pb-7.5 pl-0}
 .account-balance p {@apply mt-4;@apply text-xs;@apply text-slate-300}
 .account-balance strong {@apply block;@apply mt-2.5;font-size:clamp(calc(var(--spacing) * 8.5),3.6vw,calc(var(--spacing) * 12.25));@apply font-semibold;line-height:1.15;letter-spacing:-calc(var(--spacing) * 0.4);@apply tabular-nums;@apply text-white}
-.account-wallet {@apply grid;@apply place-items-center;@apply w-15.5;@apply h-15.5;border:calc(var(--spacing) * 0.25) solid color-mix(in srgb, var(--color-white) 14%, transparent);border-radius:calc(var(--spacing) * 5);background:color-mix(in srgb, var(--color-white) 4%, transparent);@apply text-blue-100;@apply shrink-0}
+.account-wallet {@apply grid;@apply place-items-center;@apply w-15.5;@apply h-15.5;border:calc(var(--spacing) * 0.25) solid color-mix(in srgb, var(--color-white) 14%, transparent);border-radius:calc(var(--spacing) * 5);background:color-mix(in srgb, var(--color-white) 4%, transparent);@apply text-brand-100;@apply shrink-0}
 .account-wallet svg {stroke-width:1.4}
 .account-metrics {@apply grid;grid-template-columns:repeat(3,minmax(0,1fr));@apply gap-6;@apply pt-6 pr-0 pb-6 pl-0;border-top:calc(var(--spacing) * 0.25) solid color-mix(in srgb, var(--color-white) 11%, transparent);border-bottom:calc(var(--spacing) * 0.25) solid color-mix(in srgb, var(--color-white) 11%, transparent)}
 .account-metrics p {@apply text-label;@apply text-slate-300}
@@ -348,7 +368,7 @@
 .workspace-app .data-table-scroll td {@apply text-xs}
 .data-table-sort {@apply inline-flex;@apply items-center;@apply gap-1.75;@apply text-label;@apply font-medium;@apply text-gray-500;@apply cursor-pointer}
 .data-table-sort>svg {@apply text-gray-400}
-.data-table-sort:hover,.data-table-sort:hover>svg {@apply text-blue-600}
+.data-table-sort:hover,.data-table-sort:hover>svg {@apply text-brand-600}
 .data-table-pagination {@apply flex;@apply items-center;@apply justify-between;@apply gap-3;@apply mt-4;@apply text-caption;@apply text-gray-500}
 .data-table-pagination .ui-button {@apply min-h-8;@apply pt-1.25 pr-2.5 pb-1.25 pl-2.5;@apply text-label}
 /* Connections: current state, authentication, then user settings. */
@@ -383,7 +403,7 @@
 .ui-panel-help>summary {@apply grid;@apply place-items-center;@apply w-6.5;@apply h-6.5;border-radius:calc(var(--spacing) * 1.75);@apply list-none;@apply text-gray-400;@apply cursor-pointer}
 .ui-panel-help>summary::-webkit-details-marker {@apply hidden}
 .ui-panel-help>summary:hover {@apply bg-gray-100;@apply text-slate-500}
-.ui-panel-help[open]>summary {@apply text-blue-600;@apply bg-blue-50}
+.ui-panel-help[open]>summary {@apply text-brand-600;@apply bg-brand-50}
 .ui-panel-help-copy {@apply absolute;@apply top-15.5;@apply left-6;@apply right-6;@apply z-25;@apply max-w-115;@apply pt-3.75 pr-4.5 pb-3.75 pl-4.5;@apply border border-solid border-gray-200;@apply rounded-xl;@apply bg-white;@apply text-xs;@apply font-normal;@apply leading-description;@apply text-gray-500;box-shadow:0 calc(var(--spacing) * 2) calc(var(--spacing) * 7.5) color-mix(in srgb, var(--color-gray-900) 7%, transparent)}
 @media(max-width:75rem) {.connection-status dl {grid-template-columns:repeat(2,minmax(0,1fr));gap:calc(var(--spacing) * 3) calc(var(--spacing) * 5)}}
 @media(max-width:68.75rem) {.connection-config-grid,.connection-secondary-grid {grid-template-columns:minmax(0,1fr)}}
@@ -391,8 +411,8 @@
 @media(max-width:23.75rem) {.account-metrics {grid-template-columns:minmax(0,1fr);@apply gap-4.5}.account-metrics strong {@apply text-title}.connection-key-grid,.connection-setting-grid {grid-template-columns:minmax(0,1fr)}}
 
 /* Account hierarchy and quiet, expandable notices. */
-.account-balance-eyebrow {@apply text-caption;@apply font-semibold;letter-spacing:calc(var(--spacing) * 0.5);@apply text-blue-200}
-.workspace-app .account-overview>header h2 {@apply text-blue-100;@apply text-sm;@apply font-medium}
+.account-balance-eyebrow {@apply text-caption;@apply font-semibold;letter-spacing:calc(var(--spacing) * 0.5);@apply text-brand-200}
+.workspace-app .account-overview>header h2 {@apply text-brand-100;@apply text-sm;@apply font-medium}
 .account-overview .ui-panel-help summary {@apply text-slate-300}
 .account-overview .ui-panel-help-copy {@apply text-gray-600}
 .account-overview .account-pnl-positive {@apply text-slate-400!}
@@ -415,9 +435,9 @@
 .expert-selection-summary {@apply flex;@apply items-center;gap:calc(var(--spacing) * 2.5) calc(var(--spacing) * 4.5);@apply flex-wrap;@apply pt-0 pr-1 pb-0 pl-1;@apply text-label;@apply text-slate-500}
 .expert-selection-summary b {@apply text-slate-700;@apply font-semibold}
 .expert-family-category {@apply block;@apply mb-1.5;@apply text-caption;letter-spacing:.calc(var(--spacing) * 6.25);@apply text-gray-400}
-.expert-family-selected {@apply text-blue-600}
+.expert-family-selected {@apply text-brand-600}
 .expert-family-card:hover {@apply border-slate-300;box-shadow:0 calc(var(--spacing) * 0.75) calc(var(--spacing) * 3.75) color-mix(in srgb, var(--color-slate-800) 3%, transparent)}
-.expert-version-selection input {@apply accent-blue-600}
+.expert-version-selection input {@apply accent-brand-600}
 .expert-registration-notice {@apply pt-2.5 pr-3.5 pb-2.5 pl-3.5;@apply border border-solid border-amber-100;border-radius:calc(var(--spacing) * 2.75);@apply bg-amber-50;@apply text-label;@apply text-amber-700}
 .expert-registration-notice summary {@apply flex;@apply items-center;@apply gap-1.75;@apply cursor-pointer;@apply list-none}
 .expert-registration-notice p {@apply mt-2.5;@apply leading-code}
@@ -427,7 +447,7 @@
 .expert-management>div>div:last-child {@apply border-b-0;@apply pb-0}
 @media(max-width:47.5rem) {.expert-toolbar {@apply p-4}.expert-toolbar>.ui-button {@apply flex-1;@apply justify-center;@apply text-xs}.expert-toolbar>.ui-button-primary {@apply basis-full}.expert-selection-summary {gap:calc(var(--spacing) * 2) calc(var(--spacing) * 3.5)}.expert-family-card {@apply p-4.5}.expert-family-category {@apply mb-1}}
 
-.expert-management-progress {@apply mt-3.5 mr-0 mb-3.5 ml-0;@apply pt-3 pr-3.5 pb-3 pl-3.5;border-radius:calc(var(--spacing) * 2.75);@apply bg-blue-50;@apply text-xs;@apply leading-copy;@apply text-slate-600}
+.expert-management-progress {@apply mt-3.5 mr-0 mb-3.5 ml-0;@apply pt-3 pr-3.5 pb-3 pl-3.5;border-radius:calc(var(--spacing) * 2.75);@apply bg-brand-50;@apply text-xs;@apply leading-copy;@apply text-slate-600}
 
 /* Policy actions form a visible sequence; explanatory details stay out of the way. */
 .policy-model-actions {@apply flex;@apply items-center;@apply gap-2.5;@apply flex-wrap}
@@ -444,12 +464,12 @@
 
 /* Operation overview: primary control, actual market status, then a quiet process row. */
 .operations-command-row {@apply w-full}
-.operations-command-actions .ui-button-primary {@apply flex-1;@apply justify-center;@apply min-w-50;box-shadow:0 calc(var(--spacing) * 1) calc(var(--spacing) * 3) color-mix(in srgb, var(--color-blue-600) 11%, transparent)}
+.operations-command-actions .ui-button-primary {@apply flex-1;@apply justify-center;@apply min-w-50;box-shadow:0 calc(var(--spacing) * 1) calc(var(--spacing) * 3) color-mix(in srgb, var(--color-brand-600) 11%, transparent)}
 .workspace-app .operations-hero>header h2 {@apply text-2xl;@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 1.5)}
 .operations-region-row>span {@apply flex;@apply items-center;@apply pt-1.75 pr-3 pb-1.75 pl-3;@apply border border-solid border-slate-200;@apply rounded-lg;@apply bg-slate-50}
 .operations-region-row strong.operations-connected {@apply text-emerald-700}
 .operations-region-row strong.operations-disconnected {@apply text-gray-400}
-.operations-flow-icon {@apply grid;@apply place-items-center;@apply w-9;@apply h-9;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-blue-50;@apply text-slate-500;@apply shrink-0}
+.operations-flow-icon {@apply grid;@apply place-items-center;@apply w-9;@apply h-9;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-brand-50;@apply text-slate-500;@apply shrink-0}
 .operations-device-details {@apply pt-4 pr-5 pb-4 pl-5;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 3.25);@apply bg-white;@apply text-xs;@apply text-slate-500}
 .operations-device-details>summary {@apply cursor-pointer}
 .operations-device-content {@apply mt-5}
@@ -490,10 +510,10 @@
 .rea-folder-label {@apply block;@apply text-xs;@apply font-medium;@apply text-gray-500}
 .rea-folder-name {@apply block;@apply mt-0.75;@apply text-small;@apply text-gray-400}
 .rea-file-entry[data-provenance] {@apply min-h-14.5}
-.rea-file-entry[data-provenance="original"]>svg {@apply text-blue-500}
+.rea-file-entry[data-provenance="original"]>svg {@apply text-brand-500}
 .rea-file-entry[data-provenance="inferred"]>svg {@apply text-amber-600}
 .rea-file-entry[data-provenance="analysis"]>svg {@apply text-slate-400}
-.rea-code-provenance-original {@apply border-blue-100;@apply bg-blue-50;@apply text-slate-500}
+.rea-code-provenance-original {@apply border-brand-100;@apply bg-brand-50;@apply text-slate-500}
 .rea-code-provenance-inferred {@apply border-amber-100;@apply bg-amber-50;@apply text-amber-700}
 .rea-code-provenance-analysis {@apply border-slate-200;@apply bg-slate-100;@apply text-slate-500}
 
@@ -503,7 +523,7 @@
 .account-records .data-table-scroll td:first-child {@apply z-2;@apply bg-white}
 .account-records .data-table-scroll tbody tr:hover td:first-child {@apply bg-slate-50}
 .account-records .account-instrument b {@apply wrap-anywhere}
-.data-table-scroll:focus-visible {outline:calc(var(--spacing) * 0.75) solid var(--color-blue-600);@apply outline-offset-3}
+.data-table-scroll:focus-visible {outline:calc(var(--spacing) * 0.75) solid var(--color-brand-600);@apply outline-offset-3}
 
 @media(max-width:47.5rem) {
  .policy-training-summary .policy-result-metrics {grid-template-columns:minmax(0,1fr);@apply gap-0;@apply pt-3.5 pr-0 pb-3.5 pl-0}
@@ -515,7 +535,7 @@
 
 .expert-filter-summary {@apply flex;@apply items-center;@apply justify-between;@apply gap-3;@apply flex-wrap;@apply pt-0 pr-0.5 pb-0 pl-0.5;@apply text-xs;@apply text-gray-500}
 .expert-filter-summary label {@apply flex;@apply items-center;@apply gap-2;@apply cursor-pointer;@apply text-gray-700}
-.expert-filter-summary input {@apply w-4;@apply h-4;@apply accent-blue-600}
+.expert-filter-summary input {@apply w-4;@apply h-4;@apply accent-brand-600}
 
 .connection-save-actions {@apply flex;@apply items-center;@apply gap-2.5;@apply flex-wrap}
 @media(max-width:47.5rem) {.connection-save-row>.ui-status {@apply basis-full}.connection-save-actions {@apply w-full}.connection-save-actions .ui-button {@apply flex-1}}
@@ -534,7 +554,7 @@
 .workspace-notice {@apply mb-3.5;@apply p-4;@apply border border-solid border-gray-200;border-radius:calc(var(--spacing) * 3.5);@apply bg-white}
 .workspace-notice header {@apply flex;@apply items-start;@apply justify-between;@apply gap-3}
 .workspace-notice h3 {@apply min-w-0;@apply text-compact;@apply font-semibold;@apply wrap-anywhere}
-.workspace-notice a {@apply shrink-0;@apply text-blue-600;@apply text-xs;@apply whitespace-nowrap}
+.workspace-notice a {@apply shrink-0;@apply text-brand-600;@apply text-xs;@apply whitespace-nowrap}
 .workspace-notice>p {@apply mt-2 mr-0 mb-2 ml-0;@apply text-xs;@apply text-gray-500}
 .workspace-notice details {@apply mt-3;@apply pt-3;@apply border-t border-solid border-gray-100;@apply text-xs;@apply text-gray-500}
 .workspace-notice summary {@apply cursor-pointer}
@@ -547,22 +567,22 @@
 .account-history-table table {@apply w-full;@apply text-xs;@apply text-left;@apply tabular-nums}
 .account-history-table :is(th,td) {@apply pt-2.5 pr-1.5 pb-2.5 pl-1.5;@apply border-b border-solid border-slate-200}
 .account-history-table :is(th,td):last-child {text-align:right}
-.account-history-table:focus-visible {outline:calc(var(--spacing) * 0.75) solid var(--color-blue-600);@apply outline-offset-3}
+.account-history-table:focus-visible {outline:calc(var(--spacing) * 0.75) solid var(--color-brand-600);@apply outline-offset-3}
 
 .connection-save-actions .ui-button {@apply whitespace-nowrap}
 
 /* Reusable agent components: Tailwind utilities and shared theme tokens. */
-.hermes-workspace{--ha-border:var(--color-gray-200);--ha-muted:var(--color-slate-500);--ha-ink:var(--color-slate-800);color:var(--ha-ink);@apply max-w-350;@apply mt-0 mr-auto mb-0 ml-auto}.hermes-intro{@apply flex;@apply items-center;@apply gap-3.25;@apply mt-0.5 mr-0 mb-6 ml-0}.hermes-brand{@apply grid;@apply place-items-center;@apply w-11;@apply h-11;border-radius:calc(var(--spacing) * 3.5);@apply text-blue-700;@apply bg-blue-50;@apply border border-solid border-blue-100}.hermes-intro h2{@apply text-subtitle;@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 1.25);@apply mt-0 mr-0 mb-1.25 ml-0}.hermes-intro p,.hermes-muted{@apply text-xs;color:var(--ha-muted);@apply leading-copy}.hermes-intro>.ui-button{@apply p-2;@apply text-gray-400;@apply bg-transparent;@apply shadow-none}.hermes-state{@apply flex;@apply items-center;@apply gap-1.75;@apply ml-auto;@apply text-label;@apply text-slate-500;@apply whitespace-nowrap}.hermes-state:before{content:'';@apply w-1.5;@apply h-1.5;@apply rounded-full;@apply bg-slate-300}.hermes-state.active:before{@apply bg-emerald-600}.hermes-tabs{@apply flex;@apply gap-6;border-bottom:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply mb-5;@apply pt-0 pr-1.25 pb-0 pl-1.25}.hermes-tabs .ui-button{@apply relative;@apply bg-transparent!;@apply border-0;@apply rounded-none!;@apply shadow-none!;@apply text-gray-400;@apply pt-0 pr-0.75 pb-3.5 pl-0.75;@apply font-medium;@apply text-compact;@apply gap-1.75}.hermes-tabs .ui-button[aria-pressed=true]{@apply text-blue-700;@apply font-bold}.hermes-tabs .ui-button[aria-pressed=true]:after{content:'';@apply absolute;@apply -bottom-0.25;@apply left-0;@apply right-0;@apply h-0.5;@apply bg-blue-500;@apply rounded-xs}
-.hermes-chat-layout{@apply grid;grid-template-columns:calc(var(--spacing) * 59.5) minmax(0,1fr);height:min(calc(var(--spacing) * 190),calc(100dvh - calc(var(--spacing) * 61.75)));@apply min-h-142.5;@apply bg-white;border:calc(var(--spacing) * 0.25) solid var(--ha-border);border-radius:calc(var(--spacing) * 3.75);@apply overflow-hidden;box-shadow:0 calc(var(--spacing) * 2) calc(var(--spacing) * 7.5) color-mix(in srgb, var(--color-slate-700) 1%, transparent)}.hermes-sessions{@apply flex;@apply flex-col;@apply min-w-0;@apply bg-gray-50;border-right:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply pt-4 pr-3.25 pb-4 pl-3.25}.hermes-sidebar-heading{@apply flex;@apply items-center;@apply justify-between;@apply pt-0 pr-1.25 pb-3.25 pl-1.25;@apply text-xs;@apply font-semibold;@apply text-slate-500}.hermes-sidebar-heading .ui-button{@apply bg-white;@apply p-1.5;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 1.75);box-shadow:0 calc(var(--spacing) * 0.25) calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-slate-700) 4%, transparent)}.hermes-search{@apply flex;@apply items-center;@apply gap-1.75;@apply border border-solid border-slate-200;@apply rounded-lg;@apply p-2;@apply text-gray-400;@apply bg-white}.hermes-search input{@apply w-full;@apply min-w-0;@apply border-0;@apply bg-transparent;outline:0;@apply text-label}.hermes-session-list{@apply grid;@apply content-start;@apply gap-1;@apply pt-3.5;@apply overflow-auto;@apply flex-1}.hermes-session-list>button{@apply flex;@apply items-center;@apply gap-2.25;@apply border-0;@apply rounded-lg;@apply text-left;@apply bg-transparent;@apply text-slate-500;@apply text-xs;@apply pt-2.75 pr-2.25 pb-2.75 pl-2.25;@apply cursor-pointer;@apply min-w-0}.hermes-session-list>button:hover{@apply bg-slate-100}.hermes-session-list>button[aria-current=true]{@apply bg-blue-50;@apply text-blue-700;@apply font-semibold}.hermes-session-list span{@apply overflow-hidden;@apply text-ellipsis;@apply whitespace-nowrap}.hermes-session-empty{@apply text-gray-400;@apply grid;@apply justify-items-center;@apply content-center;@apply pt-15;@apply gap-3;@apply text-label}.hermes-sidebar-bottom{@apply flex;@apply items-center;@apply gap-2;@apply bg-transparent;@apply border-0;border-top:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply pt-4 pr-0.75 pb-0 pl-0.75;@apply text-slate-500;@apply text-label;@apply cursor-pointer}.hermes-sidebar-bottom svg:last-child{@apply ml-auto}.hermes-chat{@apply flex;@apply flex-col;@apply min-w-0;@apply min-h-0}.hermes-chat-heading{@apply flex;@apply justify-between;@apply items-center;@apply pt-4.25 pr-6 pb-4.25 pl-6;@apply border-b border-solid border-gray-100;@apply gap-2.5}.hermes-chat-heading h3{@apply text-compact;@apply font-semibold;@apply overflow-hidden;@apply text-ellipsis;@apply whitespace-nowrap;@apply max-w-162.5}.hermes-chat-heading p{@apply text-caption;@apply text-gray-400;@apply mt-1}.hermes-chat-heading .ui-button{@apply p-1.75;@apply bg-transparent;@apply text-gray-400}.hermes-messages{padding:calc(var(--spacing) * 6.25) 7%;@apply overflow-y-auto;@apply min-h-0;@apply flex-1;@apply scroll-auto}.hermes-messages.is-empty{@apply flex;@apply items-center;@apply justify-center}.hermes-welcome{@apply flex;@apply flex-col;@apply items-center;@apply text-center;@apply pt-7.5 pr-0 pb-7.5 pl-0;@apply max-w-140}.hermes-welcome-symbol{@apply text-5xl;@apply text-slate-500;@apply leading-none;@apply mb-5}.hermes-eyebrow{@apply text-caption;@apply font-semibold;letter-spacing:.calc(var(--spacing) * 0.5);@apply text-slate-400;@apply mb-1.75}.hermes-welcome h3{@apply text-3xl;@apply font-medium;letter-spacing:-calc(var(--spacing) * 0.25);@apply mt-1 mr-0 mb-3.5 ml-0;@apply text-slate-700}.hermes-welcome>p:not(.hermes-eyebrow){@apply text-compact;@apply text-gray-400;@apply leading-description}.hermes-welcome>.ui-button{@apply mt-5;@apply pt-2.25 pr-3.75 pb-2.25 pl-3.75;@apply text-xs}.hermes-suggestions{@apply flex;@apply flex-wrap;@apply justify-center;@apply gap-2;@apply mt-6.5}.hermes-suggestions button{@apply flex;@apply items-center;@apply gap-2.5;@apply border border-solid border-slate-200;@apply bg-white;@apply rounded-lg;@apply pt-2.5 pr-3 pb-2.5 pl-3;@apply text-slate-400;@apply text-label;@apply cursor-pointer}.hermes-suggestions button:hover{@apply border-slate-300;@apply bg-slate-50;@apply text-slate-500}
-.hermes-message{@apply mb-6;max-width:96%;@apply text-compact;@apply leading-description}.hermes-message>b{@apply block;@apply mb-1.75;@apply text-slate-400;@apply text-caption;@apply font-medium}.hermes-message.user{@apply bg-slate-100;border-radius:calc(var(--spacing) * 3) calc(var(--spacing) * 3) calc(var(--spacing) * 0.75) calc(var(--spacing) * 3);@apply pt-3 pr-4 pb-3 pl-4;margin-left:15%;@apply text-slate-600}.hermes-workspace pre{font:inherit;@apply text-xs;@apply whitespace-pre-wrap;@apply wrap-anywhere;@apply leading-description}.hermes-message.assistant pre{@apply text-compact}.hermes-message details{@apply mt-2.5;@apply text-slate-400}.hermes-workspace summary{@apply text-label;@apply cursor-pointer;@apply list-none;@apply flex;@apply items-center;@apply gap-1.75}.hermes-workspace summary:before{content:'›';@apply text-base;@apply text-gray-400}.hermes-workspace details[open]>summary:before{transform:rotate(90deg)}.hermes-tool-result,.hermes-task-events{@apply pt-2.5 pr-3 pb-2.5 pl-3;@apply border border-solid border-gray-100;@apply rounded-lg;@apply mb-3.75;@apply text-slate-400}.hermes-tool-result pre,.hermes-task-events pre{@apply font-mono;@apply text-caption;@apply pt-2.25}.hermes-task-events>details{@apply pt-2.5 pr-0 pb-2.5 pl-0;@apply border-t border-solid border-gray-100;@apply mt-2.25}.hermes-task-events small{@apply ml-auto;@apply text-gray-400;@apply text-caption}.hermes-live-progress{@apply flex;@apply items-center;@apply gap-2;@apply text-xs;@apply text-slate-400;@apply mt-4.5 mr-0 mb-4.5 ml-0}.hermes-running-dot{@apply w-1.5;@apply h-1.5;@apply shrink-0;@apply rounded-full;@apply bg-blue-500}.hermes-composer{margin:calc(var(--spacing) * 2) 5% 0;@apply pt-3.25 pr-3.75 pb-2.5 pl-3.75;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 3.25);box-shadow:0 calc(var(--spacing) * 1) calc(var(--spacing) * 5) color-mix(in srgb, var(--color-slate-700) 3%, transparent);@apply bg-white}.hermes-composer:focus-within{@apply border-slate-300;box-shadow:0 0 0 calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-blue-500) 3%, transparent)}.hermes-composer textarea{@apply w-full;@apply min-h-11;@apply max-h-47.5;@apply border-0!;outline:0;@apply bg-transparent;@apply resize-y;font:inherit;@apply text-compact;@apply leading-code;@apply shadow-none!;@apply p-0.5}.hermes-composer textarea::placeholder{@apply text-gray-400}.hermes-composer>div{@apply flex;@apply items-center;@apply justify-between;@apply gap-2.5}.hermes-composer span{@apply text-caption;@apply text-gray-400}.hermes-composer .ui-button{@apply text-label;@apply pt-2 pr-3 pb-2 pl-3;@apply rounded-lg;@apply shadow-none}.hermes-composer-hint{@apply text-center;@apply text-small;@apply text-gray-400;@apply mt-2 mr-0 mb-3.25 ml-0}.hermes-approval{margin:0 5% calc(var(--spacing) * 2.5);@apply bg-amber-50;@apply border border-solid border-amber-100;border-radius:calc(var(--spacing) * 2.5);@apply p-3.75}.hermes-approval>b{@apply text-xs}.hermes-approval pre{@apply mt-2 mr-0 mb-2 ml-0;@apply text-gray-500}
-.hermes-settings{@apply max-w-250;@apply bg-white;border:calc(var(--spacing) * 0.25) solid var(--ha-border);border-radius:calc(var(--spacing) * 3.75);@apply p-7.5;@apply grid;@apply gap-6;@apply mt-0 mr-auto mb-0 ml-auto}.hermes-settings h3{@apply text-title;letter-spacing:-.calc(var(--spacing) * 1.5);@apply font-semibold;@apply mb-1.75}.hermes-settings h4{@apply text-compact;@apply font-semibold;@apply flex;@apply items-center;@apply gap-2.25}.hermes-section-heading{@apply flex;@apply items-center;@apply justify-between;@apply gap-3.75}.hermes-settings label{@apply grid;@apply gap-2;@apply text-label;@apply text-slate-500}.hermes-settings input:not([type=checkbox]),.hermes-settings select,.hermes-settings textarea,.hermes-approval textarea{@apply w-full;@apply min-w-0;@apply bg-white;@apply border border-solid border-slate-200;@apply rounded-lg;@apply pt-2.75 pr-3 pb-2.75 pl-3;font:inherit;@apply text-xs;@apply text-slate-600;outline:0}.hermes-settings input:focus,.hermes-settings select:focus,.hermes-settings textarea:focus{@apply border-slate-400}.hermes-settings .ui-button{@apply text-label;@apply rounded-lg;@apply pt-2.25 pr-3.25 pb-2.25 pl-3.25;@apply shadow-none}.hermes-mode-switch{@apply grid;grid-template-columns:1fr 1fr;@apply gap-3}.hermes-mode-switch>button{@apply flex;@apply items-center;@apply gap-3.25;@apply text-left;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-white;@apply p-4.5;@apply text-slate-400;@apply cursor-pointer}.hermes-mode-switch>button[aria-pressed=true]{@apply border-blue-200;@apply bg-slate-50;@apply text-blue-500;box-shadow:0 0 0 calc(var(--spacing) * 0.25) color-mix(in srgb, var(--color-blue-200) 7%, transparent)}.hermes-mode-switch span{@apply grid;@apply gap-1.5}.hermes-mode-switch b{@apply text-xs;@apply font-semibold}.hermes-mode-switch small{@apply text-caption;@apply text-slate-400}.hermes-model-box{@apply grid;@apply gap-4.5;@apply border border-solid border-slate-200;@apply rounded-xl;@apply p-5.5;@apply bg-white}.hermes-model-file{@apply flex;@apply items-center;@apply gap-3;@apply bg-white;@apply border border-solid border-slate-100;border-radius:calc(var(--spacing) * 2.25);@apply p-4;@apply text-slate-400}.hermes-model-file>div{@apply grid;@apply gap-1.25;@apply min-w-0}.hermes-model-file strong{@apply text-compact;@apply text-slate-500;@apply font-semibold}.hermes-model-file span{@apply text-caption;@apply text-slate-400}.hermes-success-badge{@apply flex;@apply items-center;@apply gap-1.25;@apply ml-auto;@apply text-slate-500!}.hermes-work-options{border-top:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply pt-6}.hermes-work-options>h4{@apply mb-5}.hermes-settings form{@apply grid;@apply gap-5}.hermes-settings fieldset{@apply border-0;@apply m-0;@apply p-0}.hermes-settings legend{@apply text-label;@apply text-slate-500;@apply mb-2.5}.hermes-tool-options{@apply grid;grid-template-columns:repeat(3,minmax(0,1fr));@apply gap-2.25}.hermes-tool-options>label{@apply flex;@apply items-center;@apply gap-2.5;@apply border border-solid border-slate-200;@apply pt-3.25 pr-2.75 pb-3.25 pl-2.75;border-radius:calc(var(--spacing) * 2.25);@apply cursor-pointer}.hermes-tool-options>label.selected{@apply border-blue-200;@apply bg-slate-50}.hermes-tool-options input{@apply w-3.25;@apply h-3.25;@apply accent-blue-500}.hermes-actions{@apply flex;@apply items-center;@apply flex-wrap;@apply gap-2.25}.hermes-inline{@apply flex;@apply items-end;@apply gap-3}.hermes-inline>label{@apply flex-1}.hermes-subtle-details{@apply border-t border-solid border-gray-100;@apply pt-3.5;@apply text-slate-400}.hermes-subtle-details[open]>:not(summary){@apply mt-3.75}.hermes-subtle-details summary{@apply text-slate-400}.hermes-notice{@apply flex;@apply items-center;@apply gap-1.75;@apply text-slate-500;@apply text-label;@apply leading-code}.hermes-workspace .ui-error{@apply text-xs;@apply mb-2.5}.hermes-error{@apply mb-3.5}.hermes-code-editor{@apply font-mono!;@apply leading-code;@apply resize-y}
-.hermes-mcp-cards{@apply grid;@apply gap-3}.hermes-mcp-card{@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply p-4.5}.hermes-mcp-card header{@apply flex;@apply items-center;@apply gap-2.5}.hermes-mcp-card header>div{@apply flex-1;@apply min-w-0}.hermes-mcp-card header b{@apply text-xs}.hermes-mcp-card header p{@apply text-slate-400;@apply text-caption;@apply mt-1}.hermes-status-tag{@apply text-caption;@apply text-slate-400;@apply whitespace-nowrap}.hermes-status-tag.connected{@apply text-slate-500}.hermes-mcp-form{@apply grid;@apply gap-3.75;@apply p-5;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-slate-50}.hermes-form-grid{@apply grid;grid-template-columns:1fr 1fr;@apply gap-3.75}.hermes-tool-names{@apply flex;@apply gap-1.5;@apply flex-wrap;@apply mt-3}.hermes-tool-names span{@apply bg-slate-100;@apply text-slate-400;border-radius:calc(var(--spacing) * 1.25);@apply text-caption;@apply pt-1 pr-1.75 pb-1 pl-1.75}.hermes-skills-layout{@apply grid;grid-template-columns:calc(var(--spacing) * 75) minmax(0,1fr);@apply gap-5.5;@apply min-h-95}.hermes-skill-list{@apply grid;@apply gap-1.5;@apply max-h-140;@apply overflow-auto;@apply content-start;@apply pr-1}.hermes-skill-list>button{@apply grid;@apply gap-1.75;@apply text-left;@apply border border-solid border-transparent;@apply bg-transparent;@apply pt-3.5 pr-3 pb-3.5 pl-3;border-radius:calc(var(--spacing) * 2.25);@apply cursor-pointer}.hermes-skill-list>button:hover{@apply bg-slate-50}.hermes-skill-list>button[aria-pressed=true]{@apply bg-blue-50;@apply border-blue-100}.hermes-skill-list b{@apply text-xs;@apply text-slate-500;@apply font-semibold}.hermes-skill-list span{@apply text-caption;@apply text-slate-400;@apply leading-relaxed}.hermes-skill-list small{@apply text-small;@apply text-slate-400}.hermes-skill-detail{@apply bg-slate-50;@apply border border-solid border-slate-200;@apply rounded-xl;@apply p-6.5;@apply min-w-0;@apply max-h-155;@apply overflow-auto}.hermes-skill-detail h4{@apply text-subtitle;@apply mb-3}.hermes-skill-detail>p{@apply text-xs;@apply text-slate-400;@apply leading-description}.hermes-skill-detail pre{@apply text-label;@apply text-slate-400}.hermes-skill-detail details{@apply border-t border-solid border-slate-200;@apply mt-6.25;@apply pt-3.75}.hermes-workspace :focus-visible{outline:calc(var(--spacing) * 0.5) solid var(--color-blue-400);@apply outline-offset-3}
-@media(max-width:62.5rem){.hermes-tool-options{grid-template-columns:1fr 1fr}.hermes-chat-layout{grid-template-columns:calc(var(--spacing) * 50) minmax(0,1fr)}.hermes-skills-layout{grid-template-columns:calc(var(--spacing) * 57.5) minmax(0,1fr)}}@media(max-width:40.625rem){.hermes-intro{@apply gap-2.5;@apply mb-5}.hermes-intro h2{@apply text-compact}.hermes-intro p{@apply text-caption}.hermes-brand{@apply w-8.75;@apply h-8.75;@apply shrink-0}.hermes-state{@apply text-small}.hermes-intro>.ui-button{@apply hidden}.hermes-tabs{@apply justify-between;@apply gap-3}.hermes-tabs .ui-button{@apply text-label;@apply gap-1.25}.hermes-tabs svg{@apply w-3.25}.hermes-chat-layout{@apply flex;@apply flex-col;height:calc(100dvh - calc(var(--spacing) * 60));@apply min-h-137.5}.hermes-sessions{@apply border-r-0;@apply border-b border-solid border-slate-200;@apply shrink-0;@apply p-2.5}.hermes-sidebar-heading{@apply pb-0}.hermes-search,.hermes-sidebar-bottom,.hermes-session-empty{@apply hidden}.hermes-session-list{@apply flex;@apply overflow-auto;@apply pt-1.75}.hermes-session-list>button{@apply min-w-26.25;@apply max-w-45;@apply p-2}.hermes-chat{@apply flex-1;@apply min-h-0}.hermes-chat-heading{@apply pt-3 pr-3.75 pb-3 pl-3.75}.hermes-chat-heading h3{@apply max-w-57.5}.hermes-chat-heading p{@apply text-small}.hermes-messages{@apply p-3.75}.hermes-welcome{@apply pt-3 pr-0 pb-3 pl-0}.hermes-welcome h3{@apply text-2xl}.hermes-welcome-symbol{@apply text-hero;@apply mb-3.25}.hermes-welcome>p:not(.hermes-eyebrow){@apply text-label}.hermes-suggestions{@apply mt-5;@apply gap-1.5}.hermes-suggestions button{@apply p-2;@apply text-small}.hermes-composer{@apply mt-2 mr-2.5 mb-0 ml-2.5;@apply p-2.75}.hermes-composer span{@apply hidden}.hermes-composer>div{@apply justify-end}.hermes-composer-hint{@apply text-tiny}.hermes-settings{@apply p-4.75;@apply gap-5}.hermes-settings h3{@apply text-lg}.hermes-mode-switch{@apply gap-2}.hermes-mode-switch>button{@apply pt-3.25 pr-2.5 pb-3.25 pl-2.5;@apply gap-2;@apply items-start}.hermes-mode-switch svg{@apply w-4;@apply shrink-0}.hermes-mode-switch b{@apply text-caption}.hermes-mode-switch small{@apply text-small;@apply leading-copy}.hermes-model-box{@apply p-4}.hermes-tool-options>label{@apply pt-2.5 pr-2 pb-2.5 pl-2;@apply gap-1.5}.hermes-inline{@apply flex-col;@apply items-stretch}.hermes-skills-layout,.hermes-form-grid{grid-template-columns:1fr}.hermes-skill-list{@apply max-h-55;@apply border-b border-solid border-slate-200;@apply pb-3}.hermes-skill-detail{@apply p-4.75;@apply max-h-100}.hermes-section-heading{@apply items-start}.hermes-model-file{@apply p-3}.hermes-model-file strong{@apply text-label}.hermes-model-file>svg{@apply w-4.25}.hermes-model-file .hermes-success-badge{@apply text-small}}
+.hermes-workspace{--ha-border:var(--color-gray-200);--ha-muted:var(--color-slate-500);--ha-ink:var(--color-slate-800);color:var(--ha-ink);@apply max-w-350;@apply mt-0 mr-auto mb-0 ml-auto}.hermes-intro{@apply flex;@apply items-center;@apply gap-3.25;@apply mt-0.5 mr-0 mb-6 ml-0}.hermes-brand{@apply grid;@apply place-items-center;@apply w-11;@apply h-11;border-radius:calc(var(--spacing) * 3.5);@apply text-brand-700;@apply bg-brand-50;@apply border border-solid border-brand-100}.hermes-intro h2{@apply text-subtitle;@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 1.25);@apply mt-0 mr-0 mb-1.25 ml-0}.hermes-intro p,.hermes-muted{@apply text-xs;color:var(--ha-muted);@apply leading-copy}.hermes-intro>.ui-button{@apply p-2;@apply text-gray-400;@apply bg-transparent;@apply shadow-none}.hermes-state{@apply flex;@apply items-center;@apply gap-1.75;@apply ml-auto;@apply text-label;@apply text-slate-500;@apply whitespace-nowrap}.hermes-state:before{content:'';@apply w-1.5;@apply h-1.5;@apply rounded-full;@apply bg-slate-300}.hermes-state.active:before{@apply bg-emerald-600}.hermes-tabs{@apply flex;@apply gap-6;border-bottom:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply mb-5;@apply pt-0 pr-1.25 pb-0 pl-1.25}.hermes-tabs .ui-button{@apply relative;@apply bg-transparent!;@apply border-0;@apply rounded-none!;@apply shadow-none!;@apply text-gray-400;@apply pt-0 pr-0.75 pb-3.5 pl-0.75;@apply font-medium;@apply text-compact;@apply gap-1.75}.hermes-tabs .ui-button[aria-pressed=true]{@apply text-brand-700;@apply font-bold}.hermes-tabs .ui-button[aria-pressed=true]:after{content:'';@apply absolute;@apply -bottom-0.25;@apply left-0;@apply right-0;@apply h-0.5;@apply bg-brand-500;@apply rounded-xs}
+.hermes-chat-layout{@apply grid;grid-template-columns:calc(var(--spacing) * 59.5) minmax(0,1fr);height:min(calc(var(--spacing) * 190),calc(100dvh - calc(var(--spacing) * 61.75)));@apply min-h-142.5;@apply bg-white;border:calc(var(--spacing) * 0.25) solid var(--ha-border);border-radius:calc(var(--spacing) * 3.75);@apply overflow-hidden;box-shadow:0 calc(var(--spacing) * 2) calc(var(--spacing) * 7.5) color-mix(in srgb, var(--color-slate-700) 1%, transparent)}.hermes-sessions{@apply flex;@apply flex-col;@apply min-w-0;@apply bg-gray-50;border-right:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply pt-4 pr-3.25 pb-4 pl-3.25}.hermes-sidebar-heading{@apply flex;@apply items-center;@apply justify-between;@apply pt-0 pr-1.25 pb-3.25 pl-1.25;@apply text-xs;@apply font-semibold;@apply text-slate-500}.hermes-sidebar-heading .ui-button{@apply bg-white;@apply p-1.5;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 1.75);box-shadow:0 calc(var(--spacing) * 0.25) calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-slate-700) 4%, transparent)}.hermes-search{@apply flex;@apply items-center;@apply gap-1.75;@apply border border-solid border-slate-200;@apply rounded-lg;@apply p-2;@apply text-gray-400;@apply bg-white}.hermes-search input{@apply w-full;@apply min-w-0;@apply border-0;@apply bg-transparent;outline:0;@apply text-label}.hermes-session-list{@apply grid;@apply content-start;@apply gap-1;@apply pt-3.5;@apply overflow-auto;@apply flex-1}.hermes-session-list>button{@apply flex;@apply items-center;@apply gap-2.25;@apply border-0;@apply rounded-lg;@apply text-left;@apply bg-transparent;@apply text-slate-500;@apply text-xs;@apply pt-2.75 pr-2.25 pb-2.75 pl-2.25;@apply cursor-pointer;@apply min-w-0}.hermes-session-list>button:hover{@apply bg-slate-100}.hermes-session-list>button[aria-current=true]{@apply bg-brand-50;@apply text-brand-700;@apply font-semibold}.hermes-session-list span{@apply overflow-hidden;@apply text-ellipsis;@apply whitespace-nowrap}.hermes-session-empty{@apply text-gray-400;@apply grid;@apply justify-items-center;@apply content-center;@apply pt-15;@apply gap-3;@apply text-label}.hermes-sidebar-bottom{@apply flex;@apply items-center;@apply gap-2;@apply bg-transparent;@apply border-0;border-top:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply pt-4 pr-0.75 pb-0 pl-0.75;@apply text-slate-500;@apply text-label;@apply cursor-pointer}.hermes-sidebar-bottom svg:last-child{@apply ml-auto}.hermes-chat{@apply flex;@apply flex-col;@apply min-w-0;@apply min-h-0}.hermes-chat-heading{@apply flex;@apply justify-between;@apply items-center;@apply pt-4.25 pr-6 pb-4.25 pl-6;@apply border-b border-solid border-gray-100;@apply gap-2.5}.hermes-chat-heading h3{@apply text-compact;@apply font-semibold;@apply overflow-hidden;@apply text-ellipsis;@apply whitespace-nowrap;@apply max-w-162.5}.hermes-chat-heading p{@apply text-caption;@apply text-gray-400;@apply mt-1}.hermes-chat-heading .ui-button{@apply p-1.75;@apply bg-transparent;@apply text-gray-400}.hermes-messages{padding:calc(var(--spacing) * 6.25) 7%;@apply overflow-y-auto;@apply min-h-0;@apply flex-1;@apply scroll-auto}.hermes-messages.is-empty{@apply flex;@apply items-center;@apply justify-center}.hermes-welcome{@apply flex;@apply flex-col;@apply items-center;@apply text-center;@apply pt-7.5 pr-0 pb-7.5 pl-0;@apply max-w-140}.hermes-welcome-symbol{@apply text-5xl;@apply text-slate-500;@apply leading-none;@apply mb-5}.hermes-eyebrow{@apply text-caption;@apply font-semibold;letter-spacing:.calc(var(--spacing) * 0.5);@apply text-slate-400;@apply mb-1.75}.hermes-welcome h3{@apply text-3xl;@apply font-medium;letter-spacing:-calc(var(--spacing) * 0.25);@apply mt-1 mr-0 mb-3.5 ml-0;@apply text-slate-700}.hermes-welcome>p:not(.hermes-eyebrow){@apply text-compact;@apply text-gray-400;@apply leading-description}.hermes-welcome>.ui-button{@apply mt-5;@apply pt-2.25 pr-3.75 pb-2.25 pl-3.75;@apply text-xs}.hermes-suggestions{@apply flex;@apply flex-wrap;@apply justify-center;@apply gap-2;@apply mt-6.5}.hermes-suggestions button{@apply flex;@apply items-center;@apply gap-2.5;@apply border border-solid border-slate-200;@apply bg-white;@apply rounded-lg;@apply pt-2.5 pr-3 pb-2.5 pl-3;@apply text-slate-400;@apply text-label;@apply cursor-pointer}.hermes-suggestions button:hover{@apply border-slate-300;@apply bg-slate-50;@apply text-slate-500}
+.hermes-message{@apply mb-6;max-width:96%;@apply text-compact;@apply leading-description}.hermes-message>b{@apply block;@apply mb-1.75;@apply text-slate-400;@apply text-caption;@apply font-medium}.hermes-message.user{@apply bg-slate-100;border-radius:calc(var(--spacing) * 3) calc(var(--spacing) * 3) calc(var(--spacing) * 0.75) calc(var(--spacing) * 3);@apply pt-3 pr-4 pb-3 pl-4;margin-left:15%;@apply text-slate-600}.hermes-workspace pre{font:inherit;@apply text-xs;@apply whitespace-pre-wrap;@apply wrap-anywhere;@apply leading-description}.hermes-message.assistant pre{@apply text-compact}.hermes-message details{@apply mt-2.5;@apply text-slate-400}.hermes-workspace summary{@apply text-label;@apply cursor-pointer;@apply list-none;@apply flex;@apply items-center;@apply gap-1.75}.hermes-workspace summary:before{content:'›';@apply text-base;@apply text-gray-400}.hermes-workspace details[open]>summary:before{transform:rotate(90deg)}.hermes-tool-result,.hermes-task-events{@apply pt-2.5 pr-3 pb-2.5 pl-3;@apply border border-solid border-gray-100;@apply rounded-lg;@apply mb-3.75;@apply text-slate-400}.hermes-tool-result pre,.hermes-task-events pre{@apply font-mono;@apply text-caption;@apply pt-2.25}.hermes-task-events>details{@apply pt-2.5 pr-0 pb-2.5 pl-0;@apply border-t border-solid border-gray-100;@apply mt-2.25}.hermes-task-events small{@apply ml-auto;@apply text-gray-400;@apply text-caption}.hermes-live-progress{@apply flex;@apply items-center;@apply gap-2;@apply text-xs;@apply text-slate-400;@apply mt-4.5 mr-0 mb-4.5 ml-0}.hermes-running-dot{@apply w-1.5;@apply h-1.5;@apply shrink-0;@apply rounded-full;@apply bg-brand-500}.hermes-composer{margin:calc(var(--spacing) * 2) 5% 0;@apply pt-3.25 pr-3.75 pb-2.5 pl-3.75;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 3.25);box-shadow:0 calc(var(--spacing) * 1) calc(var(--spacing) * 5) color-mix(in srgb, var(--color-slate-700) 3%, transparent);@apply bg-white}.hermes-composer:focus-within{@apply border-slate-300;box-shadow:0 0 0 calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-brand-500) 3%, transparent)}.hermes-composer textarea{@apply w-full;@apply min-h-11;@apply max-h-47.5;@apply border-0!;outline:0;@apply bg-transparent;@apply resize-y;font:inherit;@apply text-compact;@apply leading-code;@apply shadow-none!;@apply p-0.5}.hermes-composer textarea::placeholder{@apply text-gray-400}.hermes-composer>div{@apply flex;@apply items-center;@apply justify-between;@apply gap-2.5}.hermes-composer span{@apply text-caption;@apply text-gray-400}.hermes-composer .ui-button{@apply text-label;@apply pt-2 pr-3 pb-2 pl-3;@apply rounded-lg;@apply shadow-none}.hermes-composer-hint{@apply text-center;@apply text-small;@apply text-gray-400;@apply mt-2 mr-0 mb-3.25 ml-0}.hermes-approval{margin:0 5% calc(var(--spacing) * 2.5);@apply bg-amber-50;@apply border border-solid border-amber-100;border-radius:calc(var(--spacing) * 2.5);@apply p-3.75}.hermes-approval>b{@apply text-xs}.hermes-approval pre{@apply mt-2 mr-0 mb-2 ml-0;@apply text-gray-500}
+.hermes-settings{@apply max-w-250;@apply bg-white;border:calc(var(--spacing) * 0.25) solid var(--ha-border);border-radius:calc(var(--spacing) * 3.75);@apply p-7.5;@apply grid;@apply gap-6;@apply mt-0 mr-auto mb-0 ml-auto}.hermes-settings h3{@apply text-title;letter-spacing:-.calc(var(--spacing) * 1.5);@apply font-semibold;@apply mb-1.75}.hermes-settings h4{@apply text-compact;@apply font-semibold;@apply flex;@apply items-center;@apply gap-2.25}.hermes-section-heading{@apply flex;@apply items-center;@apply justify-between;@apply gap-3.75}.hermes-settings label{@apply grid;@apply gap-2;@apply text-label;@apply text-slate-500}.hermes-settings input:not([type=checkbox]),.hermes-settings select,.hermes-settings textarea,.hermes-approval textarea{@apply w-full;@apply min-w-0;@apply bg-white;@apply border border-solid border-slate-200;@apply rounded-lg;@apply pt-2.75 pr-3 pb-2.75 pl-3;font:inherit;@apply text-xs;@apply text-slate-600;outline:0}.hermes-settings input:focus,.hermes-settings select:focus,.hermes-settings textarea:focus{@apply border-slate-400}.hermes-settings .ui-button{@apply text-label;@apply rounded-lg;@apply pt-2.25 pr-3.25 pb-2.25 pl-3.25;@apply shadow-none}.hermes-mode-switch{@apply grid;grid-template-columns:1fr 1fr;@apply gap-3}.hermes-mode-switch>button{@apply flex;@apply items-center;@apply gap-3.25;@apply text-left;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-white;@apply p-4.5;@apply text-slate-400;@apply cursor-pointer}.hermes-mode-switch>button[aria-pressed=true]{@apply border-brand-200;@apply bg-slate-50;@apply text-brand-500;box-shadow:0 0 0 calc(var(--spacing) * 0.25) color-mix(in srgb, var(--color-brand-200) 7%, transparent)}.hermes-mode-switch span{@apply grid;@apply gap-1.5}.hermes-mode-switch b{@apply text-xs;@apply font-semibold}.hermes-mode-switch small{@apply text-caption;@apply text-slate-400}.hermes-model-box{@apply grid;@apply gap-4.5;@apply border border-solid border-slate-200;@apply rounded-xl;@apply p-5.5;@apply bg-white}.hermes-model-file{@apply flex;@apply items-center;@apply gap-3;@apply bg-white;@apply border border-solid border-slate-100;border-radius:calc(var(--spacing) * 2.25);@apply p-4;@apply text-slate-400}.hermes-model-file>div{@apply grid;@apply gap-1.25;@apply min-w-0}.hermes-model-file strong{@apply text-compact;@apply text-slate-500;@apply font-semibold}.hermes-model-file span{@apply text-caption;@apply text-slate-400}.hermes-success-badge{@apply flex;@apply items-center;@apply gap-1.25;@apply ml-auto;@apply text-slate-500!}.hermes-work-options{border-top:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply pt-6}.hermes-work-options>h4{@apply mb-5}.hermes-settings form{@apply grid;@apply gap-5}.hermes-settings fieldset{@apply border-0;@apply m-0;@apply p-0}.hermes-settings legend{@apply text-label;@apply text-slate-500;@apply mb-2.5}.hermes-tool-options{@apply grid;grid-template-columns:repeat(3,minmax(0,1fr));@apply gap-2.25}.hermes-tool-options>label{@apply flex;@apply items-center;@apply gap-2.5;@apply border border-solid border-slate-200;@apply pt-3.25 pr-2.75 pb-3.25 pl-2.75;border-radius:calc(var(--spacing) * 2.25);@apply cursor-pointer}.hermes-tool-options>label.selected{@apply border-brand-200;@apply bg-slate-50}.hermes-tool-options input{@apply w-3.25;@apply h-3.25;@apply accent-brand-500}.hermes-actions{@apply flex;@apply items-center;@apply flex-wrap;@apply gap-2.25}.hermes-inline{@apply flex;@apply items-end;@apply gap-3}.hermes-inline>label{@apply flex-1}.hermes-subtle-details{@apply border-t border-solid border-gray-100;@apply pt-3.5;@apply text-slate-400}.hermes-subtle-details[open]>:not(summary){@apply mt-3.75}.hermes-subtle-details summary{@apply text-slate-400}.hermes-notice{@apply flex;@apply items-center;@apply gap-1.75;@apply text-slate-500;@apply text-label;@apply leading-code}.hermes-workspace .ui-error{@apply text-xs;@apply mb-2.5}.hermes-error{@apply mb-3.5}.hermes-code-editor{@apply font-mono!;@apply leading-code;@apply resize-y}
+.hermes-mcp-cards{@apply grid;@apply gap-3}.hermes-mcp-card{@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply p-4.5}.hermes-mcp-card header{@apply flex;@apply items-center;@apply gap-2.5}.hermes-mcp-card header>div{@apply flex-1;@apply min-w-0}.hermes-mcp-card header b{@apply text-xs}.hermes-mcp-card header p{@apply text-slate-400;@apply text-caption;@apply mt-1}.hermes-status-tag{@apply text-caption;@apply text-slate-400;@apply whitespace-nowrap}.hermes-status-tag.connected{@apply text-slate-500}.hermes-mcp-form{@apply grid;@apply gap-3.75;@apply p-5;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-slate-50}.hermes-form-grid{@apply grid;grid-template-columns:1fr 1fr;@apply gap-3.75}.hermes-tool-names{@apply flex;@apply gap-1.5;@apply flex-wrap;@apply mt-3}.hermes-tool-names span{@apply bg-slate-100;@apply text-slate-400;border-radius:calc(var(--spacing) * 1.25);@apply text-caption;@apply pt-1 pr-1.75 pb-1 pl-1.75}.hermes-skills-layout{@apply grid;grid-template-columns:calc(var(--spacing) * 75) minmax(0,1fr);@apply gap-5.5;@apply min-h-95}.hermes-skill-list{@apply grid;@apply gap-1.5;@apply max-h-140;@apply overflow-auto;@apply content-start;@apply pr-1}.hermes-skill-list>button{@apply grid;@apply gap-1.75;@apply text-left;@apply border border-solid border-transparent;@apply bg-transparent;@apply pt-3.5 pr-3 pb-3.5 pl-3;border-radius:calc(var(--spacing) * 2.25);@apply cursor-pointer}.hermes-skill-list>button:hover{@apply bg-slate-50}.hermes-skill-list>button[aria-pressed=true]{@apply bg-brand-50;@apply border-brand-100}.hermes-skill-list b{@apply text-xs;@apply text-slate-500;@apply font-semibold}.hermes-skill-list span{@apply text-caption;@apply text-slate-400;@apply leading-relaxed}.hermes-skill-list small{@apply text-small;@apply text-slate-400}.hermes-skill-detail{@apply bg-slate-50;@apply border border-solid border-slate-200;@apply rounded-xl;@apply p-6.5;@apply min-w-0;@apply max-h-155;@apply overflow-auto}.hermes-skill-detail h4{@apply text-subtitle;@apply mb-3}.hermes-skill-detail>p{@apply text-xs;@apply text-slate-400;@apply leading-description}.hermes-skill-detail pre{@apply text-label;@apply text-slate-400}.hermes-skill-detail details{@apply border-t border-solid border-slate-200;@apply mt-6.25;@apply pt-3.75}.hermes-workspace :focus-visible{outline:calc(var(--spacing) * 0.5) solid var(--color-brand-400);@apply outline-offset-3}
+@media(max-width:62.5rem){.hermes-tool-options{grid-template-columns:1fr 1fr}.hermes-chat-layout{grid-template-columns:calc(var(--spacing) * 50) minmax(0,1fr)}.hermes-skills-layout{grid-template-columns:calc(var(--spacing) * 57.5) minmax(0,1fr)}}@media(max-width:40.625rem){.hermes-intro{@apply gap-2.5;@apply mb-5}.hermes-intro h2{@apply text-compact}.hermes-intro p{@apply text-caption}.hermes-brand{@apply w-8.75;@apply h-8.75;@apply shrink-0}.hermes-state{@apply text-small}.hermes-intro>.ui-button{@apply hidden}.hermes-tabs{@apply justify-between;@apply gap-3}.hermes-tabs .ui-button{@apply text-label;@apply gap-1.25}.hermes-tabs svg{@apply w-3.25}.hermes-chat-layout{@apply flex;@apply flex-col;height:calc(100dvh - calc(var(--spacing) * 60));@apply min-h-137.5}.hermes-sessions{@apply border-r-0;@apply border-b border-solid border-slate-200;@apply shrink-0;@apply p-2.5}.hermes-sidebar-heading{@apply pb-0}.hermes-search,.hermes-sidebar-bottom,.hermes-session-empty{@apply hidden}.hermes-session-list{@apply flex;@apply overflow-auto;@apply pt-1.75}.hermes-session-list>button{@apply min-w-26.25;@apply max-w-45;@apply p-2}.hermes-chat{@apply flex-1;@apply min-h-0}.hermes-chat-heading{@apply pt-3 pr-3.75 pb-3 pl-3.75}.hermes-chat-heading h3{@apply max-w-57.5}.hermes-chat-heading p{@apply text-small}.hermes-messages{@apply p-3.75}.hermes-welcome{@apply pt-3 pr-0 pb-3 pl-0}.hermes-welcome h3{@apply text-2xl}.hermes-welcome-symbol{@apply text-hero;@apply mb-3.25}.hermes-welcome>p:not(.hermes-eyebrow){@apply text-label}.hermes-suggestions{@apply mt-5;@apply gap-1.5}.hermes-suggestions button{@apply p-2;@apply text-small}.hermes-composer{@apply mt-2 mr-2.5 mb-0 ml-2.5;@apply p-2.75}.hermes-composer .ui-composer-key-hint{@apply hidden}.hermes-composer>div{@apply justify-end}.hermes-composer-hint{@apply text-tiny}.hermes-settings{@apply p-4.75;@apply gap-5}.hermes-settings h3{@apply text-lg}.hermes-mode-switch{@apply gap-2}.hermes-mode-switch>button{@apply pt-3.25 pr-2.5 pb-3.25 pl-2.5;@apply gap-2;@apply items-start}.hermes-mode-switch svg{@apply w-4;@apply shrink-0}.hermes-mode-switch b{@apply text-caption}.hermes-mode-switch small{@apply text-small;@apply leading-copy}.hermes-model-box{@apply p-4}.hermes-tool-options>label{@apply pt-2.5 pr-2 pb-2.5 pl-2;@apply gap-1.5}.hermes-inline{@apply flex-col;@apply items-stretch}.hermes-skills-layout,.hermes-form-grid{grid-template-columns:1fr}.hermes-skill-list{@apply max-h-55;@apply border-b border-solid border-slate-200;@apply pb-3}.hermes-skill-detail{@apply p-4.75;@apply max-h-100}.hermes-section-heading{@apply items-start}.hermes-model-file{@apply p-3}.hermes-model-file strong{@apply text-label}.hermes-model-file>svg{@apply w-4.25}.hermes-model-file .hermes-success-badge{@apply text-small}}
 
-.hermes-connections{@apply gap-5.5}.hermes-connection-mark{@apply w-14;@apply h-14;@apply grid;@apply place-items-center;@apply border border-solid border-blue-100;border-radius:calc(var(--spacing) * 4.25);@apply bg-blue-50;@apply text-blue-500}.hermes-builtin-heading,.hermes-mcp-heading{@apply flex;@apply items-center;@apply justify-between;@apply gap-4}.hermes-builtin-heading h4,.hermes-mcp-heading h4{@apply m-0}.hermes-builtin-heading .ui-button{@apply bg-transparent;@apply text-slate-500;@apply text-label}.hermes-builtin-grid{@apply grid;grid-template-columns:repeat(4,minmax(0,1fr));@apply gap-3}.hermes-builtin-card{@apply grid;@apply gap-2.5;@apply p-4.75;@apply border border-solid border-slate-200;@apply rounded-xl;@apply bg-white}.hermes-builtin-card>span{@apply w-8.5;@apply h-8.5;@apply grid;@apply place-items-center;@apply bg-blue-50;border-radius:calc(var(--spacing) * 2.5);@apply text-slate-400}.hermes-builtin-card b{@apply text-compact}.hermes-builtin-card small{@apply text-label;@apply text-slate-400}.hermes-builtin-card em{@apply not-italic;@apply text-caption;@apply text-slate-400}.hermes-builtin-card em.enabled{@apply text-emerald-600}.hermes-builtin-card em:before{content:'•';@apply mr-1.25}.hermes-mcp-heading{@apply border-t border-solid border-gray-100;@apply pt-6.5;@apply mt-1}.hermes-mcp-heading p{@apply mb-0}.hermes-mcp-heading .ui-button{@apply text-label;@apply whitespace-nowrap}.hermes-connection-stats{@apply flex;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-slate-50;@apply pt-3.75 pr-0 pb-3.75 pl-0}.hermes-connection-stats>div{@apply flex;@apply items-center;@apply justify-center;@apply gap-2.75;@apply flex-1;@apply border-r border-solid border-slate-200}.hermes-connection-stats>div:last-child{@apply border-r-0}.hermes-connection-stats b{@apply text-2xl;@apply font-semibold;@apply text-slate-600}.hermes-connection-stats span{@apply text-label;@apply text-slate-400}.hermes-connect-start{@apply border border-dashed border-slate-200;border-radius:calc(var(--spacing) * 3.5);@apply p-7.5;background:linear-gradient(150deg,var(--color-slate-50),var(--color-white))}.hermes-connect-start>div:first-child{@apply text-center}.hermes-connect-start>div:first-child>span{@apply grid;@apply place-items-center;@apply mt-auto mr-auto mb-4 ml-auto;@apply w-12;@apply h-12;border-radius:calc(var(--spacing) * 3.5);@apply bg-blue-50;@apply text-slate-400}.hermes-connect-start h4{@apply text-base;@apply mt-0 mr-0 mb-2.5 ml-0}.hermes-connect-start p{@apply text-xs;@apply leading-description;@apply text-slate-400}.hermes-connect-options{@apply grid;grid-template-columns:repeat(3,1fr);@apply gap-3;@apply mt-6.25}.hermes-connect-options>button{@apply relative;@apply text-left;@apply grid;@apply gap-2.75;@apply p-5;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-white;@apply cursor-pointer;@apply text-slate-500}.hermes-connect-options>button:hover{@apply border-blue-400;@apply bg-slate-50}.hermes-connect-options b{@apply text-xs;@apply text-slate-500}.hermes-connect-options small{@apply text-caption;@apply text-slate-400}.hermes-connect-options>button>svg:last-child{@apply absolute;@apply right-4.25;@apply top-5;@apply text-slate-400}.hermes-mcp-toolbar{@apply flex;@apply items-center;@apply justify-between;@apply gap-3.75}.hermes-mcp-toolbar>label{@apply flex;@apply items-center;@apply gap-2!;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.25);@apply pt-0 pr-3 pb-0 pl-3;@apply min-w-62.5;@apply text-slate-400}.hermes-mcp-toolbar>label>input{@apply border-0;@apply pl-0;outline:0;@apply bg-transparent}.hermes-server-title{@apply flex;@apply items-center;@apply gap-3}.hermes-server-title>span{@apply w-10;@apply h-10;border-radius:calc(var(--spacing) * 2.75);@apply grid;@apply place-items-center;@apply bg-blue-50;@apply text-slate-400}.hermes-server-title h4{@apply m-0}.hermes-server-title p{@apply mt-1 mr-0 mb-0 ml-0}.hermes-server-state{@apply text-caption;@apply text-slate-400;@apply pt-1.5 pr-2.25 pb-1.5 pl-2.25;@apply bg-slate-100;border-radius:calc(var(--spacing) * 1.75);@apply whitespace-nowrap}.hermes-server-state.connected{@apply bg-emerald-50;@apply text-emerald-600}.hermes-server-state.failed{@apply bg-red-50;@apply text-red-500}.hermes-server-command{font:calc(var(--spacing) * 2.75) ui-monospace,monospace;@apply text-slate-400;@apply wrap-anywhere;@apply bg-slate-50;@apply border border-solid border-slate-100;@apply p-2.75;@apply rounded-lg}.hermes-server-bottom{@apply flex;@apply items-center;@apply justify-between;@apply gap-3.75}.hermes-server-bottom>div{@apply flex;@apply gap-1.75}.hermes-server-bottom .ui-button{@apply text-label}.hermes-server-bottom summary{@apply text-label;@apply text-slate-400}.hermes-connections .hermes-mcp-form{@apply border border-solid border-blue-100;border-radius:calc(var(--spacing) * 3.25);@apply p-6;@apply bg-slate-50;@apply grid;@apply gap-4}.hermes-advanced{@apply border-t border-solid border-slate-200;@apply pt-4.5}.hermes-advanced>summary{@apply text-label;@apply text-slate-400}.hermes-advanced[open]{@apply grid;@apply gap-3}
+.hermes-connections{@apply gap-5.5}.hermes-connection-mark{@apply w-14;@apply h-14;@apply grid;@apply place-items-center;@apply border border-solid border-brand-100;border-radius:calc(var(--spacing) * 4.25);@apply bg-brand-50;@apply text-brand-500}.hermes-builtin-heading,.hermes-mcp-heading{@apply flex;@apply items-center;@apply justify-between;@apply gap-4}.hermes-builtin-heading h4,.hermes-mcp-heading h4{@apply m-0}.hermes-builtin-heading .ui-button{@apply bg-transparent;@apply text-slate-500;@apply text-label}.hermes-builtin-grid{@apply grid;grid-template-columns:repeat(4,minmax(0,1fr));@apply gap-3}.hermes-builtin-card{@apply grid;@apply gap-2.5;@apply p-4.75;@apply border border-solid border-slate-200;@apply rounded-xl;@apply bg-white}.hermes-builtin-card>span{@apply w-8.5;@apply h-8.5;@apply grid;@apply place-items-center;@apply bg-brand-50;border-radius:calc(var(--spacing) * 2.5);@apply text-slate-400}.hermes-builtin-card b{@apply text-compact}.hermes-builtin-card small{@apply text-label;@apply text-slate-400}.hermes-builtin-card em{@apply not-italic;@apply text-caption;@apply text-slate-400}.hermes-builtin-card em.enabled{@apply text-emerald-600}.hermes-builtin-card em:before{content:'•';@apply mr-1.25}.hermes-mcp-heading{@apply border-t border-solid border-gray-100;@apply pt-6.5;@apply mt-1}.hermes-mcp-heading p{@apply mb-0}.hermes-mcp-heading .ui-button{@apply text-label;@apply whitespace-nowrap}.hermes-connection-stats{@apply flex;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-slate-50;@apply pt-3.75 pr-0 pb-3.75 pl-0}.hermes-connection-stats>div{@apply flex;@apply items-center;@apply justify-center;@apply gap-2.75;@apply flex-1;@apply border-r border-solid border-slate-200}.hermes-connection-stats>div:last-child{@apply border-r-0}.hermes-connection-stats b{@apply text-2xl;@apply font-semibold;@apply text-slate-600}.hermes-connection-stats span{@apply text-label;@apply text-slate-400}.hermes-connect-start{@apply border border-dashed border-slate-200;border-radius:calc(var(--spacing) * 3.5);@apply p-7.5;background:linear-gradient(150deg,var(--color-slate-50),var(--color-white))}.hermes-connect-start>div:first-child{@apply text-center}.hermes-connect-start>div:first-child>span{@apply grid;@apply place-items-center;@apply mt-auto mr-auto mb-4 ml-auto;@apply w-12;@apply h-12;border-radius:calc(var(--spacing) * 3.5);@apply bg-brand-50;@apply text-slate-400}.hermes-connect-start h4{@apply text-base;@apply mt-0 mr-0 mb-2.5 ml-0}.hermes-connect-start p{@apply text-xs;@apply leading-description;@apply text-slate-400}.hermes-connect-options{@apply grid;grid-template-columns:repeat(3,1fr);@apply gap-3;@apply mt-6.25}.hermes-connect-options>button{@apply relative;@apply text-left;@apply grid;@apply gap-2.75;@apply p-5;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.75);@apply bg-white;@apply cursor-pointer;@apply text-slate-500}.hermes-connect-options>button:hover{@apply border-brand-400;@apply bg-slate-50}.hermes-connect-options b{@apply text-xs;@apply text-slate-500}.hermes-connect-options small{@apply text-caption;@apply text-slate-400}.hermes-connect-options>button>svg:last-child{@apply absolute;@apply right-4.25;@apply top-5;@apply text-slate-400}.hermes-mcp-toolbar{@apply flex;@apply items-center;@apply justify-between;@apply gap-3.75}.hermes-mcp-toolbar>label{@apply flex;@apply items-center;@apply gap-2!;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.25);@apply pt-0 pr-3 pb-0 pl-3;@apply min-w-62.5;@apply text-slate-400}.hermes-mcp-toolbar>label>input{@apply border-0;@apply pl-0;outline:0;@apply bg-transparent}.hermes-server-title{@apply flex;@apply items-center;@apply gap-3}.hermes-server-title>span{@apply w-10;@apply h-10;border-radius:calc(var(--spacing) * 2.75);@apply grid;@apply place-items-center;@apply bg-brand-50;@apply text-slate-400}.hermes-server-title h4{@apply m-0}.hermes-server-title p{@apply mt-1 mr-0 mb-0 ml-0}.hermes-server-state{@apply text-caption;@apply text-slate-400;@apply pt-1.5 pr-2.25 pb-1.5 pl-2.25;@apply bg-slate-100;border-radius:calc(var(--spacing) * 1.75);@apply whitespace-nowrap}.hermes-server-state.connected{@apply bg-emerald-50;@apply text-emerald-600}.hermes-server-state.failed{@apply bg-red-50;@apply text-red-500}.hermes-server-command{font:calc(var(--spacing) * 2.75) ui-monospace,monospace;@apply text-slate-400;@apply wrap-anywhere;@apply bg-slate-50;@apply border border-solid border-slate-100;@apply p-2.75;@apply rounded-lg}.hermes-server-bottom{@apply flex;@apply items-center;@apply justify-between;@apply gap-3.75}.hermes-server-bottom>div{@apply flex;@apply gap-1.75}.hermes-server-bottom .ui-button{@apply text-label}.hermes-server-bottom summary{@apply text-label;@apply text-slate-400}.hermes-connections .hermes-mcp-form{@apply border border-solid border-brand-100;border-radius:calc(var(--spacing) * 3.25);@apply p-6;@apply bg-slate-50;@apply grid;@apply gap-4}.hermes-advanced{@apply border-t border-solid border-slate-200;@apply pt-4.5}.hermes-advanced>summary{@apply text-label;@apply text-slate-400}.hermes-advanced[open]{@apply grid;@apply gap-3}
 @media(max-width:53.125rem){.hermes-builtin-grid{grid-template-columns:repeat(2,1fr)}.hermes-mcp-heading{@apply items-start;@apply flex-col}.hermes-connection-stats span{@apply text-caption}.hermes-connection-stats>div{@apply flex-col;@apply gap-1.25}.hermes-connect-start{@apply p-5.5}.hermes-connect-options{@apply gap-2}.hermes-connect-options>button{@apply p-3.5}.hermes-connect-options small{@apply text-small;@apply leading-copy}.hermes-connect-options>button>svg:last-child{@apply hidden}}@media(max-width:31.25rem){.hermes-connection-mark{@apply hidden}.hermes-connect-options{grid-template-columns:1fr}.hermes-connect-options>button{grid-template-columns:calc(var(--spacing) * 6) 1fr;@apply gap-x-3}.hermes-connect-options b{align-self:center}.hermes-connect-options small{@apply col-start-2}.hermes-mcp-heading .hermes-actions{@apply w-full}.hermes-mcp-toolbar{@apply items-stretch;@apply flex-col}.hermes-mcp-toolbar>label{@apply min-w-0}.hermes-builtin-card{@apply p-3.5}.hermes-builtin-card small{@apply text-caption}.hermes-server-bottom{@apply items-start}.hermes-server-state{@apply text-small}.hermes-connections .hermes-mcp-form{@apply p-4.25}}
 
-.hermes-subtabs{@apply flex;@apply gap-1.5;@apply mt-0 mr-0 mb-3.75 ml-0}.hermes-subtabs .ui-button{@apply text-xs;@apply bg-transparent;@apply text-slate-400}.hermes-subtabs .ui-button[aria-pressed=true]{@apply bg-white;@apply text-slate-600;@apply border border-solid border-slate-200}.hermes-catalog h3 small{@apply text-compact;@apply text-slate-400}.hermes-catalog-filters{@apply flex;@apply gap-3;@apply items-center}.hermes-catalog-filters>label{@apply flex;@apply items-center;@apply gap-2.5;@apply flex-1}.hermes-catalog-filters>label>input,.hermes-catalog-filters>input{@apply flex-1;@apply min-w-0}.hermes-catalog-filters>select{@apply w-40}.hermes-catalog-grid{@apply grid;grid-template-columns:repeat(2,minmax(0,1fr));@apply gap-3.5}.hermes-catalog-card{@apply flex;@apply flex-col;@apply gap-4;@apply p-5.75;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 3.25);@apply bg-white}.hermes-catalog-card h4{@apply text-sm;@apply m-0}.hermes-catalog-card p{@apply text-xs;@apply leading-code;@apply m-0}.hermes-catalog-description{@apply text-slate-500;@apply min-h-10.75}.hermes-catalog-badges{@apply flex;@apply gap-3;@apply items-center;@apply text-slate-400;@apply text-caption}.hermes-catalog-badges a{@apply flex;@apply items-center;@apply gap-1;@apply text-slate-500}.hermes-catalog-card>details{@apply text-label;@apply text-slate-400}.hermes-catalog-card>details p{@apply mt-3;@apply wrap-anywhere;@apply whitespace-pre-wrap}.hermes-catalog-card>.ui-button{align-self:flex-end;@apply mt-auto}.hermes-modal-backdrop{@apply fixed;@apply inset-0;background:color-mix(in srgb, var(--color-slate-800) 40%, transparent);@apply z-100;@apply flex;@apply items-center;@apply justify-center;@apply p-5;backdrop-filter:blur(calc(var(--spacing) * 0.75))}.hermes-dialog{@apply grid;@apply gap-4.25;@apply bg-white;@apply border border-solid border-slate-200;box-shadow:0 calc(var(--spacing) * 4.5) calc(var(--spacing) * 17.5) color-mix(in srgb, var(--color-slate-800) 20%, transparent);border-radius:calc(var(--spacing) * 4.5);width:min(calc(var(--spacing) * 170),100%);max-height:90dvh;@apply overflow-auto;@apply p-7}.hermes-dialog label{@apply grid;@apply gap-2.25;@apply text-xs;@apply text-slate-500}.hermes-dialog p,.hermes-dialog small{@apply text-xs;@apply text-slate-400;@apply leading-code}.hermes-dialog input,.hermes-dialog textarea,.hermes-dialog select{@apply w-full;@apply p-2.75;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.25);font:calc(var(--spacing) * 3) inherit}.hermes-dialog textarea{@apply resize-y}.hermes-dialog pre{@apply text-label;@apply whitespace-pre-wrap;@apply wrap-anywhere}.hermes-skill-browser{@apply grid;grid-template-columns:calc(var(--spacing) * 37.5) minmax(0,1fr);@apply gap-5}.hermes-skill-categories{@apply flex;@apply flex-col;@apply gap-1.5}.hermes-skill-categories button{@apply flex;@apply items-center;@apply justify-between;@apply gap-2;@apply pt-3 pr-2.5 pb-3 pl-2.5;@apply border-0;@apply bg-transparent;@apply text-slate-400;@apply rounded-lg;@apply text-label;@apply text-left;@apply cursor-pointer}.hermes-skill-categories button[aria-pressed=true]{@apply bg-blue-50;@apply text-slate-500}.hermes-skill-categories b{@apply text-caption;@apply text-slate-400}.hermes-skill-browser .hermes-skills-layout{grid-template-columns:minmax(calc(var(--spacing) * 60),1fr) minmax(calc(var(--spacing) * 62.5),1fr);@apply m-0;@apply gap-4}.hermes-skill-row{@apply flex;@apply gap-3;@apply items-start;@apply pt-3.25 pr-3 pb-3.25 pl-3;@apply border border-solid border-transparent;border-radius:calc(var(--spacing) * 2.5)}.hermes-skill-row.selected{@apply bg-blue-50;@apply border-blue-100}.hermes-skill-row>input{@apply w-3.75!;@apply mt-1;@apply shrink-0;@apply accent-blue-500}.hermes-skill-row>button{@apply grid;@apply gap-1.75;@apply bg-transparent;@apply border-0;@apply text-left;@apply p-0;@apply cursor-pointer;@apply text-slate-500;@apply min-w-0}.hermes-skill-row b{@apply flex;@apply gap-1.75;@apply items-center;@apply text-xs}.hermes-skill-row em{@apply text-tiny;@apply not-italic;@apply bg-slate-100;@apply text-slate-400;@apply pt-0.75 pr-1.25 pb-0.75 pl-1.25;@apply rounded-sm}.hermes-skill-row small{@apply text-small;@apply text-slate-400}.hermes-skill-row span{@apply text-label;@apply leading-description;@apply text-slate-400}.hermes-skill-detail>.hermes-section-heading{@apply items-start}.hermes-skill-detail .ui-button{@apply text-caption;@apply whitespace-nowrap}.hermes-skill-detail>p{@apply text-xs;@apply leading-description}.hermes-run-options{@apply flex;@apply gap-2.25;@apply items-center;@apply flex-wrap;@apply pt-2.5 pr-5 pb-2.5 pl-5;@apply border-t border-solid border-slate-100;@apply text-caption;@apply text-slate-400}.hermes-run-options select,.hermes-run-options input{@apply pt-1.5 pr-2 pb-1.5 pl-2;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 1.75);@apply text-caption;@apply text-slate-500;@apply bg-slate-50}.hermes-run-options input{@apply w-16.5}.hermes-autonomy-state{@apply pt-3.25 pr-5 pb-3.25 pl-5;@apply border-t border-solid border-slate-200;@apply bg-slate-50;@apply text-label;@apply text-slate-500;@apply flex;@apply items-center;@apply gap-2.5;@apply flex-wrap}.hermes-autonomy-state .ui-button{@apply text-caption;@apply pt-1.5 pr-2.25 pb-1.5 pl-2.25}
+.hermes-subtabs{@apply flex;@apply gap-1.5;@apply mt-0 mr-0 mb-3.75 ml-0}.hermes-subtabs .ui-button{@apply text-xs;@apply bg-transparent;@apply text-slate-400}.hermes-subtabs .ui-button[aria-pressed=true]{@apply bg-white;@apply text-slate-600;@apply border border-solid border-slate-200}.hermes-catalog h3 small{@apply text-compact;@apply text-slate-400}.hermes-catalog-filters{@apply flex;@apply gap-3;@apply items-center}.hermes-catalog-filters>label{@apply flex;@apply items-center;@apply gap-2.5;@apply flex-1}.hermes-catalog-filters>label>input,.hermes-catalog-filters>input{@apply flex-1;@apply min-w-0}.hermes-catalog-filters>select{@apply w-40}.hermes-catalog-grid{@apply grid;grid-template-columns:repeat(2,minmax(0,1fr));@apply gap-3.5}.hermes-catalog-card{@apply flex;@apply flex-col;@apply gap-4;@apply p-5.75;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 3.25);@apply bg-white}.hermes-catalog-card h4{@apply text-sm;@apply m-0}.hermes-catalog-card p{@apply text-xs;@apply leading-code;@apply m-0}.hermes-catalog-description{@apply text-slate-500;@apply min-h-10.75}.hermes-catalog-badges{@apply flex;@apply gap-3;@apply items-center;@apply text-slate-400;@apply text-caption}.hermes-catalog-badges a{@apply flex;@apply items-center;@apply gap-1;@apply text-slate-500}.hermes-catalog-card>details{@apply text-label;@apply text-slate-400}.hermes-catalog-card>details p{@apply mt-3;@apply wrap-anywhere;@apply whitespace-pre-wrap}.hermes-catalog-card>.ui-button{align-self:flex-end;@apply mt-auto}.hermes-modal-backdrop{@apply fixed;@apply inset-0;background:color-mix(in srgb, var(--color-slate-800) 40%, transparent);@apply z-100;@apply flex;@apply items-center;@apply justify-center;@apply p-5;backdrop-filter:blur(calc(var(--spacing) * 0.75))}.hermes-dialog{@apply grid;@apply gap-4.25;@apply bg-white;@apply border border-solid border-slate-200;box-shadow:0 calc(var(--spacing) * 4.5) calc(var(--spacing) * 17.5) color-mix(in srgb, var(--color-slate-800) 20%, transparent);border-radius:calc(var(--spacing) * 4.5);width:min(calc(var(--spacing) * 170),100%);max-height:90dvh;@apply overflow-auto;@apply p-7}.hermes-dialog label{@apply grid;@apply gap-2.25;@apply text-xs;@apply text-slate-500}.hermes-dialog p,.hermes-dialog small{@apply text-xs;@apply text-slate-400;@apply leading-code}.hermes-dialog input,.hermes-dialog textarea,.hermes-dialog select{@apply w-full;@apply p-2.75;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 2.25);font:calc(var(--spacing) * 3) inherit}.hermes-dialog textarea{@apply resize-y}.hermes-dialog pre{@apply text-label;@apply whitespace-pre-wrap;@apply wrap-anywhere}.hermes-skill-browser{@apply grid;grid-template-columns:calc(var(--spacing) * 37.5) minmax(0,1fr);@apply gap-5}.hermes-skill-categories{@apply flex;@apply flex-col;@apply gap-1.5}.hermes-skill-categories button{@apply flex;@apply items-center;@apply justify-between;@apply gap-2;@apply pt-3 pr-2.5 pb-3 pl-2.5;@apply border-0;@apply bg-transparent;@apply text-slate-400;@apply rounded-lg;@apply text-label;@apply text-left;@apply cursor-pointer}.hermes-skill-categories button[aria-pressed=true]{@apply bg-brand-50;@apply text-slate-500}.hermes-skill-categories b{@apply text-caption;@apply text-slate-400}.hermes-skill-browser .hermes-skills-layout{grid-template-columns:minmax(calc(var(--spacing) * 60),1fr) minmax(calc(var(--spacing) * 62.5),1fr);@apply m-0;@apply gap-4}.hermes-skill-row{@apply flex;@apply gap-3;@apply items-start;@apply pt-3.25 pr-3 pb-3.25 pl-3;@apply border border-solid border-transparent;border-radius:calc(var(--spacing) * 2.5)}.hermes-skill-row.selected{@apply bg-brand-50;@apply border-brand-100}.hermes-skill-row>input{@apply w-3.75!;@apply mt-1;@apply shrink-0;@apply accent-brand-500}.hermes-skill-row>button{@apply grid;@apply gap-1.75;@apply bg-transparent;@apply border-0;@apply text-left;@apply p-0;@apply cursor-pointer;@apply text-slate-500;@apply min-w-0}.hermes-skill-row b{@apply flex;@apply gap-1.75;@apply items-center;@apply text-xs}.hermes-skill-row em{@apply text-tiny;@apply not-italic;@apply bg-slate-100;@apply text-slate-400;@apply pt-0.75 pr-1.25 pb-0.75 pl-1.25;@apply rounded-sm}.hermes-skill-row small{@apply text-small;@apply text-slate-400}.hermes-skill-row span{@apply text-label;@apply leading-description;@apply text-slate-400}.hermes-skill-detail>.hermes-section-heading{@apply items-start}.hermes-skill-detail .ui-button{@apply text-caption;@apply whitespace-nowrap}.hermes-skill-detail>p{@apply text-xs;@apply leading-description}.hermes-run-options{@apply flex;@apply gap-2.25;@apply items-center;@apply flex-wrap;@apply pt-2.5 pr-5 pb-2.5 pl-5;@apply border-t border-solid border-slate-100;@apply text-caption;@apply text-slate-400}.hermes-run-options select,.hermes-run-options input{@apply pt-1.5 pr-2 pb-1.5 pl-2;@apply border border-solid border-slate-200;border-radius:calc(var(--spacing) * 1.75);@apply text-caption;@apply text-slate-500;@apply bg-slate-50}.hermes-run-options input{@apply w-16.5}.hermes-autonomy-state{@apply pt-3.25 pr-5 pb-3.25 pl-5;@apply border-t border-solid border-slate-200;@apply bg-slate-50;@apply text-label;@apply text-slate-500;@apply flex;@apply items-center;@apply gap-2.5;@apply flex-wrap}.hermes-autonomy-state .ui-button{@apply text-caption;@apply pt-1.5 pr-2.25 pb-1.5 pl-2.25}
 @media(max-width:62.5rem){.hermes-skill-browser{grid-template-columns:1fr}.hermes-skill-categories{@apply flex-row;@apply overflow-auto}.hermes-skill-categories button{@apply whitespace-nowrap}.hermes-catalog-grid{grid-template-columns:1fr}}@media(max-width:40.625rem){.hermes-catalog-card{@apply p-4.5}.hermes-catalog-filters{@apply gap-2}.hermes-catalog-filters>select{@apply w-30;@apply text-caption}.hermes-dialog{@apply p-5}.hermes-skill-browser .hermes-skills-layout{grid-template-columns:1fr}.hermes-skill-categories{@apply gap-0.75}.hermes-run-options{@apply pt-2 pr-3 pb-2 pl-3}}
 
 
@@ -581,9 +601,9 @@
 .workspace-layout:has(.hermes-workspace.is-focused){@apply h-dvh;grid-template-columns:minmax(0,1fr)!important}
 .workspace-layout:has(.hermes-workspace.is-focused)>.workspace-sidebar{@apply hidden!}
 .workspace-content:has(>.hermes-workspace.is-focused){@apply h-dvh}
-.hermes-workspace{--ha-border:var(--color-slate-200);--ha-muted:var(--color-slate-500);--ha-ink:var(--color-slate-800);--ha-accent:var(--color-blue-600);@apply flex;@apply flex-col;@apply h-full;@apply max-w-none;@apply m-0;@apply bg-white;color:var(--ha-ink);@apply min-h-0}
+.hermes-workspace{--ha-border:var(--color-slate-200);--ha-muted:var(--color-slate-500);--ha-ink:var(--color-slate-800);--ha-accent:var(--color-brand-600);@apply flex;@apply flex-col;@apply h-full;@apply max-w-none;@apply m-0;@apply bg-white;color:var(--ha-ink);@apply min-h-0}
 .hermes-workspace button,.hermes-workspace input,.hermes-workspace select,.hermes-workspace textarea{@apply font-sans}
-.hermes-workspace button:focus-visible,.hermes-workspace summary:focus-visible,.hermes-workspace a:focus-visible{outline:calc(var(--spacing) * 0.75) solid var(--color-blue-200);@apply outline-offset-3}
+.hermes-workspace button:focus-visible,.hermes-workspace summary:focus-visible,.hermes-workspace a:focus-visible{outline:calc(var(--spacing) * 0.75) solid var(--color-brand-200);@apply outline-offset-3}
 .hermes-chat-mount{@apply flex;@apply flex-1;@apply min-h-0}
 .hermes-chat-mount[hidden]{@apply hidden}
 .hermes-chat-layout{@apply relative;@apply grid;grid-template-columns:calc(var(--spacing) * 65) minmax(0,1fr);@apply w-full;@apply h-full;@apply max-h-none;@apply min-h-0;@apply border-0;@apply rounded-none;@apply shadow-none;@apply bg-white}
@@ -592,13 +612,13 @@
 .hermes-chat-heading{@apply flex;@apply items-center;@apply min-h-14.5;@apply pt-2.25 pr-4 pb-2.25 pl-4;@apply gap-3;border-bottom:calc(var(--spacing) * 0.25) solid var(--ha-border);@apply bg-white;@apply shrink-0}
 .hermes-chat-heading .ui-button{@apply flex;@apply items-center;@apply justify-center;@apply min-w-9;@apply h-9;@apply p-1.75;@apply border-0;border-radius:calc(var(--spacing) * 2.25);@apply bg-transparent;@apply text-slate-500;@apply shadow-none}
 .hermes-chat-heading .ui-button:hover{@apply bg-slate-100;@apply text-slate-700}
-.hermes-chat-heading .ui-button[aria-pressed=true]{@apply text-blue-600;@apply bg-blue-50}
+.hermes-chat-heading .ui-button[aria-pressed=true]{@apply text-brand-600;@apply bg-brand-50}
 .hermes-chat-title{@apply min-w-0;@apply max-w-55}
 .hermes-chat-title h2{@apply text-base;@apply leading-dense;@apply font-bold;letter-spacing:-.calc(var(--spacing) * 1)}
 .hermes-chat-title p{@apply text-xs;@apply leading-label;@apply text-slate-400;@apply mt-1;@apply overflow-hidden;@apply whitespace-nowrap;@apply text-ellipsis}
 .ha-model-chip{@apply flex;@apply items-center;@apply gap-2;@apply min-w-0;@apply max-w-70;@apply ml-3;@apply pt-1.75 pr-2.5 pb-1.75 pl-2.5;@apply bg-slate-50;@apply border border-solid border-slate-200;@apply rounded-lg;@apply text-slate-500;@apply text-xs;@apply cursor-pointer}
 .ha-model-chip>span:nth-child(2){@apply overflow-hidden;@apply text-ellipsis;@apply whitespace-nowrap}
-.ha-model-chip:hover{@apply bg-blue-50;@apply text-blue-700}
+.ha-model-chip:hover{@apply bg-brand-50;@apply text-brand-700}
 .ha-model-dot{@apply w-1.5;@apply h-1.5;@apply bg-slate-300;@apply rounded-full;@apply shrink-0}
 .ha-model-dot.ready{@apply bg-emerald-500;box-shadow:0 0 0 calc(var(--spacing) * 0.75) var(--color-slate-200)}
 .ha-heading-actions{@apply flex;@apply items-center;@apply gap-1.25;@apply ml-auto}
@@ -614,16 +634,16 @@
 .hermes-messages.is-empty{@apply flex;@apply justify-center;@apply items-center}
 .hermes-messages.is-empty .ha-conversation{@apply max-w-conversation}
 .hermes-welcome{@apply max-w-none;@apply m-0;@apply pt-3 pr-0 pb-3 pl-0}
-.ha-welcome-symbol{@apply grid;@apply place-items-center;@apply text-blue-500;@apply bg-blue-50;@apply w-15.5;@apply h-15.5;@apply border border-solid border-blue-100;border-radius:calc(var(--spacing) * 5);@apply mb-5.5}
+.ha-welcome-symbol{@apply grid;@apply place-items-center;@apply text-brand-500;@apply bg-brand-50;@apply w-15.5;@apply h-15.5;@apply border border-solid border-brand-100;border-radius:calc(var(--spacing) * 5);@apply mb-5.5}
 .ha-welcome-eyebrow{@apply text-xs!;letter-spacing:.calc(var(--spacing) * 0.75);@apply text-slate-400!;@apply mb-2.5}
 .hermes-welcome h1{@apply text-display;@apply font-semibold;letter-spacing:-calc(var(--spacing) * 0.325);@apply leading-heading;@apply text-slate-700;@apply mt-0 mr-0 mb-3 ml-0}
 .hermes-welcome>p:not(.ha-welcome-eyebrow){@apply text-sm;@apply text-slate-400;@apply leading-code}
 .hermes-suggestions{@apply gap-2.5;@apply mt-7}
 .hermes-suggestions button{@apply gap-2.5;@apply pt-3.5 pr-4 pb-3.5 pl-4;@apply border border-solid border-slate-200;@apply rounded-xl;@apply bg-white;@apply text-slate-500;@apply text-compact;transition:background .15s,border-color .15s,transform .15s}
-.hermes-suggestions button:hover{@apply bg-slate-50;@apply border-blue-200;transform:translateY(-calc(var(--spacing) * 0.5))}
+.hermes-suggestions button:hover{@apply bg-slate-50;@apply border-brand-200;transform:translateY(-calc(var(--spacing) * 0.5))}
 .hermes-message{@apply relative;@apply flex;@apply gap-3;@apply max-w-full;@apply mt-0 mr-0 mb-4.5 ml-0;@apply text-base;@apply leading-message}
 .hermes-message.assistant{@apply p-0;@apply bg-transparent}
-.ha-assistant-mark{@apply hidden;@apply place-items-center;@apply shrink-0;@apply w-7.25;@apply h-7.25;@apply text-3xl;@apply leading-none;@apply text-blue-500;@apply mt-1}
+.ha-assistant-mark{@apply hidden;@apply place-items-center;@apply shrink-0;@apply w-7.25;@apply h-7.25;@apply text-3xl;@apply leading-none;@apply text-brand-500;@apply mt-1}
 .ha-message-content{@apply min-w-0;@apply flex-1}
 .hermes-message.user{@apply flex;@apply justify-end;max-width:83%;@apply w-fit;@apply mt-1 mr-0 mb-5 ml-auto;@apply pt-2.5 pr-4 pb-2.5 pl-4;border-radius:calc(var(--spacing) * 5) calc(var(--spacing) * 5) calc(var(--spacing) * 1.25) calc(var(--spacing) * 5);@apply bg-gray-100;@apply text-gray-800}
 .hermes-message.user .ha-message-content{@apply flex-none;@apply max-w-full}
@@ -645,7 +665,7 @@
 .ha-markdown li>p{@apply m-0}
 .ha-markdown blockquote{@apply border-l-3 border-solid border-slate-300;@apply pt-0.75 pr-0 pb-0.75 pl-4.5;@apply mt-4.5 mr-0 mb-4.5 ml-0;@apply text-slate-500;@apply bg-transparent}
 .ha-markdown hr{@apply border-0;@apply border-t border-solid border-slate-200;@apply mt-6.25 mr-0 mb-6.25 ml-0}
-.ha-markdown a{@apply text-blue-700;@apply underline;@apply underline-offset-3}
+.ha-markdown a{@apply text-brand-700;@apply underline;@apply underline-offset-3}
 .ha-markdown :not(pre)>code{font:calc(var(--spacing) * 3.125)/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;@apply pt-0.75 pr-1.5 pb-0.75 pl-1.5;border-radius:calc(var(--spacing) * 1.25);@apply bg-slate-100;@apply text-slate-600;@apply wrap-anywhere}
 .ha-code-block{@apply max-w-full;@apply mt-4.5 mr-0 mb-4.5 ml-0;@apply border border-solid border-slate-200;@apply rounded-xl;@apply overflow-hidden;@apply bg-slate-50}
 .ha-code-block figcaption{@apply flex;@apply items-center;@apply justify-between;@apply pt-2.25 pr-3.75 pb-2.25 pl-3.75;@apply bg-slate-100;@apply text-slate-500;@apply text-label;@apply font-mono}
@@ -689,7 +709,7 @@
 .hermes-composer textarea::placeholder{@apply text-slate-500}
 .hermes-composer .ha-composer-bottom{@apply flex;@apply shrink-0;@apply items-center;@apply gap-2.5;@apply pt-0.75 pr-0 pb-0.75 pl-0}
 .ha-mode-select{@apply flex;@apply items-center;@apply gap-1.25;@apply text-slate-400}
-.ha-mode-select select{@apply border-0;@apply bg-transparent;@apply text-xs;@apply text-slate-500;@apply pt-1.25 pr-0.5 pb-1.25 pl-0.5;@apply max-w-36.25;@apply outline-blue-200}
+.ha-mode-select select{@apply border-0;@apply bg-transparent;@apply text-xs;@apply text-slate-500;@apply pt-1.25 pr-0.5 pb-1.25 pl-0.5;@apply max-w-36.25;@apply outline-brand-200}
 .hermes-composer .ha-enter-hint{@apply ml-auto;@apply text-caption;@apply text-gray-400}
 .hermes-composer .ui-button{@apply inline-flex items-center justify-center min-w-9 h-9 p-2 border-0 rounded-full bg-transparent text-slate-600 shadow-none}
 .hermes-composer .ui-button[data-composer-action=send]{@apply bg-slate-900 text-white}
@@ -727,7 +747,7 @@
 .hermes-session-list{@apply flex;@apply flex-col;@apply gap-1.25;@apply pt-3;@apply overflow-auto;@apply flex-1;@apply min-h-0}
 .hermes-session-list>button{@apply flex;@apply items-center;@apply gap-2.5;@apply border-0;border-radius:calc(var(--spacing) * 2.25);@apply bg-transparent;@apply pt-3 pr-2.5 pb-3 pl-2.5;@apply text-slate-500;@apply text-xs;@apply cursor-pointer;@apply min-w-0;@apply shrink-0;@apply text-left}
 .hermes-session-list>button:hover{@apply bg-slate-100}
-.hermes-session-list>button[aria-current=true]{@apply text-slate-500;@apply bg-blue-50;@apply font-medium}
+.hermes-session-list>button[aria-current=true]{@apply text-slate-500;@apply bg-brand-50;@apply font-medium}
 .hermes-session-list>button svg{@apply shrink-0}
 .hermes-session-list span{@apply whitespace-nowrap;@apply text-ellipsis;@apply overflow-hidden}
 .ha-sidebar-empty{@apply text-xs;@apply leading-code;@apply pt-3.75 pr-2 pb-3.75 pl-2;@apply text-slate-400}
@@ -743,7 +763,7 @@
 .hermes-workspace .ha-activity-item>summary:before{@apply hidden}
 .ha-step-dot{@apply grid;@apply place-items-center;@apply w-6.75;@apply h-6.75;@apply shrink-0;@apply border border-solid border-slate-200;@apply bg-slate-100;@apply text-slate-400;@apply rounded-full}
 .ha-activity-item.error .ha-step-dot{@apply text-gray-400;@apply border-gray-300;@apply bg-red-50}
-.ha-activity-item.running .ha-step-dot{@apply text-slate-400;@apply border-blue-200;@apply bg-blue-50}
+.ha-activity-item.running .ha-step-dot{@apply text-slate-400;@apply border-brand-200;@apply bg-brand-50}
 .ha-activity-item summary>span:nth-child(2){@apply grid;@apply gap-1;@apply min-w-0;@apply flex-1}
 .ha-activity-item summary b{@apply text-xs;@apply font-medium;@apply text-slate-500}
 .ha-activity-item summary small{@apply text-caption;@apply text-slate-400}
@@ -774,7 +794,7 @@
 .ha-settings-layout>nav button b{@apply text-compact;@apply font-medium;@apply text-slate-500}
 .ha-settings-layout>nav button small{@apply text-small;@apply leading-normal;@apply text-slate-400}
 .ha-settings-layout>nav button>svg:last-child{@apply opacity-50}
-.ha-settings-layout>nav button[aria-current=page]{@apply bg-blue-50;@apply text-slate-400}
+.ha-settings-layout>nav button[aria-current=page]{@apply bg-brand-50;@apply text-slate-400}
 .ha-settings-layout>nav button[aria-current=page] b{@apply text-slate-500}
 .ha-settings-layout>nav button:hover{@apply bg-slate-100}
 .ha-settings-content{@apply min-w-0;@apply pt-8.25 pr-7.5 pb-12.5 pl-7.5;@apply overflow-visible}
@@ -873,7 +893,7 @@
 @media(prefers-reduced-motion:reduce){.hermes-spin,.ha-stream-dot{@apply animate-none}.hermes-suggestions button{@apply transition-none}}
 
 /* Final visual pass: a single section title and one focus ring per search field. */
-.ha-session-search:focus-within{@apply border-blue-200;box-shadow:0 0 0 calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-blue-600) 4%, transparent)}
+.ha-session-search:focus-within{@apply border-brand-200;box-shadow:0 0 0 calc(var(--spacing) * 0.75) color-mix(in srgb, var(--color-brand-600) 4%, transparent)}
 .ha-session-search input:focus{outline:none!important;@apply shadow-none!;@apply border-0!}
 .ha-settings-content[data-section=skills] .hermes-section-heading>div>h3{@apply hidden}
 @media(max-width:47.5rem){.ha-settings-content .hermes-skill-detail.is-placeholder{@apply hidden}.ha-settings-content .hermes-section-heading .hermes-actions{@apply gap-1.5}}
@@ -890,7 +910,7 @@
 
 .hermes-document-panel{@apply relative flex min-w-0 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white;width:var(--side-panel-width,50%)}
 .hermes-document-panel.is-compact{width:var(--side-panel-width,33.333%)}
-.hermes-document-resizer{@apply absolute left-0 top-0 bottom-0 z-10 w-1 cursor-col-resize touch-none hover:bg-blue-200 focus-visible:bg-blue-300}
+.hermes-document-resizer{@apply absolute left-0 top-0 bottom-0 z-10 w-1 cursor-col-resize touch-none hover:bg-brand-200 focus-visible:bg-brand-300}
 .ha-chat-main{@apply flex min-w-0 min-h-0 flex-1 flex-col}
 .ha-transcript-viewport{@apply relative flex min-h-0 min-w-0 flex-1}
 .hermes-chat-body:has(.hermes-document-panel)>.ha-chat-main{@apply basis-0}
@@ -898,7 +918,7 @@
 
 /* Shared writing surface: full-width editor, predictable toolbar, real file chips. */
 .ui-composer-editor{@apply min-w-0 w-full}
-.ui-composer-toolbar{@apply flex w-full min-w-0 items-center gap-2}
+.ui-composer-toolbar{@apply flex w-full min-w-0 flex-wrap items-center gap-2}
 .ui-composer-toolbar>[data-composer-action=send]{@apply ml-auto shrink-0}
 .ui-composer-key-hint{@apply ml-auto truncate text-xs text-slate-400}
 .ui-file-chips{@apply flex min-w-0 gap-2 overflow-x-auto pb-1}
@@ -906,7 +926,7 @@
 .ui-file-chip>div{@apply min-w-0 max-w-48}
 .ui-file-chip strong{@apply block truncate text-xs font-medium text-slate-700}
 .ui-file-chip small{@apply block text-xs text-slate-500}
-.ui-composer-drop-hint{@apply pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-composer border-2 border-dashed border-blue-400 bg-blue-50 text-sm font-medium text-blue-700}
+.ui-composer-drop-hint{@apply pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-composer border-2 border-dashed border-brand-400 bg-brand-50 text-sm font-medium text-brand-700}
 .ha-engine-notes{@apply shrink-0 border-b border-slate-200 p-4 text-xs text-slate-500}
 .ha-engine-notes summary{@apply cursor-pointer font-medium}
 .ha-engine-notes p{@apply my-2 leading-relaxed}
@@ -931,17 +951,20 @@
 
 /* Shared settings surfaces: one section boundary, readable labels, compact facts. */
 .agent-settings-stack{@apply grid gap-5}
-.ui-settings-section{@apply min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white}
-.ui-settings-section>header{@apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4}
-.ui-settings-section h3{@apply text-base font-semibold text-slate-900}
+.ui-settings-section{@apply min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-brand-900/3}
+.ui-settings-section>header{@apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5}
+.ui-settings-section h3{@apply text-lg font-semibold tracking-tight text-ink}
 .ui-settings-section header p{@apply mt-1 text-sm text-slate-500}
 .ui-settings-section-actions{@apply flex items-center gap-3}
-.ui-settings-section-body{@apply grid gap-4 p-5}
-.ui-settings-fields{@apply grid gap-5}
+.ui-settings-section-body{@apply grid gap-5 p-6}
+.ui-settings-fields{@apply grid gap-6}
+.ui-settings-choice-grid{@apply grid items-start gap-6 md:grid-cols-2}
 .ui-settings-fields label,.agent-model-picker>label,.ui-settings-disclosure>label{@apply grid min-w-0 gap-2 text-sm text-slate-600}
 .ui-settings-fields fieldset{@apply min-w-0}
 .ui-settings-fields legend{@apply mb-3 text-sm text-slate-600}
 .ui-settings-actions{@apply flex flex-wrap items-center gap-2}
+.ha-reasoning-select{@apply gap-2 rounded-xl bg-brand-50 px-3 py-1 text-brand-700}
+.ha-reasoning-select select{@apply font-medium text-brand-800}
 .ui-settings-notice{@apply rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800}
 .ui-settings-load{@apply grid justify-items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500}
 .ui-field-hint{@apply text-sm leading-relaxed text-slate-500}
@@ -964,7 +987,7 @@
 .agent-server-model-row>label{@apply flex-1}
 .agent-tool-grid{@apply grid grid-cols-2 gap-2 md:grid-cols-3}
 .agent-tool-grid>label{@apply flex items-center gap-3 rounded-xl border border-slate-200 p-3}
-.agent-tool-grid>label:has(:checked){@apply border-blue-200 bg-blue-50 text-blue-800}
+.agent-tool-grid>label:has(:checked){@apply border-brand-200 bg-brand-50 text-brand-800}
 .agent-tool-grid input{@apply h-4 w-4 shrink-0}
 @media(max-width:760px){.ui-settings-section>header,.ui-settings-section-body{@apply p-4}.agent-tool-grid{@apply grid-cols-1}.agent-server-model-row{@apply flex-col items-stretch}}
 
@@ -972,7 +995,7 @@
 .hermes-skill-browser{@apply block min-w-0}
 .hermes-skill-categories{@apply mb-4 flex min-w-0 flex-row gap-2 overflow-x-auto border-0 p-0 pb-2}
 .hermes-skill-categories>.ui-button{@apply flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600}
-.hermes-skill-categories>.ui-button[aria-pressed=true]{@apply border-blue-200 bg-blue-50 text-blue-800}
+.hermes-skill-categories>.ui-button[aria-pressed=true]{@apply border-brand-200 bg-brand-50 text-brand-800}
 .hermes-skills-layout{@apply grid grid-cols-1 gap-4 lg:grid-cols-2}
 .hermes-skill-detail{@apply bg-white p-5}
 .ui-settings-empty{@apply grid justify-items-start gap-3 p-5 text-sm text-slate-500}
@@ -984,7 +1007,7 @@
 .ha-session-backdrop.ui-button{@apply absolute inset-0 z-10 block h-full w-full rounded-none border-0 bg-slate-900/10 p-0 shadow-none}
 .hermes-session-list>.ui-button{@apply justify-start border-0 bg-transparent text-left text-slate-700 shadow-none}
 .hermes-session-list>.ui-button:hover{@apply bg-slate-50}
-.hermes-session-list>.ui-button[aria-current=true]{@apply bg-blue-50 text-blue-800}
+.hermes-session-list>.ui-button[aria-current=true]{@apply bg-brand-50 text-brand-800}
 .hermes-sidebar-heading{@apply text-slate-800}
 .ha-session-search{@apply my-3 py-0}
 .ha-session-search .ui-input{@apply h-10}
@@ -999,7 +1022,7 @@
 .ha-activity-item summary b{@apply text-xs font-medium text-slate-800}
 .ha-activity-item summary small{@apply mt-1 text-xs text-slate-500}
 .ha-step-dot{@apply h-5 w-5 shrink-0 border-0 bg-transparent text-emerald-600}
-.hermes-workspace .ui-document-link,.ui-document-link{@apply inline-flex h-auto min-h-0 max-w-full items-baseline justify-start rounded-md border-0 bg-transparent px-1 py-0 text-left text-sm font-medium leading-normal text-blue-700 shadow-none underline decoration-blue-200 underline-offset-4 hover:bg-blue-50}
+.hermes-workspace .ui-document-link,.ui-document-link{@apply inline-flex h-auto min-h-0 max-w-full items-baseline justify-start rounded-md border-0 bg-transparent px-1 py-0 text-left text-sm font-medium leading-normal text-brand-700 shadow-none underline decoration-brand-200 underline-offset-4 hover:bg-brand-50}
 .workspace-menu-item{@apply text-slate-600}
 @media(max-width:760px){.hermes-chat-layout>.hermes-sessions{@apply max-w-full}}
 
@@ -1014,7 +1037,7 @@
 .ha-session-row{@apply flex min-w-0 items-center gap-1 rounded-lg}
 .ha-session-row .ha-session-choice{@apply flex min-w-0 flex-1 justify-start gap-2 overflow-hidden border-0 bg-transparent px-3 py-3 text-left text-xs text-slate-700 shadow-none}
 .ha-session-row .ha-session-choice span{@apply truncate}
-.ha-session-row:has([aria-current=true]){@apply bg-blue-50}
+.ha-session-row:has([aria-current=true]){@apply bg-brand-50}
 .ha-session-row:hover{@apply bg-slate-50}
 .ha-session-row .ha-session-rename-button{@apply shrink-0 border-0 bg-transparent p-2 text-slate-400 shadow-none hover:text-slate-800}
 .ha-session-rename{@apply flex min-w-0 flex-wrap items-center gap-1 p-1}
@@ -1045,20 +1068,20 @@
 .hermes-runtime-metrics dt{@apply font-normal text-slate-400}
 .hermes-runtime-metrics dd{@apply font-medium text-slate-600}
 .hermes-chat-heading .ha-heading-actions{@apply ml-auto gap-1}
-@media(max-width:760px){.hermes-chat-heading>.hermes-runtime-metrics{@apply ml-0 mr-0 border-0 pt-0.5}.hermes-chat-heading .ha-heading-actions{@apply gap-0}}
+@media(max-width:760px){.hermes-chat-heading>.hermes-runtime-metrics{@apply m-0 grid w-full flex-none basis-full grid-cols-3 gap-x-3 gap-y-2 border-0 pt-2}.hermes-chat-heading .ha-heading-actions{@apply gap-0}}
 
 /* Shared, keyboard-operable permission switch for chat and future option surfaces. */
 .ui-button.ui-toggle-switch{@apply flex h-auto min-h-0 shrink-0 items-center gap-2 rounded-lg border-0 bg-transparent px-2 py-1 text-xs font-normal text-slate-500 shadow-none hover:bg-slate-50}
 .ui-switch-track{@apply relative inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-slate-200 transition-colors}
 .ui-switch-track>span{@apply absolute left-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform}
-.ui-toggle-switch[aria-checked=true] .ui-switch-track{@apply bg-blue-600}
+.ui-toggle-switch[aria-checked=true] .ui-switch-track{@apply bg-brand-600}
 .ui-toggle-switch[aria-checked=true] .ui-switch-track>span{@apply translate-x-3}
-.ui-toggle-switch[aria-checked=true]{@apply text-blue-700}
+.ui-toggle-switch[aria-checked=true]{@apply text-brand-700}
 
 /* Shared side-panel geometry; values belong to the theme, user widths to storage. */
 :root{--panel-min-percent:20;--panel-max-percent:80;--panel-resize-step:2}
 .hermes-chat-body>.hermes-log{@apply relative;width:var(--side-panel-width,20rem)}
-.ui-panel-resizer{@apply absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none bg-transparent outline-none hover:bg-blue-100 focus-visible:bg-blue-100}
+.ui-panel-resizer{@apply absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none bg-transparent outline-none hover:bg-brand-100 focus-visible:bg-brand-100}
 .ui-panel-resizer::after{content:'';@apply absolute left-0 top-1/2 h-10 w-1 rounded-full bg-slate-300 transition-colors}
-.ui-panel-resizer:hover::after,.ui-panel-resizer:focus-visible::after{@apply bg-blue-500}
+.ui-panel-resizer:hover::after,.ui-panel-resizer:focus-visible::after{@apply bg-brand-500}
 @media(max-width:760px){.ui-panel-resizer{@apply hidden}.hermes-chat-body>.hermes-log{@apply absolute inset-0 z-20 w-full}.hermes-chat-body>.hermes-document-panel{@apply w-full}}

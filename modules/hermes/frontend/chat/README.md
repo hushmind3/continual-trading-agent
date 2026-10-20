@@ -2,6 +2,8 @@
 
 용도: Hermes 대화 소메뉴의 화면 구성·설정 전달·검사 인수인계입니다.
 
+RuntimeMetrics의 ‘전체 작업’은 모든 모델 요청·검색·도구 실행·대기를 합한 시간이며 API 한 번의 응답 시간이 아닙니다. 컨텍스트 안내에는 이전 대화·지침·도구 결과가 포함됨을 표시합니다. 생성 속도 미측정은 기존처럼 빈 값이며 전체 시간으로 추정하지 않습니다. 공통 테마와 이름이 표시된 추론 선택을 재사용합니다.
+
 Chat.tsx owns sessions, search, per-session drafts, send/stop/approval/resume, panel controls and scroll following. ChatStream.tsx groups adjacent tool-only turns and matches results by ID; ActivityTimeline pairs real start/complete events and retains errors. MessageBody.tsx renders Markdown/GFM with raw HTML disabled and provides copy controls.
 
 The message area fills the remaining viewport. Latest Message restores scroll following. Selected active sessions refresh every 2.5 seconds, retaining unchanged message arrays to avoid reparsing Markdown for metrics-only updates. Opening settings keeps chat mounted. Drafts survive settings navigation and page reload.

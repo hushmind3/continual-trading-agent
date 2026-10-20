@@ -133,9 +133,20 @@ class HermesWorker:
 
     def public_settings(self):
         cfg = load_settings()
+        from toolsets import get_all_toolsets, CLIENT_SURFACE_TOOLSETS, session_disabled_toolsets
+        from tools.registry import registry
+        hidden = set(session_disabled_toolsets([], 'platform') or []) | set(CLIENT_SURFACE_TOOLSETS) | {'platform_company'}
+        definitions = get_all_toolsets()
+        choices = [{'id': name, 'description': definition.get('description', '')}
+                   for name in registry.get_registered_toolset_names()
+                   if name not in hidden
+                   for definition in [definitions.get(name, {})]]
+        # Retain existing selections even when a plugin is temporarily unavailable.
+        known = {choice['id'] for choice in choices}
+        choices.extend({'id': name, 'description': '현재 저장된 도구'} for name in cfg['toolsets'] if name not in known)
         return {**cfg, **model_options(cfg,self.native_config()), 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
                 'python': sys.version.split()[0], 'engine': str(UPSTREAM),
-                'available_toolsets': ['terminal', 'file', 'todo', 'skills', 'web', 'browser', 'computer_use', 'memory'],
+                'available_toolsets': [choice['id'] for choice in choices], 'toolset_options': choices,
                 'computer_driver_installed': _driver.is_file(),
                 'browser_runtime_installed': bool(shutil.which('agent-browser') and os.environ.get('AGENT_BROWSER_EXECUTABLE_PATH'))}
 
@@ -331,10 +342,13 @@ class HermesWorker:
             from tools import tool_search
             tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'computer_use'}
             toolsets = list(cfg['toolsets']) + ['mcp-' + name for name in get_registered_mcp_server_names()]
+            if 'web' in toolsets or cfg.get('company_instructions'):
+                from ai_agent.Hermes.chat.web_search import register as register_web_search
+                register_web_search()
+                tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'web'}
             if cfg.get('company_instructions'):
                 from ai_agent.Hermes.chat.company import register
-                from ai_agent.Hermes.chat.web_search import register as register_web_search
-                register(); register_web_search()
+                register()
                 tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'platform_company','web'}
                 toolsets.extend(['platform_company', 'delegation', 'web'])
             if cfg.get('read_only'):toolsets=['file']

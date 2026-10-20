@@ -7,6 +7,7 @@ import {RunModeOptions} from './RunModeOptions';
 import {ToggleSwitch} from '@platform/ui/ToggleSwitch';
 import {ThinkingControl} from './ThinkingControl';
 import type {ThinkingMode} from './useThinking';
+import type {ReasoningSelection} from '../settings/models/ReasoningSelect';
 export type Attachment = AttachedFile;
 interface Props {
  company?:boolean;companyAvailable?:boolean;onCompany?:()=>void;
@@ -17,6 +18,7 @@ interface Props {
  times: number; setTimes: (value: number) => void;
  readOnly:boolean;setReadOnly:(value:boolean)=>void;
  thinking:ThinkingMode;setThinking:(value:ThinkingMode)=>void;localThinking:boolean;
+ reasoning?:ReasoningSelection;
 }
 export function ChatComposer(props: Props) {
  const {attachments, uploading, upload, removeAttachment, composer, text, draft, send, stop, active, pending, stopping, mode, setMode,readOnly,setReadOnly} = props;
@@ -38,7 +40,7 @@ export function ChatComposer(props: Props) {
    <Button type="button" variant="ghost" data-composer-action="attach" aria-label="파일 첨부" title="파일 첨부 · 끌어놓기와 붙여넣기도 가능" busy={uploading} disabled={uploading} onClick={() => fileInput.current?.click()}><Paperclip size={18}/></Button>
    <label className="ha-mode-select"><Sparkles size={14}/><Select aria-label="실행 방식" title={active?'다음 요청의 실행 방식':'실행 방식'} disabled={pending} value={props.company?'company':mode} onChange={event => event.target.value==='company'?props.onCompany?.():setMode(event.target.value)}><option value="chat">한 번 실행</option><option value="goal">목표 달성까지</option><option value="loop">반복 실행</option>{props.companyAvailable&&<option value="company">AI 총괄 · 승인 후 실행</option>}</Select></label>
    <ToggleSwitch label="읽기 모드" checked={readOnly} onChange={setReadOnly} title={active?'다음 요청부터 적용 · 켜면 파일 읽기·검색만 허용합니다':'켜면 파일 읽기·검색만 허용합니다. 끄면 선택한 도구를 사용할 수 있습니다.'}/>
-   <ThinkingControl value={props.thinking} change={props.setThinking} local={props.localThinking} active={active}/>
+   <ThinkingControl value={props.thinking} change={props.setThinking} local={props.localThinking} active={active} reasoning={props.reasoning}/>
    <span className="ui-composer-key-hint">{active?'다음 요청을 작성할 수 있습니다':'Enter 전송 · Shift+Enter 줄바꿈'}</span>
    {active ? <Button data-composer-action="send" tone="danger" aria-label="작업 중지" busy={pending} disabled={pending||stopping} onClick={stop}><Square size={16}/><span>{stopping?'중지 중':'중지'}</span></Button>
     : <Button data-composer-action="send" type="submit" aria-label="메시지 보내기" title="보내기" tone="primary" busy={pending} disabled={pending||uploading||(!text.trim()&&!attachments.length)}><ArrowUp size={19}/></Button>}

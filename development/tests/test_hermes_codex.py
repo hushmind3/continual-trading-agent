@@ -10,13 +10,48 @@ sys.path.insert(0, str(ROOT / 'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
 sys.path.insert(0, str(ROOT / 'modules/hermes/backend/engine/upstream'))
-from ai_agent.Hermes.models.codex import CodexConnection, runtime
+from ai_agent.Hermes.models.codex import CodexConnection, runtime, goal_reasoning
 from ai_agent.Hermes.engine.execution import bind_model
 from ai_agent.Hermes.chat import telemetry
 from types import SimpleNamespace
 
 
 class CodexTests(unittest.TestCase):
+    def test_cloud_goal_reasoning_restores_original_local_auxiliary_options(self):
+        native={'auxiliary':{'goal_judge':{'extra_body':{'other':True,'reasoning':{'effort':'low'}}}}}
+        worker=SimpleNamespace(codex=SimpleNamespace(reasoning=lambda *args:{'enabled':True,'effort':'high'}))
+        goal_reasoning(worker,native,{'provider':'openai-codex','model':'selected'},{'reasoning_effort':'high'})
+        self.assertEqual(native['auxiliary']['goal_judge']['extra_body']['reasoning']['effort'],'high')
+        goal_reasoning(worker,native,{'provider':'custom'},{})
+        self.assertEqual(native,{'auxiliary':{'goal_judge':{'extra_body':{'other':True,'reasoning':{'effort':'low'}}}}})
+
+    def test_existing_login_does_not_start_duplicate_pending_grant(self):
+        with patch('hermes_cli.auth.get_codex_auth_status',return_value={'logged_in':True}), \
+             patch('hermes_cli.auth_codex._codex_request_device_code') as request:
+            result=CodexConnection().start()
+        self.assertEqual(result,{'state':'complete','connected':True})
+        request.assert_not_called()
+
+    def test_account_catalog_keeps_all_visible_models_and_capabilities(self):
+        entries=[{'slug':name,'display_name':name.upper(),'visibility':'list','default_reasoning_level':'low',
+                  'supported_reasoning_levels':[{'effort':'high','description':'deep'},{'effort':'low'},{'effort':'ultra'}]}
+                 for name in ('gpt-6.1-sol','gpt-6-astra','gpt-6-sol')]
+        entries.append({'slug':'internal-only','visibility':'hide'})
+        connection=CodexConnection()
+        with patch('hermes_cli.auth_codex.resolve_codex_runtime_credentials',return_value={'api_key':'private','base_url':'https://owned.example'}), \
+             patch('agent.codex_headers.codex_account_headers',return_value={}), \
+             patch('agent.model_metadata.fetch_codex_catalog_entries',return_value=(entries,200)):
+            result=connection.models()
+        self.assertEqual([row['id'] for row in result['models']],['gpt-6.1-sol','gpt-6-astra','gpt-6-sol'])
+        self.assertEqual([row['value'] for row in result['models'][0]['reasoning_efforts']],['high','low','ultra'])
+        self.assertEqual(connection.reasoning('gpt-6.1-sol','auto'),{'enabled':True,'effort':'low'})
+        self.assertNotIn('private',str(result))
+        with self.assertRaises(ValueError):connection.reasoning('gpt-6.1-sol','ultra')
+        from agent.transports.codex import _resolve_reasoning
+        effort,enabled=_resolve_reasoning('gpt-6.1-sol',{'provider':'openai-codex','base_url':'https://chatgpt.com/backend-api/codex',
+            'reasoning_config':connection.reasoning('gpt-6.1-sol','high')})
+        self.assertEqual((effort,enabled),('high',True))
+
     def test_custom_route_is_unchanged_and_does_not_resolve_oauth(self):
         with patch('hermes_cli.auth_codex.resolve_codex_runtime_credentials') as resolve:
             self.assertEqual(runtime({'base_url': 'http://localhost/v1'}),

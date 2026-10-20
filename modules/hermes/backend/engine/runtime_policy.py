@@ -4,7 +4,8 @@ def model_options(settings, native):
     saved=(settings.get('model_options') or {}).get(settings['model'],{})
     return {'context_length':saved.get('context_length',context_window(native,settings['model'])),
             'thinking_mode':saved.get('thinking_mode','auto'),
-            'max_output_tokens':saved.get('max_output_tokens',0)}
+            'max_output_tokens':saved.get('max_output_tokens',0),
+            'reasoning_effort':saved.get('reasoning_effort','auto')}
 
 def save_options(settings, request):
     saved=dict((settings.get('model_options') or {}).get(settings['model'],{}))
@@ -16,6 +17,11 @@ def save_options(settings, request):
     if 'thinking_mode' in request:
         if request['thinking_mode'] not in ('auto','on','off'):raise ValueError('Thinking 설정을 확인하세요.')
         saved['thinking_mode']=request['thinking_mode']
+    if 'reasoning_effort' in request:
+        value=request['reasoning_effort']
+        if not isinstance(value,str) or not value or len(value)>40:
+            raise ValueError('추론 수준을 확인하세요.')
+        saved['reasoning_effort']=value
     if 'max_output_tokens' in request:
         value=request['max_output_tokens']
         if type(value) is not int or value!=0 and not 256<=value<=131072:

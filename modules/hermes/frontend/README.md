@@ -9,6 +9,7 @@
 ## 파일 안내
 
 - Hermes.tsx: 대화/설정 전환, 집중 모드, 선택 모델과 상태 조회.
+- 설정에서 모델을 바꾼 뒤 대화로 돌아오면 이동 경로와 관계없이 현재 모델을 다시 조회합니다. 열린 대화의 모델명·추론 선택이 이전 모델에 머무르지 않도록 연결합니다.
 - chat/Chat.tsx: 세션·초안·전송·중지·승인 등 상태와 API 연결.
 - chat/ChatHeader.tsx·SessionSidebar.tsx·ActivityPanel.tsx·ChatComposer.tsx·ChatWelcome.tsx: 공통 UI를 사용하는 역할별 표시 컴포넌트.
 - chat/ChatStream.tsx: 연속 도구 호출 묶음, 실제 실행 수치와 타임라인.

@@ -22,6 +22,8 @@ def run(worker,agent,cfg,session_id,prompt,history,request):
     native.setdefault('auxiliary',{}).setdefault('goal_judge',{}).update({'provider':provider,'model':cfg['model'],
         'base_url':cfg['base_url'],'api_key':'' if provider=='openai-codex' else cfg.get('api_key') or 'local'})
     from ai_agent.Hermes.engine.runtime_policy import auxiliary_thinking, model_options
+    from ai_agent.Hermes.models.codex import goal_reasoning
+    goal_reasoning(worker,native,cfg,model_options(cfg,native))
     auxiliary_thinking(native,cfg,model_options(cfg,native))
     worker.write_config(native)
     manager=GoalManager(session_id) if mode=='goal' else LoopManager(session_id)

@@ -172,6 +172,8 @@ class HermesWorker:
             cfg['local_model'] = ''
             from hermes_cli.auth_constants import DEFAULT_CODEX_BASE_URL
             cfg['base_url'] = DEFAULT_CODEX_BASE_URL
+            if 'reasoning_effort' in request:
+                self.codex.reasoning(cfg['model'], model_options(cfg, self.native_config())['reasoning_effort'])
         if any(key in request for key in ('provider', 'model', 'base_url')):
             native = self.native_config()
             if cfg.get('provider') == 'openai-codex':
@@ -342,6 +344,7 @@ class HermesWorker:
             from ai_agent.Hermes.models.codex import runtime as model_runtime
             self.agent = AIAgent(
                 model=cfg['model'], **model_runtime(cfg), quiet_mode=True,
+                reasoning_config=self.codex.reasoning(cfg['model'], model_options(cfg,native)['reasoning_effort']) if cfg.get('provider')=='openai-codex' else None,
                 session_id=session_id, session_db=None if cfg.get('application_request') else self.db, platform='application' if cfg.get('application_request') else 'platform',
                 enabled_toolsets=toolsets, max_iterations=cfg['max_iterations'], cwd=cfg['workspace'],
                 # Read-only and focused app discussions avoid unrelated shared-memory review writes.

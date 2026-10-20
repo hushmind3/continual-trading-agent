@@ -35,6 +35,8 @@ function ChatWorkspace({status,modelName,focused,onFocus,onStatus,onModels,onSet
  const sessionPanel=useRef<HTMLElement>(null),activityPanel=useRef<HTMLElement>(null),sessionButton=useRef<HTMLButtonElement>(null),activityButton=useRef<HTMLButtonElement>(null);
  const [answer,setAnswer]=useState(''),[mode,setMode]=useState('chat'),[turns,setTurns]=useState(20),[interval,setIntervalSeconds]=useState(60),[times,setTimes]=useState(5),[savedAutonomy,setSavedAutonomy]=useState<AutonomousState>();
  const company=useCompanyConversation(selected);
+ const pendingDrafts=company.ventures.map(v=>v.id).join(',');
+ useEffect(()=>{if(company.enabled&&pendingDrafts){setCompanyOpen(true);setActivityOpen(false);setSessionsOpen(false)}},[company.enabled,pendingDrafts]);
  const active=working(status),thisJob=status?.job.session_id===selected?status.job:undefined,auto=thisJob?.autonomy??savedAutonomy;
  const shownMessages=messages;
  const toggleCompany=()=>{setCompanyOpen(value=>{localStorage.setItem('hermes.company.open',String(!value));return !value});setActivityOpen(false);setSessionsOpen(false);documents?.close()};

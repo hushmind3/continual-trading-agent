@@ -70,6 +70,35 @@ class NativeRuntimeTests(unittest.TestCase):
         self.assertNotIn('error',success)
         self.assertEqual(failure['action'],'finish');self.assertEqual(failure['error'],'Compiler exited 1')
 
+class RecallAndGitTests(unittest.TestCase):
+    def test_native_recall_only_uses_own_scope_and_bounds_context(self):
+        worker=Mock();worker.job={'session_id':'own'}
+        worker.db.get_resume_conversations.return_value=([],[
+            {'role':'user','content':'venture_a 견적서 가격 29000원','_row_id':1},
+            {'role':'user','content':'venture_b 견적서 SECRET-B','_row_id':2},
+            {'role':'tool','content':'venture_a 견적서 '+'x'*50000}])
+        result=company.recall_transcript(worker,{'scope':'venture_a','terms':['견적서'],'items':[]})
+        self.assertIn('29000',json.dumps(result,ensure_ascii=False));self.assertNotIn('SECRET-B',json.dumps(result))
+        worker.db.get_resume_conversations.assert_called_once_with('own')
+        self.assertLessEqual(len(json.dumps(result,ensure_ascii=False)),5000)
+    def test_active_native_context_is_not_injected_twice(self):
+        worker=Mock();worker.job={'session_id':'own'}
+        active={'role':'user','content':'견적서 현재 질문'}
+        archived={'role':'user','content':'견적서 과거 결정','_row_id':1}
+        worker.db.get_resume_conversations.return_value=([active],[archived,active])
+        result=company.recall_transcript(worker,{'scope':'owner','terms':['견적서'],'items':[]})
+        self.assertEqual([r['body'] for r in result['conversation']],['견적서 과거 결정'])
+    def test_unsolicited_git_write_requires_existing_approval(self):
+        worker=Mock();worker.approve.return_value='deny';agent=Mock();original=agent._execute_tool_calls
+        company.bind_git_approval(worker,agent,'버튼을 수정해')
+        message={'tool_calls':[{'function':{'name':'terminal','arguments':json.dumps({'command':'git -C project commit -m done'})}}]}
+        with self.assertRaises(PermissionError):agent._execute_tool_calls(message)
+        original.assert_not_called();worker.approve.assert_called_once()
+        with self.assertRaises(PermissionError):agent._execute_tool_calls({'tool_calls':[{'function':{'name':'tool_call','arguments':{'calls':[{'name':'terminal','arguments':{'command':'git push origin main'}}]}}}]})
+        original.assert_not_called()
+        agent._execute_tool_calls({'tool_calls':[{'function':{'name':'terminal','arguments':{'command':'git status --short'}}}]})
+        original.assert_called_once()
+
 class AuxiliaryThinkingTests(unittest.TestCase):
     def setUp(self):
         self.cfg={'model':'local','base_url':'http://127.0.0.1:1000/v1','local_model':'local.gguf'}

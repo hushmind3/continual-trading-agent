@@ -47,7 +47,7 @@ def call(key, payload, origin=None):
         if not native.get('token') or not secrets.compare_digest(str(payload.get('token', '')), native['token']) or payload.get('session_id') != native_id:
             raise ValueError('회사 도구의 네이티브 세션 인증에 실패했습니다.')
         command = dict(payload.get('command', {}))
-        if command.get('action') not in ('overview', 'propose', 'begin', 'finish', 'meeting', 'run_start', 'run_finish') or '_owner' in command:
+        if command.get('action') not in ('overview', 'recall', 'remember', 'propose', 'begin', 'finish', 'meeting', 'run_start', 'run_finish') or '_owner' in command:
             raise ValueError('허용하지 않은 회사 도구 요청입니다.')
         command['_session'] = native_id
         return invoke('/api/admin/hermes/records', 'POST', command, token)

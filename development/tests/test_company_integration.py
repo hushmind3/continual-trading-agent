@@ -70,4 +70,28 @@ class CompanyTests(unittest.IsolatedAsyncioTestCase):
   data=await self.call({'action':'overview'})
   self.assertLessEqual(len(data['jobs'][0]['summary']),600)
   self.assertGreater(len(self.db.one('SELECT result FROM jobs WHERE id=?',(job['job_id'],))['result']),20000)
+ async def test_recall_old_decisions_and_scoped_continuation(self):
+  a=(await self.call({'action':'propose','title':'견적서','proposal':{'goal':'견적서'}}))['venture_id']
+  b=(await self.call({'action':'propose','title':'여행사업','proposal':{'goal':'다른 사업'}}))['venture_id']
+  tables=[r['name'] for r in self.db.many("SELECT name FROM sqlite_master WHERE type='table'")]
+  await self.call({'action':'remember','venture_id':a,'kind':'decision','memory_key':'가격','body':'견적서 가격은 69000원'})
+  await self.call({'action':'remember','venture_id':a,'kind':'decision','memory_key':'가격','body':'견적서 가격을 29000원으로 정정'})
+  await self.call({'action':'remember','venture_id':b,'kind':'constraint','body':'여행사업의 비공개 조건 SECRET-B'})
+  for i in range(15):await self.call({'action':'remember','kind':'experience','body':'관련 없는 기록 '+str(i)})
+  result=await self.call({'action':'recall','query':'견적서이어서해'})
+  text=json.dumps(result,ensure_ascii=False)
+  self.assertEqual(result['scope'],a);self.assertIn('29000',text);self.assertNotIn('69000',text);self.assertNotIn('SECRET-B',text)
+  self.assertLessEqual(len(text),4200)
+  self.assertEqual(tables,[r['name'] for r in self.db.many("SELECT name FROM sqlite_master WHERE type='table'")])
+  self.assertEqual(len(self.db.many("SELECT insight FROM ceo_lessons WHERE insight LIKE '%69000%'")),1)
+ async def test_recall_keeps_unfinished_and_failure_evidence(self):
+  v=(await self.call({'action':'propose','title':'홈페이지','proposal':{'goal':'제작'}}))['venture_id']
+  await self.call({'action':'decision','venture_id':v,'approve':True,'_owner':True})
+  job=await self.call({'action':'begin','venture_id':v,'role':'CTO','title':'홈페이지 빌드'})
+  await self.call({'action':'finish','job_id':job['job_id'],'error':'dependency missing'})
+  unfinished=await self.call({'action':'begin','venture_id':v,'role':'QA','title':'홈페이지 검사'})
+  recalled=await self.call({'action':'recall','venture_id':v,'query':'이어서'})
+  self.assertIn('dependency missing',json.dumps(recalled));self.assertIn(unfinished['job_id'],json.dumps(recalled))
+  self.assertEqual(len(self.db.many('SELECT * FROM ceo_experiences WHERE job_id=?',(job['job_id'],))),1)
+  await self.call({'action':'recall','venture_id':'venture_unknown'},409)
 if __name__=='__main__':unittest.main()

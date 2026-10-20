@@ -7,7 +7,8 @@ async function main(){
  const id=connected.id.split(':')[0],sid=connected.session_id,settings=await get('ai_agent/Hermes/settings');
  const browser=await chromium.launch({headless:true});fs.mkdirSync(out,{recursive:true});let page;
  try{
-  page=await browser.newPage({viewport:{width:1440,height:960}});const errors=[],submitted=[],actions=[];let approved=false;
+  page=await browser.newPage({viewport:{width:1440,height:960}});const errors=[],submitted=[],actions=[];let approved=false,confirmAllowed=false;
+  page.on('dialog',dialog=>confirmAllowed?dialog.accept():dialog.dismiss());
   const messages=[{role:'user',content:'이전 회사 대화'},{role:'assistant',content:'이전 총괄 답변'}];
   const metric={generation_tps:42.5,input_tokens:3210,output_tokens:84,api_calls:1,context_tokens:3800,context_limit:65536,elapsed_seconds:12};
   let status={job:{state:'idle',session_id:null,events:[],error:'',metrics:{}},local_model:{running:true,state:'ready'}};
@@ -40,7 +41,7 @@ async function main(){
   assert.equal(submitted[0].mode,'goal');assert.equal(submitted[0].session_id,sid);await page.getByText('42.5 tok/s',{exact:true}).waitFor();
   await mode.selectOption('loop');assert.equal(await mode.inputValue(),'loop');await mode.selectOption('chat');
   const business=page.getByRole('complementary',{name:'사업 관리',exact:true});if(!await business.isVisible())await page.getByRole('button',{name:'사업 관리 보기',exact:true}).click();await business.getByText('로컬 제작 승인됨',{exact:true}).waitFor();
-  const approve=page.getByRole('button',{name:'승인 후 실행',exact:true}),read=page.getByRole('switch',{name:'읽기 모드',exact:true});if(await read.getAttribute('aria-checked')==='false')await read.click();assert.ok(await approve.isDisabled());await read.click();await approve.click();await approve.waitFor({state:'detached'});for(let i=0;i<60&&submitted.length<2;i++)await page.waitForTimeout(50);assert.equal(submitted.length,2);assert.equal(submitted[1].mode,'goal');assert.equal(actions.filter(a=>a.action==='decision').length,1);
+  const approve=page.getByRole('button',{name:'사업 승인',exact:true}),read=page.getByRole('switch',{name:'읽기 모드',exact:true});if(await read.getAttribute('aria-checked')==='false')await read.click();assert.ok(await approve.isDisabled());await read.click();await approve.click();assert.equal(actions.filter(a=>a.action==='decision').length,0);confirmAllowed=true;await approve.click();await approve.waitFor({state:'detached'});for(let i=0;i<60&&submitted.length<2;i++)await page.waitForTimeout(50);assert.equal(submitted.length,2);assert.equal(submitted[1].mode,'goal');assert.equal(actions.filter(a=>a.action==='decision').length,1);
   await composer.fill('새로고침 보존 초안');await page.reload({waitUntil:'networkidle'});await composer.waitFor();assert.equal(await composer.inputValue(),'새로고침 보존 초안');
   await nav.getByRole('button',{name:'회사 현황',exact:true}).click();const frame=page.frameLocator('iframe[title="연결된 회사 운영 화면"]');await frame.locator('#overview.on').waitFor();await frame.locator('#teamGrid .team-card').first().waitFor();assert.ok((await frame.locator('#teamGrid').innerText()).includes('누적 완료'));
   await frame.locator('#overview [data-tab="talk"]').first().click();await page.waitForFunction(()=>document.querySelector('nav[aria-label="대화 작업 화면"] button[aria-current="page"]')?.textContent==='대화');

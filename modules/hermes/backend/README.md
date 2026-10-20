@@ -36,3 +36,5 @@ artifacts/는 대화 결과 문서 미리보기를 단일 API에 등록합니다
 2026-10-16 확인: 금융·REA 회귀 110개, Hermes 권한·재시작·문서 검사 11개 통과. TypeScript·Vite 빌드 및 서버 적용 완료. 실제 오류 보고서 문서 API 응답 확인. 실제 GGUF 추론은 이번 검증에서 실행하지 않았습니다.
 
 현재 분리 범위와 검증은 [모듈 안내](../../README.md), 현재 대화 제어는 [대화 README](../frontend/chat/README.md)를 따릅니다.
+
+총괄 전용 키 없는 검색은 chat/web_search.py가 원본 web provider registry에 연결합니다. 해당 의존성은 engine/requirements.txt와 modules/hermes/.venv에 소속됩니다. 일반 대화의 기본 도구/메모리/세션 정책은 이번 총괄 검색 연결로 변경하지 않습니다.

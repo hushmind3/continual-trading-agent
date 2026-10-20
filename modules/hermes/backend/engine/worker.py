@@ -133,7 +133,7 @@ class HermesWorker:
         cfg = load_settings()
         return {**cfg, **model_options(cfg,self.native_config()), 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
                 'python': sys.version.split()[0], 'engine': str(UPSTREAM),
-                'available_toolsets': ['terminal', 'file', 'todo', 'skills', 'browser', 'computer_use', 'memory'],
+                'available_toolsets': ['terminal', 'file', 'todo', 'skills', 'web', 'browser', 'computer_use', 'memory'],
                 'computer_driver_installed': _driver.is_file(),
                 'browser_runtime_installed': bool(shutil.which('agent-browser') and os.environ.get('AGENT_BROWSER_EXECUTABLE_PATH'))}
 
@@ -288,6 +288,9 @@ class HermesWorker:
             native=self.native_config()
             if auxiliary_thinking(native,cfg,model_options(cfg,native)):
                 self.write_config(native)
+            if cfg.get('company_instructions'):
+                from ai_agent.Hermes.chat.company import recall_context
+                cfg['company_instructions'] += recall_context(self, prompt)
             # Several upstream file/skill helpers use process cwd as their final fallback.
             # This worker owns a single active task, so pin all helpers to the selected workspace.
             os.chdir(cfg['workspace'])
@@ -311,9 +314,10 @@ class HermesWorker:
             toolsets = list(cfg['toolsets']) + ['mcp-' + name for name in get_registered_mcp_server_names()]
             if cfg.get('company_instructions'):
                 from ai_agent.Hermes.chat.company import register
-                register()
-                tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'platform_company'}
-                toolsets.extend(['platform_company', 'delegation'])
+                from ai_agent.Hermes.chat.web_search import register as register_web_search
+                register(); register_web_search()
+                tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'platform_company','web'}
+                toolsets.extend(['platform_company', 'delegation', 'web'])
             if cfg.get('read_only'):toolsets=['file']
             focused=cfg.get('application_context_scope')=='focused_discussion'
             if focused:toolsets=[]
@@ -367,6 +371,9 @@ class HermesWorker:
             if cfg.get('read_only'):
                 from ai_agent.Hermes.chat.read_only import bind as bind_read_only
                 bind_read_only(self.agent,cfg['workspace'],lambda reason:self.event('permission_denied',{'message':reason}),(request or {}).get('attachments',[]))
+            if cfg.get('company_instructions') and not cfg.get('read_only'):
+                from ai_agent.Hermes.chat.company import bind_git_approval
+                bind_git_approval(self, self.agent, prompt)
             with self.lock:
                 self.job['state'] = 'running'
             if self.stopping:

@@ -5,6 +5,55 @@ import re
 from contextlib import contextmanager
 
 
+def recall(db, command):
+    """Search existing organization tables; no new database, index or model call."""
+    query = str(command.get('query', ''))[:512].lower()
+    ignored = {'이어서', '계속', '이전', '지난번', '하던거', '진행', '작업', '해줘', '해주세요', '기억', '어디까지', '다시'}
+    words = [t for t in re.findall(r'[a-z0-9_가-힣]{2,}', query) if t not in ignored]
+    grams = [word[i:i+3] for word in words if re.fullmatch('[가-힣]{5,}',word) for i in range(len(word)-2)]
+    terms = list(dict.fromkeys(t for t in words+grams if t not in ignored))[:16]
+    scope = str(command.get('venture_id') or '')
+    if scope and not db.one('SELECT id FROM ventures WHERE id=?', (scope,)):
+        raise ValueError('사업안을 찾을 수 없습니다.')
+    job_scope = "COALESCE(NULLIF(json_extract(CASE WHEN json_valid(j.arguments) THEN j.arguments ELSE '{}' END,'$.venture_id'),''),'owner')"
+    note_meta = "CASE WHEN substr(origin,1,14)='hermes-native|' AND json_valid(substr(origin,15)) THEN substr(origin,15) ELSE '{}' END"
+    sources = f"""
+      SELECT 'venture' kind,id,id scope,name title,proposal_json body,status,created_at FROM ventures
+      UNION ALL SELECT 'job',j.id,{job_scope},j.title,COALESCE(j.error,'')||char(10)||COALESCE(j.result,''),j.status,j.created_at FROM jobs j
+      UNION ALL SELECT 'meeting',id,COALESCE(NULLIF(venture_id,''),'owner'),topic,summary,status,created_at FROM ceo_meetings
+      UNION ALL SELECT COALESCE(json_extract({note_meta},'$.kind'),'lesson'),id,
+        COALESCE(json_extract({note_meta},'$.scope'),'unscoped'),COALESCE(json_extract({note_meta},'$.key'),role),insight,'saved',created_at FROM ceo_lessons l WHERE substr(origin,1,14)<>'hermes-native|' OR NOT EXISTS (SELECT 1 FROM ceo_lessons newer WHERE newer.origin=l.origin AND newer.rowid>l.rowid)
+      UNION ALL SELECT 'experience',e.id,{job_scope},j.title,e.detail,e.outcome,e.created_at FROM ceo_experiences e JOIN jobs j ON j.id=e.job_id
+    """
+    def search(selected, limit=8):
+        filters, params = [], []
+        if selected:
+            filters.append("(scope=? OR (scope='owner' AND kind IN ('decision','constraint')))"); params.append(selected)
+        if terms:
+            filters.append('('+' OR '.join("instr(lower(title||' '||body),?)>0" for _ in terms)+" OR kind='constraint')")
+            params.extend(terms)
+        else:
+            filters.append("(kind IN ('decision','constraint','working','experience','venture') OR (kind='job' AND status IN ('running','queued','failed')))")
+        score = '+'.join("(instr(lower(title||' '||body),?)>0)" for _ in terms) or '(0+0)'
+        return db.many('WITH entries AS ('+sources+') SELECT kind,id,scope,title,status,created_at,substr(body,1,1200) body FROM entries WHERE '
+                       +' AND '.join(filters)+' ORDER BY '+score+' DESC,created_at DESC,id DESC LIMIT ?', tuple(params+terms+[limit]))
+    found = search(scope)
+    if not scope:
+        # One continuation stays in one business; organization-wide constraints still apply.
+        scoped = next((r['scope'] for r in found if r['scope'] not in ('owner','unscoped') and (not terms or any(t in (r['title']+' '+r['body']).lower() for t in terms))), '')
+        if scoped: scope=scoped; found=search(scope)
+        else: found=[r for r in found if r['scope'] in ('owner','unscoped')]
+    items, seen = [], set()
+    for row in found:
+        key=(row['kind'],row['scope'],row['title'])
+        if row['kind'] in ('decision','constraint','lesson') and key in seen: continue
+        seen.add(key)
+        items.append({**row,'body':row['body'][:420]})
+    result={'scope':scope or 'owner','terms':terms,'items':items,'source':'existing organization records'}
+    while len(json.dumps(result,ensure_ascii=False))>4200 and result['items']: result['items'].pop()
+    return result
+
+
 def install(app, data_root, activity=lambda delta: None):
     import database as db
     import server
@@ -43,6 +92,17 @@ def install(app, data_root, activity=lambda delta: None):
 
     def records(command, owner=False):
         action = command.get('action', 'overview')
+        if action == 'recall': return recall(db, command)
+        if action == 'remember':
+            kind = command.get('kind'); body = str(command.get('body', '')).strip()
+            if kind not in ('decision','constraint','experience','working') or not body or len(body)>1600:
+                raise ValueError('기억 종류와 1~1600자의 구체적인 근거가 필요합니다.')
+            scope = command.get('venture_id') or 'owner'
+            if scope != 'owner': venture(scope)
+            key = str(command.get('memory_key') or db.uid('topic'))[:80]
+            origin = 'hermes-native|' + json.dumps({'kind':kind,'scope':scope,'key':key},ensure_ascii=False)
+            db.record_lesson('CEO',body,origin,0)
+            return {'saved':True,'scope':scope,'kind':kind,'memory_key':key}
         if action == 'run_start':
             key = db.uid('job')
             with db.LOCK, db.connect() as c:
@@ -108,6 +168,7 @@ def install(app, data_root, activity=lambda delta: None):
             result, error = str(command.get('body', '')).strip(), str(command.get('error', '')).strip()
             if not result and not error: raise ValueError('실제 산출물·검증 근거나 실패 원인을 남기세요.')
             db.finish_job(row['id'], result, mode='hermes-native', error=error)
+            if not db.one('SELECT id FROM ceo_experiences WHERE job_id=?',(row['id'],)): db.record_experience(row['id'])
             return {'job_id': row['id'], 'status': 'failed' if error else 'completed', 'result': result, 'error': error}
         if action == 'meeting':
             key = db.uid('meeting'); minutes = command.get('minutes', [])

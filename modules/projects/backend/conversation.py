@@ -44,12 +44,22 @@ def call(key, payload, origin=None):
             'messages': history['messages']})
     if action == 'tool':
         native = record.get('workspace_ui', {}).get('native', {})
-        if not native.get('token') or not secrets.compare_digest(str(payload.get('token', '')), native['token']) or payload.get('session_id') != native_id:
+        session_id = payload.get('session_id')
+        if not native.get('token') or not secrets.compare_digest(str(payload.get('token', '')), native['token']):
             raise ValueError('회사 도구의 네이티브 세션 인증에 실패했습니다.')
+        if session_id != native_id:
+            if not isinstance(session_id,str) or not re.fullmatch('[A-Za-z0-9_-]{1,128}',session_id):
+                raise ValueError('회사 도구의 네이티브 세션 인증에 실패했습니다.')
+            # Additional manager conversations belong to this organization in
+            # the existing Hermes DB; the company secret alone cannot link one.
+            from ai_agent.Hermes.engine.bridge import bridge
+            session = bridge.call('session', {'id':session_id})['session']
+            if session.get('company_id') != key:
+                raise ValueError('회사 도구의 네이티브 세션 인증에 실패했습니다.')
         command = dict(payload.get('command', {}))
         if command.get('action') not in ('overview', 'recall', 'remember', 'propose', 'begin', 'finish', 'meeting', 'meeting_start', 'meeting_resume', 'meeting_proposal', 'meeting_read', 'meeting_turn', 'meeting_finish', 'run_start', 'run_finish') or '_owner' in command:
             raise ValueError('허용하지 않은 회사 도구 요청입니다.')
-        command['_session'] = native_id
+        command['_session'] = session_id
         return invoke('/api/admin/hermes/records', 'POST', command, token)
     if action == 'send':
         raise ValueError('AI 총괄은 Hermes 영구 세션의 chat/goal/loop를 사용합니다.')

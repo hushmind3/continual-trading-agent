@@ -81,3 +81,5 @@ macOS 실행: node-mcp는 같은 Hermes 전용 환경의 bin/python을 사용합
 builtin_packages와 detachment는 기존 run.py와 함께 실행 가능한 .command 진입점을 제공합니다. standalone_runner의 Mac setup은 같은 공통 설치기·Node/npm을 사용하고 Hermes Metal 실행기는 설치된 Homebrew 바이너리에 연결합니다. Mac engine.json에 Windows 공개 배포 해시가 없으면 그 키를 강제 조회하지 않습니다. 금융 CUDA·키움 환경은 Mac setup에서 설치 전에 거절합니다. 기존 Windows .cmd·공개 배포 해시 검사는 유지합니다.
 
 2026-10-22 공통 npm의 실제 버전 실행·수정 소스 구문을 확인했습니다. 기존 프로젝트를 다시 설치/내려받거나 분리·ZIP 생성하지 않았으므로 외부 앱 설치/배포 완주와 Finder GUI 조작은 미확인입니다. 공통 실행 경로 결과는 ../../../backend/README.md를 따릅니다.
+
+회사 도구 인증은 앱 비밀 토큰과 Hermes의 실제 회사 연결을 함께 검증합니다. conversation.py는 고정 대표 세션 외의 새 총괄 대화도 같은 company_id일 때 허용하고, 업무 기록은 실제 세션별로 소유하게 합니다. 일반 대화를 회사 세션으로 취급하거나 임의 session_id를 신뢰하지 않습니다. 관련 실제 확인은 integrations/README.md를 따릅니다.

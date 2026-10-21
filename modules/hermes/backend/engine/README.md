@@ -56,3 +56,5 @@ ChatGPT device-code 로그인이 진행 중인 worker도 재시작에서 보호�
 
 ## macOS 런타임
 locations.py는 macOS에서 모듈 .venv/bin/python을 선택합니다. setup.py는 같은 upstream 잠금의 darwin-arm64/x64 드라이버와 SHA-256을 사용하고 tar.gz를 안전하게 해제합니다. worker.py는 기존 공유 위치의 llama-server를 사용합니다. Mac 설치는 Homebrew Metal 실행기를 이 위치에 연결하며 모델·문맥·Thinking 설정은 유지합니다. 로컬 목록은 저장한 실제 GGUF의 폴더를 우선하고 프로젝트 모델 폴더/기존 바탕화면 폴더 순으로 찾습니다. GUI 도구의 macOS 접근성/화면 기록 권한과 실제 조작은 별도 확인 대상입니다.
+
+macOS 자원 설정(2026-10-21): worker.py는 CPU 스레드 2개 고정을 적용하지 않고 llama.cpp의 자동 선택 및 LLAMA_ARG_THREADS/THREADS_BATCH 환경변수를 사용합니다. 별도 호스트 프롬프트 캐시는 물리 RAM의 1/16(최소 256·최대 8,192 MiB)로 제한합니다. 16GB Mac에서는 1,024 MiB이며 LLAMA_ARG_CACHE_RAM 명시값은 우선합니다. 이는 [원본 host-memory prompt cache](https://github.com/ggml-org/llama.cpp/pull/16391)의 별도 RAM 보관 상한으로, 사용자의 모델 문맥·Thinking·Q8 KV·현재 슬롯의 프롬프트 재사용은 바꾸지 않습니다. 서로 다른 긴 대화 사이의 캐시 보존량은 줄 수 있으며 첫 요청의 입력 처리는 생략되지 않습니다. 재시도 루프·모델 품질 문제를 이 설정으로 해결했다고 보지 않습니다.

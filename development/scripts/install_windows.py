@@ -5,6 +5,7 @@ from module_sources import install as install_sources
 ROOT=Path(__file__).resolve().parents[2]
 
 def environment(directory,requirements,constraints=None,gpu=False):
+ if gpu and sys.platform=='darwin':raise RuntimeError('CUDA 전용 요구사항은 macOS에 설치하지 않습니다.')
  target=ROOT/directory;python=target/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
  if not python.is_file():venv.EnvBuilder(with_pip=True,system_site_packages=False).create(target)
  if 'include-system-site-packages = true' in (target/'pyvenv.cfg').read_text(encoding='utf8'):

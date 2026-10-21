@@ -598,11 +598,19 @@ class HermesWorker:
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
+        # Apple Silicon shares RAM with Metal. Bound the extra host prompt cache,
+        # independently of the user's context/KV cache, and let llama.cpp select cores.
+        runtime_args = ['--threads', '2', '--threads-batch', '2']
+        if sys.platform == 'darwin':
+            import psutil
+            memory_mib = psutil.virtual_memory().total // (1024 * 1024)
+            cache_mib = max(256, min(8192, memory_mib // 16))
+            runtime_args = [] if 'LLAMA_ARG_CACHE_RAM' in os.environ else ['--cache-ram', str(cache_mib)]
         self.model_log = (HOME / 'local-model.log').open('a', encoding='utf-8')
         self.model_process = subprocess.Popen(
             [str(executable), '--model', str(path), '--host', '127.0.0.1', '--port', str(port),
              '--n-gpu-layers', 'auto', '--ctx-size', str(context_length or 0), '--parallel', '1',
-             '--threads', '2', '--threads-batch', '2',
+             *runtime_args,
              '--checkpoint-min-step', os.environ.get('LLAMA_ARG_CHECKPOINT_MIN_SPACING_NT', '1024'),
              '-fa', 'on', '-ctk', 'q8_0', '-ctv', 'q8_0',
              '--jinja', '--alias', alias],

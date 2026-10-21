@@ -29,7 +29,7 @@ class AppWorker:
         if spec['kind'] == 'node-mcp':
             from .node_mcp import command
             from platform_modules import ROOT
-            python = ROOT / 'modules/hermes/.venv/Scripts/python.exe'
+            python = ROOT / 'modules/hermes/.venv' / ('Scripts/python.exe' if os.name=='nt' else 'bin/python')
             if not python.is_file(): raise ValueError('공유 MCP Python 실행 환경이 없습니다.')
             arguments = [str(python), '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('mcp_worker.py')), json.dumps(command(source, spec))]
         elif spec['kind'] == 'node-http':
@@ -123,7 +123,7 @@ def invoke(record, payload, origin=None):
         key = record['id']
         with LOCK:
             worker = WORKERS.get(key)
-            if worker and worker.source != str(source): worker.close(); worker = None
+            if worker and (worker.source != str(source) or worker.process.poll() is not None): worker.close(); worker = None
             if worker is None:
                 from .workspaces import adapter
                 from .store import project_folder

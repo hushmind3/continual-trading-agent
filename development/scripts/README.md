@@ -44,3 +44,8 @@ npm은 루트 workspace 설치를 사용합니다. REA install()은 modules/rea�
 verify_windows_installer.cjs: 기존 pluto-re의 원본 Windows 설치기 자동 탐지와 한국어 옵션 UI를 확인합니다. 원본 스크립트를 빈 검사 경로에서 호출해 필수 게임 누락 오류가 화면에 나오는지만 확인하고 다운로드·사용자 게임 변경은 하지 않습니다. 브라우저 오류·390px 가로 넘침을 검사하고 검사 경로/실행 상태는 정리합니다. 실제 게임 설치는 사용자 게임 경로가 필요합니다.
 
 verify_automatic_ui.cjs: UI/설명 파일 없는 일반 Python CLI 검사 소스에서 실행 유형을 자동 추출해 앱 파일 설치 경로를 실행하고 2개 명령의 생성 UI·원본 실행/결과 파일·등록 코드만 존재함·모바일 화면을 확인합니다. 별도 앱 UI를 만들거나 사용자 모델/GitHub 다운로드를 사용하지 않습니다. 성공/준비 실패 모두 소유 임시 폴더 경계를 확인해 정리합니다. 결과 runtime/projects/manage/verification/automatic-ui.json입니다.
+
+## macOS 실행
+담당: 기존 단일 API·서버 감시기의 macOS 실행. 루트 `설치.command`는 Python 3.14·uv·Node와 공식 Homebrew llama.cpp를 사용하고, `서버켜기.command`는 같은 start_server.py를 --apply-only로 실행해 화면을 엽니다. 금융 운영은 자동 시작하지 않습니다. 설치 로직은 기존 install_windows.py를 운영체제에 따라 재사용합니다. Mac에서는 플랫폼·Hermes·REA 환경을 설치하고 Windows CUDA·키움 패키지는 설치하지 않습니다.
+
+Python은 bin/python, 서버 잠금은 fcntl, 포트 소유권은 lsof로 확인합니다. 서버/감시기는 터미널과 분리해 유지합니다. 호스트는 APIRoute 직접 등록과 호환되는 FastAPI 0.115.14를 사용합니다. 새 버전의 지연 include_router가 메뉴를 누락시키므로 호스트 요구사항에서 버전을 고정했습니다. 실제 실행 결과와 남은 범위는 루트 README를 봅니다.

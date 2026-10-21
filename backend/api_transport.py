@@ -25,7 +25,8 @@ class UnifiedAPI:
             if received:return await receive()
             received=True
             return {'type':'http.request','body':body,'more_body':False}
-        await route.handle(forwarded,payload,send)
+        # Preserve lifecycle state added by the actual FastAPI request after dispatch.
+        await route.handle({**scope,**forwarded},payload,send)
 
 
 async def local_writes(request: Request, call_next):

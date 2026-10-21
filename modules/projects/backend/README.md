@@ -72,3 +72,5 @@ workspace/connect는 설치 모듈의 workspace_host를 기록해 별도 실행 
 회사 이름 투영: company-v1의 기존 JSON 응답은 runtime.py에서 Hermes의 현재 개별 프롬프트 이름으로 투영합니다. 직원 참조는 불변 staff_id로 이관하고 자연어 기록 원문은 보존하며 설정·회의·회사 카드·업무 필터에는 같은 표시 이름을 사용합니다. workspace_embed.js는 기존 카드 자식 구조를 보존하고 이름 요소만 갱신합니다. 새 DB·추가 서버·재설치는 없습니다.
 
 사업 진행 응답은 폐기된 고정 상점 brand 값을 노출하지 않습니다. 승인 사업과 실제 빌드 파일로 결과물 이름·준비 상태를 표시하며, 실제 서비스 여부는 산출물 실행 확인과 구분합니다.
+
+macOS 실행: node-mcp는 같은 Hermes 전용 환경의 bin/python을 사용합니다. 복사된 Windows wheel은 macOS에서 실행할 수 없으므로 해당 앱 .platform-runtime/python 패키지를 Mac용으로 설치해야 합니다. 원본 소스·DB·제품을 재설치하지 않습니다. runtime.py는 종료된 앱 worker를 다음 요청에서 다시 생성해 패키지 복구 뒤에도 이전 오류가 계속 남는 현상을 방지합니다.

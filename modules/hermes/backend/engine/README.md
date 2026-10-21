@@ -53,3 +53,6 @@ ChatGPT device-code 로그인이 진행 중인 worker도 재시작에서 보호�
 진행 이벤트는 긴 인수의 값/목록만 축약하고 유효한 JSON을 유지합니다. 문자열 중간 절단으로 도구 표시를 파싱하지 못하던 경로를 수정했으며 전체 실행 기록은 SessionDB에 보존합니다. 위임의 staff_id는 개별 task 값을 우선하고 공통 식별자는 묶음의 기본값으로 사용합니다. 선행 산출물이 필요한 검증은 결과를 받은 후 별도로 위임합니다.
 
 조직 실행에 기존 project_npm 도구도 직접 노출합니다. 실제 9B가 이를 쉘 명령으로 오인하거나 terminal의 장기 서버 판정에 vite build가 차단돼 확인을 반복한 근거가 있습니다. 기존 전용 도구로 빌드 명령·완료 코드·receipt를 반환하며 모델별 하드코딩은 추가하지 않습니다.
+
+## macOS 런타임
+locations.py는 macOS에서 모듈 .venv/bin/python을 선택합니다. setup.py는 같은 upstream 잠금의 darwin-arm64/x64 드라이버와 SHA-256을 사용하고 tar.gz를 안전하게 해제합니다. worker.py는 기존 공유 위치의 llama-server를 사용합니다. Mac 설치는 Homebrew Metal 실행기를 이 위치에 연결하며 모델·문맥·Thinking 설정은 유지합니다. 로컬 목록은 저장한 실제 GGUF의 폴더를 우선하고 프로젝트 모델 폴더/기존 바탕화면 폴더 순으로 찾습니다. GUI 도구의 macOS 접근성/화면 기록 권한과 실제 조작은 별도 확인 대상입니다.

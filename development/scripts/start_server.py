@@ -12,7 +12,16 @@ sys.path.insert(0,str(ROOT/'backend'))
 sys.path.insert(1,str(Path(__file__).resolve().parent))
 from platform_state_io import read_json,atomic_json
 APPLY=RUNTIME/'apply.json';APPLIED=RUNTIME/'applied-sources.json'
-HOST_PYTHON=str(ROOT/'.venv/platform/Scripts/python.exe')
+HOST_PYTHON=str(ROOT/'.venv/platform'/('Scripts/python.exe' if os.name=='nt' else 'bin/python'))
+
+def lock_file(handle,release=False):
+    handle.seek(0)
+    if os.name=='nt':
+        import msvcrt
+        msvcrt.locking(handle.fileno(),msvcrt.LK_UNLCK if release else msvcrt.LK_NBLCK,1)
+    else:
+        import fcntl
+        fcntl.flock(handle,fcntl.LOCK_UN if release else fcntl.LOCK_EX|fcntl.LOCK_NB)
 
 
 def same_path(left,right):
@@ -27,6 +36,14 @@ def classify(process):
 
 def listeners(port):
     records=[]
+    if sys.platform=='darwin':
+        result=subprocess.run(['lsof','-nP',f'-iTCP:{port}','-sTCP:LISTEN','-t'],capture_output=True,text=True)
+        if result.returncode not in (0,1):raise RuntimeError(result.stderr.strip() or '포트 소유권 확인 실패')
+        for pid in set(result.stdout.split()):
+            process=psutil.Process(int(pid));kind=classify(process)
+            if kind is None:raise RuntimeError(f'{port} 포트는 이 프로젝트 서버가 아닙니다. PID {pid}; 종료하지 않았습니다.')
+            records.append((process.pid,process.create_time(),kind))
+        return records
     for connection in psutil.net_connections(kind='tcp'):
         if connection.status!=psutil.CONN_LISTEN or connection.laddr.port!=port:continue
         if connection.pid is None:raise RuntimeError(f'{port} 포트 소유권 확인 실패')
@@ -45,7 +62,7 @@ def stop_verified(record):
         for child in process.children(recursive=True):
             try:
                 command=child.cmdline();executable=Path(command[0]).resolve() if command else None
-                if executable and executable.name.lower()=='llama-server.exe' and executable.is_relative_to((ROOT/'runtime').resolve()):
+                if executable and executable.name.lower() in ('llama-server.exe','llama-server') and executable.is_relative_to((ROOT/'runtime').resolve()):
                     child_created=child.create_time()
                     if child.ppid()==pid and abs(psutil.Process(child.pid).create_time()-child_created)<.01:
                         child.terminate();child.wait(timeout=5)
@@ -74,18 +91,17 @@ def ready():
 
 @contextmanager
 def startup_lock():
-    import msvcrt
     RUNTIME.mkdir(parents=True,exist_ok=True)
     with (RUNTIME/'server-start.lock').open('a+b') as handle:
         if handle.tell()==0:handle.write(b'.');handle.flush()
         deadline=time.monotonic()+60
         while True:
-            try:handle.seek(0);msvcrt.locking(handle.fileno(),msvcrt.LK_NBLCK,1);break
+            try:lock_file(handle);break
             except OSError:
                 if time.monotonic()>=deadline:raise RuntimeError('다른 변경 적용 작업이 진행 중입니다.')
                 time.sleep(.1)
         try:yield
-        finally:handle.seek(0);msvcrt.locking(handle.fileno(),msvcrt.LK_UNLCK,1)
+        finally:lock_file(handle,release=True)
 
 
 def sources():
@@ -157,7 +173,7 @@ def ensure_watchdog():
     with (RUNTIME/'server-watchdog.log').open('ab') as output:
         try:
             subprocess.Popen(command,cwd=ROOT,stdin=subprocess.DEVNULL,stdout=output,stderr=output,
-                creationflags=flags|getattr(subprocess,'CREATE_BREAKAWAY_FROM_JOB',0))
+                creationflags=flags|getattr(subprocess,'CREATE_BREAKAWAY_FROM_JOB',0),start_new_session=os.name!='nt')
         except OSError as exc:
             if getattr(exc,'winerror',None)!=5:raise
             subprocess.Popen(command,cwd=ROOT,stdin=subprocess.DEVNULL,stdout=output,stderr=output,creationflags=flags)
@@ -247,7 +263,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                 for record in current:stop_verified(record)
                 env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_APPLY_ID=operation['id'])
                 with (RUNTIME/'server.stdout.log').open('ab') as output,(RUNTIME/'server.stderr.log').open('ab') as errors:
-                    child=subprocess.Popen([HOST_PYTHON,'-m','uvicorn','web_api:app','--host','127.0.0.1','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+                    child=subprocess.Popen([HOST_PYTHON,'-m','uvicorn','web_api:app','--host','127.0.0.1','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),start_new_session=os.name!='nt')
                 for _ in range(100):
                     if child.poll() is not None:raise RuntimeError('서버 시작 실패: runtime/platform/server.stderr.log')
                     if ready():break

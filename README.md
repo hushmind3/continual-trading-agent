@@ -24,3 +24,10 @@ npm 루트 workspace는 플랫폼 frontend만 관리합니다. REA의 Node 패�
 메뉴·API는 `modules/<id>/module.json`에서 자동 등록하며 중앙 코드에 기능별 import를 추가하지 않습니다. 지원 Node 백엔드는 동일 IPC 규격으로 연결할 수 있지만 OpenClaw 원본 설치·어댑터는 아직 수행하지 않았습니다.
 
 현재는 금융·REA·Hermes의 소스·패키지 분리와 플랫폼 안에서의 폴더 탈착을 확인했습니다. 금융·REA·Hermes는 프로젝트 관리의 독립 실행 소스 내보내기로 필요한 공통 코드 복사본과 설치/실행 진입점을 묶을 수 있습니다. 원래 플랫폼 경로 없이 선택 모듈만 실행하는 소스 배포이며, 시스템 Python/Node/Git·외부 모델/인증은 별도 전제입니다. 다른 PC 신규 설치와 전체 업무 실행은 미확인입니다. 외부 앱의 지원 형식 ZIP과 기본 모듈의 소스 배포 ZIP은 형식이 다릅니다. 현재 검증과 남은 작업의 기준은 [모듈 안내](modules/README.md), 기능별 결과는 각 소메뉴 README입니다. 조사·검사 문서의 과거 결과는 해당 날짜와 조건에만 적용합니다.
+
+## macOS에서 이어서 실행
+담당: Windows에서 옮긴 기존 플랫폼·Hermes·회사 데이터를 Mac에서 사용하는 진입점입니다. `서버켜기.command`를 더블클릭하면 기존 단일 API와 Hermes 화면을 엽니다. 최초 의존성 준비는 `설치.command`이며 Python 3.14·uv·Node.js·Homebrew가 필요합니다. 기존 install_windows.py가 운영체제에 맞춰 환경을 준비하므로 별도 하네스·DB를 만들지 않습니다.
+
+Mac의 모델은 사용자 지정 프로젝트 `모델/`에 있으며 원본 GGUF를 그대로 사용합니다. Windows Python 실행파일·wheel·CUDA 바이너리는 Mac용으로 다시 준비해야 합니다. 설정의 옛 절대경로는 실제 Mac 경로로 옮겼고 원본 제어 설정은 runtime/platform/migration-backup에 보존했습니다. 대화·회사 DB의 과거 기록은 삭제하거나 새 DB로 바꾸지 않았습니다.
+
+2026-10-21 실제 확인: Mac의 8766 React·단일 API, 기존 Hermes 대화 조회, 회사/회의 탭 표시, Ornith 9B의 Apple M5 GPU 적재(65,536 문맥·Thinking on), 기존 총괄 세션의 실제 응답 완료. 금융 CUDA·키움 환경은 Mac에 설치하지 않았으며 시세·학습·주문, 직원 회의/제품 제작 전체, GUI 컴퓨터 조작은 이번 이전에서 확인하지 않았습니다. 금융 모델 파일은 보존돼 있지만 해당 기능까지 Mac 동작 완료로 표시하지 않습니다.

@@ -57,3 +57,5 @@ menu_registry.catalog는 한 모듈의 actions 조회 실패를 module_errors에
 재현/회귀: development/tests/test_host_resilience.py. 실제 운영 로그에서 메뉴 조회의 RuntimeError가 전체 상태 API까지 전파되던 경로를 확인했고, 나머지 오류·복구 조건은 업무 모듈 대신 검사 훅/임시 폴더로 재현합니다. 검사에서 사용자 모델·시세·학습·매매는 실행하지 않습니다.
 
 2026-10-18 확인: 신규 오류 재현 8개는 수정 전 모두 실패했고 수정 후 관련 호스트/프로세스/등록/감시/프로젝트 수명주기 검사 총 35개가 통과했습니다. 8766에 적용한 뒤 health·등록 모듈 5개 available·상태/카탈로그 오류 없음·실행 차단 작업 없음까지 확인했습니다. 실제 금융 시세·학습·추론·주문 전체 회귀는 이번 점검에서 실행하지 않았습니다. 현재 서버 확인 자료는 runtime/platform/verification/host-resilience.json입니다.
+
+macOS 호스트도 같은 `/api`와 모듈 등록을 사용합니다. api_transport.UnifiedAPI는 전달 시점의 실제 scope를 병합해 FastAPI 수명주기 상태를 유지합니다. 호스트 FastAPI 버전은 development/scripts/requirements/platform.txt에 고정하며, 모듈 전용 패키지 환경과 분리합니다. Mac 실행과 확인 범위는 루트 README를 봅니다.

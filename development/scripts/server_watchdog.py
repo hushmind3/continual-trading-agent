@@ -9,7 +9,7 @@ from pathlib import Path
 
 import psutil
 
-from start_server import ROOT,RUNTIME,PORT,ready,listeners,main,blockers,api
+from start_server import ROOT,RUNTIME,PORT,ready,listeners,main,blockers,api,lock_file
 from platform_modules import signature
 from platform_state_io import read_json,atomic_json
 
@@ -46,12 +46,11 @@ def modules_changed(desired,previous):
 
 
 def supervise():
-    import msvcrt
     RUNTIME.mkdir(parents=True,exist_ok=True)
     with (RUNTIME/'server-watchdog.lock').open('a+b') as lock:
         if lock.tell()==0:lock.write(b'.');lock.flush()
         lock.seek(0)
-        try:msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+        try:lock_file(lock)
         except OSError:return
         record={'pid':os.getpid(),'process_created':psutil.Process().create_time(),
             'status':'running','started_at':time.time(),'restarts':0,'last_error':'',
@@ -91,7 +90,7 @@ def supervise():
                     time.sleep(1)
         finally:
             record.update(status='stopped',stopped_at=time.time());atomic_json(record,STATUS)
-            lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_UNLCK,1)
+            lock_file(lock,release=True)
 
 
 if __name__=='__main__':supervise()

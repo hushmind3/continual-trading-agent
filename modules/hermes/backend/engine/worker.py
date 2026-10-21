@@ -35,7 +35,7 @@ for _browser in (Path('C:/Program Files/Google/Chrome/Application/chrome.exe'),
     if _browser.is_file():
         os.environ.setdefault('AGENT_BROWSER_EXECUTABLE_PATH', str(_browser))
         break
-_driver = ROOT / 'runtime/ai_agent/Hermes/tools/cua-driver/cua-driver.exe'
+_driver = ROOT / 'runtime/ai_agent/Hermes/tools/cua-driver' / ('cua-driver.exe' if os.name=='nt' else 'cua-driver')
 if _driver.is_file():
     os.environ['HERMES_CUA_DRIVER_CMD'] = str(_driver)
 sys.path.insert(0, str(UPSTREAM))
@@ -588,7 +588,7 @@ class HermesWorker:
         path = Path(str(request.get('path') or '')).expanduser().resolve()
         if not path.is_file() or path.suffix.lower() != '.gguf':
             raise ValueError('존재하는 GGUF 모델 파일을 선택하세요. 다른 형식은 해당 모델 실행기의 API 주소를 연결하세요.')
-        executable = ROOT / 'runtime/shared/engines/llama.cpp/llama-server.exe'
+        executable = ROOT / 'runtime/shared/engines/llama.cpp' / ('llama-server.exe' if os.name=='nt' else 'llama-server')
         if not executable.is_file():
             raise ValueError('설치된 llama-server 실행기를 찾을 수 없습니다.')
         alias = path.parent.name if path.stem.upper() in {'GGUF', 'MODEL'} else path.stem
@@ -684,7 +684,8 @@ class HermesWorker:
             with self.model_client(payload) as client:
                 return {'models': [{'id': row.id} for row in client.models.list().data]}
         if operation == 'models/local':
-            model_root = Path.home() / 'Desktop/모델'
+            selected = Path(str(load_settings().get('local_model') or '')).expanduser()
+            model_root = selected.parent if selected.is_file() else (ROOT/'모델' if (ROOT/'모델').is_dir() else Path.home()/'Desktop/모델')
             return {'root': str(model_root), 'models': [{'path': str(path), 'name': path.relative_to(model_root).as_posix(), 'bytes': path.stat().st_size}
                 for path in sorted(model_root.rglob('*.gguf')) if path.is_file()] if model_root.is_dir() else []}
         if operation == 'model/load': return self.load_model(payload)

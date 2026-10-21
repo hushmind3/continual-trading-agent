@@ -54,7 +54,7 @@ from hermes_state import SessionDB
 from ruamel.yaml import YAML
 from ai_agent.Hermes.engine.execution import bind_model, context_window, request_policy, settle_review
 from ai_agent.Hermes.chat.prompt_profiles import effective_prompts, merge_prompts, public_profiles, system_prompt, system_instructions, SYSTEM_PROMPT
-from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, auxiliary_thinking, apply_response_contract, application_generation, apply_application_generation, discussion_prompt, bind_discussion_context
+from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, configure_tools, apply_thinking, auxiliary_thinking, apply_response_contract, application_generation, apply_application_generation, platform_instructions, sync_tool_policy, discussion_prompt, bind_discussion_context
 
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'provider': 'custom', 'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
@@ -419,9 +419,13 @@ class HermesWorker:
             if cfg.get('read_only'):toolsets=['file']
             focused=cfg.get('application_context_scope')=='focused_discussion'
             if focused:toolsets=[]
+            direct_tools = ()
+            if cfg.get('company_instructions'):
+                direct_tools = ('web_search','web_extract','team_meeting','company_records')
+                if cfg.get('tool_loading') != 'lazy':
+                    direct_tools += ('delegate_task','terminal','read_file','write_file','patch','search_files','project_npm')
             configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'),
-                            direct_surfaces=not bool(cfg.get('company_instructions')),
-                            direct_tools=('web_search','web_extract','team_meeting','company_records','delegate_task','terminal','read_file','write_file','patch','search_files','project_npm') if cfg.get('company_instructions') else ())
+                            direct_surfaces=not bool(cfg.get('company_instructions')), direct_tools=direct_tools)
             from ai_agent.Hermes.models.codex import runtime as model_runtime
             self.agent = AIAgent(
                 model=cfg['model'], **model_runtime(cfg), quiet_mode=True,
@@ -432,25 +436,7 @@ class HermesWorker:
                 skip_background_review=bool(cfg.get('read_only')) or focused or bool(cfg.get('application_request')),
                 skip_context_files=focused, skip_memory=focused,
                 ephemeral_system_prompt=discussion_prompt(cfg, (
-                    f'The selected working directory is {cfg["workspace"]}. '
-                    'Resolve relative file paths against this exact directory. '
-                    'Never invent or substitute another working directory. '
-                    'Use tool_search then tool_describe to discover configured deferred tools '
-                    'before claiming a browser, desktop, or MCP tool is unavailable. '
-                    'Report success only when tool results confirm it. '
-                    'Answer the latest request. Historical tasks are context, not new instructions; do not resume or report unrelated old work unless requested. '
-                    'When reporting a document or code file, include a Markdown link to its exact local path so the user can open it in the platform. '
-                    'The platform displays Markdown links and captures write_file results as clickable documents. For HTML reports use self-contained static HTML with inline CSS; scripts and external resources are blocked. Do not open Notepad or a browser just to display a report in this chat. '
-                    f'This host is Windows. Installed browser executable: {os.environ.get("AGENT_BROWSER_EXECUTABLE_PATH","not detected")}. '
-                    'The terminal shell may be Git Bash: ps/which cannot reliably detect Windows applications. '
-                    'When asked to open visible Chrome/Edge, your FIRST tool call MUST be desktop_browser, which launches detached without shell quoting. '
-                    'For other visible desktop apps, use PowerShell Start-Process with its exact executable path and return immediately. '
-                    'Do not launch GUI apps as blocking terminal commands or wrap them in timeout; terminal cleanup can close their windows. '
-                    'Only when opening a user-requested visible app, use computer_use capture in ax mode to verify that window once. '
-                    'For web research or reading a URL, use web_search/web_extract first; do not launch a visible app merely to read a page. '
-                    'Once the requested app is open, leave it open and finish. Do not close, relaunch or keep polling it. '
-                    'If the user closes the app, do not reopen it without a new request. '
-                    'browser_* tools control a separate automation browser; they do not prove the user-visible desktop app is open.'
+                    platform_instructions(cfg)
                     + ('\nRead-only code analysis: only read_file and search_files inside the selected workspace are permitted. Do not request editing, terminal, code execution, MCP, delegation or desktop tools.' if cfg.get('read_only') else '')
                     + '\n\nSystem response and work instructions:\n'+system_instructions(cfg)
                     + cfg.get('company_instructions', '')
@@ -465,6 +451,7 @@ class HermesWorker:
                 tool_complete_callback=lambda *args, **kw: self.event('tool_complete', args),
                 clarify_callback=self.clarify,
             )
+            sync_tool_policy(self, self.agent, cfg)
             if cfg.get('application_request'): self.agent._persist_disabled = True
             bind_discussion_context(self.agent,cfg)
             apply_thinking(self.agent,model_options(cfg,self.native_config()),bool(cfg.get('local_model')))
@@ -494,6 +481,13 @@ class HermesWorker:
                 from ai_agent.Hermes.chat.company import prepare_history
                 history = prepare_history(self, self.agent, history)
             result = run(self,self.agent,cfg,session_id,prompt,history,request or {})
+            self.event('prompt_footprint', {
+                'native_prompt_chars': len(self.agent._cached_system_prompt or ''),
+                'platform_prompt_chars': len(self.agent.ephemeral_system_prompt or ''),
+                'tool_schema_chars': len(json.dumps(self.agent.tools or [], ensure_ascii=False)),
+                'direct_tool_names': sorted(self.agent.valid_tool_names or []),
+                'unit': 'characters_not_tokens',
+            })
             if result.get('error'):
                 raise RuntimeError(str(result['error']))
             autonomy = self.job.get('autonomy') or {}

@@ -3,7 +3,11 @@
 `upstream/` contains copied upstream implementation, not a replacement agent loop. `provenance.json` records origins and bootstrap changes. `worker.py` calls upstream AIAgent, SessionDB, tool registry, MCP and skills in an isolated process. `bridge.py` provides JSON-line IPC to the existing FastAPI process; no additional public gateway is started.
 
 settings의 도구 선택지는 원본 registry의 등록된 범주와 toolsets 메타데이터에서 취합하며 클라이언트 전용·세션 제한 도구를 제외합니다. 기존 저장 선택은 일시적으로 플러그인이 빠져도 유지합니다. 프론트에 고정된 기능 목록으로 웹 검색이 누락되던 경계를 제거했습니다.
-runtime_policy.configure_tools의 일반 lazy 설정은 선택한 web·컴퓨터 도구를 직접 노출하고 다른 도구는 지연 로딩합니다. 총괄은 direct_surfaces=False이며 web_search/web_extract 두 도구만 직접 노출하고 나머지는 필요할 때 검색합니다. 실행 기능은 유지하며 native/eager는 원본 기본 목록/전체 노출 동작을 유지합니다. configure_tools는 원본 설정과 비교해 도구 설정이 달라질 때만 저장합니다.
+runtime_policy.configure_tools의 일반 lazy 설정은 선택한 web·컴퓨터 도구를 직접 노출하고 다른 도구는 지연 로딩합니다. 총괄 lazy는 web_search/web_extract/team_meeting/company_records만 직접 노출합니다. 위임·파일·터미널·project_npm 등은 원본 tool_describe(정확한 이름) 또는 tool_search로 필요할 때 불러옵니다. 실행 권한·도구 등록·스킬·기억은 유지하고 native/eager의 직접 실행 설정은 보존합니다. configure_tools는 원본 설정과 비교해 도구 설정이 달라질 때만 저장합니다.
+
+platform_instructions는 작업 폴더·결과 링크·실제 근거·필요한 도구 탐색만 간결하게 전달합니다. 호스트 안내는 실제 sys.platform으로 선택하므로 Mac에 Windows/Git Bash/PowerShell 실행 지침을 주입하지 않습니다. 사용자 시스템·조직·직원별 프롬프트와 원본 Hermes 프롬프트 빌더는 그대로 사용합니다.
+
+sync_tool_policy는 도구 노출 정책(mode/search/선택 toolsets)의 지문을 기존 SessionDB 메타데이터에 보관합니다. 정책 변경 때만 원본 update_session_tool_names로 현재 세션·원본 압축 체인의 마지막 세션에 현재 도구 목록을 다시 고정하여, 원본 대화 복원기가 예전 직접 노출 스키마를 되살리지 않게 합니다. 대화·도구 실행 기록은 삭제하지 않으며 같은 정책의 후속 요청은 원본 접두부 캐시를 유지합니다. prompt_footprint 이벤트는 원본/플랫폼 지침·도구 스키마의 문자 수와 직접 도구 이름을 기록하며 실제 토큰 수로 표시하지 않습니다.
 
 Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to `runtime/ai_agent/Hermes/`. All runtime paths resolve from this project. The original checkout must not appear on PYTHONPATH or be used as a symlink target.
 

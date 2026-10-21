@@ -125,6 +125,51 @@ def apply_application_generation(agent, options):
         agent.request_overrides = {**(getattr(agent,'request_overrides',{}) or {}),'temperature':options['temperature']}
 
 
+def sync_tool_policy(worker, agent, cfg):
+    """Refresh a native session's schema pin only when its exposure policy changes."""
+    if not cfg.get('company_instructions') or cfg.get('application_request'):
+        return
+    import hashlib
+    import json
+    from tools.mcp_tool_agent import tool_pin_version
+    policy = {'mode': cfg.get('tool_loading', 'native'),
+              'search': worker.native_config().get('tools', {}).get('tool_search', {}),
+              'enabled': sorted(agent.enabled_toolsets or []),
+              'disabled': sorted(agent.disabled_toolsets or [])}
+    signature = hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest()
+    tip = worker.db.get_compression_chain(agent.session_id)[-1]
+    if worker.db.get_session_model_config_value(tip, '_platform_tool_policy') == signature:
+        return
+    # The native conversation runner restores this pin AFTER constructing AIAgent.
+    # Re-pin the freshly derived surface before it can resurrect an older eager list.
+    pin = {'version': tool_pin_version(), 'tools': agent.tools or []}
+    for session_id in {agent.session_id, tip}:
+        worker.db.update_session_tool_names(session_id, pin)
+    worker.db.update_conversation_model_config_value(agent.session_id, '_platform_tool_policy', lambda previous: signature)
+    worker.event('tool_policy_updated', {'mode': policy['mode'], 'direct_tools': len(agent.tools or [])})
+
+
+def platform_instructions(cfg):
+    """Small platform contract; native Hermes supplies tools, memory and host context."""
+    import sys
+    host = ('Windows: visible apps use detached launch; Git Bash cannot reliably inspect Windows apps.'
+            if sys.platform == 'win32' else
+            'macOS: use native macOS tools; Windows/PowerShell commands do not apply.'
+            if sys.platform == 'darwin' else
+            'Use the native host tools and shell.')
+    return (
+        f'Working directory: {cfg["workspace"]}. Resolve relative paths here. '
+        'Answer the current request; past tasks are context, not fresh instructions. '
+        'Deferred tools remain available: use tool_describe for a known name, otherwise tool_search. '
+        'Only claim outcomes confirmed by tool results. '
+        'Link local documents with their exact Markdown path. HTML previews require static, self-contained HTML; no scripts/external assets. '
+        'For web research use web_search/web_extract. Open visible apps only when requested, '
+        'launch detached, verify once, then leave them open; never reopen an app the user closed. '
+        'Automation browser tools do not verify a visible desktop window. '
+        + host
+    )
+
+
 def discussion_prompt(cfg, normal):
     if cfg.get('application_context_scope') != 'focused_discussion':return normal
     return ('You are performing the supplied application role, not a repository development task. '

@@ -84,14 +84,12 @@ def prepare(worker, cfg, session, workspace=None):
     names = staff_names(cfg)
     roster = ', '.join(name+' (내부 ID: '+key+')' for key, name in names.items() if key != 'common')
     return ('\n'+staff_prompt(cfg, manager_id(cfg))+'\n[현재 조직과 도구 연결]\n'+roster+'\n'
-            '직원 고유 ID는 도구 인수와 데이터 연결에만 사용하고 보고에는 위 표시 이름을 사용하세요. '
-            '이름만 부른 것은 보고나 실행 지시가 아닙니다. 과거 대화는 새 지시가 아니며 요청하지 않은 옛 업무를 재개하지 마세요. '
-            '회의는 team_meeting start로 현재 안건을 등록하고 speak로 필요한 직원의 실제 검토를 받아 finish로 결론과 필요한 proposal을 제출하세요. 기존 ID가 있으면 같은 회의를 재개하세요. 대표에게 진행·참석·발언 순서를 묻지 마세요. '
-            '독립 실행을 위임할 때는 delegate_task의 staff_id로 해당 내부 ID를 지정하세요. 직원의 시스템·조직·개별 지침은 자동 주입됩니다. context에는 원문 지침을 다시 쓰지 말고 이번 작업·정확한 작업 폴더·관련 파일·완료 조건만 전달하세요. '
-            '현재 업무에 과거 결정·실패가 필요할 때 company_records recall·session_search로 관련 내용만 조회하세요. 검증된 교훈은 company_records remember·기존 기억·스킬에 근거와 재검증 결과를 남기세요. '
-            '웹 조사는 web_search/web_extract를 우선하고 사용자 요청 없이 창·캡처를 실행하지 마세요. 읽은 원문의 날짜와 출처를 확인하세요. 로컬 파일은 read_file/terminal을 사용하고 웹 검색으로 찾지 마세요. '
-            '업무 기록에는 begin의 실제 job_id·workspace를 쓰고 finish/fail에 실제 결과를 남기세요. '
-            '원본 AGENTS.md와 도구·실행·승인 경계를 따르세요. 새 사업 제작·지출·인증·외부 공개는 필요한 승인을 받으세요. 요청하지 않은 Git 쓰기·업로드는 하지 마세요.')
+            '직원 ID는 도구 인수에만 쓰고 보고에는 이름을 쓰세요. 호칭·일상 질문에는 바로 답하고 요청하지 않은 실행·회의·과거 업무를 시작하지 마세요. '
+            '회의 요청은 team_meeting으로 현재 안건을 등록해 직원 토론과 결론·초안을 제출하세요. 기존 meeting_id가 있으면 재개하고 대표에게 진행·참석을 요구하지 마세요. '
+            '독립 업무는 delegate_task의 staff_id로 위임하세요. 직원 지침은 자동 주입되므로 context에는 이번 작업·폴더·관련 파일·완료 조건만 쓰세요. '
+            '필요한 과거 근거만 company_records recall/session_search로 조회하고 검증한 교훈은 remember·기억·스킬에 남기세요. '
+            '업무 기록은 begin이 반환한 job_id·workspace로 finish/fail에 실제 결과를 남기세요. '
+            'AGENTS.md와 기존 권한을 따르세요. 새 사업 제작·지출·인증·외부 공개는 필요한 승인을 받고, 요청하지 않은 Git 쓰기·업로드는 하지 마세요.')
 
 
 

@@ -123,7 +123,7 @@ def speak(worker, item, args):
     finally:
         with worker.lock:
             usage = worker.job.setdefault('meeting_usage', {})
-            for key, attr in [('input_tokens','session_input_tokens'),('output_tokens','session_output_tokens'),('api_calls','session_api_calls')]:
+            for key, attr in [('input_tokens','session_input_tokens'),('prompt_tokens','session_prompt_tokens'),('cache_read_tokens','session_cache_read_tokens'),('output_tokens','session_output_tokens'),('api_calls','session_api_calls')]:
                 usage[key] = usage.get(key,0) + int(getattr(child,attr,0) or 0)
             worker.meeting_agent = None
 

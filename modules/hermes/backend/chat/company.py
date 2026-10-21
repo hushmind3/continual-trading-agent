@@ -15,6 +15,23 @@ def links(worker):
     return json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
 
 
+def connection(worker, session_id, connections=None, row=None):
+    connections = links(worker) if connections is None else connections
+    if session_id in connections: return connections[session_id]
+    row = row or worker.db.get_session(session_id) or {}
+    config = row.get('model_config') or {}
+    if isinstance(config, str):
+        try: config = json.loads(config)
+        except ValueError: config = {}
+    if not isinstance(config, dict): config = {}
+    company_id = config.get('_platform_company_id')
+    if company_id:
+        return next((item for item in connections.values() if item['id'] == company_id), None)
+    if row.get('parent_session_id'):
+        return next((connections[key] for key in worker.db.get_compression_lineage(session_id) if key in connections), None)
+    return None
+
+
 def connect(worker, request):
     key = request['id']
     session = uuid.uuid5(uuid.NAMESPACE_URL, 'platform-company:' + key).hex
@@ -22,6 +39,7 @@ def connect(worker, request):
     if not worker.db.get_session(session):
         worker.db.create_session(session, 'platform', model=request.get('model'))
         worker.db.set_session_title(session, request.get('title', 'AI 총괄'))
+    worker.db.patch_session_model_config(session, {'_platform_company_id': key})
     # One atomic native transcript import. Original DB remains a historical backup.
     if not worker.db.get_messages_as_conversation(session):
         worker.db.append_messages_batch(session, [
@@ -36,10 +54,26 @@ def connect(worker, request):
     return {'session_id': session}
 
 
+def create_conversation(worker, company_id, title, model):
+    connections = links(worker)
+    base = next((link for link in connections.values() if link['id'] == company_id), None)
+    if base is None: raise ValueError('연결된 조직을 찾을 수 없습니다.')
+    session_id = uuid.uuid4().hex
+    worker.db.create_session(session_id, 'platform', model=model or None,
+                            model_config={'_platform_company_id': company_id})
+    worker.db.set_session_title(session_id, worker.db.get_next_title_in_lineage(title))
+    connections[session_id] = dict(base)
+    path = Path(worker.company_links_path)
+    temporary = path.with_suffix('.tmp')
+    temporary.write_text(json.dumps(connections, ensure_ascii=False), encoding='utf-8')
+    temporary.replace(path)
+    return worker.session(session_id)
+
+
 def prepare(worker, cfg, session, workspace=None):
     global _worker
     _worker = worker
-    worker.company_link = links(worker).get(session)
+    worker.company_link = connection(worker, session)
     worker.company_visible_history = None
     worker.company_prompt_settings = cfg
     if not worker.company_link:

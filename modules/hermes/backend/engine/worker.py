@@ -98,6 +98,7 @@ def event_detail(data):
 class HermesWorker:
     def __init__(self):
         self.db = SessionDB(db_path=HOME / 'state.db')
+        self.company_links_path = HOME / 'company-links.json'
         self.agent = None
         self.thread = None
         self.lock = threading.RLock()
@@ -245,15 +246,25 @@ class HermesWorker:
         # Native load_config caches by file signature; atomic replacement invalidates it.
 
     def sessions(self):
-        return [row for row in self.db.list_sessions_rich(limit=100, min_message_count=0, order_by_last_active=True) if row.get('source') != 'subagent']
+        from ai_agent.Hermes.chat.company import links, connection
+        connections = links(self)
+        return [{**row, 'company_id': (connection(self, row['id'], connections, row) or {}).get('id')}
+                for row in self.db.list_sessions_rich(limit=100, min_message_count=0, order_by_last_active=True) if row.get('source') != 'subagent']
 
     def session(self, session_id):
         row = self.db.get_session(session_id)
         if not row:
             raise ValueError('세션을 찾을 수 없습니다.')
-        return {'session': row, 'messages': self.db.get_resume_conversations(session_id)[1]}
+        from ai_agent.Hermes.chat.company import connection
+        from ai_agent.Hermes.chat.telemetry import session_metrics
+        row['company_id'] = (connection(self, session_id, row=row) or {}).get('id')
+        return {'session': row, 'messages': self.db.get_resume_conversations(session_id)[1],
+                'metrics': session_metrics(self.db, session_id)}
 
     def create_session(self, request):
+        if request.get('company_id'):
+            from ai_agent.Hermes.chat.company import create_conversation
+            return create_conversation(self, str(request['company_id']), str(request.get('title') or '새 대화')[:100], load_settings()['model'])
         session_id = uuid.uuid4().hex
         cfg = load_settings()
         self.db.create_session(session_id, 'platform', model=cfg['model'] or None)
@@ -351,9 +362,14 @@ class HermesWorker:
         self.company_links_path = HOME / 'company-links.json'
         cfg['company_instructions'] = prepare(self, cfg, session_id, request.get('workspace'))
         with self.lock:
-            self.job = {'state': 'starting', 'application': internal, 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time(),
+            self.job = {'state': 'starting', 'model': cfg['model'], 'application': internal, 'session_id': session_id, 'text': '', 'events': [], 'error': '', 'started_at': time.time(),
                         'local_inference': bool(cfg.get('local_model')) and cfg['base_url'] == self.model_base}
             if getattr(self, 'company_link', None): self.job['company_id'] = self.company_link['id']
+        if not internal:
+            from ai_agent.Hermes.chat.telemetry import saved
+            previous_metrics = saved(self.db, session_id) or {}
+            self.job['metrics'] = {key: previous_metrics[key] for key in ('context_limit',) if key in previous_metrics}
+            if previous_metrics.get('model') == cfg['model'] and previous_metrics.get('context_tokens') is not None:self.job['metrics']['previous_context_tokens'] = previous_metrics['context_tokens']
         self.job['owner_message'] = raw
         self.job['owner_request_id'] = uuid.uuid4().hex
         self.thread = threading.Thread(target=self.run_chat, args=(cfg, session_id, prompt, history, request), daemon=True)
@@ -516,6 +532,11 @@ class HermesWorker:
             os.chdir(ROOT)
             with self.lock:
                 self.job.update(completion)
+                from ai_agent.Hermes.chat.telemetry import persist
+                try: persist(self)
+                except Exception as exc:
+                    self.job['metrics_error'] = '실행 수치 저장 실패: ' + str(exc)
+                    traceback.print_exc(file=sys.stderr)
 
     def status(self):
         from ai_agent.Hermes.chat.telemetry import update

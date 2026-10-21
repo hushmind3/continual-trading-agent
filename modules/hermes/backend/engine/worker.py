@@ -77,6 +77,24 @@ def unpack(value):
     return json.loads(value) if isinstance(value, str) else value
 
 
+def event_detail(data):
+    """Keep bounded progress as valid JSON; retain full messages in SessionDB."""
+    original=json.dumps(data,ensure_ascii=False,default=str)
+    if len(original)<=2400:return original
+    for width,nodes in ((512,48),(192,32),(96,16)):
+        remaining=[nodes]
+        def compact(value):
+            remaining[0]-=1
+            if remaining[0]<0:return '…'
+            if isinstance(value,str):return value if len(value)<=width else value[:width]+'…'
+            if isinstance(value,dict):return {str(k)[:80]:compact(v) for k,v in list(value.items())[:8]}
+            if isinstance(value,(list,tuple)):return [compact(v) for v in value[:4]]
+            return value
+        encoded=json.dumps(compact(data),ensure_ascii=False,default=str)
+        if len(encoded)<=2400:return encoded
+    return json.dumps({'truncated':True,'summary':original[:512]},ensure_ascii=False)
+
+
 class HermesWorker:
     def __init__(self):
         self.db = SessionDB(db_path=HOME / 'state.db')
@@ -119,7 +137,7 @@ class HermesWorker:
     def event(self, name, data=None):
         # Keep output bounded; original complete messages stay in SessionDB.
         with self.lock:
-            item = {'name': name, 'detail': json.dumps(data, ensure_ascii=False, default=str)[:2400] if data is not None else '', 'time': time.time()}
+            item = {'name': name, 'detail': event_detail(data) if data is not None else '', 'time': time.time()}
             self.job['events'] = (self.job['events'] + [item])[-100:]
             if name == 'status' and isinstance(data, (list, tuple)) and data and data[0] == 'lifecycle' and 'Tool guardrail halted' in str(data):
                 self.job['guardrail_halt'] = True
@@ -387,7 +405,7 @@ class HermesWorker:
             if focused:toolsets=[]
             configure_tools(self,'eager' if cfg.get('read_only') else cfg.get('tool_loading','native'),
                             direct_surfaces=not bool(cfg.get('company_instructions')),
-                            direct_tools=('web_search','web_extract','team_meeting','company_records','delegate_task','terminal','read_file') if cfg.get('company_instructions') else ())
+                            direct_tools=('web_search','web_extract','team_meeting','company_records','delegate_task','terminal','read_file','write_file','patch','search_files','project_npm') if cfg.get('company_instructions') else ())
             from ai_agent.Hermes.models.codex import runtime as model_runtime
             self.agent = AIAgent(
                 model=cfg['model'], **model_runtime(cfg), quiet_mode=True,

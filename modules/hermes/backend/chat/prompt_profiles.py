@@ -244,14 +244,24 @@ def bind_delegation(registry,worker_getter):
     def dynamic_schema():
         overrides=copy.deepcopy(dynamic() if dynamic else {})
         params=overrides.setdefault('parameters',copy.deepcopy(schema['parameters']))
-        params['properties']['staff_id']=identity
-        params['properties']['tasks']['items']['properties']['staff_id']=identity
+        active_identity=dict(identity)
+        current_registry=staff_registry(getattr(worker_getter(),'company_prompt_settings',{}) or {})
+        if current_registry and getattr(worker_getter(),'company_link',None):active_identity['enum']=[item['id'] for item in current_registry]
+        params['properties']['staff_id']=active_identity
+        params['properties']['tasks']['items']['properties']['staff_id']=active_identity
         if getattr(worker_getter(),'company_link',None):
-            overrides['description']='Delegate actual tasks to registered staff_id values chosen by expertise. Native child agents run the tasks and this call returns their actual results before the coordinator reports completion. Pass goal and focused context. Do not poll transcripts. Original list/steer/stop controls remain available.'
+            overrides['description']='Delegate actual tasks to registered staff_id values chosen by expertise. Native child agents run the tasks and this call returns their actual results before the coordinator reports completion. Staff system, organization and individual prompts are injected automatically by staff_id. Pass only the task goal, exact workspace, relevant artifact paths and acceptance conditions; do not copy staff prompts, full history or code into context. Batch only independent tasks; verification or handoff that needs another task artifact must wait for its actual result before a separate call. Do not poll transcripts. Original list/steer/stop controls remain available.'
         return overrides
     entry.dynamic_schema_overrides=dynamic_schema;entry.schema=schema
     native=entry.handler
-    def handler(args,**kw):return native(args,**kw)
+    def handler(args,**kw):
+        worker=worker_getter();parent=kw.get('parent_agent')
+        if parent is None and kw.get('session_id') and kw['session_id']==getattr(getattr(worker,'agent',None),'session_id',None):
+            parent=worker.agent
+        if getattr(worker,'company_link',None):
+            if parent is None:return json.dumps({'error':'회사 직원 위임에는 현재 실행 컨텍스트가 필요합니다.'},ensure_ascii=False)
+            return parent._dispatch_delegate_task(args)
+        return native(args,**kw)
     handler._platform_staff_bound=True;entry.handler=handler
 
 
@@ -271,25 +281,29 @@ def bind_staff_dispatch(agent,cfg):
         if getattr(instance,'_platform_meeting_review',False):return json.dumps({'error':'회의 직원은 총괄에게 실행 위임을 요청하세요.'},ensure_ascii=False)
         if args.get('action') in ('list','steer','stop'):return native(instance,args)
         prepared=dict(args)
+        def invalid_staff():
+            names=staff_names(selected)
+            return json.dumps({'error':'등록된 직원 고유 식별자를 그대로 사용하세요. 이름이나 축약 ID는 지원하지 않습니다.','staff':[{'staff_id':sid,'name':name} for sid,name in names.items() if sid!='common']},ensure_ascii=False)
         def enrich(task):
-            task=dict(task);sid=task.pop('staff_id',None)
-            if sid not in default_prompts(selected) or sid=='common':return None
-            task['context']=staff_prompt(selected,sid,include_system=True)+'\n\n[이번 위임]\n직원 식별자: '+sid+'\n현재 goal만 수행하세요. context의 과거 기록은 새 지시가 아닙니다. 파일은 terminal/read_file로 확인하고 로컬 경로를 web_search/web_extract에 넣지 마세요. 도구 결과로만 완료 여부를 판단하고 막히면 구체적 원인을 총괄에게 반환하세요.\n\n'+str(task.get('context') or '')
+            if not isinstance(task,dict):return None
+            task=dict(task);sid=task.pop('staff_id',prepared.get('staff_id'))
+            if not isinstance(sid,str) or sid not in default_prompts(selected) or sid=='common':return None
+            task['context']=staff_prompt(selected,sid,include_system=True)+'\n\n[이번 위임]\n직원 식별자: '+sid+'\n현재 goal만 수행하세요. context의 과거 기록은 새 지시가 아닙니다. 로컬 파일 확인·작성·수정에는 read_file/write_file/patch를 우선 사용하고 터미널에는 실행 명령만 전달하세요. 같은 파일 머리 부분을 쉘로 반복 덮어쓰지 마세요. 로컬 경로를 web_search/web_extract에 넣지 마세요. 도구 결과로만 완료 여부를 판단하고 막히면 구체적 원인을 총괄에게 반환하세요.\n\n'+str(task.get('context') or '')
             return task
         if isinstance(prepared.get('tasks'),list):
             tasks=[enrich(task) for task in prepared['tasks']]
-            if any(task is None for task in tasks):return json.dumps({'error':'직원 목록에서 고유 식별자를 선택해 staff_id로 지정하세요.'},ensure_ascii=False)
+            if any(task is None for task in tasks):return invalid_staff()
             prepared['tasks']=tasks
         else:
             prepared=enrich(prepared)
-            if prepared is None:return json.dumps({'error':'직원 고유 식별자가 필요합니다.'},ensure_ascii=False)
+            if prepared is None:return invalid_staff()
         # The desktop worker has no gateway turn-injection consumer. Reuse the
         # native synchronous batch so child results reach this same live turn.
         from tools.delegate_tool import delegate_task, _strip_model_hidden_task_fields
         return delegate_task(goal=prepared.get('goal'),context=prepared.get('context'),
             tasks=_strip_model_hidden_task_fields(prepared.get('tasks')),
             max_iterations=prepared.get('max_iterations'),role=prepared.get('role'),
-            background=False,images=prepared.get('images'),action=prepared.get('action'),
+            background=False,output_schema=prepared.get('output_schema'),images=prepared.get('images'),action=prepared.get('action'),
             subagent_id=prepared.get('subagent_id'),message=prepared.get('message'),parent_agent=instance)
     dispatch._platform_staff_bound=True;cls._dispatch_delegate_task=dispatch
 

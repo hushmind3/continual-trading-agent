@@ -22,7 +22,7 @@ def recall(db, command):
       UNION ALL SELECT 'job',j.id,{job_scope},j.title,COALESCE(j.error,'')||char(10)||COALESCE(j.result,''),j.status,j.created_at FROM jobs j
       UNION ALL SELECT 'meeting',id,COALESCE(NULLIF(venture_id,''),'owner'),topic,summary,status,created_at FROM ceo_meetings
       UNION ALL SELECT COALESCE(json_extract({note_meta},'$.kind'),'lesson'),id,
-        COALESCE(json_extract({note_meta},'$.scope'),'unscoped'),COALESCE(json_extract({note_meta},'$.key'),role),insight,'saved',created_at FROM ceo_lessons l WHERE substr(origin,1,14)<>'hermes-native|' OR NOT EXISTS (SELECT 1 FROM ceo_lessons newer WHERE newer.origin=l.origin AND newer.rowid>l.rowid)
+        COALESCE(json_extract({note_meta},'$.scope'),'unscoped'),COALESCE(json_extract({note_meta},'$.key'),staff_id),insight,'saved',created_at FROM ceo_lessons l WHERE substr(origin,1,14)<>'hermes-native|' OR NOT EXISTS (SELECT 1 FROM ceo_lessons newer WHERE newer.origin=l.origin AND newer.rowid>l.rowid)
       UNION ALL SELECT 'experience',e.id,{job_scope},j.title,e.detail,e.outcome,e.created_at FROM ceo_experiences e JOIN jobs j ON j.id=e.job_id
     """
     def search(selected, limit=8):
@@ -204,12 +204,17 @@ def install(app, data_root, activity=lambda delta: None):
             return {'job_id': row['id'], 'state': command.get('state'), 'error': error}
         if action == 'overview':
             # A status query must not stuff every historical report into the model prompt.
-            result = {'ventures': db.many('SELECT id,name,status,substr(proposal_json,1,4000) AS proposal_json FROM ventures ORDER BY rowid DESC LIMIT 8'),
-                    'jobs': db.many('SELECT id,staff_id,title,status,mode,substr(error,1,1000) AS error,substr(result,1,600) AS summary FROM jobs ORDER BY rowid DESC LIMIT 12'),
-                    'meetings': db.many('SELECT id,topic,status,substr(summary,1,1200) AS summary FROM ceo_meetings ORDER BY rowid DESC LIMIT 4'),
+            selected = venture(command['venture_id']) if command.get('venture_id') else None
+            scope = (selected['id'],) if selected else ()
+            venture_filter = ' WHERE id=?' if selected else ''
+            job_filter = " WHERE json_extract(CASE WHEN json_valid(arguments) THEN arguments ELSE '{}' END,'$.venture_id')=?" if selected else ''
+            meeting_filter = ' WHERE venture_id=?' if selected else ''
+            result = {'ventures': db.many('SELECT id,name,status,substr(proposal_json,1,4000) AS proposal_json FROM ventures'+venture_filter+' ORDER BY rowid DESC LIMIT 8', scope),
+                    'jobs': db.many('SELECT id,staff_id,title,status,mode,substr(error,1,1000) AS error,substr(result,1,600) AS summary FROM jobs'+job_filter+' ORDER BY rowid DESC LIMIT 12', scope),
+                    'meetings': db.many('SELECT id,topic,status,substr(summary,1,1200) AS summary FROM ceo_meetings'+meeting_filter+' ORDER BY rowid DESC LIMIT 4', scope),
                     'workspace': str(base),
                     'execution': 'native Hermes session; no separate model or fixed employee pipeline'}
-            if command.get('venture_id'): result['selected_venture'] = venture(command['venture_id'])
+            if selected: result['selected_venture'] = selected
             result['staff']=[{'staff_id':sid,'name':name,'title':title,'description':description} for sid,name,title,description,icon in server.STAFF]
             result['manager_staff_id']=manager_id()
             return result

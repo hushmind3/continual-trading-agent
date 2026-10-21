@@ -71,6 +71,8 @@ def call(key, payload, origin=None):
     result = {'session_id': native_id, 'ventures': control['ventures'],
               'progress': invoke('/api/store/info')}
     approved = [v for v in control['ventures'] if v.get('status') == 'approved']
+    # Product identity belongs to approved ventures, not the retired storefront.
+    result['progress'].pop('brand',None)
     result['progress']['approved'] = len(approved)
     result['progress']['ready_products'] = 0
     for venture in approved:

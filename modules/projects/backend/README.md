@@ -70,3 +70,5 @@ workspace/connect는 설치 모듈의 workspace_host를 기록해 별도 실행 
 회사 대화 상태: conversation.py의 projects/conversation은 기존 승인 사업의 작업 폴더에서 dist/index.html을 확인해 progress.ready_products를 집계합니다. progress.approved는 승인 프로젝트 수이며 실제 실행 프로세스 수를 뜻하지 않습니다. 제품 준비 수는 모든 승인 사업을 확인하고 기존 첫 제품 미리보기 연결은 유지합니다.
 
 회사 이름 투영: company-v1의 기존 JSON 응답은 runtime.py에서 Hermes의 현재 개별 프롬프트 이름으로 투영합니다. 직원 참조는 불변 staff_id로 이관하고 자연어 기록 원문은 보존하며 설정·회의·회사 카드·업무 필터에는 같은 표시 이름을 사용합니다. workspace_embed.js는 기존 카드 자식 구조를 보존하고 이름 요소만 갱신합니다. 새 DB·추가 서버·재설치는 없습니다.
+
+사업 진행 응답은 폐기된 고정 상점 brand 값을 노출하지 않습니다. 승인 사업과 실제 빌드 파일로 결과물 이름·준비 상태를 표시하며, 실제 서비스 여부는 산출물 실행 확인과 구분합니다.

@@ -30,11 +30,12 @@ os.environ['CUA_DRIVER_RS_TELEMETRY_ENABLED'] = '0'
 os.environ['HERMES_SKIP_UPDATE_CHECK'] = '1'
 os.environ['HERMES_DISABLE_LAZY_INSTALLS'] = '1'
 os.environ['PATH'] = str(NODE_BIN) + os.pathsep + str(PYTHON.parent) + os.pathsep + os.environ.get('PATH', '')
-for _browser in (Path('C:/Program Files/Google/Chrome/Application/chrome.exe'),
-                 Path('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe')):
-    if _browser.is_file():
-        os.environ.setdefault('AGENT_BROWSER_EXECUTABLE_PATH', str(_browser))
-        break
+from platform_native import browser_executable
+_browser = browser_executable()
+if _browser:
+    os.environ['AGENT_BROWSER_EXECUTABLE_PATH'] = str(_browser)
+else:
+    os.environ.pop('AGENT_BROWSER_EXECUTABLE_PATH', None)
 _driver = ROOT / 'runtime/ai_agent/Hermes/tools/cua-driver' / ('cua-driver.exe' if os.name=='nt' else 'cua-driver')
 if _driver.is_file():
     os.environ['HERMES_CUA_DRIVER_CMD'] = str(_driver)
@@ -604,6 +605,9 @@ class HermesWorker:
         if not path.is_file() or path.suffix.lower() != '.gguf':
             raise ValueError('존재하는 GGUF 모델 파일을 선택하세요. 다른 형식은 해당 모델 실행기의 API 주소를 연결하세요.')
         executable = ROOT / 'runtime/shared/engines/llama.cpp' / ('llama-server.exe' if os.name=='nt' else 'llama-server')
+        if sys.platform=='darwin' and not executable.is_file():
+            installed=shutil.which('llama-server')
+            if installed:executable=Path(installed)
         if not executable.is_file():
             raise ValueError('설치된 llama-server 실행기를 찾을 수 없습니다.')
         alias = path.parent.name if path.stem.upper() in {'GGUF', 'MODEL'} else path.stem

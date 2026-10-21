@@ -51,3 +51,5 @@ verify_automatic_ui.cjs: UI/설명 파일 없는 일반 Python CLI 검사 소스
 Python은 bin/python, 서버 잠금은 fcntl, 포트 소유권은 lsof로 확인합니다. 서버/감시기는 터미널과 분리해 유지합니다. 호스트는 APIRoute 직접 등록과 호환되는 FastAPI 0.115.14를 사용합니다. 새 버전의 지연 include_router가 메뉴를 누락시키므로 호스트 요구사항에서 버전을 고정했습니다. 실제 실행 결과와 남은 범위는 루트 README를 봅니다.
 
 Mac 설치 분기는 CUDA·키움 전용 설치를 건너뛰고, environment(gpu=True)를 직접 호출해도 macOS에서는 명시적으로 거절합니다. Mac 진입 .command 두 파일은 실행 권한을 Git에도 보존합니다.
+
+Mac 설치·내보내기 정리(2026-10-22): install_windows.py는 이름과 무관하게 기존 OS 분기를 사용하며 npm은 공통 npm_command의 Node+실제 npm-cli.js 인수로 실행합니다. module_sources의 같은 .pth hook이 모듈 소스와 공유 native 도구를 연결합니다. 기존 환경에는 hook만 갱신했고 패키지 재설치·추가 다운로드는 수행하지 않았습니다. CUDA·키움은 Mac 설치 대상에서 제외합니다. 독립 기본 모듈의 Mac 설치도 같은 설치기를 재사용하며 Metal 실행기는 설치된 Homebrew llama-server에 연결합니다.

@@ -5,8 +5,8 @@
 `handlers.py`가 모델 설정·로컬 목록·불러오기·내리기를 기존 API에 등록합니다. 실제 처리는 `../engine/worker.py`가 담당합니다.
 
 - 로컬 목록: 바탕화면 `모델/` 아래 GGUF. 원본 파일을 복사하거나 변환하지 않습니다.
-- 실행기: 프로젝트 `runtime/shared/engines/llama.cpp/llama-server.exe`.
-- 문맥은 플랫폼의 해당 모델별 실행 설정을 우선하고, 없으면 원본 config.yaml의 해당 model.context_length를 따릅니다. 미지정 시 llama.cpp의 모델 기본 문맥(--ctx-size 0)을 사용하며 고정 65,536을 강제하지 않습니다. 선택한 모델·주소·명시 문맥은 원본 설정에도 일치시킵니다. 동시 슬롯 1개·GPU 레이어 우선·CPU 보조 스레드 2개는 실행기 자원 설정입니다.
+- 실행기: 프로젝트 `runtime/shared/engines/llama.cpp/llama-server`(Mac) 또는 `llama-server.exe`(Windows).
+- 문맥은 플랫폼의 해당 모델별 실행 설정을 우선하고, 없으면 원본 config.yaml의 해당 model.context_length를 따릅니다. 미지정 시 llama.cpp의 모델 기본 문맥(--ctx-size 0)을 사용하며 고정 65,536을 강제하지 않습니다. 선택한 모델·주소·명시 문맥은 원본 설정에도 일치시킵니다. 동시 슬롯 1개·GPU 레이어 우선을 유지합니다. Mac의 CPU 코어 선택은 llama.cpp 자동 선택이며 별도 RAM 캐시 상한은 아래 Mac 설정을 따릅니다. Windows CPU 보조 스레드는 기존 설정을 유지합니다.
 - 연결 준비 전 또는 모델을 내린 뒤에는 대화를 시작하지 않고 불러오기를 안내합니다.
 - AIAgent의 출력 한도는 모델 설정의 max_output_tokens로 제어합니다. 0이면 원본 기본값이고, 양수이면 원본 agent.max_tokens로 다음 요청부터 전달합니다. 컨텍스트/Thinking과 별도이며 숨겨진 고정 한도는 없습니다. reasoning은 원본 정책과 사용자의 Thinking 설정을 따릅니다.
 - 외부 실행기를 사용하려면 OpenAI 호환 주소·모델을 저장합니다. 키는 로컬 설정에 저장하며 응답에 반환하지 않습니다.
@@ -102,3 +102,5 @@ Thinking 제어층은 원본 agent/reasoning_params.py·reasoning_effort.py에 �
 macOS: 같은 공유 실행기 폴더의 `llama-server`와 모듈 `.venv/bin/python`을 사용합니다. 로컬 모델 목록은 저장한 GGUF의 실제 폴더를 우선하며, 없으면 프로젝트 `모델/` 또는 기존 바탕화면 폴더를 찾습니다. 모델을 다시 복사하거나 내려받지 않습니다. 2026-10-21 Mac에서 기존 Ornith 9B를 65,536 문맥·Thinking on으로 불러와 기존 총괄 세션의 실제 답변 완료를 확인했습니다. 이 확인은 새 제품 제작·직원 회의의 완주나 답변 품질을 보증하지 않습니다.
 
 Mac 자원 최적화: Metal과 llama.cpp의 CPU 자동 선택을 사용하며 별도 RAM 프롬프트 캐시를 장비 RAM에 비례해 제한합니다. 16GB Mac의 상한은 1GB이고 사용자 지정 LLAMA_ARG_CACHE_RAM은 보존합니다. 문맥 65,536·Thinking on·Q8 KV는 유지합니다. Windows 전용 PE 실행기·DLL 37개(약 161.6 MiB)는 사용 중이지 않음을 확인해 프로젝트 휴지통의 동일 상대경로로 옮겼으며 Mac Metal 실행기·드라이버·모델·DB는 유지했습니다. 이 이동은 RAM이나 응답 속도 개선 수치가 아닙니다. 실제 재적재 후 실행 인수의 cache-ram=1024, 실행기 로그의 n_threads=4, 문맥 65,536을 확인했습니다. 기존 총괄 세션의 실제 응답은 “연결 확인”으로 완료됐고 첫 요청 입력 11,213·출력 32토큰·1회 요청·전체 22.8초·생성 20.0 tok/s였습니다. 변경 전과 같은 입력의 비교 측정은 하지 않아 속도 향상 배수나 즉답 성능은 주장하지 않습니다.
+
+Mac에서 공유 llama-server 링크가 Homebrew 갱신/이동으로 유효하지 않을 때는 이미 설치된 PATH의 llama-server를 사용합니다. 설치기는 새 다운로드 대신 같은 공유 경로의 링크를 갱신합니다. 기존 M5 Metal·자동 CPU 코어 선택·RAM 캐시 상한·모델 원본·문맥/Thinking 설정은 유지합니다. 이번 native 경로 변경에서 추가 모델 적재/추론은 하지 않았습니다.

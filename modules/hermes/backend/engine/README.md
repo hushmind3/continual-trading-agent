@@ -7,7 +7,7 @@ runtime_policy.configure_tools의 일반 lazy 설정은 선택한 web·컴퓨터
 
 platform_instructions는 작업 폴더·결과 링크·실제 근거·필요한 도구 탐색만 간결하게 전달합니다. 호스트 안내는 실제 sys.platform으로 선택하므로 Mac에 Windows/Git Bash/PowerShell 실행 지침을 주입하지 않습니다. 사용자 시스템·조직·직원별 프롬프트와 원본 Hermes 프롬프트 빌더는 그대로 사용합니다.
 
-sync_tool_policy는 도구 노출 정책(mode/search/선택 toolsets)의 지문을 기존 SessionDB 메타데이터에 보관합니다. 정책 변경 때만 원본 update_session_tool_names로 현재 세션·원본 압축 체인의 마지막 세션에 현재 도구 목록을 다시 고정하여, 원본 대화 복원기가 예전 직접 노출 스키마를 되살리지 않게 합니다. 대화·도구 실행 기록은 삭제하지 않으며 같은 정책의 후속 요청은 원본 접두부 캐시를 유지합니다. prompt_footprint 이벤트는 원본/플랫폼 지침·도구 스키마의 문자 수와 직접 도구 이름을 기록하며 실제 토큰 수로 표시하지 않습니다.
+sync_tool_policy는 도구 노출 정책(OS/mode/search/선택 toolsets)의 지문을 기존 SessionDB 메타데이터에 보관합니다. 정책 변경 때만 원본 update_session_tool_names로 현재 세션·원본 압축 체인의 마지막 세션에 현재 도구 목록을 다시 고정하여, 원본 대화 복원기가 예전 직접 노출 스키마를 되살리지 않게 합니다. 대화·도구 실행 기록은 삭제하지 않으며 같은 정책의 후속 요청은 원본 접두부 캐시를 유지합니다. prompt_footprint 이벤트는 원본/플랫폼 지침·도구 스키마의 문자 수와 직접 도구 이름을 기록하며 실제 토큰 수로 표시하지 않습니다.
 
 Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to `runtime/ai_agent/Hermes/`. All runtime paths resolve from this project. The original checkout must not appear on PYTHONPATH or be used as a symlink target.
 
@@ -64,3 +64,5 @@ locations.py는 macOS에서 모듈 .venv/bin/python을 선택합니다. setup.py
 macOS 자원 설정(2026-10-21): worker.py는 CPU 스레드 2개 고정을 적용하지 않고 llama.cpp의 자동 선택 및 LLAMA_ARG_THREADS/THREADS_BATCH 환경변수를 사용합니다. 별도 호스트 프롬프트 캐시는 물리 RAM의 1/16(최소 256·최대 8,192 MiB)로 제한합니다. 16GB Mac에서는 1,024 MiB이며 LLAMA_ARG_CACHE_RAM 명시값은 우선합니다. 이는 [원본 host-memory prompt cache](https://github.com/ggml-org/llama.cpp/pull/16391)의 별도 RAM 보관 상한으로, 사용자의 모델 문맥·Thinking·Q8 KV·현재 슬롯의 프롬프트 재사용은 바꾸지 않습니다. 서로 다른 긴 대화 사이의 캐시 보존량은 줄 수 있으며 첫 요청의 입력 처리는 생략되지 않습니다. 재시도 루프·모델 품질 문제를 이 설정으로 해결했다고 보지 않습니다.
 
 대화 수치 보존과 새 총괄 대화: worker.session/create는 연결된 company_id가 있으면 회사 도구 연결을 같은 SessionDB의 새 세션으로 이어줍니다. 세션 조회는 저장 metrics를 반환하고 작업 종료 시 같은 DB 메타데이터에 마지막 실행을 기록합니다. 로컬·외부 제공자는 같은 경로를 사용합니다. 상세 집계·미보고 처리는 ../chat/README.md를 봅니다.
+
+Mac native 실행 경로(2026-10-22): worker의 Windows 브라우저 경로 고정을 제거하고 공유 platform_native가 탐지한 실제 Mac Chrome/Edge를 AGENT_BROWSER_EXECUTABLE_PATH로 사용합니다. 해당 도구는 module_sources의 기존 환경 hook으로 연결합니다. desktop_browser는 Mac에서 open -a, Windows에서 분리 프로세스 실행을 사용하며 Windows 플래그를 Mac에 전달하지 않습니다. 원본 terminal/agent loop는 교체하지 않았습니다. 실제 원본 LocalEnvironment에서 /bin/bash·선택 프로젝트 cwd·명령 종료 코드 0을 확인했습니다. GUI 브라우저 창·Finder·선택창을 자동으로 열어 확인하지는 않았습니다. 기존 Metal GPU/자동 CPU 선택/메모리 캐시 상한은 유지했으며 이번 변경에서 모델 호출·신규 9B 추론은 하지 않았습니다.

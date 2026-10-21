@@ -2,14 +2,13 @@
 from pathlib import Path
 import sys
 
-BOOTSTRAP='''import importlib.abc,importlib.util,json,sys
+BOOTSTRAP='''import importlib.abc,importlib.util,json,os,sys
 from pathlib import Path
 def install():
  root=next((p for p in Path(sys.prefix).resolve().parents if (p/'module.json').is_file()),None)
  if root is None:return
  prefix=Path(sys.prefix).resolve();marker=prefix/'module-executable-root.txt'
  if not marker.is_file() or marker.read_text(encoding='utf8')!=str(prefix):
-  import os
   with (prefix/'module-executable.lock').open('a+b') as guard:
    guard.seek(0,os.SEEK_END)
    if guard.tell()==0:guard.write(b'0');guard.flush()
@@ -34,6 +33,8 @@ def install():
     guard.seek(0)
     if sys.platform=='win32':msvcrt.locking(guard.fileno(),msvcrt.LK_UNLCK,1)
     else:fcntl.flock(guard.fileno(),fcntl.LOCK_UN)
+ common=Path(os.environ.get('PLATFORM_ROOT') or root.parent.parent)/'backend'
+ if (common/'platform_native.py').is_file() and str(common) not in sys.path:sys.path.append(str(common))
  name=json.loads((root/'module.json').read_text(encoding='utf8')).get('runtime',{}).get('package')
  if not name:return
  class Finder(importlib.abc.MetaPathFinder):

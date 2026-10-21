@@ -131,8 +131,9 @@ def sync_tool_policy(worker, agent, cfg):
         return
     import hashlib
     import json
+    import sys
     from tools.mcp_tool_agent import tool_pin_version
-    policy = {'mode': cfg.get('tool_loading', 'native'),
+    policy = {'platform': sys.platform, 'mode': cfg.get('tool_loading', 'native'),
               'search': worker.native_config().get('tools', {}).get('tool_search', {}),
               'enabled': sorted(agent.enabled_toolsets or []),
               'disabled': sorted(agent.disabled_toolsets or [])}

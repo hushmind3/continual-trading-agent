@@ -49,7 +49,6 @@ def read_file(identifier,path):
 
 def open_folder(identifier):
     folder=_project(identifier)
-    if os.name!='nt':raise RuntimeError('폴더 열기는 현재 Windows 로컬 환경을 사용합니다.')
-    os.startfile(str(folder))
-    return {'path':str(folder)}
+    from platform_native import open_folder as open_native_folder
+    return open_native_folder(folder)
 

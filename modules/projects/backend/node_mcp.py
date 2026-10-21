@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import re
 import shutil
+from platform_native import npm_command
 from urllib.parse import quote
 from urllib.request import urlopen
 from .github import repository
@@ -49,8 +50,7 @@ def command(source, spec):
 
 
 def prepare(source, spec, run):
-    node = shutil.which('node'); npm = Path(node or '').parent / 'node_modules/npm/bin/npm-cli.js'
-    if not node or not npm.is_file(): raise ValueError('Node.js/npm 실행기를 찾지 못했습니다.')
+    node, npm = npm_command()
     with urlopen('https://registry.npmjs.org/' + quote(spec['package'], safe='') + '/' + spec['version'], timeout=25) as response:
         metadata = json.load(response)
     origin = metadata.get('repository', {})

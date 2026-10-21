@@ -112,6 +112,7 @@ def main():
     elif kind == 'python-cli':
         execute([python(), '-c', 'import sys,site,importlib;site.addsitedir(sys.argv.pop(1));m,n=sys.argv.pop(1).split(":");sys.exit(getattr(importlib.import_module(m),n)())', str(source/'.platform-runtime/python'),spec['entry'], *extra], work)
     elif kind=='powershell':
+        if os.name!='nt':raise ValueError('Windows 전용 설치 프로그램은 macOS에서 실행할 수 없습니다.')
         executable=Path(os.environ.get('SystemRoot','C:/Windows'))/'System32/WindowsPowerShell/v1.0/powershell.exe'
         script=inside(source,spec['script'])
         if not executable.is_file():raise ValueError('Windows PowerShell이 필요합니다.')

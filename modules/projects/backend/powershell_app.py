@@ -10,6 +10,7 @@ CANCELS={}
 
 
 def executable():
+    if os.name!='nt':raise ValueError('Windows 전용 설치 프로그램은 macOS에서 실행할 수 없습니다. 해당 앱의 macOS 배포본을 사용하세요.')
     path=Path(os.environ.get('SystemRoot','C:/Windows'))/'System32/WindowsPowerShell/v1.0/powershell.exe'
     if not path.is_file():raise ValueError('이 설치 프로그램은 Windows PowerShell이 필요합니다.')
     return str(path)

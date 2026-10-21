@@ -19,7 +19,7 @@ API: `projects/install`, `retry`, `settings`, `detach`, `reconnect`, `remove`, `
 검사 명령·현재 한계·실제 결과는 [상위 안내](../README.md)를 따릅니다. 외부 native 모듈과 임의 데스크톱 앱 변환은 기존 외부 앱 ZIP 대상이 아닙니다. 기본 금융·REA·Hermes는 별도 standalone-module 소스 배포 형식으로 지원합니다.
 
 - builtin_packages.py: finance/rea/hermes만 받아 선택 모듈·공통 호스트/UI 소스 복사본·의존성 명세·전용 설치/실행 진입점을 ZIP에 넣습니다. 다른 모듈·실제 가상환경·데이터·비밀 설정은 제외합니다. 기존 projects/export와 안전한 project-packages 다운로드 경로를 사용합니다.
-- standalone_runner.py: 원래 프로젝트 경로를 찾지 않고 추출한 폴더를 ROOT로 사용합니다. 상속된 PLATFORM_ROOT/PLATFORM_MODULES_DIR/PYTHONPATH/HERMES_HOME을 정리하며 setup/check/run을 제공합니다. 설치는 기존 install_windows.py·module_sources.py를 복사해 재사용합니다. Hermes 모델 실행기는 공개 URL·해시를 내보내 setup에서 검증·설치합니다. Windows 전용 설치이며 모델/키/기존 데이터는 별도 준비합니다.
+- standalone_runner.py: 원래 프로젝트 경로를 찾지 않고 추출한 폴더를 ROOT로 사용합니다. 상속된 PLATFORM_ROOT/PLATFORM_MODULES_DIR/PYTHONPATH/HERMES_HOME을 정리하며 setup/check/run을 제공합니다. 설치는 기존 install_windows.py·module_sources.py를 복사해 재사용합니다. Hermes 모델 실행기는 공개 URL·해시를 내보내 setup에서 검증·설치합니다. Windows/macOS 설치 분기를 사용하며 모델/키/기존 데이터는 별도 준비합니다. Mac의 금융 CUDA·키움 설치는 지원하지 않습니다.
 - development/tests/test_builtin_packages.py: 다른 모듈/비밀/환경 제외, 경로·무결성·실행 환경, 실행기 SHA-256과 압축 경계 검사. 실제 단독 실행 검사는 development/scripts/verify_standalone_modules.py이며 자세한 조건은 상위 README를 따릅니다.
 
 현재 분리 경로: projects/detach는 detachment.start의 비동기 작업으로 실행합니다. 현재 패키지·독립 실행 진입점·필요한 UI를 준비한 뒤 원래 프로그램과 해당 모듈 data 항목을 이동합니다. builtin_record는 기본 모듈을 같은 작업 목록에 등록하고 reconnect_builtin은 원래 위치로 되돌립니다. 롤백 실패 시 파일을 보존하고 오류를 표시합니다.
@@ -74,3 +74,10 @@ workspace/connect는 설치 모듈의 workspace_host를 기록해 별도 실행 
 사업 진행 응답은 폐기된 고정 상점 brand 값을 노출하지 않습니다. 승인 사업과 실제 빌드 파일로 결과물 이름·준비 상태를 표시하며, 실제 서비스 여부는 산출물 실행 확인과 구분합니다.
 
 macOS 실행: node-mcp는 같은 Hermes 전용 환경의 bin/python을 사용합니다. 복사된 Windows wheel은 macOS에서 실행할 수 없으므로 해당 앱 .platform-runtime/python 패키지를 Mac용으로 설치해야 합니다. 원본 소스·DB·제품을 재설치하지 않습니다. runtime.py는 종료된 앱 worker를 다음 요청에서 다시 생성해 패키지 복구 뒤에도 이전 오류가 계속 남는 현상을 방지합니다.
+
+## macOS 실행 경계
+용도: 기존 프로젝트 관리/설치/분리/내보내기의 native 실행 경로입니다. adapters·node_mcp는 공유 platform_native.npm_command로 npm 심볼릭 링크를 해석합니다. folder/open은 Finder를 사용하며 Windows 설치기는 Mac에서 실행하지 않습니다. 기존 외부 앱 portable_runner는 같은 Windows 경계를 명시합니다.
+
+builtin_packages와 detachment는 기존 run.py와 함께 실행 가능한 .command 진입점을 제공합니다. standalone_runner의 Mac setup은 같은 공통 설치기·Node/npm을 사용하고 Hermes Metal 실행기는 설치된 Homebrew 바이너리에 연결합니다. Mac engine.json에 Windows 공개 배포 해시가 없으면 그 키를 강제 조회하지 않습니다. 금융 CUDA·키움 환경은 Mac setup에서 설치 전에 거절합니다. 기존 Windows .cmd·공개 배포 해시 검사는 유지합니다.
+
+2026-10-22 공통 npm의 실제 버전 실행·수정 소스 구문을 확인했습니다. 기존 프로젝트를 다시 설치/내려받거나 분리·ZIP 생성하지 않았으므로 외부 앱 설치/배포 완주와 Finder GUI 조작은 미확인입니다. 공통 실행 경로 결과는 ../../../backend/README.md를 따릅니다.

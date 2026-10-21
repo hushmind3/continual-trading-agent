@@ -12,6 +12,8 @@ from urllib.request import urlopen
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0,str(ROOT/'backend'))
+from platform_native import npm_command
 
 
 def environment():
@@ -32,6 +34,15 @@ def python():
 
 def install_runner(metadata):
     spec=metadata.get('llama_cpp')
+    if sys.platform=='darwin':
+        runner=shutil.which('llama-server')
+        if not runner:raise ValueError('Metal 실행기가 필요합니다: brew install llama.cpp')
+        target=ROOT/'runtime/shared/engines/llama.cpp/llama-server'
+        target.parent.mkdir(parents=True,exist_ok=True)
+        if not target.exists():
+            pending=target.with_name(target.name+'.tmp')
+            pending.symlink_to(runner);pending.replace(target)
+        return
     if not spec:return
     if not spec['source'].startswith('https://github.com/ggml-org/llama.cpp/releases/download/'):
         raise ValueError('llama.cpp 공식 배포 주소가 아닙니다.')
@@ -77,10 +88,11 @@ def main():
     metadata = verify(check_hash=args.command=='check')
     if metadata['changed_files']:print('내보낸 뒤 수정된 소스: '+', '.join(metadata['changed_files']),flush=True)
     if args.command == 'setup':
-        if os.name != 'nt': raise ValueError('현재 의존성 설치 스크립트는 Windows용입니다.')
+        if os.name!='nt' and sys.platform!='darwin':raise ValueError('현재 독립 설치는 Windows와 macOS를 지원합니다.')
+        if sys.platform=='darwin' and metadata['module']=='finance':raise ValueError('금융 CUDA·키움 전용 환경은 macOS 설치 대상이 아닙니다. 원본 데이터·모델은 보존하세요.')
         execute([sys.executable, 'development/scripts/install_windows.py'])
-        execute([shutil.which('npm.cmd') or 'npm.cmd', 'run', 'build', '--workspace', 'frontend'])
-        install_runner(metadata)
+        execute([*npm_command(), 'run', 'build', '--workspace', 'frontend'])
+        if metadata['module']=='hermes':install_runner(metadata)
         return
     if not python().is_file(): raise ValueError('먼저 python run.py setup으로 전용 환경을 설치하세요.')
     if not (ROOT / 'frontend/dist/index.html').is_file(): raise ValueError('화면 빌드가 없습니다. setup을 실행하세요.')

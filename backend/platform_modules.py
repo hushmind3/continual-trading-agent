@@ -11,6 +11,7 @@ import re
 import sys
 import types
 from functools import lru_cache
+from platform_native import native_runtime_path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = Path(os.environ.get('PLATFORM_MODULES_DIR') or ROOT / 'modules').resolve()
@@ -22,6 +23,9 @@ def discover(directory=None):
     namespaces = set()
     for path in sorted(Path(directory or MODULES).glob('*/module.json')):
         data = json.loads(path.read_text(encoding='utf-8'))
+        if isinstance(data.get('resources'), dict):
+            data['resources'] = {key:native_runtime_path(value) if isinstance(value,str) else value
+                                 for key,value in data['resources'].items()}
         identifier = data.get('id', '')
         if data.get('schema') != 1 or not re.fullmatch(r'[a-z][a-z0-9_-]*', identifier):
             raise ValueError(f'Invalid module manifest: {path}')

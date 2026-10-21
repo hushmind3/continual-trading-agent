@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import shutil
+from platform_native import npm_command
 import sys
 import tomllib
 from .store import owned
@@ -120,9 +121,7 @@ def prepare(source, spec, run, reuse=False):
         from .node_mcp import prepare as prepare_mcp
         prepare_mcp(source, spec, run)
     elif kind in ('vite', 'node-http'):
-        node = shutil.which('node')
-        npm = Path(node or '').parent / 'node_modules/npm/bin/npm-cli.js'
-        if not node or not npm.is_file(): raise ValueError('설치된 Node.js/npm을 찾지 못했습니다.')
+        node, npm = npm_command()
         lock = folder / 'package-lock.json'
         if not (reuse and (folder / 'node_modules').is_dir()):
             run([node, str(npm), 'ci' if lock.is_file() else 'install', '--no-audit', '--no-fund'], folder, 900)

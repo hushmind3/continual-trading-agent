@@ -43,9 +43,8 @@ def open_folder(request:dict):
         folder=Path(record.get('standalone_path') or (record.get('active_source') if record.get('builtin') else project_folder(record))).resolve()
         from .store import ROOT
         if not folder.is_dir() or not folder.is_relative_to(ROOT.resolve()):raise ValueError('앱 폴더가 없습니다.')
-        if os.name!='nt':raise ValueError('폴더 열기는 현재 Windows에서 지원합니다.')
-        os.startfile(str(folder))
-        return {'path':str(folder)}
+        from platform_native import open_folder
+        return open_folder(folder)
     return call(open_owned)
 
 

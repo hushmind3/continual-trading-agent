@@ -12,6 +12,7 @@ import sys
 import threading
 import uuid
 from fastapi import APIRouter, HTTPException, Request, Response
+from platform_native import native_runtime_path
 from fastapi.responses import FileResponse
 
 
@@ -34,9 +35,7 @@ class ModuleRuntime:
         command = self.spec['command']
         if not isinstance(command, list) or not command or not all(isinstance(value, str) for value in command):
             raise ValueError('모듈 실행 명령은 문자열 목록이어야 합니다.')
-        executable = self.folder / command[0]
-        if sys.platform != 'win32' and command[0].endswith('/Scripts/python.exe'):
-            executable = self.folder / command[0].removesuffix('/Scripts/python.exe') / 'bin/python'
+        executable = self.folder / native_runtime_path(command[0])
         if not executable.is_file():
             if any(separator in command[0] for separator in ('/', '\\')):
                 raise RuntimeError(f'{self.metadata["id"]} 전용 실행 환경이 없습니다: {executable}')

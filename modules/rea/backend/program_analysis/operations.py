@@ -3,6 +3,7 @@ import json,os,queue,re,shutil,subprocess,threading,sys
 from functools import lru_cache
 from pathlib import Path
 import psutil
+from platform_native import npm_command
 from rea import ROOT, CONFIG_DIR
 BASE=Path(__file__).parent.parent
 WORK=ROOT/'runtime/rea/program_analysis'
@@ -11,7 +12,8 @@ SOURCE='https://github.com/morluto/rea'
 @lru_cache(maxsize=1)
 def node_runtime():
     choices=[os.environ.get('STOCKRL_REA_NODE'),shutil.which('node')]
-    choices += [str(p/'node.exe') for p in sorted((Path.home()/'AppData/Local/Programs').glob('node-v*-win-x64'),reverse=True)]
+    if os.name=='nt':
+        choices += [str(p/'node.exe') for p in sorted((Path.home()/'AppData/Local/Programs').glob('node-v*-win-x64'),reverse=True)]
     for candidate in dict.fromkeys(p for p in choices if p):
         try:
             result=subprocess.run([candidate,'--version'],capture_output=True,text=True,timeout=5,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
@@ -110,11 +112,7 @@ def call_tool(name,arguments):
 
 
 def install():
-    node,_=node_runtime();npm=shutil.which('npm')
-    if not npm:raise RuntimeError('npm이 설치되지 않았습니다.')
-    npm_path=Path(npm).resolve().parent/'node_modules/npm/bin/npm-cli.js'
-    if not npm_path.is_file():npm_path=Path(node).parent/'node_modules/npm/bin/npm-cli.js'
-    if not npm_path.is_file():raise RuntimeError('npm-cli.js를 찾을 수 없습니다.')
+    node,_=node_runtime();node,npm_path=npm_command(node)
     env=os.environ.copy();env['PATH']=str(Path(node).parent)+os.pathsep+env.get('PATH','')
     if os.name=='nt':env['ComSpec']=str(Path(os.environ.get('SystemRoot','C:/Windows'))/'System32/cmd.exe')
     subprocess.run([node,str(npm_path),'ci','--workspaces=false','--no-audit','--no-fund'],cwd=BASE.parent,env=env,check=True)

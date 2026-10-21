@@ -11,6 +11,7 @@
 | [platform_modules.py](platform_modules.py) | modules/*/module.json 탐색·Python 등록·실행 보호 훅 |
 | [menu_registry.py](menu_registry.py) | 모듈 등록 정보를 취합하는 총괄 |
 | [web_api.py](web_api.py) | 단일 /api 진입점; 총괄만 통해 기능 등록 |
+| [platform_native.py](platform_native.py) | OS별 npm·브라우저 탐색·폴더 열기; 표준 라이브러리만 사용, 설치·모델 호출 없음 |
 | api_context.py, api_transport.py | 공유 HTTP 객체·요청 전달·React 제공 |
 | runtime/rea/project_explorer/projects/ | 저장된 원본·추론 분석 결과; 실행 기능 등록 대상이 아니며 Git 제외 |
 
@@ -36,7 +37,7 @@
 | runtime/ai_agent/Hermes/ | 헤르메스 대화·세션·설정·MCP·스킬 |
 | runtime/shared/engines/ | 여러 메뉴가 공유하는 실행기 |
 
-별도 생성 파일이 없는 메뉴는 빈 런타임 폴더를 만들지 않습니다. 원본 모델과 모델별 JSON은 바탕화면 모델 폴더를 계속 사용합니다. 기존 런타임 이동은 development/scripts/runtime_layout.py가 담당하며 서버·감시기·작업 프로세스를 중지한 상태에서만 사용합니다. 같은 이름의 목적지가 있으면 덮어쓰지 않습니다. 원본 모델을 역직렬화하거나 변환하지 않습니다.
+별도 생성 파일이 없는 메뉴는 빈 런타임 폴더를 만들지 않습니다. 원본 모델과 모델별 JSON은 사용자 지정 모델 폴더를 사용하며 현재 Mac은 프로젝트 모델/을 사용합니다. 기존 런타임 이동은 development/scripts/runtime_layout.py가 담당하며 서버·감시기·작업 프로세스를 중지한 상태에서만 사용합니다. 같은 이름의 목적지가 있으면 덮어쓰지 않습니다. 원본 모델을 역직렬화하거나 변환하지 않습니다.
 
 호스트 API 컨텍스트는 금융 라이브러리를 import하지 않습니다. module_runtime.py가 모듈별 실행 명령을 선택하고 JSON-line IPC/ASGI 응답만 연결합니다. Python 금융·REA와 Node 어댑터는 같은 규격을 사용합니다. platform_state_io.py는 호스트 자체 상태 입출력입니다. stockrl/·rea/에는 이전 import를 위한 연결만 남았습니다.
 
@@ -59,3 +60,7 @@ menu_registry.catalog는 한 모듈의 actions 조회 실패를 module_errors에
 2026-10-18 확인: 신규 오류 재현 8개는 수정 전 모두 실패했고 수정 후 관련 호스트/프로세스/등록/감시/프로젝트 수명주기 검사 총 35개가 통과했습니다. 8766에 적용한 뒤 health·등록 모듈 5개 available·상태/카탈로그 오류 없음·실행 차단 작업 없음까지 확인했습니다. 실제 금융 시세·학습·추론·주문 전체 회귀는 이번 점검에서 실행하지 않았습니다. 현재 서버 확인 자료는 runtime/platform/verification/host-resilience.json입니다.
 
 macOS 호스트도 같은 `/api`와 모듈 등록을 사용합니다. api_transport.UnifiedAPI는 전달 시점의 실제 scope를 병합해 FastAPI 수명주기 상태를 유지합니다. 호스트 FastAPI 버전은 development/scripts/requirements/platform.txt에 고정하며, 모듈 전용 패키지 환경과 분리합니다. Mac 실행과 확인 범위는 루트 README를 봅니다.
+
+Mac 모듈 실행: module_runtime.command는 공통 native_runtime_path로 Windows 표기의 경로 구분자와 Python/llama 실행 파일 경로를 해석합니다. platform_modules도 같은 변환으로 리소스 정보를 제공하므로 Mac API에 Windows 실행 경로를 표시하지 않습니다. 원본 module.json은 바꾸지 않아 다른 OS의 설치 정보를 보존합니다. module_sources의 기존 환경 hook이 공유 표준 라이브러리 도구 platform_native를 연결하며, 다른 메뉴의 업무 패키지는 import하지 않습니다. npm_command는 npm 심볼릭 링크의 실제 npm-cli.js를 Node로 직접 실행하고, browser_executable은 macOS 앱/Windows 설치/Linux 실행 경로를 선택합니다. open_folder는 Mac Finder(open), Windows startfile, Linux xdg-open을 사용합니다. 사용자 권한·데이터 저장 경계와 단일 /api는 유지합니다.
+
+2026-10-22 실제 적용: 기존 실행 중이던 REA worker에는 새 .pth hook이 재실행되지 않아 platform_native import 오류와 재시작 보호가 발생했습니다. 자식 작업이 없는 해당 REA 프로세스만 확인·종료한 뒤 같은 적용 경로로 정상 교체했습니다. 이후 health=ok, Hermes=idle/계정 연결 remote·native browser ready, rea/status 정상, 기존 REA 저장 기록 11개 조회를 확인했습니다. 프론트 변경이 없어 재빌드하지 않았고 기존 React 빌드를 유지했습니다. 모델 호출·새 프로젝트/제품·추가 설치는 하지 않았습니다. GUI 선택창/Finder/보이는 브라우저 조작·외부 앱 재설치·분리/ZIP 완주는 미확인입니다.

@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import urlopen
 import psutil
+from platform_native import browser_executable
 from rea import ROOT, CONFIG_DIR
 from rea.state_io import atomic_json
 from rea.program_analysis.operations import BASE
@@ -92,13 +93,16 @@ root.destroy();print(json.dumps({'path':value},ensure_ascii=False))
     process=None
     try:
         _cancel.clear();_processes.clear();_publish('picking','파일·폴더 선택창에서 대상을 선택하세요.')
-        process=subprocess.Popen([sys.executable,'-c',script,kind],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf8',env=runtime_environment(),creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        command = ['/usr/bin/osascript','-e','POSIX path of (choose '+('folder' if kind=='folder' else 'file')+' with prompt "분석할 대상 선택")'] if sys.platform=='darwin' else [sys.executable,'-c',script,kind]
+        process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf8',env=runtime_environment(),creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         _processes.append(process)
         if _cancel.is_set() and process.poll() is None:process.terminate()
         stdout,stderr=process.communicate()
         if _cancel.is_set():return {'path':''}
-        if process.returncode:raise RuntimeError('파일 선택창을 열지 못했습니다: '+stderr[-1000:])
-        return json.loads(stdout)
+        if process.returncode:
+            if sys.platform=='darwin' and '(-128)' in stderr:return {'path':''}
+            raise RuntimeError('파일 선택창을 열지 못했습니다: '+stderr[-1000:])
+        return {'path':stdout.rstrip('\r\n')} if sys.platform=='darwin' else json.loads(stdout)
     except RuntimeError:
         if _cancel.is_set():return {'path':''}
         raise
@@ -173,8 +177,7 @@ def _web(url,folder):
     parsed=urlparse(url)
     if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError('분석할 http/https 웹사이트 주소를 입력하세요.')
-    chrome=next((path for path in [Path(os.environ.get('PROGRAMFILES','C:/Program Files'))/'Google/Chrome/Application/chrome.exe',
-        Path(os.environ.get('PROGRAMFILES(X86)','C:/Program Files (x86)'))/'Microsoft/Edge/Application/msedge.exe'] if path.is_file()),None)
+    chrome=browser_executable()
     if not chrome:raise RuntimeError('설치된 Chrome 또는 Edge가 필요합니다.')
     profile=WORK/'browser'/uuid.uuid4().hex;profile.mkdir(parents=True)
     browser=_spawn([str(chrome),'--headless=new','--remote-debugging-port=0','--remote-debugging-address=127.0.0.1',

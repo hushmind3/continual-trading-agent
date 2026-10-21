@@ -15,3 +15,8 @@ operations.py는 설치된 원본 REA CLI/MCP·Ghidra와 연결하며 extract.py
 파일·폴더 선택도 분석과 같은 작업 잠금 및 중지 경로로 관리합니다. 취소는 선택 프로세스를 종료하고 빈 경로로 응답합니다. 서버 종료 시 남은 선택·분석 프로세스를 정리합니다. 실제 프론트 취소 요청 및 즉시 재선택을 확인했습니다. 입력 원본·코딩 에이전트는 실행하지 않았습니다.
 
 런타임: `runtime/rea/program_analysis/`. 분석 입력·도구 실행·임시 자료를 보관하며 최종 저장 프로젝트는 project_explorer 소메뉴의 런타임을 공유합니다.
+
+## macOS native 경로
+용도: 기존 REA 분석기의 실행 환경 호환성입니다. operations.node_runtime은 Mac에서 Windows AppData를 탐색하지 않고, 설치는 공통 platform_native.npm_command로 실제 Homebrew npm JS를 실행합니다. extract._web은 같은 도구의 native Chrome/Edge 실행 파일을 headless CDP로 사용합니다. extract.pick은 Mac에서 기본 osascript 파일/폴더 선택창을 사용하고 취소(-128)·분석 잠금·중지 처리를 유지합니다. 새 서버·분석 엔진·DB는 없습니다.
+
+2026-10-22 실제 확인: 기존 REA 환경에서 Node v26.7.0·npm 11.19.0·기존 저장 기록 조회를 확인했습니다. Mac Chrome을 실제 실행해 CDP 준비와 기존 8766 플랫폼 URL의 대상 등록을 확인했고 프로세스·임시 프로필은 정리했습니다. 첫 dump-dom 종료 대기는 시간 초과되어 중단했으며, REA가 실제 사용하는 CDP 경로로 확인을 전환했습니다. 전체 웹/바이너리 분석·로그인 페이지·파일 선택 대화상자 조작은 실행하지 않았습니다.

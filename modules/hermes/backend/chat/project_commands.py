@@ -3,9 +3,9 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import time
+from platform_native import npm_command
 
 
 def run(worker, args):
@@ -21,10 +21,7 @@ def run(worker, args):
         commands = {'versions': ['--version'], 'install': ['install', *(['--save-dev'] if args.get('development') else []), *packages],
                     'test': ['test', '--', '--run'], 'build': ['run', 'build'], 'package_info': ['view', *packages, 'version']}
         if action not in commands or action == 'package_info' and len(packages)!=1: raise ValueError('지원하지 않는 npm 요청입니다.')
-        node = shutil.which('node'); npm = shutil.which('npm.cmd') or shutil.which('npm')
-        cli = Path(npm).parent/'node_modules/npm/bin/npm-cli.js' if npm else None
-        if not node or not cli or not cli.is_file(): raise ValueError('공유 Node/npm 실행기를 찾지 못했습니다.')
-        command = [node, str(cli), *commands[action]]
+        command = [*npm_command(), *commands[action]]
         process = subprocess.Popen(command, cwd=folder, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, encoding='utf-8', errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         start=time.monotonic(); failure=None

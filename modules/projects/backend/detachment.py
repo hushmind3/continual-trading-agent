@@ -73,6 +73,9 @@ def prepare(record,target,progress):
         copy_environment(store.ROOT/'.venv/platform',environment)
     (target/'.runtime').mkdir(exist_ok=True)
     (target/'실행.cmd').write_text('@echo off\ncd /d "%~dp0"\npy -X utf8 run.py run\npause\n',encoding='utf8')
+    launcher=target/'실행.command'
+    launcher.write_text('#!/bin/zsh\nset -e\ncd "${0:A:h}"\nexport PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"\npython3 run.py run\n',encoding='utf8')
+    launcher.chmod(0o755)
     if record.get('builtin'):
         node=target/'node_modules'
         shutil.copytree(long_path(store.ROOT/'node_modules'),long_path(node),copy_function=os.link,
@@ -137,7 +140,7 @@ def start(key):
                     (target/'.runtime/environment.json').write_text(json.dumps(record.get('environment',{})),encoding='utf8')
                 record.update(stage='removed',standalone_path=str(target),detached_module=str(destination),
                     detached_moves=[{'original':str(a),'detached':str(b)} for a,b in moves],
-                    detail='분리 완료 · 이 폴더의 실행.cmd로 바로 실행하거나 다시 연결할 수 있습니다.')
+                    detail='분리 완료 · 이 폴더의 실행.cmd(Windows)·실행.command(Mac)로 실행하거나 다시 연결할 수 있습니다.')
                 store.save(record)
         except Exception as exc:
             with store.LOCK:

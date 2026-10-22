@@ -1,5 +1,5 @@
 diff --git a/web/src/App.tsx b/web/src/App.tsx
-index 49b23a40..e62f7f6e 100644
+index 49b23a40..5342dc2f 100644
 --- a/web/src/App.tsx
 +++ b/web/src/App.tsx
 @@ -192,7 +192,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
@@ -7,1113 +7,149 @@ index 49b23a40..e62f7f6e 100644
      icon: MessageSquare,
    },
 -  { path: "/files", label: "Files", icon: FolderOpen },
-+  { path: "/files", label: "파일", icon: FolderOpen },
++  { path: "/files", labelKey: "files", label: "Files", icon: FolderOpen },
    {
      path: "/analytics",
      labelKey: "analytics",
-@@ -210,13 +210,13 @@ const BUILTIN_NAV_REST: NavItem[] = [
+@@ -209,14 +209,14 @@ const BUILTIN_NAV_REST: NavItem[] = [
+   { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock },
    { path: "/skills", labelKey: "skills", label: "Skills", icon: Package },
    { path: "/plugins", labelKey: "plugins", label: "Plugins", icon: Puzzle },
-   { path: "/mcp", label: "MCP", icon: Plug },
+-  { path: "/mcp", label: "MCP", icon: Plug },
 -  { path: "/channels", label: "Channels", icon: Radio },
 -  { path: "/webhooks", label: "Webhooks", icon: Webhook },
 -  { path: "/pairing", label: "Pairing", icon: ShieldCheck },
-+  { path: "/channels", label: "채널", icon: Radio },
-+  { path: "/webhooks", label: "외부 이벤트 연결", icon: Webhook },
-+  { path: "/pairing", label: "연결 승인", icon: ShieldCheck },
++  { path: "/mcp", labelKey: "mcp", label: "MCP", icon: Plug },
++  { path: "/channels", labelKey: "channels", label: "Channels", icon: Radio },
++  { path: "/webhooks", labelKey: "webhooks", label: "Webhooks", icon: Webhook },
++  { path: "/pairing", labelKey: "pairing", label: "Pairing", icon: ShieldCheck },
    { path: "/profiles", labelKey: "profiles", label: "Profiles", icon: Users },
    { path: "/config", labelKey: "config", label: "Config", icon: Settings },
    { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound },
 -  { path: "/system", label: "System", icon: Wrench },
-+  { path: "/system", label: "시스템", icon: Wrench },
++  { path: "/system", labelKey: "system", label: "System", icon: Wrench },
    {
      path: "/docs",
      labelKey: "documentation",
-diff --git a/web/src/components/ChatSidebar.tsx b/web/src/components/ChatSidebar.tsx
-index 94071b4e..9ad9a9f8 100644
---- a/web/src/components/ChatSidebar.tsx
-+++ b/web/src/components/ChatSidebar.tsx
-@@ -83,11 +83,11 @@ const SIDE_CAR_GAVE_UP_MESSAGE =
-   `${SIDE_CAR_MAX_RECONNECT_ATTEMPTS} attempts, use Reconnect`;
- 
- const STATE_LABEL: Record<ConnectionState, string> = {
--  idle: 'idle',
--  connecting: 'connecting',
--  open: 'live',
--  closed: 'closed',
--  error: 'error'
-+  idle: '대기',
-+  connecting: '연결 중',
-+  open: '연결됨',
-+  closed: '연결 끊김',
-+  error: '오류'
- }
- 
- const STATE_TONE: Record<ConnectionState, 'secondary' | 'warning' | 'success' | 'destructive'> = {
-@@ -549,7 +549,7 @@ export function ChatSidebar({
-     >
-       <Card className="flex items-center justify-between gap-2 px-3 py-2">
-         <div className="min-w-0 flex-1">
--          <div className="text-display text-xs tracking-wider text-text-tertiary">model</div>
-+          <div className="text-display text-xs tracking-wider text-text-tertiary">모델</div>
- 
-           <Button
-             ghost
-@@ -560,7 +560,7 @@ export function ChatSidebar({
-               'self-start normal-case tracking-normal text-sm font-medium',
-               'hover:underline disabled:no-underline'
-             )}
--            title={modelName === '—' ? 'switch model' : modelName}
-+            title={modelName === '—' ? '모델 변경' : modelName}
-           >
-             <span className="flex min-w-0 max-w-full items-center gap-1">
-               <span className="truncate">{modelLabel}</span>
-@@ -583,7 +583,7 @@ export function ChatSidebar({
-             refreshKey={modelRefreshKey}
-             onChanged={effort =>
-               setModelNotice(
--                `Reasoning effort set to ${effort}. Run /new or refresh the page to apply it to this chat.`
-+                `추론 수준을 ${effort}(으)로 저장했습니다. 이 채팅에 적용하려면 /new를 실행하거나 페이지를 새로고침하세요.`
-               )
-             }
-           />
-@@ -613,12 +613,12 @@ export function ChatSidebar({
-                 onClick={() => window.location.reload()}
-                 prefix={<RefreshCw />}
-               >
--                Reload page
-+                페이지 새로고침
-               </Button>
-             )}
-             {error && !showReload && (
-               <Button size="sm" outlined className="mt-1" onClick={reconnect} prefix={<RefreshCw />}>
--                Reconnect side panel
-+                보조 패널 다시 연결
-               </Button>
-             )}
-             {!error && credential && (
-@@ -632,10 +632,10 @@ export function ChatSidebar({
-                   // still lives under ChatPage, so router context is present.)
-                   onClick={() => navigate('/env')}
-                 >
--                  Add key
-+                  키 추가
-                 </Button>
-                 <Button size="sm" outlined onClick={() => setModelOpen(true)}>
--                  Switch model
-+                  모델 변경
-                 </Button>
-               </div>
-             )}
-diff --git a/web/src/components/ModelPickerDialog.tsx b/web/src/components/ModelPickerDialog.tsx
-index 2bca8f3b..360809f0 100644
---- a/web/src/components/ModelPickerDialog.tsx
-+++ b/web/src/components/ModelPickerDialog.tsx
-@@ -97,7 +97,7 @@ export function ModelPickerDialog(props: Props) {
-     loader,
-     onApply,
-     onClose,
--    title = "Switch Model",
-+    title = "모델 변경",
-     alwaysGlobal = false,
-     currentAssignment,
-   } = props;
-@@ -390,7 +390,7 @@ export function ModelPickerDialog(props: Props) {
-             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-             <Input
-               autoFocus
--              placeholder="Filter providers and models…"
-+              placeholder="모델 제공자·모델 검색…"
-               value={query}
-               onChange={(e) => setQuery(e.target.value)}
-               className="pl-7 h-8 text-sm"
-@@ -437,7 +437,7 @@ export function ModelPickerDialog(props: Props) {
-         <footer className="border-t border-border p-3 flex items-center justify-between gap-3 flex-wrap">
-           {alwaysGlobal ? (
-             <span className="text-xs text-muted-foreground">
--              Saves to config.yaml — applies to new sessions.
-+              설정을 저장합니다. 새 대화부터 적용됩니다.
-             </span>
-           ) : (
-             <div className="flex items-center gap-2">
-@@ -453,7 +453,7 @@ export function ModelPickerDialog(props: Props) {
-                 className="font-mondwest normal-case tracking-normal text-xs text-muted-foreground cursor-pointer"
-                 htmlFor="model-picker-persist-global"
-               >
--                Persist globally (otherwise this session only)
-+                기본 모델로 저장 (끄면 현재 대화에만 적용)
-               </Label>
-             </div>
-           )}
-@@ -465,24 +465,24 @@ export function ModelPickerDialog(props: Props) {
-               disabled={applying || loading || refreshing}
-             >
-               {refreshing ? <Spinner /> : <RefreshCw className="h-3.5 w-3.5" />}
--              Refresh Models
-+              모델 목록 새로고침
-             </Button>
-             <Button outlined onClick={onClose} disabled={applying}>
--              Cancel
-+              취소
-             </Button>
-             <Button onClick={confirm} disabled={!canConfirm}>
--              {applying ? <Spinner /> : "Switch"}
-+              {applying ? <Spinner /> : "변경"}
-             </Button>
-           </div>
-         </footer>
-       </div>
-       <ConfirmDialog
-         open={!!pendingConfirm}
--        title="Expensive Model Warning"
-+        title="고비용 모델 선택 확인"
-         description={pendingConfirm?.message}
-         destructive
--        confirmLabel="Switch anyway"
--        cancelLabel="Cancel"
-+        confirmLabel="비용을 확인하고 변경"
-+        cancelLabel="취소"
-         loading={applying}
-         onCancel={() => setPendingConfirm(null)}
-         onConfirm={() => {
-@@ -503,7 +503,7 @@ export function ModelPickerDialog(props: Props) {
- 
- /** Empty picker: no key and no OAuth login anywhere. Points at the two in-app fixes. */
- export const NO_PROVIDERS_MESSAGE =
--  "No model providers are set up yet. Add an API key under Keys or sign in to a provider under Models to see models here.";
-+  "연결된 모델 제공자가 없습니다. 키 화면에서 API 키를 추가하거나 모델 화면에서 로그인하세요.";
- 
- function ProviderColumn({
-   loading,
-@@ -531,7 +531,7 @@ function ProviderColumn({
-     <div className="border-r border-border overflow-y-auto">
-       {loading && (
-         <div className="flex items-center gap-2 p-4 text-xs text-muted-foreground">
--          <Spinner className="text-xs" /> loading…
-+          <Spinner className="text-xs" /> 불러오는 중…
-         </div>
-       )}
- 
-@@ -540,16 +540,16 @@ function ProviderColumn({
-       {!loading && !error && providers.length === 0 && (
-         <div className="p-4 text-xs text-muted-foreground">
-           {query || total > 0 ? (
--            <span className="italic">No providers match your search.</span>
-+            <span className="italic">검색 조건에 맞는 모델 제공자가 없습니다.</span>
-           ) : (
-             <div className="flex flex-col gap-2">
-               <span>{NO_PROVIDERS_MESSAGE}</span>
-               <div className="flex flex-wrap gap-2">
-                 <Link to="/env" onClick={onClose} className="underline underline-offset-2 hover:text-foreground">
--                  Open Keys
-+                  인증 키 설정
-                 </Link>
-                 <Link to="/models" onClick={onClose} className="underline underline-offset-2 hover:text-foreground">
--                  Sign in to a provider
-+                  모델 제공자 로그인
-                 </Link>
-               </div>
-             </div>
-@@ -614,7 +614,7 @@ function ModelColumn({
-     return (
-       <div className="overflow-y-auto">
-         <div className="p-4 text-xs text-muted-foreground italic">
--          pick a provider →
-+          모델 제공자를 선택하세요 →
-         </div>
-       </div>
-     );
-@@ -631,8 +631,8 @@ function ModelColumn({
-       {models.length === 0 ? (
-         <div className="p-4 text-xs text-muted-foreground italic">
-           {allModels.length
--            ? "no models match your filter"
--            : "no models listed for this provider"}
-+            ? "검색 조건에 맞는 모델이 없습니다"
-+            : "이 제공자의 모델 목록이 없습니다"}
-         </div>
-       ) : (
-         models.map(({ model: m, positions }) => {
-@@ -666,7 +666,7 @@ function ModelColumn({
- function CurrentTag() {
-   return (
-     <span className="text-display text-xs tracking-wider text-primary shrink-0">
--      current
-+      현재 사용 중
-     </span>
-   );
- }
-diff --git a/web/src/components/ModelReloadConfirm.tsx b/web/src/components/ModelReloadConfirm.tsx
-index 3b5d27d6..f014a136 100644
---- a/web/src/components/ModelReloadConfirm.tsx
-+++ b/web/src/components/ModelReloadConfirm.tsx
-@@ -27,12 +27,12 @@ export function ModelReloadConfirm({
-   return (
-     <ConfirmDialog
-       open={model !== null}
--      title="Switch model?"
-+      title="모델을 바꿔 새 대화를 시작할까요?"
-       description={
-         description ??
--        `Switching to ${model ?? ""} starts a fresh chat. Your current chat stays in your Sessions list and the agent's memory is kept. Reload now to apply it?`
-+        `${model ?? ""}(으)로 바꾸면 새 대화를 시작합니다. 현재 대화는 세션 목록에 남고 에이전트의 기억도 유지됩니다. 지금 적용할까요?`
-       }
--      confirmLabel="Reload"
-+      confirmLabel="새 모델 적용"
-       onConfirm={() => window.location.reload()}
-       onCancel={onCancel}
-     />
-diff --git a/web/src/components/ReasoningPicker.tsx b/web/src/components/ReasoningPicker.tsx
-index 7883f588..a96efe86 100644
---- a/web/src/components/ReasoningPicker.tsx
-+++ b/web/src/components/ReasoningPicker.tsx
-@@ -98,7 +98,7 @@ export function ReasoningPicker({
-     <div className="flex items-center gap-2 px-3 py-2 text-xs">
-       <div className="flex items-center gap-1.5 text-text-tertiary">
-         <Brain className="h-3.5 w-3.5" />
--        <span className="text-display tracking-wider">reasoning</span>
-+        <span className="text-display tracking-wider">추론 수준</span>
-       </div>
-       <Select
-         className="ml-auto min-w-0"
-diff --git a/web/src/i18n/context.tsx b/web/src/i18n/context.tsx
-index e407988e..0c4e516b 100644
---- a/web/src/i18n/context.tsx
-+++ b/web/src/i18n/context.tsx
-@@ -60,7 +60,7 @@ function getInitialLocale(): Locale {
-   } catch {
-     // SSR or privacy mode
-   }
--  return "en";
-+  return "ko";
- }
- 
- interface I18nContextValue {
-@@ -70,9 +70,9 @@ interface I18nContextValue {
- }
- 
- const I18nContext = createContext<I18nContextValue>({
--  locale: "en",
-+  locale: "ko",
-   setLocale: () => {},
--  t: en,
-+  t: ko,
- });
- 
- export function I18nProvider({ children }: { children: ReactNode }) {
 diff --git a/web/src/i18n/ko.ts b/web/src/i18n/ko.ts
-index 5d2e9911..5c935b8e 100644
+index 5d2e9911..663657d5 100644
 --- a/web/src/i18n/ko.ts
 +++ b/web/src/i18n/ko.ts
-@@ -2,6 +2,11 @@ import type { Translations } from "./types";
- 
- export const ko: Translations = {
-   common: {
-+    loadFailed: "{what}을(를) 불러오지 못했습니다. 서버가 실행 중인지 확인한 뒤 다시 시도하세요.",
-+    loadFailedDetails: "오류 상세: {detail}",
-+    gateway: "연결 서비스",
-+    gatewayHint: "메신저, API 서버, 웹훅은 채널 화면에서 설정합니다. 여기서는 연결 서비스 전체의 프록시·중계 방식과 접근 허용 목록을 관리합니다.",
-+
-     save: "저장",
-     saving: "저장 중...",
-     cancel: "취소",
-@@ -50,6 +55,24 @@ export const ko: Translations = {
-   },
- 
-   app: {
-+    managingProfile: "관리 중인 프로필",
-+    currentProfileOption: "현재 화면 ({name})",
-+    managingProfileBanner: "“{name}” 프로필을 관리하고 있습니다. 설정·키·스킬·MCP·모델과 새 채팅은 이 프로필에 적용됩니다.",
-+    memoryOomRestartBanner: "에이전트가 예기치 않게 재시작됐습니다. 메모리 부족이 원인일 수 있습니다. 긴 대화나 동시 작업이 많으면 메모리 사용량이 늘어납니다.",
-+    memoryCriticalBanner: "메모리가 거의 부족해 에이전트가 재시작될 수 있습니다. 사용하지 않는 세션을 닫거나 메모리를 늘려 주세요.",
-+    memoryElevatedBanner: "에이전트가 사용할 수 있는 메모리가 부족합니다.",
-+    diskCriticalBanner: "저장 공간이 거의 가득 찼습니다. 새 메시지·기억·설정이 저장되지 않을 수 있습니다.",
-+    diskElevatedBanner: "저장 공간이 부족해지고 있습니다. 오래된 세션을 정리하거나 저장 공간을 늘려 주세요.",
-+    multiplexStandaloneBanner: "현재 연결 서비스는 프로필 하나만 처리합니다. 연결되지 않은 프로필: {profiles}. 원인: {reason}. 전환 명령: hermes gateway migrate --multiplex",
-+    dismiss: "닫기",
-+    sharedMetricsTitle: "사용 통계 제공에 동의하시겠어요?",
-+    sharedMetricsBody: "제한된 횟수 통계만 하루 한 번 Nous에 전송합니다. 프롬프트·파일·경로·오류 원문은 보내지 않습니다.",
-+    sharedMetricsReaskBody: "이전 버전에서 이 질문을 보기 전에 거절로 저장됐을 수 있어 한 번 더 확인합니다.",
-+    sharedMetricsShare: "통계 제공 동의",
-+    sharedMetricsOff: "제공하지 않음",
-+    sharedMetricsDetails: "자세히 보기",
-+    sharedMetricsSaveFailed: "선택을 저장하지 못했습니다",
-+
-     brand: "Hermes Agent",
-     brandShort: "HA",
-     closeNavigation: "내비게이션 닫기",
-@@ -60,6 +83,9 @@ export const ko: Translations = {
-     activeSessionsLabel: "활성 세션:",
-     gatewayStatusLabel: "게이트웨이 상태:",
-     gatewayStrip: {
-+      degraded: "일부 기능 이상",
-+      heartbeatStale: "응답 확인 지연",
-+
-       failed: "시작 실패",
-       off: "꺼짐",
-       running: "실행 중",
-@@ -70,7 +96,7 @@ export const ko: Translations = {
+@@ -68,17 +68,23 @@ export const ko: Translations = {
+     },
+     nav: {
        analytics: "분석",
++      channels: "채널",
        chat: "채팅",
        config: "설정",
 -      cron: "Cron",
 +      cron: "예약 작업",
        documentation: "문서",
++      files: "파일",
        keys: "키",
        logs: "로그",
-@@ -89,10 +115,17 @@ export const ko: Translations = {
-     sessionsActiveCount: "{count}개 활성",
-     statusOverview: "상태 개요",
-     system: "시스템",
--    webUi: "Web UI",
-+    webUi: "웹 화면",
-   },
- 
-   status: {
-+    disabled: "비활성화됨",
-+    restartGatewayConfirmMessage: "헤르메스 연결 서비스를 재시작합니다. 연결된 채널과 활성 세션은 재시작 후 다시 연결됩니다.",
-+    restartGatewayConfirmTitle: "연결 서비스를 재시작할까요?",
-+    updateHermesConfirmMessage: "hermes update를 실행하고 완료 후 연결 서비스를 재시작합니다. 그때까지 활성 세션의 프롬프트 캐시는 유지됩니다.",
-+    updateHermesConfirmNow: "지금 업데이트",
-+    updateHermesConfirmTitle: "헤르메스를 업데이트할까요?",
-+
-     actionFailed: "작업 실패",
-     actionFinished: "완료됨",
-     actionFinishedOwed: "업데이트되었지만 아직 남은 작업이 있습니다 (완료하려면 `hermes update`를 다시 실행하세요)",
-@@ -230,10 +263,15 @@ export const ko: Translations = {
-   },
- 
-   cron: {
-+    loadWhat: "예약 작업",
-+    scriptRequired: "스크립트 전용 작업에는 스크립트 경로가 필요합니다. 경로를 입력하거나 프롬프트 방식으로 바꿔 주세요.",
-+    overdueSince: "실행 예정 시각 경과",
-+    schedulerLastTicked: "마지막 일정 확인: {when}. 이후 실행 시각이 된 작업은 아직 실행되지 않았습니다.",
-+
-     confirmDeleteMessage:
-       "이 작업은 일정에서 작업을 제거합니다. 되돌릴 수 없습니다.",
-     confirmDeleteTitle: "예약된 작업을 삭제하시겠습니까?",
--    newJob: "새 Cron 작업",
-+    newJob: "새 예약 작업",
-     nameOptional: "이름 (선택 사항)",
-     namePlaceholder: "예: 일일 요약",
-     prompt: "프롬프트",
-@@ -283,15 +321,49 @@ export const ko: Translations = {
-     resume: "재개",
-     triggerNow: "지금 실행",
-     delivery: {
-+      needsHomeChannel: "먼저 기본 알림 채널을 설정하세요",
-+      noneConfigured: "연결된 메신저가 없습니다. 보고서를 받으려면 채널 화면에서 연결하세요.",
-+
-       local: "로컬",
-       telegram: "Telegram",
-       discord: "Discord",
-       slack: "Slack",
--      email: "Email",
-+      email: "이메일",
++      mcp: "MCP",
+       models: "모델",
++      pairing: "연결 승인",
+       profiles: "프로필: 멀티 에이전트",
+       plugins: "플러그인",
+       sessions: "세션",
+       skills: "스킬",
++      system: "시스템",
++      webhooks: "외부 이벤트 연결",
      },
-   },
- 
-   profiles: {
-+    activeProfile: "현재 프로필",
-+    activeBadge: "사용 중",
-+    setActive: "이 프로필 사용",
-+    activeSet: "사용할 프로필을 변경했습니다",
-+    gatewayRunning: "연결 서비스 실행 중",
-+    gatewayStopped: "연결 서비스 중지됨",
-+    gatewayRunningWarning: "이 프로필의 연결 서비스가 실행 중입니다. 작업을 진행하면 중지됩니다.",
-+    aliasBadge: "별칭",
-+    description: "설명",
-+    descriptionPlaceholder: "이 에이전트의 전문 분야와 맡을 일을 적으세요. 작업 담당자를 정할 때 참고합니다.",
-+    noDescription: "등록된 설명이 없습니다",
-+    editDescription: "설명 수정",
-+    descriptionSaved: "설명을 저장했습니다",
-+    reviewBadge: "검토 필요",
-+    autoGenerate: "자동 작성",
-+    generating: "작성 중…",
-+    describeFailed: "설명을 작성하지 못했습니다",
-+    distribution: "배포 구성",
-+    advancedOptions: "고급 설정",
-+    cloneAll: "모두 복사 (기억·대화·스킬·상태)",
-+    noSkillsOption: "기본 제공 스킬을 추가하지 않음",
-+    descriptionOptional: "설명 (선택)",
-+    modelOptional: "모델 (선택)",
-+    modelInherit: "복사한 프로필 또는 기본 모델 사용",
-+    modelLoading: "모델을 불러오는 중…",
-+    modelNone: "연결된 모델 제공자가 없습니다. 키 화면에서 API 키를 추가하거나 모델 화면에서 로그인하세요.",
-+    editModel: "모델 변경",
-+    modelSaved: "모델을 변경했습니다",
-+    modelSelect: "모델 선택",
-+    actions: "작업",
-+
-     newProfile: "새 프로필",
-     name: "이름",
-     namePlaceholder: "예: coder, writer 등.",
-@@ -324,6 +396,23 @@ export const ko: Translations = {
+     modelToolsSheetSubtitle: "및 도구",
+     modelToolsSheetTitle: "모델",
+@@ -324,6 +330,11 @@ export const ko: Translations = {
    },
  
    pluginsPage: {
 +    catalogHeading: "플러그인 목록",
-+    catalogHint: "Nous에서 검토하고 특정 버전으로 고정한 플러그인입니다. 검증된 버전을 설치하려면 이 목록을 이용하세요.",
++    catalogHint: "검토를 거쳐 특정 버전으로 고정한 플러그인입니다.",
 +    catalogSearchPlaceholder: "플러그인 검색…",
 +    catalogEmpty: "검색 조건에 맞는 플러그인이 없습니다.",
-+    catalogEmptyDocsLink: "플러그인 사용법 보기",
-+    catalogInstallBtn: "설치",
-+    catalogInstalledBadge: "설치됨 ✓",
-+    catalogUpdateBtn: "업데이트 가능",
-+    catalogRemovedBadge: "제거됨",
-+    catalogConfirmTitle: "이 플러그인을 설치할까요?",
-+    catalogConfirmInstallNote: "설치 직후에는 비활성 상태입니다. 사용하려면 설치 후 활성화하세요.",
-+    catalogRequiresEnv: "필요한 환경 변수",
-+    removedFromCatalog: "목록에서 제외됨",
-+    updateConsentBody: (name: string, sha: string) => `새 버전 ${name} (${sha})에는 현재 설치본에 없는 기능과 접근 범위가 추가됩니다. 아래 내용을 신뢰할 때만 적용하세요:`,
-+    updateScanBody: (name: string, count: number) => `보안 검사에서 ${name}의 새 코드에 주의 사항 ${count}개가 발견됐습니다. 출처를 신뢰할 때만 업데이트하세요:`,
-+    updateScanBlocked: (name: string) => `${name}의 새 코드가 보안 검사에서 위험으로 판정되어 업데이트하지 않았습니다.`,
-+
++    catalogEmptyDocsLink: "Hermes 플러그인 안내 보기",
      contextEngineLabel: "컨텍스트 엔진",
      dashboardSlots: "대시보드 슬롯",
      disableRuntime: "비활성화",
-@@ -367,6 +456,13 @@ export const ko: Translations = {
-   },
- 
-   skills: {
-+    loadWhat: "스킬",
-+    browseHub: "스킬 찾아보기",
-+    createSkill: "스킬 만들기",
-+    profileSelector: "프로필",
-+    currentProfile: "현재 ({name})",
-+    managingProfile: "“{name}” 프로필의 스킬을 관리합니다. 변경 사항은 현재 화면이 아닌 해당 프로필에 적용됩니다.",
-+
-     title: "스킬",
-     searchPlaceholder: "스킬 및 도구 세트 검색...",
-     enabledOf: "{enabled}/{total} 활성화됨",
-@@ -505,6 +601,13 @@ export const ko: Translations = {
-   },
- 
-   theme: {
-+    fontTitle: "글꼴",
-+    fontDefault: "테마 기본 글꼴",
-+    fontDefaultHint: "현재 테마에 지정된 글꼴 사용",
-+    fontSans: "고딕체",
-+    fontSerif: "명조체",
-+    fontMono: "고정폭 글꼴",
-+
-     title: "테마",
-     switchTheme: "테마 전환",
-   },
-@@ -616,6 +719,30 @@ export const ko: Translations = {
-     },
-   },
-   kanban: {
-+    needsAssignee: "담당자 지정 필요",
-+    needsAssigneeHint: "선행 작업은 끝났지만 담당 프로필을 지정해야 이 작업을 배정합니다.",
-+    confirmScheduled: "예약 작업으로 옮길까요? 사람의 답변을 기다리는 작업이 아니라, 정해진 시간이 지난 후 실행할 때 사용합니다.",
-+    newTaskTitle: "새 작업 — {column}",
-+    taskTitleLabel: "제목",
-+    assigneeLabel: "담당자",
-+    assigneeLabelHint: "(비우면 자동 배정)",
-+    skillsLabel: "스킬",
-+    skillsLabelHint: "(선택, 쉼표로 구분)",
-+    parentLabel: "선행 작업",
-+    parentLabelHint: "(선행 작업이 끝날 때까지 대기)",
-+    create: "만들기",
-+    boardSettings: "설정",
-+    boardSettingsTitle: "작업판 이름·설명·새 작업의 기본 폴더 설정",
-+    boardSettingsTitleFor: "작업판 설정 — {name}",
-+    projectDirectoryOverrideHint: "새 작업은 이 폴더를 기본 작업 공간으로 사용합니다. 작업을 만들 때 개별 변경할 수 있습니다.",
-+    saving: "저장 중…",
-+    commentHint: "댓글은 다음 실행이나 kanban_show() 호출 때 담당자에게 전달됩니다. 작업을 먼저 중지할 필요는 없습니다.",
-+    commentHintTitle: "댓글로 작업 담당자에게 의견을 전달하세요. 댓글은 즉시 대화에 기록되고 실행 중인 담당자는 다음 작업 조회나 재실행 때 확인합니다. 담당자를 멈춰 답변을 기다리게 할 때만 작업을 차단하세요.",
-+
-+    trash: {
-+      confirmTitle: "작업을 삭제할까요?",
-+      confirmManyTitle: "작업 {n}개를 삭제할까요?",
-+    },
-     loading: "Kanban 보드를 불러오는 중입니다…",
-     loadFailed: "Kanban 보드를 불러오지 못했습니다: ",
-     loadFailedHint:
-diff --git a/web/src/lib/aux-tasks.ts b/web/src/lib/aux-tasks.ts
-index e2df12d7..e02653b8 100644
---- a/web/src/lib/aux-tasks.ts
-+++ b/web/src/lib/aux-tasks.ts
-@@ -13,18 +13,18 @@ export interface AuxTaskMeta {
- // not listed here: the backend appends them to `/api/model/auxiliary` with the
- // plugin's own `label`/`hint` and `auxTaskRows` folds them in after these.
- export const BUILTIN_AUX_TASKS: readonly AuxTaskMeta[] = [
--  { key: "vision", label: "Vision", hint: "Image analysis" },
--  { key: "compression", label: "Compression", hint: "Context compaction" },
--  { key: "skills_hub", label: "Skills Hub", hint: "Skill search" },
--  { key: "approval", label: "Approval", hint: "Smart auto-approve" },
--  { key: "mcp", label: "MCP", hint: "MCP tool routing" },
--  { key: "title_generation", label: "Title Gen", hint: "Session titles" },
--  { key: "review", label: "Review", hint: "/review subagent" },
--  { key: "voice_chat", label: "Voice Chat", hint: "Spoken voice-mode replies" },
--  { key: "triage_specifier", label: "Triage Specifier", hint: "Kanban spec fleshing" },
--  { key: "kanban_decomposer", label: "Kanban Decomposer", hint: "Task decomposition" },
--  { key: "profile_describer", label: "Profile Describer", hint: "Auto profile descriptions" },
--  { key: "curator", label: "Curator", hint: "Skill-usage review" },
-+  { key: "vision", label: "이미지 이해", hint: "이미지 내용 분석" },
-+  { key: "compression", label: "문맥 압축", hint: "긴 대화 요약·압축" },
-+  { key: "skills_hub", label: "스킬 검색", hint: "필요한 스킬 찾기" },
-+  { key: "approval", label: "실행 승인 판단", hint: "자동 승인 규칙 판단" },
-+  { key: "mcp", label: "MCP", hint: "외부 도구 선택" },
-+  { key: "title_generation", label: "대화 제목", hint: "대화 제목 자동 작성" },
-+  { key: "review", label: "검토", hint: "/review 명령의 검토 담당" },
-+  { key: "voice_chat", label: "음성 대화", hint: "음성 대화의 답변 생성" },
-+  { key: "triage_specifier", label: "안건 구체화", hint: "안건의 요구사항 정리" },
-+  { key: "kanban_decomposer", label: "작업 분할", hint: "큰 작업을 실행 단위로 나누기" },
-+  { key: "profile_describer", label: "프로필 설명", hint: "프로필 설명 자동 작성" },
-+  { key: "curator", label: "스킬 개선", hint: "스킬 사용 결과 검토" },
- ] as const;
- 
- /**
-diff --git a/web/src/lib/chat-sidebar-banner.ts b/web/src/lib/chat-sidebar-banner.ts
-index 5b532b50..8e016da3 100644
---- a/web/src/lib/chat-sidebar-banner.ts
-+++ b/web/src/lib/chat-sidebar-banner.ts
-@@ -7,7 +7,7 @@
- 
- /** The side panel could not connect; the chat itself is unaffected. */
- export const SIDECAR_DISCONNECTED_MESSAGE =
--  'The chat side panel (model and tool activity) could not connect. Chat still works. Click Reconnect side panel to try again.'
-+  '모델·도구 보조 패널에 연결하지 못했습니다. 채팅은 계속 사용할 수 있습니다. 보조 패널 다시 연결을 눌러 주세요.'
- 
- /** Transport-level texts the shared JSON-RPC client can throw. All mean "sidecar down". */
- const SIDECAR_TRANSPORT_ERRORS = [
-@@ -47,6 +47,6 @@ export function credentialWarning(raw: string | undefined | null): CredentialWar
-   const provider = match[1]
-   return {
-     provider,
--    message: `No API key set for ${provider}, so messages will fail. Add a key under Keys, or pick a different provider.`
-+    message: `${provider}의 API 키가 없어 메시지를 보낼 수 없습니다. 키 화면에서 키를 추가하거나 다른 모델 제공자를 선택하세요.`
-   }
- }
-diff --git a/web/src/lib/model-picker-current.ts b/web/src/lib/model-picker-current.ts
-index 6e156f3e..8e42b6c2 100644
---- a/web/src/lib/model-picker-current.ts
-+++ b/web/src/lib/model-picker-current.ts
-@@ -51,7 +51,7 @@ export function resolvePickerCurrent(
- 
- export function formatPickerCurrentLabel(current: PickerCurrent): string {
-   if (isAutoPickerCurrent(current)) {
--    return "auto (use main model)";
-+    return "주 대화 모델과 공유";
-   }
-   const model = current.model.trim() || "(unknown)";
-   const provider = current.provider.trim();
-diff --git a/web/src/lib/reasoning-effort.ts b/web/src/lib/reasoning-effort.ts
-index 55bc303b..d826c297 100644
---- a/web/src/lib/reasoning-effort.ts
-+++ b/web/src/lib/reasoning-effort.ts
-@@ -21,14 +21,14 @@ export interface EffortOption {
- }
- 
- const EFFORT_LABELS: Record<ReasoningEffortValue, string> = {
--  none: "Off (no thinking)",
--  minimal: "Minimal",
--  low: "Low",
--  medium: "Medium",
--  high: "High",
--  xhigh: "Extra High",
--  max: "Max",
--  ultra: "Ultra",
-+  none: "끄기 (추론 안 함)",
-+  minimal: "최소",
-+  low: "낮음",
-+  medium: "보통",
-+  high: "높음",
-+  xhigh: "매우 높음",
-+  max: "최대",
-+  ultra: "최상",
+diff --git a/web/src/i18n/types.ts b/web/src/i18n/types.ts
+index cac661b0..adbe8dbd 100644
+--- a/web/src/i18n/types.ts
++++ b/web/src/i18n/types.ts
+@@ -93,6 +93,12 @@ export interface Translations {
+       stopped: string;
+     };
+     nav: {
++      channels?: string;
++      files?: string;
++      mcp?: string;
++      pairing?: string;
++      system?: string;
++      webhooks?: string;
+       analytics: string;
+       chat: string;
+       config: string;
+diff --git a/web/src/lib/resolve-page-title.ts b/web/src/lib/resolve-page-title.ts
+index 15fa5b38..0becc1f4 100644
+--- a/web/src/lib/resolve-page-title.ts
++++ b/web/src/lib/resolve-page-title.ts
+@@ -3,21 +3,25 @@ import type { Translations } from "@/i18n/types";
+ const BUILTIN: Record<string, keyof Translations["app"]["nav"]> = {
+   "/chat": "chat",
+   "/sessions": "sessions",
++  "/files": "files",
+   "/analytics": "analytics",
+   "/models": "models",
+   "/logs": "logs",
+   "/cron": "cron",
+   "/skills": "skills",
+   "/plugins": "plugins",
++  "/mcp": "mcp",
++  "/channels": "channels",
++  "/webhooks": "webhooks",
++  "/pairing": "pairing",
++  "/system": "system",
+   "/profiles": "profiles",
+   "/config": "config",
+   "/env": "keys",
+   "/docs": "documentation",
  };
  
- /** `none` first, then the seven levels ascending — the shared value order. */
-diff --git a/web/src/pages/ChatPage.tsx b/web/src/pages/ChatPage.tsx
-index 9baf9304..90d7033e 100644
---- a/web/src/pages/ChatPage.tsx
-+++ b/web/src/pages/ChatPage.tsx
-@@ -58,7 +58,6 @@ import {
- } from "@/lib/pty-reconnect";
- import {
-   PTY_RESUME_LOADING_MAX_MS,
--  PTY_RESUME_LOADING_MESSAGE,
-   shouldFinishResumeHydrationOnChunk,
-   shouldShowResumeLoadingOverlay,
- } from "@/lib/pty-resume-loading";
-@@ -82,7 +81,6 @@ import { uploadChatImage } from "@/lib/chatImagePaste";
- import { attachChatImageDropListeners } from "@/lib/chat-image-drop";
- import { maybeReloadForLoopbackWsAuthFailure } from "@/lib/dashboard-auth-reload";
- import {
--  PTY_GAVE_UP_BANNER,
-   PTY_RECONNECTING_BANNER,
-   PTY_SESSION_ENDED_MESSAGE,
-   PTY_SESSION_ENDED_TERMINAL_LINE,
-@@ -1901,7 +1899,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
-           <div
-             ref={hostRef}
-             role="region"
--            aria-label="Chat terminal"
-+            aria-label="채팅 입력 및 대화"
-             className="hermes-chat-xterm-host min-h-0 min-w-0 flex-1"
-           />
+-// Built-in routes without an i18n nav key. Keep these in sync with the
+-// sidebar labels in App.tsx — the naive capitalize fallback below mangles
+-// initialisms ("/mcp" → "Mcp") and can't match multi-word labels.
++// English fallback labels for routes whose locale may not define a nav key.
+ const BUILTIN_LITERAL: Record<string, string> = {
+   "/files": "Files",
+   "/mcp": "MCP",
+@@ -42,7 +46,7 @@ export function resolvePageTitle(
+   }
+   const key = BUILTIN[normalized];
+   if (key) {
+-    return t.app.nav[key];
++    return t.app.nav[key] ?? BUILTIN_LITERAL[normalized] ?? key;
+   }
+   const literal = BUILTIN_LITERAL[normalized];
+   if (literal) {
+diff --git a/web/src/pages/PluginsPage.tsx b/web/src/pages/PluginsPage.tsx
+index e240dd72..3c2228de 100644
+--- a/web/src/pages/PluginsPage.tsx
++++ b/web/src/pages/PluginsPage.tsx
+@@ -570,7 +570,7 @@ export default function PluginsPage() {
+             <CardHeader>
+               <CardTitle>{t.pluginsPage.providersHeading}</CardTitle>
+               <p className="text-xs tracking-[0.08em] text-text-tertiary">
+-                Configure memory providers and runtime context engine selection.
++                메모리 제공자와 실행 중 컨텍스트 엔진을 설정합니다.
+               </p>
+             </CardHeader>
  
-@@ -1910,10 +1908,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
-               <div className="flex max-w-[min(28rem,calc(100vw-3rem))] flex-col items-start gap-2 border border-warning/60 bg-black/80 px-3 py-2 text-xs text-warning shadow-lg">
-                 <div className="tracking-wide">
-                   {ptyState === "reconnecting"
--                    ? "Chat is reconnecting."
-+                    ? "채팅에 다시 연결하고 있습니다."
-                     : reconnectGaveUp
--                      ? PTY_GAVE_UP_BANNER.text
--                      : "Chat disconnected."}
-+                      ? "채팅 연결이 끊겼습니다. 서버가 실행 중인지 확인한 뒤 다시 연결하세요."
-+                      : "채팅 연결이 끊겼습니다."}
-                 </div>
-                 <div className="flex flex-wrap gap-2">
-                   <Button
-@@ -1921,18 +1919,18 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
-                     outlined
-                     onClick={reconnectPty}
-                     prefix={<RotateCcw className="h-4 w-4" />}
--                    aria-label="Reconnect chat"
-+                    aria-label="채팅 다시 연결"
-                   >
--                    Reconnect now
-+                    지금 다시 연결
-                   </Button>
-                   {ptyState === "closed" && reconnectGaveUp && (
-                     <Button
-                       size="sm"
-                       ghost
-                       onClick={() => navigate("/system")}
--                      aria-label="Check server status"
-+                      aria-label="서버 상태 확인"
-                     >
--                      Check server status
-+                      서버 상태 확인
-                     </Button>
+@@ -613,7 +613,7 @@ export default function PluginsPage() {
+ 
+                   {!selectedMemoryName && (
+                     <p className="text-xs text-muted-foreground">
+-                      Hermes will use the built-in MEMORY.md and USER.md files.
++                      Hermes가 기본 MEMORY.md 및 USER.md 파일을 사용합니다.
+                     </p>
                    )}
-                 </div>
-@@ -1945,10 +1943,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
-               className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
-               role="status"
-               aria-live="polite"
--              aria-label={PTY_RESUME_LOADING_MESSAGE}
-+              aria-label="이전 대화를 불러오는 중입니다"
-             >
-               <div className="max-w-[min(28rem,calc(100vw-3rem))] border border-current/30 bg-black/80 px-4 py-3 text-center text-xs tracking-wide text-white/85 shadow-lg">
--                {PTY_RESUME_LOADING_MESSAGE}
-+                {"이전 대화를 불러오는 중입니다"}
-               </div>
-             </div>
-           )}
-@@ -1995,7 +1993,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
-               ghost
-               onClick={toggleChatPanel}
-               title="Show side panel (model + sessions)"
--              aria-label="Show chat side panel"
-+              aria-label="모델·도구 패널 열기"
-               className={cn(
-                 "absolute z-10",
-                 "normal-case tracking-normal font-normal",
-@@ -2029,7 +2027,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
-                 ghost
-                 size="icon"
-                 onClick={toggleChatPanel}
--                aria-label="Collapse chat side panel"
-+                aria-label="모델·도구 패널 접기"
-                 title="Collapse side panel"
-                 className="text-text-secondary hover:text-midground"
-               >
-diff --git a/web/src/pages/ModelsPage.tsx b/web/src/pages/ModelsPage.tsx
-index 30afe5ee..121980c7 100644
---- a/web/src/pages/ModelsPage.tsx
-+++ b/web/src/pages/ModelsPage.tsx
-@@ -47,9 +47,9 @@ import { errorMessage } from "@/lib/api-error";
- import { assignmentToPickerCurrent } from "@/lib/model-picker-current";
  
- const PERIODS = [
--  { label: "7d", days: 7 },
--  { label: "30d", days: 30 },
--  { label: "90d", days: 90 },
-+  { label: "7일", days: 7 },
-+  { label: "30일", days: 30 },
-+  { label: "90일", days: 90 },
- ] as const;
- 
- function formatTokens(n: number): string {
-@@ -163,17 +163,17 @@ function CapabilityBadges({
-     <div className="flex flex-wrap items-center gap-1.5">
-       {capabilities.supports_tools && (
-         <span className="inline-flex items-center gap-1 bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success">
--          <Wrench className="h-2.5 w-2.5" /> Tools
-+          <Wrench className="h-2.5 w-2.5" /> 도구 사용
-         </span>
-       )}
-       {capabilities.supports_vision && (
-         <span className="inline-flex items-center gap-1 bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
--          <Eye className="h-2.5 w-2.5" /> Vision
-+          <Eye className="h-2.5 w-2.5" /> 이미지 이해
-         </span>
-       )}
-       {capabilities.supports_reasoning && (
-         <span className="inline-flex items-center gap-1 bg-purple-500/10 px-1.5 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-400">
--          <Brain className="h-2.5 w-2.5" /> Reasoning
-+          <Brain className="h-2.5 w-2.5" /> 추론
-         </span>
-       )}
-       {capabilities.model_family && (
-@@ -275,7 +275,7 @@ function UseAsMenu({
-         className="h-6 px-2 text-xs uppercase"
-         prefix={busy ? <Spinner /> : null}
-       >
--        Use as <ChevronDown className="h-3 w-3" />
-+        사용 대상 <ChevronDown className="h-3 w-3" />
-       </Button>
-       {open && (
-         <div className="absolute right-0 top-full mt-1 z-50 min-w-[220px] border border-border bg-card shadow-lg">
-@@ -287,17 +287,17 @@ function UseAsMenu({
-           >
-             <span className="flex items-center gap-2">
-               <Star className="h-3 w-3" />
--              Main model
-+              주 대화 모델
-             </span>
-             {isMain && (
-               <span className="text-display text-xs tracking-wider text-primary">
--                current
-+                현재 사용 중
-               </span>
-             )}
-           </button>
- 
-           <div className="border-t border-border/50 px-3 py-1.5 text-display text-xs tracking-wider text-text-tertiary">
--            Auxiliary task
-+            보조 작업
-           </div>
- 
-           <button
-@@ -306,7 +306,7 @@ function UseAsMenu({
-             disabled={busy}
-             className="flex w-full items-center justify-between px-3 py-1.5 text-xs uppercase hover:bg-muted/50 disabled:opacity-40"
-           >
--            <span>All auxiliary tasks</span>
-+            <span>모든 보조 작업</span>
-           </button>
- 
-           {auxTaskRows(auxTasks).map((t) => (
-@@ -320,7 +320,7 @@ function UseAsMenu({
-               <span>{t.label}</span>
-               {mainAuxTask === t.key && (
-                 <span className="text-display text-xs tracking-wider text-primary">
--                  current
-+                  현재 사용 중
-                 </span>
-               )}
-             </button>
-@@ -335,7 +335,7 @@ function UseAsMenu({
-       )}
-       <ConfirmDialog
-         open={!!pendingConfirm}
--        title="Expensive Model Warning"
-+        title="고비용 모델 선택 확인"
-         description={pendingConfirm?.message}
-         destructive
-         confirmLabel="Switch anyway"
-@@ -404,7 +404,7 @@ function ModelCard({
-               </CardTitle>
-               {isMain && (
-                 <span className="inline-flex items-center gap-0.5 bg-primary/15 px-1.5 py-0.5 text-display text-xs font-medium tracking-wider text-primary">
--                  <Star className="h-2.5 w-2.5" /> main
-+                  <Star className="h-2.5 w-2.5" /> 주 모델
-                 </span>
-               )}
-               {mainAuxTask && (
-@@ -597,7 +597,7 @@ function AuxiliaryTasksModal({
-               id="aux-modal-title"
-               className="font-mondwest text-display text-base tracking-wider"
-             >
--              Auxiliary Tasks
-+              보조 작업 모델
-             </h2>
-             <Button
-               size="sm"
-@@ -607,14 +607,11 @@ function AuxiliaryTasksModal({
-               className="h-6 text-xs uppercase"
-               prefix={resetBusy ? <Spinner /> : null}
-             >
--              Reset all to auto
-+              모두 주 모델과 공유
-             </Button>
-           </div>
-           <p className="text-xs text-text-secondary mt-2">
--            Auxiliary tasks handle side-jobs like vision, session search, and
--            compression. <span className="font-mono">auto</span> means
--            &quot;use the main model&quot;. Override per-task when you want a
--            cheap/fast model for a specific job.
-+            보조 모델은 이미지 이해·이전 대화 검색·문맥 압축 등을 처리합니다. <span className="font-mono">auto</span> 는 주 대화 모델을 함께 사용한다는 뜻입니다. 특정 작업에 더 빠르거나 저렴한 모델을 쓰려면 개별 지정하세요.
-           </p>
-         </header>
- 
-@@ -626,8 +623,8 @@ function AuxiliaryTasksModal({
-             const eff = cur?.effective;
-             const effRoute =
-               eff?.provider && eff.provider !== "auto"
--                ? `${eff.provider} · ${eff.model || "(provider default)"}`
--                : "auto (use main model)";
-+                ? `${eff.provider} · ${eff.model || "(제공자 기본 모델)"}`
-+                : "주 대화 모델과 공유";
-             return (
-               <div
-                 key={t.key}
-@@ -642,10 +639,10 @@ function AuxiliaryTasksModal({
-                   </div>
-                   <div className="text-xs font-mono text-text-secondary truncate">
-                     {isAuto && t.inheritFrom
--                      ? `inherits ${auxTaskLabel(aux?.tasks, t.inheritFrom)} · ${effRoute}`
-+                      ? `${auxTaskLabel(aux?.tasks, t.inheritFrom)} 설정 공유 · ${effRoute}`
-                       : isAuto
--                        ? "auto (use main model)"
--                        : `${cur?.provider} · ${cur?.model || "(provider default)"}`}
-+                        ? "주 대화 모델과 공유"
-+                        : `${cur?.provider} · ${cur?.model || "(제공자 기본 모델)"}`}
-                   </div>
-                 </div>
-                 {t.inheritFrom && !isAuto && (
-@@ -663,7 +660,7 @@ function AuxiliaryTasksModal({
-                     }}
-                     className="h-6 text-xs uppercase"
-                   >
--                    Follow {auxTaskLabel(aux?.tasks, t.inheritFrom)}
-+                    설정 공유: {auxTaskLabel(aux?.tasks, t.inheritFrom)}
-                   </Button>
-                 )}
-                 <Button
-@@ -672,7 +669,7 @@ function AuxiliaryTasksModal({
-                   onClick={() => setPicker({ kind: "aux", task: t.key })}
-                   className="h-6 text-xs uppercase"
-                 >
--                  Change
-+                  변경
-                 </Button>
-               </div>
-             );
-@@ -687,7 +684,7 @@ function AuxiliaryTasksModal({
-             currentAssignment={assignmentToPickerCurrent(
-               aux?.tasks.find((a) => a.task === picker.task),
-             )}
--            title={`Set Auxiliary: ${auxTaskLabel(aux?.tasks, picker.task)}`}
-+            title={`보조 모델 선택: ${auxTaskLabel(aux?.tasks, picker.task)}`}
-             onApply={async ({ provider, model, confirmExpensiveModel }) => {
-               const result = await api.setModelAssignment({
-                 confirm_expensive_model: confirmExpensiveModel,
-@@ -706,8 +703,8 @@ function AuxiliaryTasksModal({
-           open={confirmReset}
-           onCancel={() => setConfirmReset(false)}
-           onConfirm={() => void resetAllAux()}
--          title="Reset auxiliary models"
--          description="Reset every auxiliary task to 'auto'? This overrides any per-task overrides you've set."
-+          title="보조 모델 설정 초기화"
-+          description="보조 작업을 모두 주 대화 모델과 공유하도록 바꿀까요? 작업별 모델 지정이 초기화됩니다."
-           destructive
-           confirmLabel="Reset all"
-           loading={resetBusy}
-@@ -841,12 +838,12 @@ function MoaModelsModal({
-             id="moa-modal-title"
-             className="font-mondwest text-display text-base tracking-wider"
-           >
--            Configure Mixture of Agents presets
-+            여러 모델 협업 설정
-           </h2>
-         </header>
-         <div className="space-y-4 p-5">
-           <p className="text-xs text-text-secondary">
--            Presets appear as models under the Mixture of Agents provider. References produce perspectives; the aggregator is the acting model that answers and calls tools.
-+            여러 모델의 의견을 모아 하나의 답변을 만드는 구성입니다. 참고 모델이 분석하고 취합 모델이 최종 답변과 도구 실행을 담당합니다.
-           </p>
- 
-           <div className="flex flex-wrap items-center gap-2">
-@@ -857,23 +854,23 @@ function MoaModelsModal({
-             >
-               {presetNames.map((name) => <option key={name} value={name}>{name}</option>)}
-             </select>
--            <Button size="sm" outlined onClick={() => setDraft((prev) => ({ ...prev, default_preset: selected }))}>Set default</Button>
--            <Button size="sm" ghost disabled={presetNames.length <= 1} onClick={deletePreset}>Delete</Button>
-+            <Button size="sm" outlined onClick={() => setDraft((prev) => ({ ...prev, default_preset: selected }))}>기본값으로 지정</Button>
-+            <Button size="sm" ghost disabled={presetNames.length <= 1} onClick={deletePreset}>삭제</Button>
-             <input
-               className="border border-border bg-background px-2 py-1 text-xs"
--              placeholder="new preset name"
-+              placeholder="새 구성 이름"
-               value={newName}
-               onChange={(event) => setNewName(event.target.value)}
-             />
--            <Button size="sm" outlined disabled={!newName.trim() || !!draft.presets[newName.trim()]} onClick={addPreset}>Add preset</Button>
-+            <Button size="sm" outlined disabled={!newName.trim() || !!draft.presets[newName.trim()]} onClick={addPreset}>구성 추가</Button>
-           </div>
- 
-           <div className="text-xs text-text-secondary">
--            Default: <span className="font-mono">{draft.default_preset}</span>
-+            기본 구성: <span className="font-mono">{draft.default_preset}</span>
-           </div>
- 
-           <div className="space-y-2">
--            <div className="text-display text-xs font-medium tracking-wider">Reference models</div>
-+            <div className="text-display text-xs font-medium tracking-wider">참고 모델</div>
-             {preset.reference_models.map((slot, index) => (
-               <div
-                 key={`${selected}-${slot.provider}-${slot.model}-${index}`}
-@@ -894,24 +891,24 @@ function MoaModelsModal({
-                   }
-                 />
-                 <div className="min-w-0 flex-1 truncate font-mono text-xs text-text-secondary">{slotLabel(slot)}</div>
--                <Button size="sm" outlined onClick={() => setPicker({ kind: "reference", index })}>Change</Button>
--                <Button size="sm" ghost disabled={preset.reference_models.length <= 1} onClick={() => updateSelectedPreset((prev) => ({ ...prev, reference_models: prev.reference_models.filter((_, i) => i !== index) }))}>Remove</Button>
-+                <Button size="sm" outlined onClick={() => setPicker({ kind: "reference", index })}>변경</Button>
-+                <Button size="sm" ghost disabled={preset.reference_models.length <= 1} onClick={() => updateSelectedPreset((prev) => ({ ...prev, reference_models: prev.reference_models.filter((_, i) => i !== index) }))}>제거</Button>
-               </div>
-             ))}
--            <Button size="sm" outlined onClick={() => updateSelectedPreset((prev) => ({ ...prev, reference_models: [...prev.reference_models, { ...prev.aggregator, enabled: true }] }))}>Add reference model</Button>
-+            <Button size="sm" outlined onClick={() => updateSelectedPreset((prev) => ({ ...prev, reference_models: [...prev.reference_models, { ...prev.aggregator, enabled: true }] }))}>참고 모델 추가</Button>
-           </div>
- 
-           <div className="space-y-2">
--            <div className="text-display text-xs font-medium tracking-wider">Aggregator</div>
-+            <div className="text-display text-xs font-medium tracking-wider">최종 취합 모델</div>
-             <div className="flex items-center gap-2 border border-border/50 bg-muted/20 px-3 py-2">
-               <div className="min-w-0 flex-1 truncate font-mono text-xs text-text-secondary">{slotLabel(preset.aggregator)}</div>
--              <Button size="sm" outlined onClick={() => setPicker({ kind: "aggregator" })}>Change</Button>
-+              <Button size="sm" outlined onClick={() => setPicker({ kind: "aggregator" })}>변경</Button>
-             </div>
-           </div>
- 
-           {error && <div className="text-xs text-destructive">{error}</div>}
-           <div className="flex justify-end gap-2 pt-2">
--            <Button ghost onClick={onClose} disabled={busy}>Cancel</Button>
-+            <Button ghost onClick={onClose} disabled={busy}>취소</Button>
-             <Button onClick={() => void save()} disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
-           </div>
-         </div>
-@@ -926,7 +923,7 @@ function MoaModelsModal({
-               ? preset.aggregator
-               : preset.reference_models[picker.index]
-           }
--          title="Select MoA Model"
-+          title="협업에 사용할 모델 선택"
-           onApply={async ({ provider, model }) => {
-             if ((provider || "").toLowerCase() === "moa") {
-               setError("MoA presets can't reference or aggregate the Mixture of Agents provider (no recursive MoA).");
-@@ -1008,9 +1005,9 @@ function ModelSettingsPanel({
-       <CardHeader className="min-w-0 pb-3">
-         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-           <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground" />
--          <CardTitle className="text-sm">Model Settings</CardTitle>
-+          <CardTitle className="text-sm">모델 설정</CardTitle>
-           <span className="max-w-full min-w-0 text-xs text-text-secondary [overflow-wrap:anywhere]">
--            applies to new sessions
-+            새 대화부터 적용됩니다
-           </span>
-         </div>
-       </CardHeader>
-@@ -1022,13 +1019,13 @@ function ModelSettingsPanel({
-             <div className="flex items-center gap-2 mb-0.5">
-               <Star className="h-3 w-3 text-primary" />
-               <span className="text-display text-xs font-medium tracking-wider">
--                Main model
-+                주 대화 모델
-               </span>
-             </div>
-             <div className="text-xs font-mono text-text-secondary truncate">
--              {mainProv || "(unset)"}
-+              {mainProv || "(설정 안 됨)"}
-               {mainProv && mainModel && " · "}
--              {mainModel || "(unset)"}
-+              {mainModel || "(설정 안 됨)"}
-             </div>
-           </div>
-           <Button
-@@ -1036,7 +1033,7 @@ function ModelSettingsPanel({
-             onClick={() => setPicker({ kind: "main" })}
-             className="shrink-0 self-start text-xs uppercase sm:self-center"
-           >
--            Change
-+            변경
-           </Button>
-         </div>
- 
-@@ -1046,13 +1043,13 @@ function ModelSettingsPanel({
-             <div className="flex items-center gap-2 mb-0.5">
-               <Cpu className="h-3 w-3 text-text-tertiary" />
-               <span className="text-display text-xs font-medium tracking-wider">
--                Auxiliary tasks
-+                보조 작업
-               </span>
-             </div>
-             <div className="text-xs font-mono text-text-secondary truncate">
-               {auxOverrideCount > 0
--                ? `${auxOverrideCount} override${auxOverrideCount > 1 ? "s" : ""} · ${auxTaskCount - auxOverrideCount} auto`
--                : `${auxTaskCount} tasks · all auto`}
-+                ? `${auxOverrideCount}개 개별 지정 · ${auxTaskCount - auxOverrideCount}개 주 모델 공유`
-+                : `${auxTaskCount}개 작업 · 모두 주 모델 공유`}
-             </div>
-           </div>
-           <Button
-@@ -1061,7 +1058,7 @@ function ModelSettingsPanel({
-             onClick={() => setAuxModalOpen(true)}
-             className="shrink-0 self-start text-xs uppercase sm:self-center"
-           >
--            Configure
-+            설정
-           </Button>
-         </div>
- 
-@@ -1070,13 +1067,13 @@ function ModelSettingsPanel({
-             <div className="flex items-center gap-2 mb-0.5">
-               <Brain className="h-3 w-3 text-text-tertiary" />
-               <span className="text-display text-xs font-medium tracking-wider">
--                Mixture of Agents
-+                여러 모델 협업
-               </span>
-             </div>
-             <div className="text-xs font-mono text-text-secondary truncate">
-               {moa
--                ? `${moa.reference_models.length} reference${moa.reference_models.length === 1 ? "" : "s"} · ${moa.aggregator.provider}/${shortModelName(moa.aggregator.model)}`
--                : "not loaded"}
-+                ? `참고 모델 ${moa.reference_models.length}개 · ${moa.aggregator.provider}/${shortModelName(moa.aggregator.model)}`
-+                : "불러오지 못함"}
-             </div>
-           </div>
-           <Button
-@@ -1086,7 +1083,7 @@ function ModelSettingsPanel({
-             disabled={!moa}
-             className="shrink-0 self-start text-xs uppercase sm:self-center"
-           >
--            Configure
-+            설정
-           </Button>
-         </div>
- 
-@@ -1095,7 +1092,7 @@ function ModelSettingsPanel({
-             key={`picker-${refreshKey}`}
-             loader={api.getModelOptions}
-             alwaysGlobal
--            title="Set Main Model"
-+            title="주 대화 모델 선택"
-             onApply={async ({ provider, model, confirmExpensiveModel }) => {
-               const result = await applyAssignment({
-                 confirmExpensiveModel,
-@@ -1324,13 +1321,9 @@ export default function ModelsPage() {
-               </div>
-               {!showTokens && (
-                 <p className="mt-4 text-xs text-text-tertiary leading-relaxed">
--                  Token & cost analytics are hidden because the local counts
--                  exclude auxiliary calls (compression, vision, web extract,
--                  …) and provider retries, so they diverge from your provider
--                  bill. Enable{" "}
-+                  문맥 압축·이미지 분석·웹 자료 추출 같은 보조 호출과 재시도는 로컬 통계에 포함되지 않아 실제 청구 금액과 다릅니다. 그래서 토큰·비용 통계를 기본으로 숨깁니다. 로컬 추정치가 필요하면 설정의{" "}
-                   <span className="font-mono">dashboard.show_token_analytics</span>{" "}
--                  in <a href="/config" className="underline">Config</a> to
--                  show the local debug estimate anyway.
-+                  <a href="/config" className="underline">항목</a>을 켜세요.
-                 </p>
-               )}
-             </CardContent>

@@ -14,8 +14,8 @@ export function Original(){
  },[busy]);
  const act=async(command:string)=>{setBusy(true);setError('');try{setState(await request<State>(prefix+command))}
   catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}};
- return <section className="flex h-full min-h-0 flex-col">
-  <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-3">
+ return <section className="ui-app-workspace hermes-original-workspace">
+  <header className="ui-app-workspace-header">
    <div className="flex items-center gap-3"><h1 className="font-semibold">헤르메스 원본</h1>
     <Status tone={state?.state==='ready'?'good':'idle'}>{state?.state==='ready'?'실행 중':state?.state==='starting'?'원본 준비 중':'중지됨'}</Status></div>
    <div className="flex items-center gap-2">{state?.url&&<Button onClick={()=>window.open(state.url,'_blank','noopener')}>원본 새 창</Button>}
@@ -23,6 +23,6 @@ export function Original(){
      <Button busy={busy} onClick={()=>void act('stop')}>중지</Button>}</div>
   </header>
   {error&&<ErrorMessage message={error}/>}
-  {state?.url&&<iframe title="Hermes Agent 원본" src={state.url} className="min-h-0 w-full flex-1 border-0" allow="clipboard-read; clipboard-write; microphone; camera; fullscreen"/>}
+  {state?.url&&<iframe title="Hermes Agent 원본" src={state.url} className="ui-app-workspace-frame" allow="clipboard-read; clipboard-write; microphone; camera; fullscreen"/>}
  </section>;
 }

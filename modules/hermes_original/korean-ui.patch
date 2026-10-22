@@ -1,5 +1,5 @@
 diff --git a/web/src/App.tsx b/web/src/App.tsx
-index 49b23a40..5342dc2f 100644
+index 49b23a40..9ac59748 100644
 --- a/web/src/App.tsx
 +++ b/web/src/App.tsx
 @@ -192,7 +192,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
@@ -7,35 +7,405 @@ index 49b23a40..5342dc2f 100644
      icon: MessageSquare,
    },
 -  { path: "/files", label: "Files", icon: FolderOpen },
-+  { path: "/files", labelKey: "files", label: "Files", icon: FolderOpen },
++  { path: "/files", label: "파일", icon: FolderOpen },
    {
      path: "/analytics",
      labelKey: "analytics",
-@@ -209,14 +209,14 @@ const BUILTIN_NAV_REST: NavItem[] = [
-   { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock },
+@@ -210,13 +210,13 @@ const BUILTIN_NAV_REST: NavItem[] = [
    { path: "/skills", labelKey: "skills", label: "Skills", icon: Package },
    { path: "/plugins", labelKey: "plugins", label: "Plugins", icon: Puzzle },
--  { path: "/mcp", label: "MCP", icon: Plug },
+   { path: "/mcp", label: "MCP", icon: Plug },
 -  { path: "/channels", label: "Channels", icon: Radio },
 -  { path: "/webhooks", label: "Webhooks", icon: Webhook },
 -  { path: "/pairing", label: "Pairing", icon: ShieldCheck },
-+  { path: "/mcp", labelKey: "mcp", label: "MCP", icon: Plug },
-+  { path: "/channels", labelKey: "channels", label: "Channels", icon: Radio },
-+  { path: "/webhooks", labelKey: "webhooks", label: "Webhooks", icon: Webhook },
-+  { path: "/pairing", labelKey: "pairing", label: "Pairing", icon: ShieldCheck },
++  { path: "/channels", label: "채널", icon: Radio },
++  { path: "/webhooks", label: "외부 이벤트 연결", icon: Webhook },
++  { path: "/pairing", label: "연결 승인", icon: ShieldCheck },
    { path: "/profiles", labelKey: "profiles", label: "Profiles", icon: Users },
    { path: "/config", labelKey: "config", label: "Config", icon: Settings },
    { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound },
 -  { path: "/system", label: "System", icon: Wrench },
-+  { path: "/system", labelKey: "system", label: "System", icon: Wrench },
++  { path: "/system", label: "시스템", icon: Wrench },
    {
      path: "/docs",
      labelKey: "documentation",
+@@ -258,6 +258,7 @@ function resolveIcon(name: string): ComponentType<{ className?: string }> {
+ function buildNavItems(
+   builtIn: NavItem[],
+   manifests: PluginManifest[],
++  locale: string,
+ ): NavItem[] {
+   const items = [...builtIn];
+ 
+@@ -267,7 +268,12 @@ function buildNavItems(
+ 
+     const pluginItem: NavItem = {
+       path: manifest.tab.path,
+-      label: manifest.label,
++      label:
++        locale === "ko" && manifest.name === "hermes-achievements"
++          ? "업적"
++          : locale === "ko" && manifest.name === "kanban"
++            ? "칸반 보드"
++            : manifest.label,
+       icon: resolveIcon(manifest.icon),
+     };
+ 
+@@ -294,8 +300,9 @@ function buildNavItems(
+ function partitionSidebarNav(
+   builtIn: NavItem[],
+   manifests: PluginManifest[],
++  locale: string,
+ ): { coreItems: NavItem[]; pluginItems: NavItem[] } {
+-  const merged = buildNavItems(builtIn, manifests);
++  const merged = buildNavItems(builtIn, manifests, locale);
+   const builtinPaths = new Set(builtIn.map((i) => i.path));
+   const coreItems: NavItem[] = [];
+   const pluginItems: NavItem[] = [];
+@@ -372,7 +379,7 @@ function buildRoutes(
+ const SIDEBAR_COLLAPSED_KEY = "hermes-sidebar-collapsed";
+ 
+ export default function App() {
+-  const { t } = useI18n();
++  const { t, locale } = useI18n();
+   const { pathname } = useLocation();
+   const { profile } = useProfileScope();
+   const { manifests, loading: pluginsLoading } = usePlugins(profile);
+@@ -469,8 +476,8 @@ export default function App() {
+   }, [embeddedChat, showTokenAnalytics]);
+ 
+   const sidebarNav = useMemo(
+-    () => partitionSidebarNav(builtinNav, manifests),
+-    [builtinNav, manifests],
++    () => partitionSidebarNav(builtinNav, manifests, locale),
++    [builtinNav, manifests, locale],
+   );
+   const routes = useMemo(
+     () => buildRoutes(builtinRoutes, manifests),
+diff --git a/web/src/components/ChatSidebar.tsx b/web/src/components/ChatSidebar.tsx
+index 94071b4e..9ad9a9f8 100644
+--- a/web/src/components/ChatSidebar.tsx
++++ b/web/src/components/ChatSidebar.tsx
+@@ -83,11 +83,11 @@ const SIDE_CAR_GAVE_UP_MESSAGE =
+   `${SIDE_CAR_MAX_RECONNECT_ATTEMPTS} attempts, use Reconnect`;
+ 
+ const STATE_LABEL: Record<ConnectionState, string> = {
+-  idle: 'idle',
+-  connecting: 'connecting',
+-  open: 'live',
+-  closed: 'closed',
+-  error: 'error'
++  idle: '대기',
++  connecting: '연결 중',
++  open: '연결됨',
++  closed: '연결 끊김',
++  error: '오류'
+ }
+ 
+ const STATE_TONE: Record<ConnectionState, 'secondary' | 'warning' | 'success' | 'destructive'> = {
+@@ -549,7 +549,7 @@ export function ChatSidebar({
+     >
+       <Card className="flex items-center justify-between gap-2 px-3 py-2">
+         <div className="min-w-0 flex-1">
+-          <div className="text-display text-xs tracking-wider text-text-tertiary">model</div>
++          <div className="text-display text-xs tracking-wider text-text-tertiary">모델</div>
+ 
+           <Button
+             ghost
+@@ -560,7 +560,7 @@ export function ChatSidebar({
+               'self-start normal-case tracking-normal text-sm font-medium',
+               'hover:underline disabled:no-underline'
+             )}
+-            title={modelName === '—' ? 'switch model' : modelName}
++            title={modelName === '—' ? '모델 변경' : modelName}
+           >
+             <span className="flex min-w-0 max-w-full items-center gap-1">
+               <span className="truncate">{modelLabel}</span>
+@@ -583,7 +583,7 @@ export function ChatSidebar({
+             refreshKey={modelRefreshKey}
+             onChanged={effort =>
+               setModelNotice(
+-                `Reasoning effort set to ${effort}. Run /new or refresh the page to apply it to this chat.`
++                `추론 수준을 ${effort}(으)로 저장했습니다. 이 채팅에 적용하려면 /new를 실행하거나 페이지를 새로고침하세요.`
+               )
+             }
+           />
+@@ -613,12 +613,12 @@ export function ChatSidebar({
+                 onClick={() => window.location.reload()}
+                 prefix={<RefreshCw />}
+               >
+-                Reload page
++                페이지 새로고침
+               </Button>
+             )}
+             {error && !showReload && (
+               <Button size="sm" outlined className="mt-1" onClick={reconnect} prefix={<RefreshCw />}>
+-                Reconnect side panel
++                보조 패널 다시 연결
+               </Button>
+             )}
+             {!error && credential && (
+@@ -632,10 +632,10 @@ export function ChatSidebar({
+                   // still lives under ChatPage, so router context is present.)
+                   onClick={() => navigate('/env')}
+                 >
+-                  Add key
++                  키 추가
+                 </Button>
+                 <Button size="sm" outlined onClick={() => setModelOpen(true)}>
+-                  Switch model
++                  모델 변경
+                 </Button>
+               </div>
+             )}
+diff --git a/web/src/components/ModelPickerDialog.tsx b/web/src/components/ModelPickerDialog.tsx
+index 2bca8f3b..360809f0 100644
+--- a/web/src/components/ModelPickerDialog.tsx
++++ b/web/src/components/ModelPickerDialog.tsx
+@@ -97,7 +97,7 @@ export function ModelPickerDialog(props: Props) {
+     loader,
+     onApply,
+     onClose,
+-    title = "Switch Model",
++    title = "모델 변경",
+     alwaysGlobal = false,
+     currentAssignment,
+   } = props;
+@@ -390,7 +390,7 @@ export function ModelPickerDialog(props: Props) {
+             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+             <Input
+               autoFocus
+-              placeholder="Filter providers and models…"
++              placeholder="모델 제공자·모델 검색…"
+               value={query}
+               onChange={(e) => setQuery(e.target.value)}
+               className="pl-7 h-8 text-sm"
+@@ -437,7 +437,7 @@ export function ModelPickerDialog(props: Props) {
+         <footer className="border-t border-border p-3 flex items-center justify-between gap-3 flex-wrap">
+           {alwaysGlobal ? (
+             <span className="text-xs text-muted-foreground">
+-              Saves to config.yaml — applies to new sessions.
++              설정을 저장합니다. 새 대화부터 적용됩니다.
+             </span>
+           ) : (
+             <div className="flex items-center gap-2">
+@@ -453,7 +453,7 @@ export function ModelPickerDialog(props: Props) {
+                 className="font-mondwest normal-case tracking-normal text-xs text-muted-foreground cursor-pointer"
+                 htmlFor="model-picker-persist-global"
+               >
+-                Persist globally (otherwise this session only)
++                기본 모델로 저장 (끄면 현재 대화에만 적용)
+               </Label>
+             </div>
+           )}
+@@ -465,24 +465,24 @@ export function ModelPickerDialog(props: Props) {
+               disabled={applying || loading || refreshing}
+             >
+               {refreshing ? <Spinner /> : <RefreshCw className="h-3.5 w-3.5" />}
+-              Refresh Models
++              모델 목록 새로고침
+             </Button>
+             <Button outlined onClick={onClose} disabled={applying}>
+-              Cancel
++              취소
+             </Button>
+             <Button onClick={confirm} disabled={!canConfirm}>
+-              {applying ? <Spinner /> : "Switch"}
++              {applying ? <Spinner /> : "변경"}
+             </Button>
+           </div>
+         </footer>
+       </div>
+       <ConfirmDialog
+         open={!!pendingConfirm}
+-        title="Expensive Model Warning"
++        title="고비용 모델 선택 확인"
+         description={pendingConfirm?.message}
+         destructive
+-        confirmLabel="Switch anyway"
+-        cancelLabel="Cancel"
++        confirmLabel="비용을 확인하고 변경"
++        cancelLabel="취소"
+         loading={applying}
+         onCancel={() => setPendingConfirm(null)}
+         onConfirm={() => {
+@@ -503,7 +503,7 @@ export function ModelPickerDialog(props: Props) {
+ 
+ /** Empty picker: no key and no OAuth login anywhere. Points at the two in-app fixes. */
+ export const NO_PROVIDERS_MESSAGE =
+-  "No model providers are set up yet. Add an API key under Keys or sign in to a provider under Models to see models here.";
++  "연결된 모델 제공자가 없습니다. 키 화면에서 API 키를 추가하거나 모델 화면에서 로그인하세요.";
+ 
+ function ProviderColumn({
+   loading,
+@@ -531,7 +531,7 @@ function ProviderColumn({
+     <div className="border-r border-border overflow-y-auto">
+       {loading && (
+         <div className="flex items-center gap-2 p-4 text-xs text-muted-foreground">
+-          <Spinner className="text-xs" /> loading…
++          <Spinner className="text-xs" /> 불러오는 중…
+         </div>
+       )}
+ 
+@@ -540,16 +540,16 @@ function ProviderColumn({
+       {!loading && !error && providers.length === 0 && (
+         <div className="p-4 text-xs text-muted-foreground">
+           {query || total > 0 ? (
+-            <span className="italic">No providers match your search.</span>
++            <span className="italic">검색 조건에 맞는 모델 제공자가 없습니다.</span>
+           ) : (
+             <div className="flex flex-col gap-2">
+               <span>{NO_PROVIDERS_MESSAGE}</span>
+               <div className="flex flex-wrap gap-2">
+                 <Link to="/env" onClick={onClose} className="underline underline-offset-2 hover:text-foreground">
+-                  Open Keys
++                  인증 키 설정
+                 </Link>
+                 <Link to="/models" onClick={onClose} className="underline underline-offset-2 hover:text-foreground">
+-                  Sign in to a provider
++                  모델 제공자 로그인
+                 </Link>
+               </div>
+             </div>
+@@ -614,7 +614,7 @@ function ModelColumn({
+     return (
+       <div className="overflow-y-auto">
+         <div className="p-4 text-xs text-muted-foreground italic">
+-          pick a provider →
++          모델 제공자를 선택하세요 →
+         </div>
+       </div>
+     );
+@@ -631,8 +631,8 @@ function ModelColumn({
+       {models.length === 0 ? (
+         <div className="p-4 text-xs text-muted-foreground italic">
+           {allModels.length
+-            ? "no models match your filter"
+-            : "no models listed for this provider"}
++            ? "검색 조건에 맞는 모델이 없습니다"
++            : "이 제공자의 모델 목록이 없습니다"}
+         </div>
+       ) : (
+         models.map(({ model: m, positions }) => {
+@@ -666,7 +666,7 @@ function ModelColumn({
+ function CurrentTag() {
+   return (
+     <span className="text-display text-xs tracking-wider text-primary shrink-0">
+-      current
++      현재 사용 중
+     </span>
+   );
+ }
+diff --git a/web/src/components/ModelReloadConfirm.tsx b/web/src/components/ModelReloadConfirm.tsx
+index 3b5d27d6..f014a136 100644
+--- a/web/src/components/ModelReloadConfirm.tsx
++++ b/web/src/components/ModelReloadConfirm.tsx
+@@ -27,12 +27,12 @@ export function ModelReloadConfirm({
+   return (
+     <ConfirmDialog
+       open={model !== null}
+-      title="Switch model?"
++      title="모델을 바꿔 새 대화를 시작할까요?"
+       description={
+         description ??
+-        `Switching to ${model ?? ""} starts a fresh chat. Your current chat stays in your Sessions list and the agent's memory is kept. Reload now to apply it?`
++        `${model ?? ""}(으)로 바꾸면 새 대화를 시작합니다. 현재 대화는 세션 목록에 남고 에이전트의 기억도 유지됩니다. 지금 적용할까요?`
+       }
+-      confirmLabel="Reload"
++      confirmLabel="새 모델 적용"
+       onConfirm={() => window.location.reload()}
+       onCancel={onCancel}
+     />
+diff --git a/web/src/components/ReasoningPicker.tsx b/web/src/components/ReasoningPicker.tsx
+index 7883f588..a96efe86 100644
+--- a/web/src/components/ReasoningPicker.tsx
++++ b/web/src/components/ReasoningPicker.tsx
+@@ -98,7 +98,7 @@ export function ReasoningPicker({
+     <div className="flex items-center gap-2 px-3 py-2 text-xs">
+       <div className="flex items-center gap-1.5 text-text-tertiary">
+         <Brain className="h-3.5 w-3.5" />
+-        <span className="text-display tracking-wider">reasoning</span>
++        <span className="text-display tracking-wider">추론 수준</span>
+       </div>
+       <Select
+         className="ml-auto min-w-0"
+diff --git a/web/src/i18n/context.tsx b/web/src/i18n/context.tsx
+index e407988e..0c4e516b 100644
+--- a/web/src/i18n/context.tsx
++++ b/web/src/i18n/context.tsx
+@@ -60,7 +60,7 @@ function getInitialLocale(): Locale {
+   } catch {
+     // SSR or privacy mode
+   }
+-  return "en";
++  return "ko";
+ }
+ 
+ interface I18nContextValue {
+@@ -70,9 +70,9 @@ interface I18nContextValue {
+ }
+ 
+ const I18nContext = createContext<I18nContextValue>({
+-  locale: "en",
++  locale: "ko",
+   setLocale: () => {},
+-  t: en,
++  t: ko,
+ });
+ 
+ export function I18nProvider({ children }: { children: ReactNode }) {
 diff --git a/web/src/i18n/ko.ts b/web/src/i18n/ko.ts
-index 5d2e9911..663657d5 100644
+index 5d2e9911..472aff00 100644
 --- a/web/src/i18n/ko.ts
 +++ b/web/src/i18n/ko.ts
-@@ -68,17 +68,23 @@ export const ko: Translations = {
+@@ -2,6 +2,11 @@ import type { Translations } from "./types";
+ 
+ export const ko: Translations = {
+   common: {
++    loadFailed: "{what}을(를) 불러오지 못했습니다. 서버가 실행 중인지 확인한 뒤 다시 시도하세요.",
++    loadFailedDetails: "오류 상세: {detail}",
++    gateway: "연결 서비스",
++    gatewayHint: "메신저, API 서버, 웹훅은 채널 화면에서 설정합니다. 여기서는 연결 서비스 전체의 프록시·중계 방식과 접근 허용 목록을 관리합니다.",
++
+     save: "저장",
+     saving: "저장 중...",
+     cancel: "취소",
+@@ -50,6 +55,24 @@ export const ko: Translations = {
+   },
+ 
+   app: {
++    managingProfile: "관리 중인 프로필",
++    currentProfileOption: "현재 화면 ({name})",
++    managingProfileBanner: "“{name}” 프로필을 관리하고 있습니다. 설정·키·스킬·MCP·모델과 새 채팅은 이 프로필에 적용됩니다.",
++    memoryOomRestartBanner: "에이전트가 예기치 않게 재시작됐습니다. 메모리 부족이 원인일 수 있습니다. 긴 대화나 동시 작업이 많으면 메모리 사용량이 늘어납니다.",
++    memoryCriticalBanner: "메모리가 거의 부족해 에이전트가 재시작될 수 있습니다. 사용하지 않는 세션을 닫거나 메모리를 늘려 주세요.",
++    memoryElevatedBanner: "에이전트가 사용할 수 있는 메모리가 부족합니다.",
++    diskCriticalBanner: "저장 공간이 거의 가득 찼습니다. 새 메시지·기억·설정이 저장되지 않을 수 있습니다.",
++    diskElevatedBanner: "저장 공간이 부족해지고 있습니다. 오래된 세션을 정리하거나 저장 공간을 늘려 주세요.",
++    multiplexStandaloneBanner: "현재 연결 서비스는 프로필 하나만 처리합니다. 연결되지 않은 프로필: {profiles}. 원인: {reason}. 전환 명령: hermes gateway migrate --multiplex",
++    dismiss: "닫기",
++    sharedMetricsTitle: "사용 통계 제공에 동의하시겠어요?",
++    sharedMetricsBody: "제한된 횟수 통계만 하루 한 번 Nous에 전송합니다. 프롬프트·파일·경로·오류 원문은 보내지 않습니다.",
++    sharedMetricsReaskBody: "이전 버전에서 이 질문을 보기 전에 거절로 저장됐을 수 있어 한 번 더 확인합니다.",
++    sharedMetricsShare: "통계 제공 동의",
++    sharedMetricsOff: "제공하지 않음",
++    sharedMetricsDetails: "자세히 보기",
++    sharedMetricsSaveFailed: "선택을 저장하지 못했습니다",
++
+     brand: "Hermes Agent",
+     brandShort: "HA",
+     closeNavigation: "내비게이션 닫기",
+@@ -60,6 +83,9 @@ export const ko: Translations = {
+     activeSessionsLabel: "활성 세션:",
+     gatewayStatusLabel: "게이트웨이 상태:",
+     gatewayStrip: {
++      degraded: "일부 기능 이상",
++      heartbeatStale: "응답 확인 지연",
++
+       failed: "시작 실패",
+       off: "꺼짐",
+       running: "실행 중",
+@@ -68,17 +94,23 @@ export const ko: Translations = {
      },
      nav: {
        analytics: "분석",
@@ -60,82 +430,1381 @@ index 5d2e9911..663657d5 100644
      },
      modelToolsSheetSubtitle: "및 도구",
      modelToolsSheetTitle: "모델",
-@@ -324,6 +330,11 @@ export const ko: Translations = {
+@@ -89,10 +121,17 @@ export const ko: Translations = {
+     sessionsActiveCount: "{count}개 활성",
+     statusOverview: "상태 개요",
+     system: "시스템",
+-    webUi: "Web UI",
++    webUi: "웹 화면",
+   },
+ 
+   status: {
++    disabled: "비활성화됨",
++    restartGatewayConfirmMessage: "헤르메스 연결 서비스를 재시작합니다. 연결된 채널과 활성 세션은 재시작 후 다시 연결됩니다.",
++    restartGatewayConfirmTitle: "연결 서비스를 재시작할까요?",
++    updateHermesConfirmMessage: "hermes update를 실행하고 완료 후 연결 서비스를 재시작합니다. 그때까지 활성 세션의 프롬프트 캐시는 유지됩니다.",
++    updateHermesConfirmNow: "지금 업데이트",
++    updateHermesConfirmTitle: "헤르메스를 업데이트할까요?",
++
+     actionFailed: "작업 실패",
+     actionFinished: "완료됨",
+     actionFinishedOwed: "업데이트되었지만 아직 남은 작업이 있습니다 (완료하려면 `hermes update`를 다시 실행하세요)",
+@@ -230,10 +269,15 @@ export const ko: Translations = {
+   },
+ 
+   cron: {
++    loadWhat: "예약 작업",
++    scriptRequired: "스크립트 전용 작업에는 스크립트 경로가 필요합니다. 경로를 입력하거나 프롬프트 방식으로 바꿔 주세요.",
++    overdueSince: "실행 예정 시각 경과",
++    schedulerLastTicked: "마지막 일정 확인: {when}. 이후 실행 시각이 된 작업은 아직 실행되지 않았습니다.",
++
+     confirmDeleteMessage:
+       "이 작업은 일정에서 작업을 제거합니다. 되돌릴 수 없습니다.",
+     confirmDeleteTitle: "예약된 작업을 삭제하시겠습니까?",
+-    newJob: "새 Cron 작업",
++    newJob: "새 예약 작업",
+     nameOptional: "이름 (선택 사항)",
+     namePlaceholder: "예: 일일 요약",
+     prompt: "프롬프트",
+@@ -283,15 +327,49 @@ export const ko: Translations = {
+     resume: "재개",
+     triggerNow: "지금 실행",
+     delivery: {
++      needsHomeChannel: "먼저 기본 알림 채널을 설정하세요",
++      noneConfigured: "연결된 메신저가 없습니다. 보고서를 받으려면 채널 화면에서 연결하세요.",
++
+       local: "로컬",
+       telegram: "Telegram",
+       discord: "Discord",
+       slack: "Slack",
+-      email: "Email",
++      email: "이메일",
+     },
+   },
+ 
+   profiles: {
++    activeProfile: "현재 프로필",
++    activeBadge: "사용 중",
++    setActive: "이 프로필 사용",
++    activeSet: "사용할 프로필을 변경했습니다",
++    gatewayRunning: "연결 서비스 실행 중",
++    gatewayStopped: "연결 서비스 중지됨",
++    gatewayRunningWarning: "이 프로필의 연결 서비스가 실행 중입니다. 작업을 진행하면 중지됩니다.",
++    aliasBadge: "별칭",
++    description: "설명",
++    descriptionPlaceholder: "이 에이전트의 전문 분야와 맡을 일을 적으세요. 작업 담당자를 정할 때 참고합니다.",
++    noDescription: "등록된 설명이 없습니다",
++    editDescription: "설명 수정",
++    descriptionSaved: "설명을 저장했습니다",
++    reviewBadge: "검토 필요",
++    autoGenerate: "자동 작성",
++    generating: "작성 중…",
++    describeFailed: "설명을 작성하지 못했습니다",
++    distribution: "배포 구성",
++    advancedOptions: "고급 설정",
++    cloneAll: "모두 복사 (기억·대화·스킬·상태)",
++    noSkillsOption: "기본 제공 스킬을 추가하지 않음",
++    descriptionOptional: "설명 (선택)",
++    modelOptional: "모델 (선택)",
++    modelInherit: "복사한 프로필 또는 기본 모델 사용",
++    modelLoading: "모델을 불러오는 중…",
++    modelNone: "연결된 모델 제공자가 없습니다. 키 화면에서 API 키를 추가하거나 모델 화면에서 로그인하세요.",
++    editModel: "모델 변경",
++    modelSaved: "모델을 변경했습니다",
++    modelSelect: "모델 선택",
++    actions: "작업",
++
+     newProfile: "새 프로필",
+     name: "이름",
+     namePlaceholder: "예: coder, writer 등.",
+@@ -324,6 +402,23 @@ export const ko: Translations = {
    },
  
    pluginsPage: {
 +    catalogHeading: "플러그인 목록",
-+    catalogHint: "검토를 거쳐 특정 버전으로 고정한 플러그인입니다.",
++    catalogHint: "Nous에서 검토하고 특정 버전으로 고정한 플러그인입니다. 검증된 버전을 설치하려면 이 목록을 이용하세요.",
 +    catalogSearchPlaceholder: "플러그인 검색…",
 +    catalogEmpty: "검색 조건에 맞는 플러그인이 없습니다.",
-+    catalogEmptyDocsLink: "Hermes 플러그인 안내 보기",
++    catalogEmptyDocsLink: "플러그인 사용법 보기",
++    catalogInstallBtn: "설치",
++    catalogInstalledBadge: "설치됨 ✓",
++    catalogUpdateBtn: "업데이트 가능",
++    catalogRemovedBadge: "제거됨",
++    catalogConfirmTitle: "이 플러그인을 설치할까요?",
++    catalogConfirmInstallNote: "설치 직후에는 비활성 상태입니다. 사용하려면 설치 후 활성화하세요.",
++    catalogRequiresEnv: "필요한 환경 변수",
++    removedFromCatalog: "목록에서 제외됨",
++    updateConsentBody: (name: string, sha: string) => `새 버전 ${name} (${sha})에는 현재 설치본에 없는 기능과 접근 범위가 추가됩니다. 아래 내용을 신뢰할 때만 적용하세요:`,
++    updateScanBody: (name: string, count: number) => `보안 검사에서 ${name}의 새 코드에 주의 사항 ${count}개가 발견됐습니다. 출처를 신뢰할 때만 업데이트하세요:`,
++    updateScanBlocked: (name: string) => `${name}의 새 코드가 보안 검사에서 위험으로 판정되어 업데이트하지 않았습니다.`,
++
      contextEngineLabel: "컨텍스트 엔진",
      dashboardSlots: "대시보드 슬롯",
      disableRuntime: "비활성화",
+@@ -334,11 +429,11 @@ export const ko: Translations = {
+     forceReinstall: "강제 재설치 (기존 폴더를 먼저 삭제)",
+     headline:
+       "Hermes 플러그인을 검색, 설치, 활성화 및 업데이트합니다 (`hermes plugins` 동등).",
+-    identifierLabel: "Git URL 또는 owner/repo",
++    identifierLabel: "Git 주소 또는 저장소 경로(owner/repo)",
+     inactive: "비활성",
+     installBtn: "설치",
+-    installHeading: "GitHub / Git URL에서 설치",
+-    installHint: "owner/repo 약어 또는 전체 https:// 또는 git@ 클론 URL을 사용하세요.",
++    installHeading: "GitHub 저장소에서 설치",
++    installHint: "저장소 경로(owner/repo) 또는 전체 HTTPS·SSH 클론 주소를 입력하세요.",
+     memoryProviderLabel: "메모리 제공자",
+     missingEnvWarn: "플러그인을 실행하기 전에 Keys에서 다음 항목을 설정하세요:",
+     noDashboardTab: "대시보드 탭 없음",
+@@ -367,6 +462,13 @@ export const ko: Translations = {
+   },
+ 
+   skills: {
++    loadWhat: "스킬",
++    browseHub: "스킬 찾아보기",
++    createSkill: "스킬 만들기",
++    profileSelector: "프로필",
++    currentProfile: "현재 ({name})",
++    managingProfile: "“{name}” 프로필의 스킬을 관리합니다. 변경 사항은 현재 화면이 아닌 해당 프로필에 적용됩니다.",
++
+     title: "스킬",
+     searchPlaceholder: "스킬 및 도구 세트 검색...",
+     enabledOf: "{enabled}/{total} 활성화됨",
+@@ -505,6 +607,13 @@ export const ko: Translations = {
+   },
+ 
+   theme: {
++    fontTitle: "글꼴",
++    fontDefault: "테마 기본 글꼴",
++    fontDefaultHint: "현재 테마에 지정된 글꼴 사용",
++    fontSans: "고딕체",
++    fontSerif: "명조체",
++    fontMono: "고정폭 글꼴",
++
+     title: "테마",
+     switchTheme: "테마 전환",
+   },
+@@ -616,6 +725,30 @@ export const ko: Translations = {
+     },
+   },
+   kanban: {
++    needsAssignee: "담당자 지정 필요",
++    needsAssigneeHint: "선행 작업은 끝났지만 담당 프로필을 지정해야 이 작업을 배정합니다.",
++    confirmScheduled: "예약 작업으로 옮길까요? 사람의 답변을 기다리는 작업이 아니라, 정해진 시간이 지난 후 실행할 때 사용합니다.",
++    newTaskTitle: "새 작업 — {column}",
++    taskTitleLabel: "제목",
++    assigneeLabel: "담당자",
++    assigneeLabelHint: "(비우면 자동 배정)",
++    skillsLabel: "스킬",
++    skillsLabelHint: "(선택, 쉼표로 구분)",
++    parentLabel: "선행 작업",
++    parentLabelHint: "(선행 작업이 끝날 때까지 대기)",
++    create: "만들기",
++    boardSettings: "설정",
++    boardSettingsTitle: "작업판 이름·설명·새 작업의 기본 폴더 설정",
++    boardSettingsTitleFor: "작업판 설정 — {name}",
++    projectDirectoryOverrideHint: "새 작업은 이 폴더를 기본 작업 공간으로 사용합니다. 작업을 만들 때 개별 변경할 수 있습니다.",
++    saving: "저장 중…",
++    commentHint: "댓글은 다음 실행이나 kanban_show() 호출 때 담당자에게 전달됩니다. 작업을 먼저 중지할 필요는 없습니다.",
++    commentHintTitle: "댓글로 작업 담당자에게 의견을 전달하세요. 댓글은 즉시 대화에 기록되고 실행 중인 담당자는 다음 작업 조회나 재실행 때 확인합니다. 담당자를 멈춰 답변을 기다리게 할 때만 작업을 차단하세요.",
++
++    trash: {
++      confirmTitle: "작업을 삭제할까요?",
++      confirmManyTitle: "작업 {n}개를 삭제할까요?",
++    },
+     loading: "Kanban 보드를 불러오는 중입니다…",
+     loadFailed: "Kanban 보드를 불러오지 못했습니다: ",
+     loadFailedHint:
 diff --git a/web/src/i18n/types.ts b/web/src/i18n/types.ts
-index cac661b0..adbe8dbd 100644
+index cac661b0..2b256d96 100644
 --- a/web/src/i18n/types.ts
 +++ b/web/src/i18n/types.ts
-@@ -93,6 +93,12 @@ export interface Translations {
-       stopped: string;
+@@ -94,17 +94,23 @@ export interface Translations {
      };
      nav: {
-+      channels?: string;
-+      files?: string;
-+      mcp?: string;
-+      pairing?: string;
-+      system?: string;
-+      webhooks?: string;
        analytics: string;
++      channels?: string;
        chat: string;
        config: string;
+       cron: string;
+       documentation: string;
++      files?: string;
+       keys: string;
+       logs: string;
++      mcp?: string;
+       models: string;
++      pairing?: string;
+       profiles: string;
+       plugins: string;
+       sessions: string;
+       skills: string;
++      system?: string;
++      webhooks?: string;
+     };
+     modelToolsSheetSubtitle: string;
+     modelToolsSheetTitle: string;
+diff --git a/web/src/lib/aux-tasks.ts b/web/src/lib/aux-tasks.ts
+index e2df12d7..e02653b8 100644
+--- a/web/src/lib/aux-tasks.ts
++++ b/web/src/lib/aux-tasks.ts
+@@ -13,18 +13,18 @@ export interface AuxTaskMeta {
+ // not listed here: the backend appends them to `/api/model/auxiliary` with the
+ // plugin's own `label`/`hint` and `auxTaskRows` folds them in after these.
+ export const BUILTIN_AUX_TASKS: readonly AuxTaskMeta[] = [
+-  { key: "vision", label: "Vision", hint: "Image analysis" },
+-  { key: "compression", label: "Compression", hint: "Context compaction" },
+-  { key: "skills_hub", label: "Skills Hub", hint: "Skill search" },
+-  { key: "approval", label: "Approval", hint: "Smart auto-approve" },
+-  { key: "mcp", label: "MCP", hint: "MCP tool routing" },
+-  { key: "title_generation", label: "Title Gen", hint: "Session titles" },
+-  { key: "review", label: "Review", hint: "/review subagent" },
+-  { key: "voice_chat", label: "Voice Chat", hint: "Spoken voice-mode replies" },
+-  { key: "triage_specifier", label: "Triage Specifier", hint: "Kanban spec fleshing" },
+-  { key: "kanban_decomposer", label: "Kanban Decomposer", hint: "Task decomposition" },
+-  { key: "profile_describer", label: "Profile Describer", hint: "Auto profile descriptions" },
+-  { key: "curator", label: "Curator", hint: "Skill-usage review" },
++  { key: "vision", label: "이미지 이해", hint: "이미지 내용 분석" },
++  { key: "compression", label: "문맥 압축", hint: "긴 대화 요약·압축" },
++  { key: "skills_hub", label: "스킬 검색", hint: "필요한 스킬 찾기" },
++  { key: "approval", label: "실행 승인 판단", hint: "자동 승인 규칙 판단" },
++  { key: "mcp", label: "MCP", hint: "외부 도구 선택" },
++  { key: "title_generation", label: "대화 제목", hint: "대화 제목 자동 작성" },
++  { key: "review", label: "검토", hint: "/review 명령의 검토 담당" },
++  { key: "voice_chat", label: "음성 대화", hint: "음성 대화의 답변 생성" },
++  { key: "triage_specifier", label: "안건 구체화", hint: "안건의 요구사항 정리" },
++  { key: "kanban_decomposer", label: "작업 분할", hint: "큰 작업을 실행 단위로 나누기" },
++  { key: "profile_describer", label: "프로필 설명", hint: "프로필 설명 자동 작성" },
++  { key: "curator", label: "스킬 개선", hint: "스킬 사용 결과 검토" },
+ ] as const;
+ 
+ /**
+diff --git a/web/src/lib/chat-sidebar-banner.ts b/web/src/lib/chat-sidebar-banner.ts
+index 5b532b50..8e016da3 100644
+--- a/web/src/lib/chat-sidebar-banner.ts
++++ b/web/src/lib/chat-sidebar-banner.ts
+@@ -7,7 +7,7 @@
+ 
+ /** The side panel could not connect; the chat itself is unaffected. */
+ export const SIDECAR_DISCONNECTED_MESSAGE =
+-  'The chat side panel (model and tool activity) could not connect. Chat still works. Click Reconnect side panel to try again.'
++  '모델·도구 보조 패널에 연결하지 못했습니다. 채팅은 계속 사용할 수 있습니다. 보조 패널 다시 연결을 눌러 주세요.'
+ 
+ /** Transport-level texts the shared JSON-RPC client can throw. All mean "sidecar down". */
+ const SIDECAR_TRANSPORT_ERRORS = [
+@@ -47,6 +47,6 @@ export function credentialWarning(raw: string | undefined | null): CredentialWar
+   const provider = match[1]
+   return {
+     provider,
+-    message: `No API key set for ${provider}, so messages will fail. Add a key under Keys, or pick a different provider.`
++    message: `${provider}의 API 키가 없어 메시지를 보낼 수 없습니다. 키 화면에서 키를 추가하거나 다른 모델 제공자를 선택하세요.`
+   }
+ }
+diff --git a/web/src/lib/model-picker-current.ts b/web/src/lib/model-picker-current.ts
+index 6e156f3e..8e42b6c2 100644
+--- a/web/src/lib/model-picker-current.ts
++++ b/web/src/lib/model-picker-current.ts
+@@ -51,7 +51,7 @@ export function resolvePickerCurrent(
+ 
+ export function formatPickerCurrentLabel(current: PickerCurrent): string {
+   if (isAutoPickerCurrent(current)) {
+-    return "auto (use main model)";
++    return "주 대화 모델과 공유";
+   }
+   const model = current.model.trim() || "(unknown)";
+   const provider = current.provider.trim();
+diff --git a/web/src/lib/reasoning-effort.ts b/web/src/lib/reasoning-effort.ts
+index 55bc303b..d826c297 100644
+--- a/web/src/lib/reasoning-effort.ts
++++ b/web/src/lib/reasoning-effort.ts
+@@ -21,14 +21,14 @@ export interface EffortOption {
+ }
+ 
+ const EFFORT_LABELS: Record<ReasoningEffortValue, string> = {
+-  none: "Off (no thinking)",
+-  minimal: "Minimal",
+-  low: "Low",
+-  medium: "Medium",
+-  high: "High",
+-  xhigh: "Extra High",
+-  max: "Max",
+-  ultra: "Ultra",
++  none: "끄기 (추론 안 함)",
++  minimal: "최소",
++  low: "낮음",
++  medium: "보통",
++  high: "높음",
++  xhigh: "매우 높음",
++  max: "최대",
++  ultra: "최상",
+ };
+ 
+ /** `none` first, then the seven levels ascending — the shared value order. */
 diff --git a/web/src/lib/resolve-page-title.ts b/web/src/lib/resolve-page-title.ts
-index 15fa5b38..0becc1f4 100644
+index 15fa5b38..4403a260 100644
 --- a/web/src/lib/resolve-page-title.ts
 +++ b/web/src/lib/resolve-page-title.ts
-@@ -3,21 +3,25 @@ import type { Translations } from "@/i18n/types";
- const BUILTIN: Record<string, keyof Translations["app"]["nav"]> = {
-   "/chat": "chat",
-   "/sessions": "sessions",
+@@ -13,6 +13,12 @@ const BUILTIN: Record<string, keyof Translations["app"]["nav"]> = {
+   "/config": "config",
+   "/env": "keys",
+   "/docs": "documentation",
 +  "/files": "files",
-   "/analytics": "analytics",
-   "/models": "models",
-   "/logs": "logs",
-   "/cron": "cron",
-   "/skills": "skills",
-   "/plugins": "plugins",
 +  "/mcp": "mcp",
 +  "/channels": "channels",
 +  "/webhooks": "webhooks",
 +  "/pairing": "pairing",
 +  "/system": "system",
-   "/profiles": "profiles",
-   "/config": "config",
-   "/env": "keys",
-   "/docs": "documentation",
  };
  
--// Built-in routes without an i18n nav key. Keep these in sync with the
--// sidebar labels in App.tsx — the naive capitalize fallback below mangles
--// initialisms ("/mcp" → "Mcp") and can't match multi-word labels.
-+// English fallback labels for routes whose locale may not define a nav key.
- const BUILTIN_LITERAL: Record<string, string> = {
-   "/files": "Files",
-   "/mcp": "MCP",
-@@ -42,7 +46,7 @@ export function resolvePageTitle(
+ // Built-in routes without an i18n nav key. Keep these in sync with the
+@@ -42,7 +48,8 @@ export function resolvePageTitle(
    }
    const key = BUILTIN[normalized];
    if (key) {
 -    return t.app.nav[key];
-+    return t.app.nav[key] ?? BUILTIN_LITERAL[normalized] ?? key;
++    const translated = t.app.nav[key];
++    if (translated) return translated;
    }
    const literal = BUILTIN_LITERAL[normalized];
    if (literal) {
+diff --git a/web/src/pages/AnalyticsPage.tsx b/web/src/pages/AnalyticsPage.tsx
+index f32a2771..b57104a9 100644
+--- a/web/src/pages/AnalyticsPage.tsx
++++ b/web/src/pages/AnalyticsPage.tsx
+@@ -491,32 +491,28 @@ export default function AnalyticsPage() {
+           <CardContent className="py-12">
+             <div className="mx-auto flex max-w-2xl flex-col gap-3 text-sm text-muted-foreground">
+               <h2 className="font-mondwest text-display text-base tracking-wider text-foreground">
+-                Token analytics hidden
++                토큰 사용량 분석이 숨겨져 있습니다
+               </h2>
+               <p>
+-                The token, cost, and per-day analytics on this page are a
+-                local debug estimate. They only count successful main-agent
+-                responses with a usable <span className="font-mono">usage</span>{" "}
+-                block, and silently exclude auxiliary calls (context
+-                compression, title generation, vision, session search, web
+-                extract, smart approvals, MCP routing, plugin LLM access)
+-                plus provider-side retries and fallback attempts. Cache
+-                writes are missing entirely.
++                이 페이지의 토큰·비용·일별 분석은 로컬 디버그용 추정치입니다.
++                사용 가능한 <span className="font-mono">usage</span>{" "}
++                정보가 있는 주 에이전트의 성공 응답만 집계합니다. 문맥 압축,
++                제목 생성, 이미지 이해, 세션 검색, 웹 추출, 스마트 승인,
++                MCP 라우팅, 플러그인 모델 호출과 제공자 재시도·대체 호출은
++                제외되며 캐시 쓰기도 집계하지 않습니다.
+               </p>
+               <p>
+-                On models with heavy auxiliary traffic (Kimi K2.6, MiniMax
+-                M2.7) the local total can be 10x–100x lower than what your
+-                provider bills. Hiding these numbers is safer than letting
+-                them look authoritative.
++                보조 호출이 많은 모델(Kimi K2.6, MiniMax M2.7)은 로컬 집계가
++                제공자 청구량보다 10~100배 낮을 수 있습니다. 실제 청구량처럼
++                오해하지 않도록 분석을 숨겼습니다.
+               </p>
+               <p>
+-                Check your provider dashboard (OpenRouter, Anthropic, etc.)
+-                for actual usage and billing. To re-enable the local debug
+-                estimate anyway, set{" "}
++                실제 사용량과 비용은 제공자 대시보드(OpenRouter, Anthropic 등)에서
++                확인하세요. 로컬 추정치를 다시 표시하려면{" "}
+                 <span className="font-mono">
+                   dashboard.show_token_analytics: true
+                 </span>{" "}
+-                in <a href="/config" className="underline">Config</a>.
++                을 <a href="/config" className="underline">설정</a>에서 켜세요.
+               </p>
+             </div>
+           </CardContent>
+diff --git a/web/src/pages/ChannelsPage.tsx b/web/src/pages/ChannelsPage.tsx
+index 02a23fd3..50c7f5e8 100644
+--- a/web/src/pages/ChannelsPage.tsx
++++ b/web/src/pages/ChannelsPage.tsx
+@@ -26,6 +26,7 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+ import { Toast } from "@nous-research/ui/ui/components/toast";
+ import { useToast } from "@nous-research/ui/hooks/use-toast";
+ import { api } from "@/lib/api";
++import { useI18n } from "@/i18n";
+ import type {
+   MessagingPlatform,
+   MessagingPlatformEnvVar,
+@@ -60,6 +61,15 @@ function stateBadge(state: string) {
+   return STATE_BADGE[state] ?? { tone: "outline" as const, label: state };
+ }
+ 
++function channelDescriptionHash(value: string): string {
++  let hash = 14695981039346656037n;
++  for (let i = 0; i < value.length; i += 1) {
++    hash ^= BigInt(value.charCodeAt(i));
++    hash = BigInt.asUintN(64, hash * 1099511628211n);
++  }
++  return hash.toString(16).padStart(16, "0");
++}
++
+ const TELEGRAM_USER_ID_RE = /^\d+$/;
+ const TELEGRAM_BOT_TOKEN_RE = /^\d+:[A-Za-z0-9_-]{30,}$/;
+ const SLACK_MEMBER_ID_RE = /^[UW][A-Z0-9]{2,}$/;
+@@ -139,6 +149,8 @@ export default function ChannelsPage() {
+     "hermes gateway start",
+   );
+   const [loading, setLoading] = useState(true);
++  const [channelDescriptionsKo, setChannelDescriptionsKo] = useState<Record<string, { hash: string; text: string }> | null>(null);
++  const { locale } = useI18n();
+   const { toast, showToast } = useToast();
+   const { setEnd } = usePageHeader();
+ 
+@@ -161,6 +173,18 @@ export default function ChannelsPage() {
+ 
+   const gatewayRunning = platforms.length > 0 && platforms[0].gateway_running;
+ 
++  useEffect(() => {
++    let cancelled = false;
++    if (locale !== "ko") {
++      setChannelDescriptionsKo(null);
++      return () => { cancelled = true; };
++    }
++    void import("@/i18n/channel-descriptions.ko.json").then((module) => {
++      if (!cancelled) setChannelDescriptionsKo(module.default);
++    });
++    return () => { cancelled = true; };
++  }, [locale]);
++
+   const load = useCallback(() => {
+     return api
+       .getMessagingPlatforms()
+@@ -338,7 +362,7 @@ export default function ChannelsPage() {
+             <div className="flex items-center gap-2 text-sm">
+               <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+               <span>
+-                Changes are saved. Restart the gateway for them to take effect.
++                변경 사항을 저장했습니다. 적용하려면 게이트웨이를 재시작하세요.
+               </span>
+             </div>
+             <Button
+@@ -359,18 +383,28 @@ export default function ChannelsPage() {
+           <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+             <WifiOff className="h-4 w-4 shrink-0" />
+             <span>
+-              The gateway is not running. Configure channels here, then start the
+-              gateway with <code className="font-courier">{gatewayStartCommand}</code>{" "}
+-              (or the Restart button above).
++              게이트웨이가 실행 중이 아닙니다. 여기서 채널을 설정한 다음{" "}
++              <code className="font-courier">{gatewayStartCommand}</code> 명령으로
++              게이트웨이를 시작하세요(또는 위의 재시작 버튼을 누르세요).
+             </span>
+           </CardContent>
+         </Card>
+       )}
+ 
+       <p className="text-xs text-muted-foreground">
+-        {configured} of {platforms.length} channels configured. Credentials are
+-        written to <code className="font-courier">{envPath}</code>; the
+-        gateway connects each enabled channel on its next restart.
++        {locale === "ko" ? (
++          <>
++            설정된 채널: {configured} / {platforms.length}. 인증 정보는{" "}
++            <code className="font-courier">{envPath}</code>에 저장되며, 사용 설정한 채널은
++            다음 게이트웨이 재시작 때 연결됩니다.
++          </>
++        ) : (
++          <>
++            {configured} of {platforms.length} channels configured. Credentials are
++            written to <code className="font-courier">{envPath}</code>; the
++            gateway connects each enabled channel on its next restart.
++          </>
++        )}
+       </p>
+ 
+       {/* Config modal */}
+@@ -429,20 +463,20 @@ export default function ChannelsPage() {
+               {editing.id === "telegram" && (
+                 <div className="grid gap-3 text-sm text-muted-foreground">
+                   <p>
+-                    Connect a bot you already own, or create one in Telegram before
+-                    filling in this form.
++                    이 양식을 작성하기 전에 기존 봇을 연결하거나 Telegram에서
++                    새 봇을 만드세요.
+                   </p>
+                   <ol className="grid list-decimal gap-1.5 pl-5">
+                     <li>
+-                      Open <span className="text-foreground">@BotFather</span>, send
+-                      <code className="mx-1 font-courier text-xs">/newbot</code>, and
+-                      follow its prompts.
++                      <span className="text-foreground">@BotFather</span>를 열고{" "}
++                      <code className="mx-1 font-courier text-xs">/newbot</code>을
++                      보낸 뒤 안내를 따르세요.
+                     </li>
+-                    <li>Copy the complete bot token BotFather gives you.</li>
++                    <li>BotFather가 발급한 전체 봇 토큰을 복사하세요.</li>
+                     <li>
+-                      Message <span className="text-foreground">@userinfobot</span> to
+-                      find your numeric Telegram user ID, then add it below for
+-                      immediate access.
++                      <span className="text-foreground">@userinfobot</span>에 메시지를
++                      보내 Telegram 사용자 ID(숫자)를 확인한 뒤, 아래에 입력하면
++                      바로 사용할 수 있습니다.
+                     </li>
+                   </ol>
+                   <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+@@ -452,7 +486,7 @@ export default function ChannelsPage() {
+                       rel="noopener noreferrer"
+                       className="inline-flex items-center gap-1 text-primary hover:underline"
+                     >
+-                      Open @BotFather <ExternalLink className="h-3 w-3" />
++                      @BotFather 열기 <ExternalLink className="h-3 w-3" />
+                     </a>
+                     <a
+                       href="https://t.me/userinfobot"
+@@ -460,12 +494,12 @@ export default function ChannelsPage() {
+                       rel="noopener noreferrer"
+                       className="inline-flex items-center gap-1 text-primary hover:underline"
+                     >
+-                      Find my user ID <ExternalLink className="h-3 w-3" />
++                      내 사용자 ID 확인 <ExternalLink className="h-3 w-3" />
+                     </a>
+                   </div>
+                   <p className="text-xs">
+-                    You can leave allowed users blank. Hermes will then send new DM
+-                    users a code that you approve from the Pairing page.
++                    허용 사용자 목록은 비워둘 수 있습니다. 이 경우 새로 DM을 보내는
++                    사용자에게 Hermes가 코드를 보내며, 연결 승인 화면에서 승인할 수 있습니다.
+                   </p>
+                 </div>
+               )}
+@@ -602,7 +636,11 @@ export default function ChannelsPage() {
+                         <Badge tone={badge.tone}>{badge.label}</Badge>
+                       </div>
+                       <span className="text-xs text-muted-foreground">
+-                        {platform.description}
++                        {locale === "ko" &&
++                        channelDescriptionsKo?.[platform.id]?.hash ===
++                          channelDescriptionHash(platform.description)
++                          ? channelDescriptionsKo[platform.id].text
++                          : platform.description}
+                       </span>
+                       {platform.error_message && (
+                         <span className="text-xs text-destructive">
+@@ -661,6 +699,7 @@ export default function ChannelsPage() {
+                   <TelegramOnboardingPanel
+                     onManualSetup={() => openConfig(platform)}
+                     onChanged={load}
++                    locale={locale}
+                     onRestartNeeded={() => setRestartNeeded(true)}
+                     platform={platform}
+                     setRestartNeeded={setRestartNeeded}
+@@ -1118,6 +1157,7 @@ export function WhatsAppOnboardingPanel({
+ function TelegramOnboardingPanel({
+   onManualSetup,
+   onChanged,
++  locale,
+   onRestartNeeded,
+   platform,
+   setRestartNeeded,
+@@ -1125,6 +1165,7 @@ function TelegramOnboardingPanel({
+ }: {
+   onManualSetup: () => void;
+   onChanged: () => Promise<void>;
++  locale: string;
+   onRestartNeeded: () => void;
+   platform: MessagingPlatform;
+   setRestartNeeded: (needed: boolean) => void;
+@@ -1333,11 +1374,12 @@ function TelegramOnboardingPanel({
+     <div className="rounded-sm border border-border bg-background/35 p-4">
+       <div className="grid gap-1">
+         <span className="font-mondwest text-sm text-foreground">
+-          Choose how to connect your Telegram bot
++          {locale === "ko" ? "Telegram 봇 연결 방법을 선택하세요" : "Choose how to connect your Telegram bot"}
+         </span>
+         <span className="text-xs text-muted-foreground">
+-          Both options connect a bot you control and save its credentials only to
+-          this Hermes installation.
++          {locale === "ko"
++            ? "두 방법 모두 본인이 관리하는 봇을 연결하며, 인증 정보는 이 Hermes 설치 환경에만 저장됩니다."
++            : "Both options connect a bot you control and save its credentials only to this Hermes installation."}
+         </span>
+       </div>
+ 
+@@ -1350,8 +1392,9 @@ function TelegramOnboardingPanel({
+             <Badge tone="success">recommended</Badge>
+           </div>
+           <p className="text-xs text-muted-foreground">
+-            Scan a QR code and confirm in Telegram. Hermes creates the bot and
+-            detects your Telegram user ID automatically.
++            {locale === "ko"
++              ? "QR 코드를 스캔해 Telegram에서 확인하세요. Hermes가 봇을 만들고 Telegram 사용자 ID를 자동으로 확인합니다."
++              : "Scan a QR code and confirm in Telegram. Hermes creates the bot and detects your Telegram user ID automatically."}
+           </p>
+           <Button
+             size="sm"
+@@ -1369,8 +1412,9 @@ function TelegramOnboardingPanel({
+             Use your own bot
+           </span>
+           <p className="text-xs text-muted-foreground">
+-            Create a bot with @BotFather, or connect one you already have, by
+-            entering its token and choosing who can use it.
++            {locale === "ko"
++              ? "@BotFather에서 새 봇을 만들거나 기존 봇의 토큰을 입력해 연결하세요. 이어서 봇을 사용할 수 있는 사람을 선택합니다."
++              : "Create a bot with @BotFather, or connect one you already have, by entering its token and choosing who can use it."}
+           </p>
+           <Button
+             size="sm"
+@@ -1387,15 +1431,18 @@ function TelegramOnboardingPanel({
+ 
+       {platform.configured && (
+         <div className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+-          Telegram credentials are already configured. A new QR setup or bot token
+-          will replace the current bot when you save.
++          {locale === "ko"
++            ? "Telegram 인증 정보가 이미 설정되어 있습니다. 새 QR 설정이나 봇 토큰을 저장하면 현재 봇 정보가 교체됩니다."
++            : "Telegram credentials are already configured. A new QR setup or bot token will replace the current bot when you save."}
+         </div>
+       )}
+ 
+       {phase !== "idle" && (
+         <div className="mt-4 border-t border-border pt-4">
+           <span className="text-xs text-muted-foreground">
+-            Finish or cancel the current QR setup before switching methods.
++            {locale === "ko"
++              ? "연결 방법을 바꾸기 전에 현재 QR 설정을 완료하거나 취소하세요."
++              : "Finish or cancel the current QR setup before switching methods."}
+           </span>
+         </div>
+       )}
+diff --git a/web/src/pages/ChatPage.tsx b/web/src/pages/ChatPage.tsx
+index 9baf9304..90d7033e 100644
+--- a/web/src/pages/ChatPage.tsx
++++ b/web/src/pages/ChatPage.tsx
+@@ -58,7 +58,6 @@ import {
+ } from "@/lib/pty-reconnect";
+ import {
+   PTY_RESUME_LOADING_MAX_MS,
+-  PTY_RESUME_LOADING_MESSAGE,
+   shouldFinishResumeHydrationOnChunk,
+   shouldShowResumeLoadingOverlay,
+ } from "@/lib/pty-resume-loading";
+@@ -82,7 +81,6 @@ import { uploadChatImage } from "@/lib/chatImagePaste";
+ import { attachChatImageDropListeners } from "@/lib/chat-image-drop";
+ import { maybeReloadForLoopbackWsAuthFailure } from "@/lib/dashboard-auth-reload";
+ import {
+-  PTY_GAVE_UP_BANNER,
+   PTY_RECONNECTING_BANNER,
+   PTY_SESSION_ENDED_MESSAGE,
+   PTY_SESSION_ENDED_TERMINAL_LINE,
+@@ -1901,7 +1899,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+           <div
+             ref={hostRef}
+             role="region"
+-            aria-label="Chat terminal"
++            aria-label="채팅 입력 및 대화"
+             className="hermes-chat-xterm-host min-h-0 min-w-0 flex-1"
+           />
+ 
+@@ -1910,10 +1908,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+               <div className="flex max-w-[min(28rem,calc(100vw-3rem))] flex-col items-start gap-2 border border-warning/60 bg-black/80 px-3 py-2 text-xs text-warning shadow-lg">
+                 <div className="tracking-wide">
+                   {ptyState === "reconnecting"
+-                    ? "Chat is reconnecting."
++                    ? "채팅에 다시 연결하고 있습니다."
+                     : reconnectGaveUp
+-                      ? PTY_GAVE_UP_BANNER.text
+-                      : "Chat disconnected."}
++                      ? "채팅 연결이 끊겼습니다. 서버가 실행 중인지 확인한 뒤 다시 연결하세요."
++                      : "채팅 연결이 끊겼습니다."}
+                 </div>
+                 <div className="flex flex-wrap gap-2">
+                   <Button
+@@ -1921,18 +1919,18 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+                     outlined
+                     onClick={reconnectPty}
+                     prefix={<RotateCcw className="h-4 w-4" />}
+-                    aria-label="Reconnect chat"
++                    aria-label="채팅 다시 연결"
+                   >
+-                    Reconnect now
++                    지금 다시 연결
+                   </Button>
+                   {ptyState === "closed" && reconnectGaveUp && (
+                     <Button
+                       size="sm"
+                       ghost
+                       onClick={() => navigate("/system")}
+-                      aria-label="Check server status"
++                      aria-label="서버 상태 확인"
+                     >
+-                      Check server status
++                      서버 상태 확인
+                     </Button>
+                   )}
+                 </div>
+@@ -1945,10 +1943,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+               className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
+               role="status"
+               aria-live="polite"
+-              aria-label={PTY_RESUME_LOADING_MESSAGE}
++              aria-label="이전 대화를 불러오는 중입니다"
+             >
+               <div className="max-w-[min(28rem,calc(100vw-3rem))] border border-current/30 bg-black/80 px-4 py-3 text-center text-xs tracking-wide text-white/85 shadow-lg">
+-                {PTY_RESUME_LOADING_MESSAGE}
++                {"이전 대화를 불러오는 중입니다"}
+               </div>
+             </div>
+           )}
+@@ -1995,7 +1993,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+               ghost
+               onClick={toggleChatPanel}
+               title="Show side panel (model + sessions)"
+-              aria-label="Show chat side panel"
++              aria-label="모델·도구 패널 열기"
+               className={cn(
+                 "absolute z-10",
+                 "normal-case tracking-normal font-normal",
+@@ -2029,7 +2027,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+                 ghost
+                 size="icon"
+                 onClick={toggleChatPanel}
+-                aria-label="Collapse chat side panel"
++                aria-label="모델·도구 패널 접기"
+                 title="Collapse side panel"
+                 className="text-text-secondary hover:text-midground"
+               >
+diff --git a/web/src/pages/CronPage.tsx b/web/src/pages/CronPage.tsx
+index 0d099ca2..b3044c59 100644
+--- a/web/src/pages/CronPage.tsx
++++ b/web/src/pages/CronPage.tsx
+@@ -277,7 +277,7 @@ function CronAdvancedFields({
+               checked={form.no_agent}
+               onChange={(e) => update("no_agent", e.target.checked)}
+             />
+-            no_agent: run the script only and deliver stdout verbatim
++            no_agent: 스크립트만 실행하고 표준 출력을 그대로 전달
+           </label>
+           <div className="grid gap-1">
+             <Label htmlFor={`${idPrefix}-script`}>Script</Label>
+@@ -915,8 +915,8 @@ export default function CronPage() {
+         value={view}
+         onChange={(v) => setView(v as "jobs" | "blueprints")}
+         options={[
+-          { value: "jobs", label: "Jobs" },
+-          { value: "blueprints", label: "Blueprints" },
++          { value: "jobs", label: locale === "ko" ? "작업" : "Jobs" },
++          { value: "blueprints", label: locale === "ko" ? "작업 템플릿" : "Blueprints" },
+         ]}
+       />
+ 
+diff --git a/web/src/pages/McpPage.tsx b/web/src/pages/McpPage.tsx
+index 773479ab..47ca0341 100644
+--- a/web/src/pages/McpPage.tsx
++++ b/web/src/pages/McpPage.tsx
+@@ -6,6 +6,7 @@ import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
+ import { Spinner } from "@nous-research/ui/ui/components/spinner";
+ import { H2 } from "@nous-research/ui/ui/components/typography/h2";
+ import { api } from "@/lib/api";
++import { useI18n } from "@/i18n";
+ import type {
+   McpCatalogDiagnostic,
+   McpCatalogEntry,
+@@ -49,9 +50,23 @@ export default function McpPage() {
+   const [catalog, setCatalog] = useState<McpCatalogEntry[]>([]);
+   const [diagnostics, setDiagnostics] = useState<McpCatalogDiagnostic[]>([]);
+   const [loading, setLoading] = useState(true);
++  const [catalogDescriptionsKo, setCatalogDescriptionsKo] = useState<Record<string, { hash: string; text: string }> | null>(null);
++  const { locale } = useI18n();
+   const { toast, showToast } = useToast();
+   const { setEnd } = usePageHeader();
+ 
++  useEffect(() => {
++    let cancelled = false;
++    if (locale !== "ko") {
++      setCatalogDescriptionsKo(null);
++      return () => { cancelled = true; };
++    }
++    void import("@/i18n/mcp-catalog.ko.json").then((module) => {
++      if (!cancelled) setCatalogDescriptionsKo(module.default);
++    });
++    return () => { cancelled = true; };
++  }, [locale]);
++
+   // Add server modal state
+   const [createModalOpen, setCreateModalOpen] = useState(false);
+   const [name, setName] = useState("");
+@@ -596,7 +611,7 @@ export default function McpPage() {
+             className="flex items-center gap-2 text-muted-foreground"
+           >
+             <Server className="h-4 w-4" />
+-            Your MCP servers ({servers.length})
++            {locale === "ko" ? `내 MCP 서버 (${servers.length})` : `Your MCP servers (${servers.length})`}
+           </H2>
+         </div>
+ 
+@@ -606,8 +621,9 @@ export default function McpPage() {
+           <Card>
+             <CardContent className="flex flex-col items-center gap-3 py-8 text-center text-sm text-muted-foreground">
+               <p>
+-                No MCP servers yet. MCP servers give the agent extra tools (GitHub, databases,
+-                browsers…). Pick one from the catalog below, or click Add Server at the top of the page.
++                {locale === "ko"
++                  ? "아직 MCP 서버가 없습니다. MCP 서버를 연결하면 에이전트에 GitHub, 데이터베이스, 브라우저 등의 도구를 추가할 수 있습니다. 아래 카탈로그에서 서버를 선택하거나 페이지 위쪽의 서버 추가를 누르세요."
++                  : "No MCP servers yet. MCP servers give the agent extra tools (GitHub, databases, browsers…). Pick one from the catalog below, or click Add Server at the top of the page."}
+               </p>
+               <Button
+                 size="sm"
+@@ -618,7 +634,7 @@ export default function McpPage() {
+                 }
+                 prefix={<Package className="h-3.5 w-3.5" />}
+               >
+-                Browse catalog
++                {locale === "ko" ? "카탈로그 보기" : "Browse catalog"}
+               </Button>
+             </CardContent>
+           </Card>
+@@ -762,18 +778,20 @@ export default function McpPage() {
+             className="flex items-center gap-2 text-muted-foreground"
+           >
+             <Package className="h-4 w-4" />
+-            <span id="mcp-catalog">Catalog ({catalog.length})</span>
++            <span id="mcp-catalog">{locale === "ko" ? `카탈로그 (${catalog.length})` : `Catalog (${catalog.length})`}</span>
+           </H2>
+         </div>
+ 
+         <p className="text-xs text-muted-foreground">
+-          Browse Nous-approved MCP servers and install them with one click.
++          {locale === "ko"
++            ? "Nous에서 승인한 MCP 서버를 살펴보고 한 번의 클릭으로 설치할 수 있습니다."
++            : "Browse Nous-approved MCP servers and install them with one click."}
+         </p>
+ 
+         {catalog.length === 0 && (
+           <Card>
+             <CardContent className="py-8 text-center text-sm text-muted-foreground">
+-              No catalog entries available.
++              {locale === "ko" ? "사용 가능한 카탈로그 항목이 없습니다." : "No catalog entries available."}
+             </CardContent>
+           </Card>
+         )}
+@@ -817,7 +835,11 @@ export default function McpPage() {
+                   </div>
+                   {entry.description && (
+                     <p className="text-xs text-muted-foreground">
+-                      {entry.description}
++                      {locale === "ko" &&
++                      catalogDescriptionsKo?.[entry.name]?.hash ===
++                        mcpDescriptionHash(entry.description)
++                        ? catalogDescriptionsKo[entry.name].text
++                        : entry.description}
+                     </p>
+                   )}
+                   {/* Connection detail: what the agent actually talks to. */}
+@@ -915,3 +937,12 @@ export default function McpPage() {
+     </div>
+   );
+ }
++
++function mcpDescriptionHash(value: string): string {
++  let hash = 14695981039346656037n;
++  for (let i = 0; i < value.length; i += 1) {
++    hash ^= BigInt(value.charCodeAt(i));
++    hash = BigInt.asUintN(64, hash * 1099511628211n);
++  }
++  return hash.toString(16).padStart(16, "0");
++}
+diff --git a/web/src/pages/ModelsPage.tsx b/web/src/pages/ModelsPage.tsx
+index 30afe5ee..121980c7 100644
+--- a/web/src/pages/ModelsPage.tsx
++++ b/web/src/pages/ModelsPage.tsx
+@@ -47,9 +47,9 @@ import { errorMessage } from "@/lib/api-error";
+ import { assignmentToPickerCurrent } from "@/lib/model-picker-current";
+ 
+ const PERIODS = [
+-  { label: "7d", days: 7 },
+-  { label: "30d", days: 30 },
+-  { label: "90d", days: 90 },
++  { label: "7일", days: 7 },
++  { label: "30일", days: 30 },
++  { label: "90일", days: 90 },
+ ] as const;
+ 
+ function formatTokens(n: number): string {
+@@ -163,17 +163,17 @@ function CapabilityBadges({
+     <div className="flex flex-wrap items-center gap-1.5">
+       {capabilities.supports_tools && (
+         <span className="inline-flex items-center gap-1 bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success">
+-          <Wrench className="h-2.5 w-2.5" /> Tools
++          <Wrench className="h-2.5 w-2.5" /> 도구 사용
+         </span>
+       )}
+       {capabilities.supports_vision && (
+         <span className="inline-flex items-center gap-1 bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+-          <Eye className="h-2.5 w-2.5" /> Vision
++          <Eye className="h-2.5 w-2.5" /> 이미지 이해
+         </span>
+       )}
+       {capabilities.supports_reasoning && (
+         <span className="inline-flex items-center gap-1 bg-purple-500/10 px-1.5 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-400">
+-          <Brain className="h-2.5 w-2.5" /> Reasoning
++          <Brain className="h-2.5 w-2.5" /> 추론
+         </span>
+       )}
+       {capabilities.model_family && (
+@@ -275,7 +275,7 @@ function UseAsMenu({
+         className="h-6 px-2 text-xs uppercase"
+         prefix={busy ? <Spinner /> : null}
+       >
+-        Use as <ChevronDown className="h-3 w-3" />
++        사용 대상 <ChevronDown className="h-3 w-3" />
+       </Button>
+       {open && (
+         <div className="absolute right-0 top-full mt-1 z-50 min-w-[220px] border border-border bg-card shadow-lg">
+@@ -287,17 +287,17 @@ function UseAsMenu({
+           >
+             <span className="flex items-center gap-2">
+               <Star className="h-3 w-3" />
+-              Main model
++              주 대화 모델
+             </span>
+             {isMain && (
+               <span className="text-display text-xs tracking-wider text-primary">
+-                current
++                현재 사용 중
+               </span>
+             )}
+           </button>
+ 
+           <div className="border-t border-border/50 px-3 py-1.5 text-display text-xs tracking-wider text-text-tertiary">
+-            Auxiliary task
++            보조 작업
+           </div>
+ 
+           <button
+@@ -306,7 +306,7 @@ function UseAsMenu({
+             disabled={busy}
+             className="flex w-full items-center justify-between px-3 py-1.5 text-xs uppercase hover:bg-muted/50 disabled:opacity-40"
+           >
+-            <span>All auxiliary tasks</span>
++            <span>모든 보조 작업</span>
+           </button>
+ 
+           {auxTaskRows(auxTasks).map((t) => (
+@@ -320,7 +320,7 @@ function UseAsMenu({
+               <span>{t.label}</span>
+               {mainAuxTask === t.key && (
+                 <span className="text-display text-xs tracking-wider text-primary">
+-                  current
++                  현재 사용 중
+                 </span>
+               )}
+             </button>
+@@ -335,7 +335,7 @@ function UseAsMenu({
+       )}
+       <ConfirmDialog
+         open={!!pendingConfirm}
+-        title="Expensive Model Warning"
++        title="고비용 모델 선택 확인"
+         description={pendingConfirm?.message}
+         destructive
+         confirmLabel="Switch anyway"
+@@ -404,7 +404,7 @@ function ModelCard({
+               </CardTitle>
+               {isMain && (
+                 <span className="inline-flex items-center gap-0.5 bg-primary/15 px-1.5 py-0.5 text-display text-xs font-medium tracking-wider text-primary">
+-                  <Star className="h-2.5 w-2.5" /> main
++                  <Star className="h-2.5 w-2.5" /> 주 모델
+                 </span>
+               )}
+               {mainAuxTask && (
+@@ -597,7 +597,7 @@ function AuxiliaryTasksModal({
+               id="aux-modal-title"
+               className="font-mondwest text-display text-base tracking-wider"
+             >
+-              Auxiliary Tasks
++              보조 작업 모델
+             </h2>
+             <Button
+               size="sm"
+@@ -607,14 +607,11 @@ function AuxiliaryTasksModal({
+               className="h-6 text-xs uppercase"
+               prefix={resetBusy ? <Spinner /> : null}
+             >
+-              Reset all to auto
++              모두 주 모델과 공유
+             </Button>
+           </div>
+           <p className="text-xs text-text-secondary mt-2">
+-            Auxiliary tasks handle side-jobs like vision, session search, and
+-            compression. <span className="font-mono">auto</span> means
+-            &quot;use the main model&quot;. Override per-task when you want a
+-            cheap/fast model for a specific job.
++            보조 모델은 이미지 이해·이전 대화 검색·문맥 압축 등을 처리합니다. <span className="font-mono">auto</span> 는 주 대화 모델을 함께 사용한다는 뜻입니다. 특정 작업에 더 빠르거나 저렴한 모델을 쓰려면 개별 지정하세요.
+           </p>
+         </header>
+ 
+@@ -626,8 +623,8 @@ function AuxiliaryTasksModal({
+             const eff = cur?.effective;
+             const effRoute =
+               eff?.provider && eff.provider !== "auto"
+-                ? `${eff.provider} · ${eff.model || "(provider default)"}`
+-                : "auto (use main model)";
++                ? `${eff.provider} · ${eff.model || "(제공자 기본 모델)"}`
++                : "주 대화 모델과 공유";
+             return (
+               <div
+                 key={t.key}
+@@ -642,10 +639,10 @@ function AuxiliaryTasksModal({
+                   </div>
+                   <div className="text-xs font-mono text-text-secondary truncate">
+                     {isAuto && t.inheritFrom
+-                      ? `inherits ${auxTaskLabel(aux?.tasks, t.inheritFrom)} · ${effRoute}`
++                      ? `${auxTaskLabel(aux?.tasks, t.inheritFrom)} 설정 공유 · ${effRoute}`
+                       : isAuto
+-                        ? "auto (use main model)"
+-                        : `${cur?.provider} · ${cur?.model || "(provider default)"}`}
++                        ? "주 대화 모델과 공유"
++                        : `${cur?.provider} · ${cur?.model || "(제공자 기본 모델)"}`}
+                   </div>
+                 </div>
+                 {t.inheritFrom && !isAuto && (
+@@ -663,7 +660,7 @@ function AuxiliaryTasksModal({
+                     }}
+                     className="h-6 text-xs uppercase"
+                   >
+-                    Follow {auxTaskLabel(aux?.tasks, t.inheritFrom)}
++                    설정 공유: {auxTaskLabel(aux?.tasks, t.inheritFrom)}
+                   </Button>
+                 )}
+                 <Button
+@@ -672,7 +669,7 @@ function AuxiliaryTasksModal({
+                   onClick={() => setPicker({ kind: "aux", task: t.key })}
+                   className="h-6 text-xs uppercase"
+                 >
+-                  Change
++                  변경
+                 </Button>
+               </div>
+             );
+@@ -687,7 +684,7 @@ function AuxiliaryTasksModal({
+             currentAssignment={assignmentToPickerCurrent(
+               aux?.tasks.find((a) => a.task === picker.task),
+             )}
+-            title={`Set Auxiliary: ${auxTaskLabel(aux?.tasks, picker.task)}`}
++            title={`보조 모델 선택: ${auxTaskLabel(aux?.tasks, picker.task)}`}
+             onApply={async ({ provider, model, confirmExpensiveModel }) => {
+               const result = await api.setModelAssignment({
+                 confirm_expensive_model: confirmExpensiveModel,
+@@ -706,8 +703,8 @@ function AuxiliaryTasksModal({
+           open={confirmReset}
+           onCancel={() => setConfirmReset(false)}
+           onConfirm={() => void resetAllAux()}
+-          title="Reset auxiliary models"
+-          description="Reset every auxiliary task to 'auto'? This overrides any per-task overrides you've set."
++          title="보조 모델 설정 초기화"
++          description="보조 작업을 모두 주 대화 모델과 공유하도록 바꿀까요? 작업별 모델 지정이 초기화됩니다."
+           destructive
+           confirmLabel="Reset all"
+           loading={resetBusy}
+@@ -841,12 +838,12 @@ function MoaModelsModal({
+             id="moa-modal-title"
+             className="font-mondwest text-display text-base tracking-wider"
+           >
+-            Configure Mixture of Agents presets
++            여러 모델 협업 설정
+           </h2>
+         </header>
+         <div className="space-y-4 p-5">
+           <p className="text-xs text-text-secondary">
+-            Presets appear as models under the Mixture of Agents provider. References produce perspectives; the aggregator is the acting model that answers and calls tools.
++            여러 모델의 의견을 모아 하나의 답변을 만드는 구성입니다. 참고 모델이 분석하고 취합 모델이 최종 답변과 도구 실행을 담당합니다.
+           </p>
+ 
+           <div className="flex flex-wrap items-center gap-2">
+@@ -857,23 +854,23 @@ function MoaModelsModal({
+             >
+               {presetNames.map((name) => <option key={name} value={name}>{name}</option>)}
+             </select>
+-            <Button size="sm" outlined onClick={() => setDraft((prev) => ({ ...prev, default_preset: selected }))}>Set default</Button>
+-            <Button size="sm" ghost disabled={presetNames.length <= 1} onClick={deletePreset}>Delete</Button>
++            <Button size="sm" outlined onClick={() => setDraft((prev) => ({ ...prev, default_preset: selected }))}>기본값으로 지정</Button>
++            <Button size="sm" ghost disabled={presetNames.length <= 1} onClick={deletePreset}>삭제</Button>
+             <input
+               className="border border-border bg-background px-2 py-1 text-xs"
+-              placeholder="new preset name"
++              placeholder="새 구성 이름"
+               value={newName}
+               onChange={(event) => setNewName(event.target.value)}
+             />
+-            <Button size="sm" outlined disabled={!newName.trim() || !!draft.presets[newName.trim()]} onClick={addPreset}>Add preset</Button>
++            <Button size="sm" outlined disabled={!newName.trim() || !!draft.presets[newName.trim()]} onClick={addPreset}>구성 추가</Button>
+           </div>
+ 
+           <div className="text-xs text-text-secondary">
+-            Default: <span className="font-mono">{draft.default_preset}</span>
++            기본 구성: <span className="font-mono">{draft.default_preset}</span>
+           </div>
+ 
+           <div className="space-y-2">
+-            <div className="text-display text-xs font-medium tracking-wider">Reference models</div>
++            <div className="text-display text-xs font-medium tracking-wider">참고 모델</div>
+             {preset.reference_models.map((slot, index) => (
+               <div
+                 key={`${selected}-${slot.provider}-${slot.model}-${index}`}
+@@ -894,24 +891,24 @@ function MoaModelsModal({
+                   }
+                 />
+                 <div className="min-w-0 flex-1 truncate font-mono text-xs text-text-secondary">{slotLabel(slot)}</div>
+-                <Button size="sm" outlined onClick={() => setPicker({ kind: "reference", index })}>Change</Button>
+-                <Button size="sm" ghost disabled={preset.reference_models.length <= 1} onClick={() => updateSelectedPreset((prev) => ({ ...prev, reference_models: prev.reference_models.filter((_, i) => i !== index) }))}>Remove</Button>
++                <Button size="sm" outlined onClick={() => setPicker({ kind: "reference", index })}>변경</Button>
++                <Button size="sm" ghost disabled={preset.reference_models.length <= 1} onClick={() => updateSelectedPreset((prev) => ({ ...prev, reference_models: prev.reference_models.filter((_, i) => i !== index) }))}>제거</Button>
+               </div>
+             ))}
+-            <Button size="sm" outlined onClick={() => updateSelectedPreset((prev) => ({ ...prev, reference_models: [...prev.reference_models, { ...prev.aggregator, enabled: true }] }))}>Add reference model</Button>
++            <Button size="sm" outlined onClick={() => updateSelectedPreset((prev) => ({ ...prev, reference_models: [...prev.reference_models, { ...prev.aggregator, enabled: true }] }))}>참고 모델 추가</Button>
+           </div>
+ 
+           <div className="space-y-2">
+-            <div className="text-display text-xs font-medium tracking-wider">Aggregator</div>
++            <div className="text-display text-xs font-medium tracking-wider">최종 취합 모델</div>
+             <div className="flex items-center gap-2 border border-border/50 bg-muted/20 px-3 py-2">
+               <div className="min-w-0 flex-1 truncate font-mono text-xs text-text-secondary">{slotLabel(preset.aggregator)}</div>
+-              <Button size="sm" outlined onClick={() => setPicker({ kind: "aggregator" })}>Change</Button>
++              <Button size="sm" outlined onClick={() => setPicker({ kind: "aggregator" })}>변경</Button>
+             </div>
+           </div>
+ 
+           {error && <div className="text-xs text-destructive">{error}</div>}
+           <div className="flex justify-end gap-2 pt-2">
+-            <Button ghost onClick={onClose} disabled={busy}>Cancel</Button>
++            <Button ghost onClick={onClose} disabled={busy}>취소</Button>
+             <Button onClick={() => void save()} disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
+           </div>
+         </div>
+@@ -926,7 +923,7 @@ function MoaModelsModal({
+               ? preset.aggregator
+               : preset.reference_models[picker.index]
+           }
+-          title="Select MoA Model"
++          title="협업에 사용할 모델 선택"
+           onApply={async ({ provider, model }) => {
+             if ((provider || "").toLowerCase() === "moa") {
+               setError("MoA presets can't reference or aggregate the Mixture of Agents provider (no recursive MoA).");
+@@ -1008,9 +1005,9 @@ function ModelSettingsPanel({
+       <CardHeader className="min-w-0 pb-3">
+         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+           <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+-          <CardTitle className="text-sm">Model Settings</CardTitle>
++          <CardTitle className="text-sm">모델 설정</CardTitle>
+           <span className="max-w-full min-w-0 text-xs text-text-secondary [overflow-wrap:anywhere]">
+-            applies to new sessions
++            새 대화부터 적용됩니다
+           </span>
+         </div>
+       </CardHeader>
+@@ -1022,13 +1019,13 @@ function ModelSettingsPanel({
+             <div className="flex items-center gap-2 mb-0.5">
+               <Star className="h-3 w-3 text-primary" />
+               <span className="text-display text-xs font-medium tracking-wider">
+-                Main model
++                주 대화 모델
+               </span>
+             </div>
+             <div className="text-xs font-mono text-text-secondary truncate">
+-              {mainProv || "(unset)"}
++              {mainProv || "(설정 안 됨)"}
+               {mainProv && mainModel && " · "}
+-              {mainModel || "(unset)"}
++              {mainModel || "(설정 안 됨)"}
+             </div>
+           </div>
+           <Button
+@@ -1036,7 +1033,7 @@ function ModelSettingsPanel({
+             onClick={() => setPicker({ kind: "main" })}
+             className="shrink-0 self-start text-xs uppercase sm:self-center"
+           >
+-            Change
++            변경
+           </Button>
+         </div>
+ 
+@@ -1046,13 +1043,13 @@ function ModelSettingsPanel({
+             <div className="flex items-center gap-2 mb-0.5">
+               <Cpu className="h-3 w-3 text-text-tertiary" />
+               <span className="text-display text-xs font-medium tracking-wider">
+-                Auxiliary tasks
++                보조 작업
+               </span>
+             </div>
+             <div className="text-xs font-mono text-text-secondary truncate">
+               {auxOverrideCount > 0
+-                ? `${auxOverrideCount} override${auxOverrideCount > 1 ? "s" : ""} · ${auxTaskCount - auxOverrideCount} auto`
+-                : `${auxTaskCount} tasks · all auto`}
++                ? `${auxOverrideCount}개 개별 지정 · ${auxTaskCount - auxOverrideCount}개 주 모델 공유`
++                : `${auxTaskCount}개 작업 · 모두 주 모델 공유`}
+             </div>
+           </div>
+           <Button
+@@ -1061,7 +1058,7 @@ function ModelSettingsPanel({
+             onClick={() => setAuxModalOpen(true)}
+             className="shrink-0 self-start text-xs uppercase sm:self-center"
+           >
+-            Configure
++            설정
+           </Button>
+         </div>
+ 
+@@ -1070,13 +1067,13 @@ function ModelSettingsPanel({
+             <div className="flex items-center gap-2 mb-0.5">
+               <Brain className="h-3 w-3 text-text-tertiary" />
+               <span className="text-display text-xs font-medium tracking-wider">
+-                Mixture of Agents
++                여러 모델 협업
+               </span>
+             </div>
+             <div className="text-xs font-mono text-text-secondary truncate">
+               {moa
+-                ? `${moa.reference_models.length} reference${moa.reference_models.length === 1 ? "" : "s"} · ${moa.aggregator.provider}/${shortModelName(moa.aggregator.model)}`
+-                : "not loaded"}
++                ? `참고 모델 ${moa.reference_models.length}개 · ${moa.aggregator.provider}/${shortModelName(moa.aggregator.model)}`
++                : "불러오지 못함"}
+             </div>
+           </div>
+           <Button
+@@ -1086,7 +1083,7 @@ function ModelSettingsPanel({
+             disabled={!moa}
+             className="shrink-0 self-start text-xs uppercase sm:self-center"
+           >
+-            Configure
++            설정
+           </Button>
+         </div>
+ 
+@@ -1095,7 +1092,7 @@ function ModelSettingsPanel({
+             key={`picker-${refreshKey}`}
+             loader={api.getModelOptions}
+             alwaysGlobal
+-            title="Set Main Model"
++            title="주 대화 모델 선택"
+             onApply={async ({ provider, model, confirmExpensiveModel }) => {
+               const result = await applyAssignment({
+                 confirmExpensiveModel,
+@@ -1324,13 +1321,9 @@ export default function ModelsPage() {
+               </div>
+               {!showTokens && (
+                 <p className="mt-4 text-xs text-text-tertiary leading-relaxed">
+-                  Token & cost analytics are hidden because the local counts
+-                  exclude auxiliary calls (compression, vision, web extract,
+-                  …) and provider retries, so they diverge from your provider
+-                  bill. Enable{" "}
++                  문맥 압축·이미지 분석·웹 자료 추출 같은 보조 호출과 재시도는 로컬 통계에 포함되지 않아 실제 청구 금액과 다릅니다. 그래서 토큰·비용 통계를 기본으로 숨깁니다. 로컬 추정치가 필요하면 설정의{" "}
+                   <span className="font-mono">dashboard.show_token_analytics</span>{" "}
+-                  in <a href="/config" className="underline">Config</a> to
+-                  show the local debug estimate anyway.
++                  <a href="/config" className="underline">항목</a>을 켜세요.
+                 </p>
+               )}
+             </CardContent>
 diff --git a/web/src/pages/PluginsPage.tsx b/web/src/pages/PluginsPage.tsx
-index e240dd72..3c2228de 100644
+index e240dd72..bd3141a4 100644
 --- a/web/src/pages/PluginsPage.tsx
 +++ b/web/src/pages/PluginsPage.tsx
-@@ -570,7 +570,7 @@ export default function PluginsPage() {
+@@ -101,7 +101,7 @@ function MemoryProviderSetupResults({ results }: { results: MemoryProviderSetupR
+ 
+   return (
+     <div className="grid gap-2 border border-border bg-background/20 p-3">
+-      <p className="text-muted-foreground">Setup results</p>
++      <p className="text-muted-foreground">설정 결과</p>
+       {results.map((result, index) => {
+         const detail = result.stderr || result.stdout;
+         return (
+@@ -165,7 +165,7 @@ function MemoryProviderSetupHint({
+   if (!hasDetails || !setup) {
+     return (
+       <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
+-        This provider is installed but unavailable. It may need local dependencies or a manual setup step before Hermes can activate it.
++        제공자를 설치했지만 사용할 수 없습니다. Hermes에서 활성화하려면 로컬 종속 항목을 설치하거나 수동으로 설정해야 할 수 있습니다.
+       </p>
+     );
+   }
+@@ -179,8 +179,8 @@ function MemoryProviderSetupHint({
+     >
+       <p className={isBlocked ? "text-destructive" : "text-muted-foreground"}>
+         {needsDependencySetup
+-          ? "Finish these setup steps before Hermes can activate this provider."
+-          : "Provider dependency setup completed."}
++          ? "Hermes에서 이 제공자를 활성화하기 전에 다음 설정 단계를 완료하세요."
++          : "제공자 종속 항목 설정을 완료했습니다."}
+       </p>
+ 
+       {needsDependencySetup ? (
+@@ -199,7 +199,7 @@ function MemoryProviderSetupHint({
+ 
+       {installing ? (
+         <div className="flex items-center gap-2 text-muted-foreground">
+-          <Spinner /> Running provider setup. This may take a minute…
++          <Spinner /> 제공자를 설정하고 있습니다. 잠시 걸릴 수 있습니다…
+         </div>
+       ) : null}
+ 
+@@ -210,7 +210,7 @@ function MemoryProviderSetupHint({
+           {setup.external_dependencies.map((dep, index) => (
+             <div key={`${dep.name || "dependency"}-${index}`} className="grid gap-2">
+               <p className="text-muted-foreground">
+-                External dependency{dep.name ? `: ${dep.name}` : ""}
++                외부 종속 항목{dep.name ? `: ${dep.name}` : ""}
+               </p>
+               {dep.install ? (
+                 <SetupCommandBlock
+@@ -229,7 +229,7 @@ function MemoryProviderSetupHint({
+ 
+           {setup.pip_dependencies.length ? (
+             <div className="grid gap-2">
+-              <p className="text-muted-foreground">Python dependencies</p>
++              <p className="text-muted-foreground">Python 종속 항목</p>
+               <div className="flex flex-wrap gap-2">
+                 {setup.pip_dependencies.map((dep) => (
+                   <code
+@@ -248,7 +248,7 @@ function MemoryProviderSetupHint({
+       {setup.required_env.length && needsDependencySetup ? (
+         <div className="grid gap-2">
+           <p className="text-muted-foreground">
+-            Required environment values. Fill the matching fields below, or set them in the Hermes environment.
++            필요한 환경 변수입니다. 아래 항목을 입력하거나 Hermes 환경에 설정하세요.
+           </p>
+           <div className="flex flex-wrap gap-2">
+             {setup.required_env.map((envKey) => (
+@@ -290,11 +290,33 @@ export default function PluginsPage() {
+   const [memorySetupResults, setMemorySetupResults] = useState<MemoryProviderSetupResult[] | null>(null);
+   const [contextBusy, setContextBusy] = useState(false);
+   const [rowBusy, setRowBusy] = useState<string | null>(null);
++  const [catalogDescriptionsKo, setCatalogDescriptionsKo] = useState<Record<string, { hash: string; text: string }> | null>(null);
++  const [pluginDescriptionsKo, setPluginDescriptionsKo] = useState<Record<string, { hash: string; text: string }[]> | null>(null);
+ 
+   const { toast, showToast } = useToast();
+-  const { t } = useI18n();
++  const { t, locale } = useI18n();
+   const { setAfterTitle } = usePageHeader();
+ 
++  useEffect(() => {
++    if (locale !== "ko") {
++      setCatalogDescriptionsKo(null);
++      setPluginDescriptionsKo(null);
++      return;
++    }
++    let current = true;
++    void Promise.all([
++      import("@/i18n/plugin-catalog.ko.json"),
++      import("@/i18n/plugin-hub.ko.json"),
++    ]).then(([catalogModule, pluginModule]) => {
++      if (!current) return;
++      setCatalogDescriptionsKo(catalogModule.default);
++      setPluginDescriptionsKo(pluginModule.default);
++    });
++    return () => {
++      current = false;
++    };
++  }, [locale]);
++
+   const loadHub = useCallback((memorySelection?: string) => {
+     return api
+       .getPluginsHub()
+@@ -570,7 +592,7 @@ export default function PluginsPage() {
              <CardHeader>
                <CardTitle>{t.pluginsPage.providersHeading}</CardTitle>
                <p className="text-xs tracking-[0.08em] text-text-tertiary">
@@ -144,7 +1813,7 @@ index e240dd72..3c2228de 100644
                </p>
              </CardHeader>
  
-@@ -613,7 +613,7 @@ export default function PluginsPage() {
+@@ -613,13 +635,13 @@ export default function PluginsPage() {
  
                    {!selectedMemoryName && (
                      <p className="text-xs text-muted-foreground">
@@ -153,3 +1822,447 @@ index e240dd72..3c2228de 100644
                      </p>
                    )}
  
+                   {activeMemoryInfo?.status === "missing" && (
+                     <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
+-                      Active provider {providers.memory_provider} is no longer installed. Select another provider and save.
++                      활성 제공자 {providers.memory_provider}가 더 이상 설치되어 있지 않습니다. 다른 제공자를 선택하고 저장하세요.
+                     </p>
+                   )}
+ 
+@@ -918,6 +940,12 @@ export default function PluginsPage() {
+                 <li key={entry.name}>
+                   <CatalogEntryCard
+                     busy={catalogBusy === entry.name}
++                    description={
++                      locale === "ko" &&
++                      catalogDescriptionsKo?.[entry.name]?.hash === catalogDescriptionHash(entry.description ?? "")
++                        ? catalogDescriptionsKo[entry.name].text
++                        : entry.description ?? ""
++                    }
+                     entry={entry}
+                     onInstall={() => setCatalogConfirm(entry)}
+                     removed={removedByName.get(entry.name) ?? null}
+@@ -955,7 +983,19 @@ export default function PluginsPage() {
+ 
+ 
+                   <PluginRowCard
+-                    {...{ row, rowBusy, setRuntimeLoading, showToast, t }}
++                    {...{
++                      row,
++                      description:
++                        locale === "ko"
++                          ? pluginDescriptionsKo?.[row.name]?.find(
++                              (item) => item.hash === catalogDescriptionHash(row.description ?? ""),
++                            )?.text ?? row.description ?? ""
++                          : row.description ?? "",
++                      rowBusy,
++                      setRuntimeLoading,
++                      showToast,
++                      t,
++                    }}
+                   />
+ 
+                 </li>
+@@ -980,7 +1020,7 @@ export default function PluginsPage() {
+                 <li className="text-xs text-text-secondary" key={m.name}>
+ 
+ 
+-                  {m.label ?? m.name} — {m.description || m.tab?.path}
++                  {m.label ?? m.name} — {orphanDashboardDescription(m, locale)}
+ 
+ 
+                   {!m.tab?.hidden ? (
+@@ -1034,6 +1074,7 @@ export default function PluginsPage() {
+ interface PluginRowCardProps {
+ 
+   row: HubAgentPluginRow;
++  description: string;
+   rowBusy: string | null;
+   setRuntimeLoading: (
+     name: string,
+@@ -1047,6 +1088,7 @@ interface PluginRowCardProps {
+ function PluginRowCard(props: PluginRowCardProps) {
+   const {
+     row,
++    description,
+     rowBusy,
+     setRuntimeLoading,
+     showToast,
+@@ -1216,9 +1258,9 @@ function PluginRowCard(props: PluginRowCardProps) {
+           </div>
+         </div>
+ 
+-        {row.description ? (
++        {description ? (
+           <p className="min-w-0 w-full text-xs tracking-[0.06em] text-text-secondary break-words">
+-            {row.description}
++            {description}
+           </p>
+         ) : null}
+ 
+@@ -1272,14 +1314,46 @@ function PluginRowCard(props: PluginRowCardProps) {
+ 
+ interface CatalogEntryCardProps {
+   busy: boolean;
++  description: string;
+   entry: CatalogEntry;
+   onInstall: () => void;
+   removed: CatalogRemovedEntry | null;
+   t: Translations;
+ }
+ 
++function catalogDescriptionHash(value: string): string {
++  let hash = 14695981039346656037n;
++  for (let i = 0; i < value.length; i += 1) {
++    hash ^= BigInt(value.charCodeAt(i));
++    hash = BigInt.asUintN(64, hash * 1099511628211n);
++  }
++  return hash.toString(16).padStart(16, "0");
++}
++
++function orphanDashboardDescription(
++  manifest: { name: string; description?: string; tab?: { path?: string } },
++  locale: string,
++): string {
++  if (locale !== "ko") return manifest.description || manifest.tab?.path || "";
++  const known: Record<string, { hash: string; text: string }> = {
++    "hermes-achievements": {
++      hash: catalogDescriptionHash("Steam-style achievements for vibe coding and agentic Hermes workflows."),
++      text: "Hermes의 바이브 코딩과 에이전트 워크플로에서 달성할 수 있는 Steam 스타일 업적입니다.",
++    },
++    kanban: {
++      hash: catalogDescriptionHash("Multi-agent collaboration board — drag-drop cards across columns, read comment threads, see which profile is running what"),
++      text: "여러 에이전트가 함께 사용하는 협업 보드입니다. 카드를 열 사이에서 옮기고 댓글을 확인하며, 각 프로필의 실행 작업을 살펴볼 수 있습니다.",
++    },
++  };
++  const localized = known[manifest.name];
++  const description = manifest.description ?? "";
++  return localized?.hash === catalogDescriptionHash(description)
++    ? localized.text
++    : description || manifest.tab?.path || "";
++}
++
+ function CatalogEntryCard(props: CatalogEntryCardProps) {
+-  const { busy, entry, onInstall, removed, t } = props;
++  const { busy, description, entry, onInstall, removed, t } = props;
+ 
+   const caps = entry.capabilities;
+   const chips: string[] = [];
+@@ -1337,9 +1411,9 @@ function CatalogEntryCard(props: CatalogEntryCardProps) {
+           </p>
+         ) : null}
+ 
+-        {entry.description ? (
++        {description ? (
+           <p className="min-w-0 w-full text-xs tracking-[0.06em] text-text-secondary break-words">
+-            {entry.description}
++            {description}
+           </p>
+         ) : null}
+ 
+diff --git a/web/src/pages/ProfileBuilderPage.tsx b/web/src/pages/ProfileBuilderPage.tsx
+index 7e8b38e9..9f50216c 100644
+--- a/web/src/pages/ProfileBuilderPage.tsx
++++ b/web/src/pages/ProfileBuilderPage.tsx
+@@ -328,8 +328,7 @@ export default function ProfileBuilderPage() {
+                 />
+                 {name && !nameValid && (
+                   <p className="text-xs text-destructive">
+-                    Lowercase letters, digits, hyphens and underscores; must
+-                    start with a letter or digit.
++                    영문 소문자, 숫자, 하이픈, 밑줄만 사용할 수 있으며 영문자나 숫자로 시작해야 합니다.
+                   </p>
+                 )}
+               </div>
+@@ -350,8 +349,7 @@ export default function ProfileBuilderPage() {
+           {step === "model" && (
+             <div className="space-y-3">
+               <p className="text-sm text-muted-foreground">
+-                Pick the model+provider for this profile. Skip to use the
+-                default.
++                이 프로필에서 사용할 모델과 제공자를 선택하세요. 기본값을 사용하려면 건너뛰세요.
+               </p>
+               <Input
+                 placeholder="Filter models…"
+diff --git a/web/src/pages/SkillsPage.tsx b/web/src/pages/SkillsPage.tsx
+index 65598e90..7cd9012c 100644
+--- a/web/src/pages/SkillsPage.tsx
++++ b/web/src/pages/SkillsPage.tsx
+@@ -71,6 +71,17 @@ import { errorMessage } from "@/lib/api-error";
+ /* ------------------------------------------------------------------ */
+ 
+ const CATEGORY_LABELS: Record<string, string> = {
++  apple: "Apple",
++  "autonomous ai agents": "자율형 AI 에이전트",
++  creative: "창작",
++  email: "이메일",
++  media: "미디어",
++  "note taking": "메모",
++  productivity: "생산성",
++  research: "연구",
++  "social media": "소셜 미디어",
++  "software development": "소프트웨어 개발",
++  web: "웹",
+   mlops: "MLOps",
+   "mlops/cloud": "MLOps / Cloud",
+   "mlops/evaluation": "MLOps / Evaluation",
+@@ -92,7 +103,8 @@ function prettyCategory(
+   generalLabel: string,
+ ): string {
+   if (!raw) return generalLabel;
+-  if (CATEGORY_LABELS[raw]) return CATEGORY_LABELS[raw];
++  const categoryLabel = CATEGORY_LABELS[raw] ?? CATEGORY_LABELS[raw.toLowerCase()];
++  if (categoryLabel) return categoryLabel;
+   return raw
+     .split(/[-_/]/)
+     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+@@ -130,6 +142,7 @@ function toolsetIcon(
+ 
+ export default function SkillsPage() {
+   const [skills, setSkills] = useState<SkillInfo[]>([]);
++  const [skillDescriptionsKo, setSkillDescriptionsKo] = useState<Record<string, { hash: string; text: string }> | null>(null);
+   const [toolsets, setToolsets] = useState<ToolsetInfo[]>([]);
+   const [loading, setLoading] = useState(true);
+   // Humanized error from the last skills/toolsets load; drives a persistent
+@@ -145,7 +158,7 @@ export default function SkillsPage() {
+   const [editorOpen, setEditorOpen] = useState(false);
+   const [editorSkill, setEditorSkill] = useState<string | null>(null);
+   const { toast, showToast } = useToast();
+-  const { t } = useI18n();
++  const { t, locale } = useI18n();
+   const { setAfterTitle, setEnd } = usePageHeader();
+ 
+   // ── Profile scoping ──
+@@ -159,6 +172,18 @@ export default function SkillsPage() {
+     profile: selectedProfile,
+   } = useProfileScope();
+ 
++  useEffect(() => {
++    let cancelled = false;
++    if (locale !== "ko") {
++      setSkillDescriptionsKo(null);
++      return () => { cancelled = true; };
++    }
++    void import("@/i18n/skills.ko.json").then((module) => {
++      if (!cancelled) setSkillDescriptionsKo(module.default);
++    });
++    return () => { cancelled = true; };
++  }, [locale]);
++
+   useEffect(() => {
+     // Promise-chain shape: setState fires only inside async callbacks so the
+     // effect body stays lint-clean (react-hooks/set-state-in-effect). On a
+@@ -434,7 +459,7 @@ export default function SkillsPage() {
+                 />
+                 <PanelItem
+                   icon={Search}
+-                  label="Browse hub"
++                  label={locale === "ko" ? "허브에서 찾아보기" : "Browse hub"}
+                   active={view === "hub"}
+                   onClick={() => {
+                     setView("hub");
+@@ -513,6 +538,7 @@ export default function SkillsPage() {
+                       <SkillRow
+                         key={skill.name}
+                         skill={skill}
++                        description={localizedSkillDescription(skill, locale, skillDescriptionsKo)}
+                         toggling={togglingSkills.has(skill.name)}
+                         onToggle={() => handleToggleSkill(skill)}
+                         onEdit={() => openEditEditor(skill.name)}
+@@ -549,7 +575,7 @@ export default function SkillsPage() {
+                       onClick={openLearn}
+                       prefix={<Sparkles />}
+                     >
+-                      Learn a skill
++                      {locale === "ko" ? "스킬 익히기" : "Learn a skill"}
+                     </Button>
+                     <Button
+                       size="sm"
+@@ -557,7 +583,7 @@ export default function SkillsPage() {
+                       onClick={openCreateEditor}
+                       prefix={<Plus />}
+                     >
+-                      New skill
++                      {locale === "ko" ? "새 스킬" : "New skill"}
+                     </Button>
+                   </div>
+                 </div>
+@@ -587,6 +613,7 @@ export default function SkillsPage() {
+                       <SkillRow
+                         key={skill.name}
+                         skill={skill}
++                        description={localizedSkillDescription(skill, locale, skillDescriptionsKo)}
+                         toggling={togglingSkills.has(skill.name)}
+                         onToggle={() => handleToggleSkill(skill)}
+                         onEdit={() => openEditEditor(skill.name)}
+@@ -704,11 +731,11 @@ export default function SkillsPage() {
+       <Dialog open={learnOpen} onOpenChange={setLearnOpen}>
+         <DialogContent className="max-w-lg">
+           <DialogHeader>
+-            <DialogTitle>Learn a skill</DialogTitle>
++            <DialogTitle>스킬 학습</DialogTitle>
+             <DialogDescription>
+-              Point Hermes at anything and it will distill a reusable skill —
+-              following the house authoring standards. Fill in any combination
+-              below; the agent gathers the sources and writes the skill in chat.
++              자료를 Hermes에 지정하면 작성 기준에 맞춰 재사용 가능한 스킬을
++              만들어냅니다. 아래 항목을 원하는 대로 입력하면 에이전트가 자료를
++              모아 대화에서 스킬을 작성합니다.
+             </DialogDescription>
+           </DialogHeader>
+           <div className="grid gap-3 py-2">
+@@ -764,8 +791,31 @@ export default function SkillsPage() {
+   );
+ }
+ 
++function localizedSkillDescription(
++  skill: SkillInfo,
++  locale: string,
++  translations: Record<string, { hash: string; text: string }> | null,
++): string {
++  const source = skill.description || "";
++  const translated = translations?.[skill.name];
++  if (locale === "ko" && translated?.hash === skillDescriptionHash(source)) {
++    return translated.text;
++  }
++  return source;
++}
++
++function skillDescriptionHash(value: string): string {
++  let hash = 14695981039346656037n;
++  for (let i = 0; i < value.length; i += 1) {
++    hash ^= BigInt(value.charCodeAt(i));
++    hash = BigInt.asUintN(64, hash * 1099511628211n);
++  }
++  return hash.toString(16).padStart(16, "0");
++}
++
+ function SkillRow({
+   skill,
++  description,
+   toggling,
+   onToggle,
+   onEdit,
+@@ -791,7 +841,7 @@ function SkillRow({
+           </span>
+         </div>
+         <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+-          {skill.description || noDescriptionLabel}
++          {description || noDescriptionLabel}
+         </p>
+       </div>
+       <Button
+@@ -833,6 +883,7 @@ interface PanelItemProps {
+ }
+ 
+ interface SkillRowProps {
++  description: string;
+   noDescriptionLabel: string;
+   onToggle: () => void;
+   onEdit: () => void;
+diff --git a/web/src/pages/WebhooksPage.tsx b/web/src/pages/WebhooksPage.tsx
+index 6d1bf4cf..2f4b9825 100644
+--- a/web/src/pages/WebhooksPage.tsx
++++ b/web/src/pages/WebhooksPage.tsx
+@@ -28,6 +28,7 @@ import { Label } from "@nous-research/ui/ui/components/label";
+ import { usePageHeader } from "@/contexts/usePageHeader";
+ import { cn, themedBody } from "@/lib/utils";
+ import { errorMessage } from "@/lib/api-error";
++import { useI18n } from "@/i18n";
+ 
+ interface CreatedWebhook {
+   url: string;
+@@ -66,6 +67,7 @@ export default function WebhooksPage() {
+   const [restartError, setRestartError] = useState<string | null>(null);
+   const [restarting, setRestarting] = useState(false);
+   const { toast, showToast } = useToast();
++  const { locale } = useI18n();
+   const { setEnd } = usePageHeader();
+ 
+   // New subscription modal state
+@@ -332,8 +334,7 @@ export default function WebhooksPage() {
+             {created ? (
+               <div className="p-5 grid gap-4">
+                 <p className="text-sm text-muted-foreground">
+-                  Subscription created. Copy the secret now — it is only shown
+-                  once.
++                  구독을 만들었습니다. 보안 키는 한 번만 표시되니 지금 복사하세요.
+                 </p>
+ 
+                 <div className="grid gap-2">
+@@ -466,12 +467,13 @@ export default function WebhooksPage() {
+             <div className="flex items-start gap-3">
+               <Webhook className="h-5 w-5 shrink-0 text-warning" />
+               <div className="flex flex-col gap-1">
+-                <span className="font-medium">Webhook receiver disabled</span>
++                <span className="font-medium">
++                  {locale === "ko" ? "웹훅 수신기가 꺼져 있습니다" : "Webhook receiver disabled"}
++                </span>
+                 <span className="text-muted-foreground">
+-                  Webhooks are their own gateway platform. Enable them here to
+-                  accept incoming HTTP events; chat channels are only needed
+-                  when a subscription delivers to Telegram, Discord, Slack, or
+-                  another channel.
++                  {locale === "ko"
++                    ? "웹훅은 별도의 게이트웨이 플랫폼입니다. 여기서 켜면 HTTP 이벤트를 받을 수 있습니다. 구독 이벤트를 Telegram, Discord, Slack 등으로 전달할 때만 채팅 채널 설정이 필요합니다."
++                    : "Webhooks are their own gateway platform. Enable them here to accept incoming HTTP events; chat channels are only needed when a subscription delivers to Telegram, Discord, Slack, or another channel."}
+                 </span>
+               </div>
+             </div>
+@@ -482,7 +484,9 @@ export default function WebhooksPage() {
+               disabled={enabling}
+               prefix={enabling ? <Spinner /> : <Webhook className="h-4 w-4" />}
+             >
+-              {enabling ? "Enabling…" : "Enable webhooks"}
++              {enabling
++                ? locale === "ko" ? "활성화 중…" : "Enabling…"
++                : locale === "ko" ? "웹훅 켜기" : "Enable webhooks"}
+             </Button>
+           </CardContent>
+         </Card>
+@@ -504,7 +508,9 @@ export default function WebhooksPage() {
+               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+               <span>
+                 {restartError ??
+-                  "Webhooks are enabled, but the gateway still needs a restart before the receiver can come online."}
++                  locale === "ko"
++                    ? "웹훅을 켰습니다. 수신기를 시작하려면 게이트웨이를 재시작해야 합니다."
++                    : "Webhooks are enabled, but the gateway still needs a restart before the receiver can come online."}
+               </span>
+             </div>
+             <Button
+@@ -514,7 +520,9 @@ export default function WebhooksPage() {
+               disabled={restarting}
+               prefix={restarting ? <Spinner /> : <RotateCw className="h-4 w-4" />}
+             >
+-              {restarting ? "Restarting…" : "Restart gateway"}
++              {restarting
++                ? locale === "ko" ? "재시작 중…" : "Restarting…"
++                : locale === "ko" ? "게이트웨이 재시작" : "Restart gateway"}
+             </Button>
+           </CardContent>
+         </Card>
+@@ -526,18 +534,19 @@ export default function WebhooksPage() {
+           className="flex items-center gap-2 text-muted-foreground"
+         >
+           <Webhook className="h-4 w-4" />
+-          Subscriptions ({subscriptions.length})
++          {locale === "ko" ? "구독" : "Subscriptions"} ({subscriptions.length})
+         </H2>
+ 
+         <p className="text-xs text-muted-foreground -mt-1">
+-          Subscription changes hot-reload once the webhook receiver is running.
+-          Disabled subscriptions reject incoming events.
++          {locale === "ko"
++            ? "웹훅 수신기가 실행 중이면 구독 변경 사항이 즉시 반영됩니다. 비활성화된 구독은 들어오는 이벤트를 거부합니다."
++            : "Subscription changes hot-reload once the webhook receiver is running. Disabled subscriptions reject incoming events."}
+         </p>
+ 
+         {subscriptions.length === 0 && (
+           <Card>
+             <CardContent className="py-8 text-center text-sm text-muted-foreground">
+-              No webhook subscriptions yet.
++              {locale === "ko" ? "아직 웹훅 구독이 없습니다." : "No webhook subscriptions yet."}
+             </CardContent>
+           </Card>
+         )}

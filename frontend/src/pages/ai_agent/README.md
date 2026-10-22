@@ -18,3 +18,5 @@ AI 에이전트 화면 구성과 주소를 관리합니다. `ai_agent_menu_manag
 메뉴 계층: **AI 에이전트(대메뉴) → 헤르메스(중메뉴) → 대화·모델·작업 환경·MCP·스킬·시스템 프롬프트(소메뉴)**. section 메타데이터를 공통 NavigationTree가 표시합니다. OpenClaw를 추가할 때는 Hermes와 별도 section·작업공간·mountKey를 등록하며, 현재 OpenClaw 항목이나 엔진은 추가하지 않습니다.
 
 2026-10-16 확인: TypeScript·Vite 빌드 성공, Hermes 브라우저 검사 24개 통과. 3단계 메뉴 접기·펼치기, 여섯 실행 수치, 모델 미실행 표시, 문서·첨부·설정 초안 보존을 확인했습니다. HTML 보고서는 채팅 옆에서 실제로 열어 확인했습니다. 프론트 독립 적용 완료. 실제 GGUF 추론·학습·매매는 이번 UI 검사에서 실행하지 않았습니다.
+
+헤르메스 원본은 별도 중메뉴 `#ai_agent/HermesOriginal`에 등록합니다. [원본 모듈](../../../../modules/hermes_original/README.md)의 register.ts가 전체 원본 dashboard를 열며, 기존 Hermes 메뉴·실행·기록은 유지합니다.

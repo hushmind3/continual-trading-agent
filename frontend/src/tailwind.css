@@ -81,7 +81,7 @@
 /* One visual language for every registered workspace. */
 .workspace-app {--workspace-bg:var(--color-canvas);--workspace-surface:var(--color-white);--workspace-ink:var(--color-ink);--workspace-muted:var(--color-gray-500);--workspace-line:var(--color-gray-200);--workspace-accent:var(--color-brand-600);background:var(--workspace-bg);color:var(--workspace-ink);font-family:var(--font-sans);@apply text-sm;@apply leading-relaxed;-webkit-font-smoothing:antialiased}
 .workspace-app :where(button,a,input,select,textarea,summary):focus-visible {outline:calc(var(--spacing) * 0.75) solid var(--color-brand-600);@apply outline-offset-3}
-.workspace-header {@apply h-17;position:sticky;@apply top-0;@apply z-30;@apply flex;@apply items-center;@apply justify-between;@apply gap-4;@apply pt-0 pr-6 pb-0 pl-6;background:rgba(255,255,255,.9);backdrop-filter:blur(calc(var(--spacing) * 5));border-bottom:calc(var(--spacing) * 0.25) solid var(--workspace-line)}
+.workspace-header {@apply h-12;position:sticky;@apply top-0;@apply z-30;@apply flex;@apply items-center;@apply justify-between;@apply gap-4;@apply pt-0 pr-6 pb-0 pl-6;background:rgba(255,255,255,.9);backdrop-filter:blur(calc(var(--spacing) * 5));border-bottom:calc(var(--spacing) * 0.25) solid var(--workspace-line)}
 .workspace-header-brand,.workspace-header-actions {@apply flex;@apply items-center;@apply gap-3}
 .workspace-brand {@apply flex;@apply items-center;@apply gap-2.75;@apply text-body;@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 8.75);@apply whitespace-nowrap}
 .workspace-brand-mark {@apply grid;@apply place-items-center;@apply w-8;@apply h-8;@apply bg-gray-900;@apply text-white;border-radius:calc(var(--spacing) * 2.5)}
@@ -91,9 +91,9 @@
 .workspace-job-link {@apply text-xs;color:var(--workspace-accent)}
 .workspace-notifications {@apply relative}
 .workspace-notification-dot {@apply absolute;@apply top-1.5;@apply right-1.75;@apply w-1.5;@apply h-1.5;@apply bg-red-500;@apply border border-solid border-white;@apply rounded-full}
-.workspace-layout {@apply grid;grid-template-columns:calc(var(--spacing) * 57) minmax(0,1fr);min-height:calc(100dvh - calc(var(--spacing) * 17))}
+.workspace-layout {@apply grid;grid-template-columns:calc(var(--spacing) * 57) minmax(0,1fr);min-height:calc(100dvh - calc(var(--spacing) * 12))}
 .workspace-layout-compact {grid-template-columns:calc(var(--spacing) * 18) minmax(0,1fr)}
-.workspace-sidebar {position:sticky;@apply top-17;height:calc(100dvh - calc(var(--spacing) * 17));@apply overflow-y-auto;@apply overscroll-contain;border-right:calc(var(--spacing) * 0.25) solid var(--workspace-line);background:var(--color-canvas);@apply pt-6 pr-3 pb-6 pl-3;scrollbar-width:thin;scrollbar-color:var(--color-gray-300) transparent}
+.workspace-sidebar {position:sticky;@apply top-12;height:calc(100dvh - calc(var(--spacing) * 12));@apply overflow-y-auto;@apply overscroll-contain;border-right:calc(var(--spacing) * 0.25) solid var(--workspace-line);background:var(--color-canvas);@apply pt-6 pr-3 pb-6 pl-3;scrollbar-width:thin;scrollbar-color:var(--color-gray-300) transparent}
 .workspace-menu-group {@apply mb-6}
 .workspace-menu-group>summary {@apply flex;@apply items-center;@apply gap-2;@apply list-none;@apply pt-0 pr-3 pb-2.5 pl-3;@apply text-label;@apply font-semibold;letter-spacing:.06em;@apply text-gray-500;@apply cursor-pointer}
 .workspace-menu-group>summary::-webkit-details-marker {@apply hidden}
@@ -186,7 +186,7 @@
 .operations-flow-step h3 {@apply text-compact;@apply font-semibold}
 @media(min-width:47.5625rem) {.workspace-content>div:last-child {@apply min-w-0}}
 @media(max-width:68.75rem) {.workspace-layout {grid-template-columns:calc(var(--spacing) * 50) minmax(0,1fr)}.workspace-layout-compact {grid-template-columns:calc(var(--spacing) * 17) minmax(0,1fr)}.workspace-content {@apply pt-7 pr-6 pb-11 pl-6}.operations-overview {grid-template-columns:1fr}}
-@media(max-width:47.5rem) {.workspace-header {@apply h-15;@apply pt-0 pr-4 pb-0 pl-4;@apply gap-2}.workspace-header-brand,.workspace-header-actions {@apply gap-1.5}.workspace-brand {@apply text-compact;@apply gap-2}.workspace-brand-mark {@apply w-7.25;@apply h-7.25;border-radius:calc(var(--spacing) * 2.25)}.workspace-desktop-toggle,.workspace-sidebar,.workspace-header-divider,.workspace-job-link {@apply hidden}.workspace-mobile-toggle {@apply grid}.workspace-layout,.workspace-layout-compact {grid-template-columns:minmax(0,1fr);min-height:calc(100dvh - calc(var(--spacing) * 15))}.workspace-content {@apply pt-6.5 pr-4 pb-10 pl-4}.workspace-page-heading {@apply mb-6;@apply items-start}.workspace-page-heading h1 {font-size:calc(var(--spacing) * 7)}.workspace-updated {@apply text-caption;@apply max-w-30;@apply whitespace-normal;text-align:right}.workspace-updated span {@apply block}.workspace-app .ui-panel {@apply p-5;@apply rounded-2xl}.workspace-app .ui-panel>header h2 {@apply text-base}.workspace-app .ui-drawer-panel {@apply p-6;@apply border-l-0}.operations-layout,.operations-overview {@apply gap-4}.workspace-app .operations-hero {@apply p-5.5}.operations-command-row {@apply gap-4}.operations-command-actions {@apply w-full;@apply gap-2}.operations-command-actions .ui-button {@apply flex-1}.operations-command-actions select {@apply w-full!}.operations-flow-heading {@apply p-5}.operations-flow-step {@apply p-5}.workspace-app table {@apply text-xs}.workspace-app th,.workspace-app td {@apply pt-2.5;@apply pb-2.5}}
+@media(max-width:47.5rem) {.workspace-header {@apply h-12;@apply pt-0 pr-4 pb-0 pl-4;@apply gap-2}.workspace-header-brand,.workspace-header-actions {@apply gap-1.5}.workspace-brand {@apply text-compact;@apply gap-2}.workspace-brand-mark {@apply w-7.25;@apply h-7.25;border-radius:calc(var(--spacing) * 2.25)}.workspace-desktop-toggle,.workspace-sidebar,.workspace-header-divider,.workspace-job-link {@apply hidden}.workspace-mobile-toggle {@apply grid}.workspace-layout,.workspace-layout-compact {grid-template-columns:minmax(0,1fr);min-height:calc(100dvh - calc(var(--spacing) * 12))}.workspace-content {@apply pt-6.5 pr-4 pb-10 pl-4}.workspace-page-heading {@apply mb-6;@apply items-start}.workspace-page-heading h1 {font-size:calc(var(--spacing) * 7)}.workspace-updated {@apply text-caption;@apply max-w-30;@apply whitespace-normal;text-align:right}.workspace-updated span {@apply block}.workspace-app .ui-panel {@apply p-5;@apply rounded-2xl}.workspace-app .ui-panel>header h2 {@apply text-base}.workspace-app .ui-drawer-panel {@apply p-6;@apply border-l-0}.operations-layout,.operations-overview {@apply gap-4}.workspace-app .operations-hero {@apply p-5.5}.operations-command-row {@apply gap-4}.operations-command-actions {@apply w-full;@apply gap-2}.operations-command-actions .ui-button {@apply flex-1}.operations-command-actions select {@apply w-full!}.operations-flow-heading {@apply p-5}.operations-flow-step {@apply p-5}.workspace-app table {@apply text-xs}.workspace-app th,.workspace-app td {@apply pt-2.5;@apply pb-2.5}}
 @media(max-width:23.75rem) {.workspace-header .ui-status {@apply hidden}.operations-resource-grid {grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce) {.workspace-app *,.workspace-app *::before,.workspace-app *::after {animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;@apply scroll-auto!}}
 
@@ -587,17 +587,18 @@
 
 
 /* Installed applications reuse one compact heading and fill the remaining viewport. */
-.workspace-layout:has(.ui-app-workspace){height:calc(100dvh - calc(var(--spacing) * 17));@apply min-h-0}
+.workspace-layout:has(.ui-app-workspace){height:calc(100dvh - calc(var(--spacing) * 12));@apply min-h-0}
 .workspace-content:has(>.ui-app-workspace){@apply h-full min-h-0 min-w-0 w-full max-w-none justify-self-stretch p-0! bg-white overflow-hidden}
 .workspace-content:has(>.ui-app-workspace)>.workspace-page-heading{@apply hidden}
 .workspace-content:has(>.hermes-original-workspace)>.workspace-other-issues{@apply hidden}
-.hermes-original-workspace>.ui-app-workspace-header{@apply py-1}
+.hermes-original-controls{@apply flex items-center gap-2}
+@media(max-width:47.5rem){.workspace-header:has(.hermes-original-controls) .workspace-brand{@apply hidden}}
 .ui-app-workspace{@apply flex h-full min-h-0 flex-col bg-white}
 .ui-app-workspace-header{@apply flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3}
 .ui-app-workspace-frame{@apply min-h-0 w-full flex-1 border-0 bg-white}
 /* Hermes owns its viewport; these selectors leave the other platform pages alone. */
-.workspace-layout:has(.hermes-workspace){height:calc(100dvh - calc(var(--spacing) * 17));@apply min-h-0}
-.workspace-content:has(>.hermes-workspace){height:calc(100dvh - calc(var(--spacing) * 17));@apply min-h-0;@apply min-w-0;@apply w-full;@apply max-w-none;@apply justify-self-stretch;@apply p-0!;@apply bg-white;@apply overflow-hidden}
+.workspace-layout:has(.hermes-workspace){height:calc(100dvh - calc(var(--spacing) * 12));@apply min-h-0}
+.workspace-content:has(>.hermes-workspace){height:calc(100dvh - calc(var(--spacing) * 12));@apply min-h-0;@apply min-w-0;@apply w-full;@apply max-w-none;@apply justify-self-stretch;@apply p-0!;@apply bg-white;@apply overflow-hidden}
 .workspace-content:has(>.hermes-workspace)>:not(.hermes-workspace){@apply hidden}
 .workspace-app:has(.hermes-workspace.is-focused)>.workspace-header{@apply hidden!}
 .workspace-layout:has(.hermes-workspace.is-focused){@apply h-dvh;grid-template-columns:minmax(0,1fr)!important}
@@ -823,7 +824,7 @@
  .hermes-log~.ha-scroll-latest{left:40%}
 }
 @media(max-width:47.5rem){
- .workspace-layout:has(.hermes-workspace),.workspace-content:has(>.hermes-workspace){height:calc(100dvh - calc(var(--spacing) * 15))}
+ .workspace-layout:has(.hermes-workspace),.workspace-content:has(>.hermes-workspace){height:calc(100dvh - calc(var(--spacing) * 12))}
  .workspace-layout:has(.hermes-workspace.is-focused),.workspace-content:has(>.hermes-workspace.is-focused){@apply h-dvh}
  .hermes-chat-layout,.hermes-chat-layout.sessions-open{@apply flex;@apply relative}
  .hermes-chat{@apply w-full;@apply flex-1}
@@ -873,7 +874,7 @@
  .hermes-sessions{@apply absolute;@apply left-0;@apply top-0;@apply bottom-0;@apply w-67.5;@apply z-12;@apply pt-5 pr-3.75 pb-5 pl-3.75;@apply bg-slate-50;box-shadow:calc(var(--spacing) * 2.5) 0 calc(var(--spacing) * 10) color-mix(in srgb, var(--color-slate-700) 13%, transparent)}
  .hermes-session-list{@apply flex;@apply flex-col;@apply max-h-none;@apply overflow-auto}
  .ha-panel-backdrop{@apply block;@apply absolute;@apply inset-0;@apply z-11;@apply border-0;background:color-mix(in srgb, var(--color-slate-700) 27%, transparent);backdrop-filter:blur(calc(var(--spacing) * 0.5))}
- .ha-activity-backdrop{@apply fixed;top:calc(calc(var(--spacing) * 15) + calc(var(--spacing) * 24));@apply bottom-0;@apply right-0;@apply left-0}
+ .ha-activity-backdrop{@apply fixed;top:calc(calc(var(--spacing) * 12) + calc(var(--spacing) * 24));@apply bottom-0;@apply right-0;@apply left-0}
  .is-focused .ha-activity-backdrop{@apply top-24}
  .hermes-log{@apply absolute;@apply right-0;@apply top-0;@apply bottom-0;@apply z-12;width:min(calc(var(--spacing) * 80),90%);box-shadow:-calc(var(--spacing) * 2) 0 calc(var(--spacing) * 7.5) color-mix(in srgb, var(--color-slate-700) 11%, transparent)}
  .ha-scroll-latest{@apply text-caption;@apply pt-2 pr-2.75 pb-2 pl-2.75;@apply bottom-3}

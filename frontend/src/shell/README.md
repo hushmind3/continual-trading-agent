@@ -2,6 +2,7 @@
 
 용도: 플랫폼 공통 메뉴 등록·계층·레이아웃과 모듈 연결을 안내합니다.
 
+- 플랫폼 상단 바는 48px 높이이며 화면·사이드바 높이도 함께 맞춥니다. `workspace-header-slot`은 소메뉴가 React portal로 실행 버튼을 올리는 공통 위치입니다. 헤르메스 원본은 이 위치를 사용해 중복 제목·제어 줄을 없앱니다.
 - `Shell.tsx`: 상단 바, 금융·REA·AI 에이전트·GitHub 메뉴, 현재 화면 제목, 갱신 시각, 오류와 알림 창.
 - `menu_groups/menu_registry.ts`: module_loader의 모듈 등록 정보를 취합합니다. 프로젝트 관리 화면과 외부 설치기의 생성 메뉴도 같은 등록 경로를 사용합니다.
 - `installed_navigation.ts`: 설치 기록 `install_revision`이 있는 모듈은 GitHub 대메뉴 → 앱별 중메뉴로 취합합니다. 기존 설치본도 같은 규칙을 적용합니다. 주소·컴포넌트·기능은 유지하며 기본 AI 에이전트/Hermes/MCP 계층은 변경하지 않습니다. 같은 분류를 백엔드 `platform_modules.discover()`에도 적용합니다.

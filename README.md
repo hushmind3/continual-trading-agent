@@ -32,4 +32,6 @@ Mac의 모델은 사용자 지정 프로젝트 `모델/`에 있으며 원본 GGU
 
 2026-10-21 실제 확인: Mac의 8766 React·단일 API, 기존 Hermes 대화 조회, 회사/회의 탭 표시, Ornith 9B의 Apple M5 GPU 적재(65,536 문맥·Thinking on), 기존 총괄 세션의 실제 응답 완료. 금융 CUDA·키움 환경은 Mac에 설치하지 않았으며 시세·학습·주문, 직원 회의/제품 제작 전체, GUI 컴퓨터 조작은 이번 이전에서 확인하지 않았습니다. 금융 모델 파일은 보존돼 있지만 해당 기능까지 Mac 동작 완료로 표시하지 않습니다.
 
+2026-10-23 금융 상태 조회 복구: Mac 금융 전용 Python 3.11·네이티브 패키지 환경을 연결하고 설치 스크립트의 금융 제외를 수정했습니다. 실제 8766 상태 API의 operations/resources/capabilities와 운영 제어 화면은 정상이며, 시세·학습·주문과 Windows 키움 SDK 실행은 이번 복구에서 확인하지 않았습니다.
+
 2026-10-22 Mac 실행 경로 정리: 공통 native 실행기 탐색을 서버·설치·Hermes·REA·프로젝트 설치/분리 경로가 재사용합니다. Homebrew npm 심볼릭 링크, Chrome/Edge 앱, Finder 폴더 열기, REA 기본 파일 선택창, 독립 소스의 .command 진입점을 연결했습니다. Windows 전용 설치는 Mac에서 명시적으로 거절하며 CUDA·키움 의존성 설치를 우회하지 않습니다. 모델·회사/대화·REA·금융 원본 기록은 이동하거나 삭제하지 않았습니다. 실제 확인 범위는 [공통 실행](backend/README.md), [REA 분석](modules/rea/backend/program_analysis/README.md), [Hermes](modules/hermes/backend/engine/README.md), [프로젝트 관리](modules/projects/backend/README.md)를 따릅니다. 금융 CUDA/키움·전체 학습·주문과 독립 ZIP의 타 컴퓨터 설치까지 완료했다는 의미는 아닙니다.

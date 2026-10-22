@@ -7,6 +7,7 @@
 - ModelServerForm.tsx: 서버 주소·키·모델 입력. settings 저장 시 연결 필드만 전달합니다.
 - CodexModelForm.tsx: ChatGPT · Codex 탭의 로그인 코드·완료 상태·모델 목록과 선택을 담당합니다. 원본 Hermes 인증을 사용하는 codex/status·codex/login·codex/models API에 연결하며 ‘이 모델 사용’에서만 provider/model을 저장합니다. 로그인 토큰은 프론트에 전달하지 않습니다. 실제 첫 응답 완료 전 모델 목록만으로 추론 성공을 표시하지 않습니다.
 - 모델은 전체 계정 목록을 공통 Select에 표시합니다. 기존 Input+datalist는 현재 입력값으로 목록을 필터해 GPT-6.1 Sol과 문맥 변형만 보이는 문제가 있었습니다. ReasoningSelect.tsx는 서버가 보낸 모델별 추론 옵션/기본값을 설정 화면과 대화 입력창에서 재사용합니다. 모델명·선택지 배열을 프론트에 고정하지 않고 미지원 실행 모드는 이유와 함께 비활성 표시합니다.
+- 추론 선택 도움말은 서버 설명을 우선 표시하되, 확인된 `Greater reasoning depth for complex problems` 문구는 대화 입력창에서 자연스러운 한국어로 표시합니다.
 - ../useAgentSettings.ts: 설정 조회·실패 후 다시 불러오기.
 - 공통 ui/SettingsSection·Primitives: 패널·읽기 실패·입력·키보드 탭.
 

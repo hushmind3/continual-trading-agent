@@ -62,13 +62,16 @@ def start():
             raise ValueError('Hermes 공식 원본 체크아웃을 먼저 설치하세요.')
         BASE.mkdir(parents=True, exist_ok=True)
         HOME.mkdir(parents=True, exist_ok=True)
+        # Keep the browser origin stable so native language/theme preferences survive restarts.
+        previous_port = _read(READY).get('port')
+        port = previous_port if type(previous_port) is int and 0 < previous_port < 65536 else 0
         READY.unlink(missing_ok=True)
         env = environment()
         env['HERMES_DESKTOP_READY_FILE'] = str(READY)
         with (BASE / 'dashboard.log').open('ab') as log:
             os.chmod(log.name, 0o600)
             _process = subprocess.Popen([sys.executable, str(Path(__file__).with_name('launch.py')),
-                'dashboard', '--no-open', '--isolated', '--host', '127.0.0.1', '--port', '0'],
+                'dashboard', '--no-open', '--isolated', '--host', '127.0.0.1', '--port', str(port)],
                 cwd=SOURCE, env=env, stdout=log, stderr=log, start_new_session=True)
         # exec replaces the launcher PID. Store its actual command identity before publishing.
         identity = ''

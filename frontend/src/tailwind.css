@@ -591,6 +591,7 @@
 .workspace-content:has(>.ui-app-workspace){@apply h-full min-h-0 min-w-0 w-full max-w-none justify-self-stretch p-0! bg-white overflow-hidden}
 .workspace-content:has(>.ui-app-workspace)>.workspace-page-heading{@apply hidden}
 .workspace-content:has(>.hermes-original-workspace)>.workspace-other-issues{@apply hidden}
+.hermes-original-workspace>.ui-app-workspace-header{@apply py-1}
 .ui-app-workspace{@apply flex h-full min-h-0 flex-col bg-white}
 .ui-app-workspace-header{@apply flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3}
 .ui-app-workspace-frame{@apply min-h-0 w-full flex-1 border-0 bg-white}

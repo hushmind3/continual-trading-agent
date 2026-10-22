@@ -13,7 +13,7 @@ export function OperationControl(){
  return <div className="operations-layout">
   <SystemControls/>
   <div className="operations-overview">
-   <Panel title="키움 시세 연결" description="최근 시세는 실제 가격 이벤트 기준입니다. 서버 연결과 시세 수신 상태는 구분합니다." className="operations-market-card" actions={<Status tone={!receiving?'idle':connected?'good':'warn'}>{connectionLabel}</Status>}>
+   <Panel title="키움 시세 연결" description="최근 시세 시각은 실제 시세를 마지막으로 받은 때를 나타냅니다. 서버 연결 여부와 시세 수신 여부는 서로 다른 상태입니다." className="operations-market-card" actions={<Status tone={!receiving?'idle':connected?'good':'warn'}>{connectionLabel}</Status>}>
     <dl className="operations-connection-metrics"><div><dt className="operations-stat-label">실제 시세 수신</dt><dd className="operations-stat-value">{number(broker?.quote_events??0,0)} <span className="text-xs font-normal text-slate-400">건</span></dd></div><div><dt className="operations-stat-label">최근 시세</dt><dd className="operations-stat-value operations-stat-value-small">{date(broker?.last_quote_utc)}</dd></div></dl>
     <div className="operations-region-row"><span>국내<strong className={receiving&&broker?.kr_connected?'operations-connected':'operations-disconnected'}>{receiving&&broker?.kr_connected?'연결됨':'미연결'}</strong></span><span>미국<strong className={receiving&&broker?.us_connected?'operations-connected':'operations-disconnected'}>{receiving&&broker?.us_connected?'연결됨':'미연결'}</strong></span></div>
     {receiving&&!connected&&!!broker?.reconnect_in_seconds&&<p className="mt-3 text-xs text-amber-700">{String(broker.reconnect_in_seconds)}초 후 연결 재시도</p>}

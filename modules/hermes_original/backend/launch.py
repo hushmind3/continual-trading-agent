@@ -1,4 +1,4 @@
-"""Launch the untouched checkout through its official PM environment."""
+"""Launch the official PM environment with the requested Korean dashboard patch."""
 import json
 import os
 from pathlib import Path
@@ -20,6 +20,14 @@ def environment():
 
 
 def launch(arguments):
+    if arguments and arguments[0] == 'dashboard':
+        patch = Path(__file__).resolve().parents[1] / 'korean-ui.patch'
+        # Reuse the already-applied patch; never overwrite upstream/local conflicts.
+        applied = subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)],
+                                 cwd=SOURCE, capture_output=True)
+        if applied.returncode:
+            subprocess.run(['git', 'apply', '--check', str(patch)], cwd=SOURCE, check=True)
+            subprocess.run(['git', 'apply', str(patch)], cwd=SOURCE, check=True)
     env = environment()
     result = subprocess.run([sys.executable, '-m', 'pm.cli', 'env'], cwd=SOURCE,
                             env=env, capture_output=True, text=True, check=True)

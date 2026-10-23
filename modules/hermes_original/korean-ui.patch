@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..bc79605e6f 100644
+index 18475fe8f4..21faa2572c 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1705 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -1683,25 +1683,25 @@ index 18475fe8f4..bc79605e6f 100644
 +};
 +
 +const AUXILIARY_TASKS_KO: Record<string, string> = {
-+  vision: "이미지 내용 파악",
-+  compression: "긴 대화 내용을 줄여 정리",
-+  skills_hub: "스킬 검색과 관리",
-+  approval: "작업 승인 여부 판단",
-+  review: "코드와 작업 결과 검토",
-+  mcp: "MCP 도구 관련 작업",
-+  title_generation: "대화 제목 생성",
-+  memory_query_rewrite: "기억 검색어 다듬기",
-+  tts_audio_tags: "음성 대본에 표현 태그 추가",
-+  voice_chat: "음성 대화 응답 생성",
-+  triage_specifier: "칸반 작업 요청을 구체적인 명세로 정리",
-+  kanban_decomposer: "칸반 작업을 하위 작업으로 나누기",
-+  profile_describer: "프로필 소개 문장 작성",
-+  goal_judge: "목표 달성 여부와 완료 조건 판단",
-+  curator: "스킬 사용 기록 검토와 정리",
-+  monitor: "중요 메일의 우선순위 점수 매기기",
-+  background_review: "작업 뒤 기억과 스킬 개선점 검토",
-+  moa_reference: "MoA 답변 비교에 참고할 의견 작성",
-+  moa_aggregator: "MoA 참고 의견을 모아 최종 답변 작성",
++  vision: "첨부 이미지와 화면 캡처의 내용 분석",
++  compression: "긴 대화를 요약해 다음 답변에 필요한 문맥만 남기기",
++  skills_hub: "스킬을 검색하고 설치·관리하는 작업",
++  approval: "명령이나 도구 실행에 사용자 승인이 필요한지 분류",
++  review: "코드 변경과 작업 결과 검토",
++  mcp: "MCP 서버와 도구에 관한 보조 작업",
++  title_generation: "대화 내용을 알아보기 쉬운 제목으로 요약",
++  memory_query_rewrite: "저장된 기억을 찾기 위한 검색어 다시 쓰기",
++  tts_audio_tags: "음성 대본에 감정·말투 표현을 위한 태그 추가",
++  voice_chat: "음성 대화에서 사용할 답변 작성",
++  triage_specifier: "칸반 한 줄 요청을 실행 가능한 요구사항으로 풀어쓰기",
++  kanban_decomposer: "칸반 작업을 서로 연결된 하위 작업으로 나누기",
++  profile_describer: "프로필의 짧은 소개 문장 작성",
++  goal_judge: "목표 달성 여부를 따지고 완료 기준 작성",
++  curator: "스킬 사용 기록을 검토해 보관할 지식과 개선점 정리",
++  monitor: "중요 메일의 우선순위를 0~10점으로 판단",
++  background_review: "작업 뒤 기억에 저장할 내용과 스킬 개선점 검토",
++  moa_reference: "MoA가 답변을 비교할 때 참고할 독립 의견 작성",
++  moa_aggregator: "MoA의 여러 참고 의견을 비교해 최종 답변 작성",
 +};
 +
 +function auxiliaryFieldDescription(schemaKey: string): string {
@@ -1713,52 +1713,52 @@ index 18475fe8f4..bc79605e6f 100644
 +  let explanation = "";
 +  switch (field) {
 +    case "enabled":
-+      explanation = "이 기능을 자동으로 사용할지 정합니다.";
++      explanation = "이 보조 작업에 별도 AI 요청을 사용할지 정합니다.";
 +      break;
 +    case "provider":
-+      explanation = "이 작업을 맡길 AI 서비스입니다.";
++      explanation = "이 작업을 맡길 AI 서비스입니다. auto는 주 대화에 설정된 서비스를 우선 이용하고, 연결할 수 없으면 보조 작업용 대체 경로를 시도합니다.";
 +      break;
 +    case "model":
-+      explanation = "이 작업에 사용할 AI 모델 이름 또는 ID입니다.";
++      explanation = "이 작업에 사용할 모델 이름 또는 ID입니다. 비우면 선택한 서비스의 보조 작업용 기본 모델을 사용합니다.";
 +      break;
 +    case "base_url":
-+      explanation = "AI 서비스의 기본 주소 대신 사용할 API 주소입니다. 별도 주소가 없으면 비워 둡니다.";
++      explanation = "AI 서비스에 요청을 보낼 API 주소를 직접 지정합니다. 제공자의 기본 주소를 쓰려면 비워 둡니다.";
 +      break;
 +    case "api_key":
-+      explanation = "이 작업을 위해 AI 서비스에 접속할 때 사용할 비밀 키입니다.";
++      explanation = "이 작업이 AI 서비스에 접속할 때 사용할 비밀 키입니다. 비우면 OPENAI_API_KEY 환경 변수에서 가져옵니다.";
 +      break;
 +    case "timeout":
-+      explanation = "AI 서비스의 응답을 기다릴 최대 시간입니다.";
++      explanation = "AI 서비스에 요청한 뒤 응답을 기다릴 전체 제한 시간(초)입니다. 답변이 중간에 멈춘 경우의 no_progress_timeout과는 별도입니다.";
 +      break;
 +    case "reasoning_effort":
-+      explanation = "모델이 이 작업을 풀 때 들일 생각의 깊이입니다. 높이면 복잡한 작업을 더 잘 처리할 수 있지만 시간과 비용이 늘 수 있습니다.";
++      explanation = "이 작업에서 모델에 요청할 추론 강도입니다. none은 제공자가 지원하는 가장 낮은 단계이고, 빈 값은 제공자의 기본 설정을 사용합니다. 선택지가 높을수록 시간이 더 걸리거나 비용이 늘 수 있습니다.";
 +      break;
 +    case "api_mode":
-+      explanation = "선택한 서비스와 통신할 때 사용할 API 형식입니다.";
++      explanation = "검토 모델과 통신할 API 형식입니다. chat_completions는 일반 대화 API, anthropic_messages는 Anthropic 형식, codex_responses는 Codex Responses 형식입니다. 비우면 제공자 설정을 따릅니다.";
 +      break;
 +    case "transient_retries":
-+      explanation = "보조 AI 요청에서 일시적인 연결 오류나 시간 초과가 났을 때 같은 서비스로 다시 시도할 횟수입니다.";
++      explanation = "보조 AI 요청에서 연결 끊김·시간 초과 같은 일시 오류가 나면 대체 서비스로 넘어가기 전에 같은 서비스에 다시 요청할 횟수입니다. 0이면 재시도하지 않습니다.";
 +      break;
 +    case "free_only":
-+      explanation = "OpenRouter를 통한 자동 대체에서 무료 모델만 사용합니다. 유료 모델은 선택하지 않습니다.";
++      explanation = "자동 대체 경로에서 OpenRouter를 사용할 때 무료 모델만 선택합니다. 유료 모델로 요청하지 않습니다.";
 +      break;
 +    case "openrouter_model":
-+      explanation = "자동 대체 시 OpenRouter에서 사용할 모델 ID입니다.";
++      explanation = "설정한 AI 서비스에 연결할 수 없어 OpenRouter로 자동 대체할 때 사용할 모델 ID입니다. 무료 모델만 원하면 free_only도 켜세요.";
 +      break;
 +    case "stream_only_base_urls":
-+      explanation = "일반 요청을 거부하는 서비스 주소를 등록합니다. 해당 주소로는 응답을 실시간 전송 방식으로 요청합니다.";
++      explanation = "실시간 전송을 끄면 요청을 거부하는 서비스 주소의 일부를 적습니다. 주소에 이 문자열이 포함되면 실시간으로 받아 모아 표시하는 방식으로 요청합니다. 대소문자는 구분하지 않습니다.";
 +      break;
 +    case "download_timeout":
-+      explanation = "이미지를 분석하기 전에 이미지 파일을 내려받을 때 기다릴 최대 시간입니다.";
++      explanation = "이미지 분석을 시작하기 전에 이미지 파일을 내려받으며 기다릴 최대 시간(초)입니다.";
 +      break;
 +    case "no_progress_timeout":
-+      explanation = "모델이 응답을 시작한 뒤 이 시간 동안 새 내용을 보내지 않으면 요청을 실패 처리하고 재시도합니다. 전체 요청 제한 시간과는 별도입니다.";
++      explanation = "실시간 답변이 시작된 뒤 이 시간(초) 동안 새 내용이 오지 않으면 요청을 실패 처리하고 대체·재시도를 진행합니다. 전체 요청 제한 시간과는 별도이며, 비우면 기본 60초를 사용합니다.";
 +      break;
 +    case "model_upgrade_enabled":
-+      explanation = "기본 방식으로 만든 제목이 부적절할 때 AI 모델에 더 나은 제목을 요청합니다.";
++      explanation = "기본 방식으로 만든 대화 제목을 보조 AI 모델에 다시 작성해 달라고 요청합니다. 끄면 모델을 호출하지 않고 기본 제목을 바로 사용합니다.";
 +      break;
 +    case "prefer_fast_model":
-+      explanation = "서비스가 빠른 응답용 모델을 제공하면 대화 제목을 만들 때 우선 사용합니다.";
++      explanation = "제공자가 빠른 응답용 모델을 지원하면 대화 제목을 만들 때 그 모델을 우선 사용합니다.";
 +      break;
 +    case "language":
 +      explanation = "대화 제목을 작성할 언어입니다. 비우면 대화 내용에 맞춰 정합니다.";

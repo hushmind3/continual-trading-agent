@@ -1,9 +1,9 @@
 diff --git a/plugins/kanban/dashboard/README.md b/plugins/kanban/dashboard/README.md
 new file mode 100644
-index 0000000000..d14195fbb9
+index 0000000000..bc69f760bf
 --- /dev/null
 +++ b/plugins/kanban/dashboard/README.md
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,14 @@
 +# Hermes Kanban Dashboard
 +
 +용도: Hermes 원본 대시보드에 칸반 협업 작업판을 제공합니다. 카드와 보드 설정은 Kanban 플러그인 API가 처리하고, 이 폴더는 화면 진입점과 스타일을 제공합니다.
@@ -14,19 +14,35 @@ index 0000000000..d14195fbb9
 +- 확인: 공식 Hermes 웹 빌드 후 실행 중인 대시보드의 `/kanban` 화면에서 도구 설명을 확인합니다. 실행 중인 화면은 플랫폼 8766의 Hermes 원본 탭이 연결하는 원본 대시보드에서 제공합니다.
 +
 +현재 확인: 공식 웹 빌드 성공. 8766에서 연결되는 실행 중 Hermes 원본 대시보드의 60750 `/kanban` 화면에서 작업 자동 배정·검색·담당자·보관·디스패처 안내와 `Review` 상태의 한국어 풀이를 확인했습니다. 작업 상태·배정·삭제 기능은 변경하지 않았습니다.
++
++2026-10-23: 검색·태그·담당 프로필·보관 항목·디스패처·검토 상태·삭제 안내의 영어 설명 옆에 더 구체적인 한국어 풀이를 보완했습니다. 화면 동작과 작업 상태는 바꾸지 않았습니다. 확인은 8766에 연결된 원본 대시보드의 60750 `/kanban`에서 새로고침한 뒤 툴팁과 상태 설명을 확인합니다.
++
++2026-10-23: 작업판 경로, 총괄 프로필, 기본 담당자, 자동 분해, 프로필 역할 안내와 만들기/저장 버튼의 영어 문구에 괄호로 쉬운 한국어 풀이를 추가했습니다. 사용자가 60750 Kanban의 설정·새 작업판 창과 자동 배정 설정에서 문구를 확인했습니다. 보드·작업 데이터와 자동 분배 동작은 유지했습니다.
 diff --git a/plugins/kanban/dashboard/dist/index.js b/plugins/kanban/dashboard/dist/index.js
-index 658ae11c5b..dea1c802cd 100644
+index 658ae11c5b..3d1a0fb525 100644
 --- a/plugins/kanban/dashboard/dist/index.js
 +++ b/plugins/kanban/dashboard/dist/index.js
-@@ -129,7 +129,7 @@
+@@ -107,7 +107,7 @@
+     ready: "Dependencies satisfied; assign a profile to dispatch",
+     running: "Claimed by a worker — in-flight",
+     blocked: "Worker asked for human input",
+-    review: "Implementation complete — awaiting review",
++    review: "Implementation complete — awaiting review (구현을 마치고 검토를 기다리는 중)",
+     done: "Completed",
+     archived: "Archived",
+   };
+@@ -129,9 +129,9 @@
    };
    const FALLBACK_TRASH = {
      label: "Trash",
 -    title: "Drag a card here to permanently delete it",
 +    title: "Drag a card here to permanently delete it (카드를 이곳으로 끌어오면 복구할 수 없게 삭제합니다.)",
      confirm: "Permanently delete this task? This cannot be undone.",
-     dropHint: "Drop to delete",
+-    dropHint: "Drop to delete",
++    dropHint: "Drop to delete (여기에 끌어 놓으면 작업을 삭제합니다)",
    };
+   const DIAGNOSTIC_EVENT_KIND_KEYS = {
+     completion_blocked_hallucination: "completionBlockedHallucination",
 @@ -1452,7 +1452,7 @@
          h("button", {
            className: "hermes-kanban-attention-dismiss",
@@ -79,6 +95,95 @@ index 658ae11c5b..dea1c802cd 100644
          }, headerLabel),
        );
      }
+@@ -1961,7 +1961,7 @@
+             className: "text-sm font-medium underline-offset-2 hover:underline",
+           }, headerLabel),
+           modePill,
+-          h(Button, { onClick: loadAll, size: "sm" }, "Reload"),
++          h(Button, { onClick: loadAll, size: "sm" }, "Reload (새로 불러오기)"),
+         ),
+         msg ? h("div", {
+           className: msg.ok ? "hermes-kanban-msg-ok" : "hermes-kanban-msg-err",
+@@ -1970,7 +1970,7 @@
+         settings ? h("div", { className: "grid gap-3 sm:grid-cols-3" },
+           h("div", { className: "flex flex-col gap-1" },
+             h(Label, { className: "text-xs text-muted-foreground" },
+-              "Orchestrator profile"),
++              "Orchestrator profile (총괄 프로필)"),
+             h(Select, Object.assign({
+               value: settings.orchestrator_profile || "",
+               className: "h-8",
+@@ -1978,17 +1978,17 @@
+               saveSettings({ orchestrator_profile: v });
+             })),
+               h(SelectOption, { value: "" },
+-                "(default: " + (settings.active_profile || "default") + ")"),
++                "(default: " + (settings.active_profile || "default") + " / 기본값: 현재 프로필)"),
+               profileOptions,
+             ),
+             h("div", { className: "text-[10px] text-muted-foreground" },
+-              "Resolved: " + (settings.resolved_orchestrator_profile || "default")),
++              "Resolved: " + (settings.resolved_orchestrator_profile || "default") + " (실제 적용 프로필)"),
+             h("div", { className: "text-[10px] text-muted-foreground" },
+-              "Owns the root task after fan-out (wakes back up to judge completion). Does not drive how tasks split — configure the decomposer model under auxiliary.kanban_decomposer."),
++              "Owns the root task after fan-out (wakes back up to judge completion). Does not drive how tasks split — configure the decomposer model under auxiliary.kanban_decomposer. (하위 작업을 나눈 뒤 상위 작업을 맡아 결과를 검토하는 프로필입니다. 작업을 나누는 모델은 설정의 auxiliary.kanban_decomposer에서 따로 정합니다.)"),
+           ),
+           h("div", { className: "flex flex-col gap-1" },
+             h(Label, { className: "text-xs text-muted-foreground" },
+-              "Default assignee"),
++              "Default assignee (기본 담당자)"),
+             h(Select, Object.assign({
+               value: settings.default_assignee || "",
+               className: "h-8",
+@@ -1996,15 +1996,15 @@
+               saveSettings({ default_assignee: v });
+             })),
+               h(SelectOption, { value: "" },
+-                "(default: " + (settings.active_profile || "default") + ")"),
++                "(default: " + (settings.active_profile || "default") + " / 기본값: 현재 프로필)"),
+               profileOptions,
+             ),
+             h("div", { className: "text-[10px] text-muted-foreground" },
+-              "Resolved: " + (settings.resolved_default_assignee || "default")),
++              "Resolved: " + (settings.resolved_default_assignee || "default") + " (실제 적용 담당자)"),
+           ),
+           h("div", { className: "flex flex-col gap-1" },
+             h(Label, { className: "text-xs text-muted-foreground" },
+-              "Orchestration mode"),
++              "Orchestration mode (작업 배정 방식)"),
+             h("label", { className: "flex items-center gap-2 text-xs h-8" },
+               h(Checkbox, {
+                 checked: !!settings.auto_decompose,
+@@ -2012,23 +2012,23 @@
+                   saveSettings({ auto_decompose: checked === true });
+                 },
+               }),
+-              "Auto-decompose triage tasks",
++              "Auto-decompose triage tasks (분류 대기 작업 자동 나누기)",
+             ),
+             h("div", { className: "text-[10px] text-muted-foreground" },
+               settings.auto_decompose
+-                ? "The dispatcher decomposes new triage tasks automatically."
+-                : "Triage tasks stay in triage until you click ⚗ Decompose."),
++                ? "The dispatcher decomposes new triage tasks automatically. (새 분류 대기 작업을 디스패처가 자동으로 나눕니다.)"
++                : "Triage tasks stay in triage until you click ⚗ Decompose. (⚗ 나누기를 누르기 전까지 작업이 분류 대기 열에 남습니다.)"),
+           ),
+         ) : h("div", { className: "text-xs text-muted-foreground" },
+           "Loading…"),
+ 
+         h("div", { className: "border-t pt-3" },
+           h(Label, { className: "text-xs text-muted-foreground" },
+-            "Profile descriptions"),
++            "Profile descriptions (프로필별 역할 설명)"),
+           h("div", { className: "text-[10px] text-muted-foreground pb-2" },
+-            "Descriptions guide the decomposer's routing. Click ⚗ to auto-generate, or edit and save."),
++            "Descriptions guide the decomposer's routing. Click ⚗ to auto-generate, or edit and save. (각 설명을 참고해 작업을 알맞은 프로필에 배정합니다. ⚗ 자동 작성을 누르거나 직접 고친 뒤 저장하세요.)"),
+           profiles.length === 0
+-            ? h("div", { className: "text-xs text-muted-foreground" }, "No profiles installed.")
++            ? h("div", { className: "text-xs text-muted-foreground" }, "No profiles installed. (사용할 수 있는 프로필이 없습니다.)")
+             : h("div", { className: "flex flex-col gap-2" },
+                 profiles.map(function (p) {
+                   return h(ProfileDescriptionRow, {
 @@ -2079,13 +2079,13 @@
            onClick: function () { props.onSave(p.name, draft); },
            size: "sm",
@@ -113,12 +218,106 @@ index 658ae11c5b..dea1c802cd 100644
          }, tx(t, "newBoard", "+ New board")),
          props.board !== "default"
            ? h(Button, {
+@@ -2327,22 +2327,22 @@
+             h(Input, {
+               value: description,
+               onChange: function (e) { setDescription(e.target.value); },
+-              placeholder: "What goes on this board?",
++      placeholder: "What goes on this board? (이 작업판에서 어떤 일을 할지 적으세요.)",
+               className: "h-8",
+             }),
+           ),
+           h("div", { className: "flex flex-col gap-1" },
+             h(Label, { className: "text-xs" },
+-              tx(t, "projectDirectory", "Project directory"), " ",
++              tx(t, "projectDirectory", "Project directory (프로젝트 폴더)"), " ",
+               h("span", { className: "text-muted-foreground" },
+-                tx(t, "projectDirectoryHint", "(recommended)"))),
++                tx(t, "projectDirectoryHint", "(recommended / 권장)"))),
+             h(Input, {
+               value: projectDirectory,
+               onChange: function (e) { setProjectDirectory(e.target.value); },
+               placeholder: tx(t, "projectDirectoryPlaceholder",
+-                "Absolute path to the project folder"),
++                "Absolute path to the project folder (프로젝트 폴더의 전체 경로)"),
+               title: tx(t, "projectDirectoryHelp",
+-                "Git projects use preserved worktrees. Other folders use the directory directly. Leave blank only for temporary work."),
++                "Git projects use preserved worktrees. Other folders use the directory directly. Leave blank only for temporary work. (Git 프로젝트는 작업별로 따로 보존되는 작업 폴더를 사용합니다. 그 외 폴더는 지정한 위치에서 바로 작업합니다. 임시 작업이 아니라면 비워 두지 마세요.)"),
+               className: "h-8",
+               autoCapitalize: "none",
+               autoCorrect: "off",
+@@ -2350,7 +2350,7 @@
+             }),
+             h("div", { className: "text-xs text-muted-foreground" },
+               tx(t, "projectDirectoryExplanation",
+-                "Sets the default location for task files so project output is preserved.")),
++                "Sets the default location for task files so project output is preserved. (작업 파일을 저장할 기본 위치입니다. 작업 결과를 프로젝트 안에 보관합니다.)")),
+           ),
+           projects.length ? h("div", { className: "flex flex-col gap-1" },
+             h(Label, { className: "text-xs" }, tx(t, "boardProject", "Project"), " ",
+@@ -2397,12 +2397,12 @@
+             onClick: props.onCancel,
+             size: "sm",
+             disabled: submitting,
+-          }, tx(t, "cancel", "Cancel")),
++          }, tx(t, "cancel", "Cancel (취소)")),
+           h(Button, {
+             type: "submit",
+             size: "sm",
+             disabled: submitting || !slug.trim(),
+-          }, submitting ? tx(t, "creating", "Creating…") : tx(t, "createBoard", "Create board")),
++        }, submitting ? tx(t, "creating", "Creating…") : tx(t, "createBoard", "Create board (작업판 만들기)")),
+         ),
+       ),
+     );
+@@ -2480,14 +2480,14 @@
+           ),
+           h("div", { className: "flex flex-col gap-1" },
+             h(Label, { className: "text-xs" },
+-              tx(t, "projectDirectory", "Project directory")),
++              tx(t, "projectDirectory", "Project directory (프로젝트 폴더)")),
+             h(Input, {
+               value: projectDirectory,
+               onChange: function (e) { setProjectDirectory(e.target.value); },
+               placeholder: tx(t, "projectDirectoryPlaceholder",
+-                "Absolute path to the project folder"),
++                "Absolute path to the project folder (프로젝트 폴더의 전체 경로)"),
+               title: tx(t, "projectDirectoryHelp",
+-                "Git projects use preserved worktrees. Other folders use the directory directly. Leave blank only for temporary work."),
++                "Git projects use preserved worktrees. Other folders use the directory directly. Leave blank only for temporary work. (Git 프로젝트는 작업별로 따로 보존되는 작업 폴더를 사용합니다. 그 외 폴더는 지정한 위치에서 바로 작업합니다. 임시 작업이 아니라면 비워 두지 마세요.)"),
+               className: "h-8",
+               autoCapitalize: "none",
+               autoCorrect: "off",
+@@ -2495,7 +2495,7 @@
+             }),
+             h("div", { className: "text-xs text-muted-foreground" },
+               tx(t, "projectDirectoryOverrideHint",
+-                "New tasks inherit this as their workspace default; each task can still override it in the create dialog.")),
++                "New tasks inherit this as their workspace default; each task can still override it in the create dialog. (새 작업은 기본으로 이 폴더를 사용합니다. 작업을 만들 때 별도 폴더로 바꿀 수도 있습니다.)")),
+           ),
+           projects.length ? h("div", { className: "flex flex-col gap-1" },
+             h(Label, { className: "text-xs" },
+@@ -2525,12 +2525,12 @@
+             onClick: props.onCancel,
+             size: "sm",
+             disabled: submitting,
+-          }, tx(t, "cancel", "Cancel")),
++          }, tx(t, "cancel", "Cancel (취소)")),
+           h(Button, {
+             type: "submit",
+             size: "sm",
+             disabled: submitting,
+-          }, submitting ? tx(t, "saving", "Saving…") : tx(t, "save", "Save")),
++        }, submitting ? tx(t, "saving", "Saving…") : tx(t, "save", "Save (저장)")),
+         ),
+       ),
+     );
 @@ -2546,7 +2546,7 @@
      const assignees = (props.board && props.board.assignees) || [];
      return h("div", { className: "flex flex-wrap items-end gap-3" },
        h("div", { className: "flex flex-col gap-1",
 -                 title: "Fuzzy-match tasks by id, title, or description. Matches across all columns." },
-+                 title: "Fuzzy-match tasks by id, title, or description. Matches across all columns. (ID·제목·설명으로 모든 열의 작업을 검색합니다.)" },
++                 title: "Fuzzy-match tasks by id, title, or description. Matches across all columns. (작업 ID·제목·설명의 일부만 입력해도 모든 열에서 비슷한 작업을 찾아줍니다.)" },
          h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "search", "Search")),
          h(Input, {
            placeholder: tx(t, "filterCards", "Filter cards…"),
@@ -127,7 +326,7 @@ index 658ae11c5b..dea1c802cd 100644
        ),
        h("div", { className: "flex flex-col gap-1",
 -                 title: "Tenants are free-form tags on a task (e.g. customer, project, team). Set them via the task drawer or kanban_create." },
-+                 title: "Tenants are free-form tags on a task (e.g. customer, project, team). Set them via the task drawer or kanban_create. (테넌트는 고객·프로젝트·팀처럼 작업을 묶는 자유 입력 태그입니다. 작업 상세 창이나 kanban_create에서 지정합니다.)" },
++                 title: "Tenants are free-form tags on a task (e.g. customer, project, team). Set them via the task drawer or kanban_create. (테넌트는 고객사·프로젝트·팀별로 작업을 구분하는 꼬리표입니다. 작업 상세 창에서 입력하거나 kanban_create로 지정할 수 있습니다.)" },
          h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "tenant", "Tenant")),
          h(Select, Object.assign({
            value: props.tenantFilter,
@@ -136,7 +335,7 @@ index 658ae11c5b..dea1c802cd 100644
        ),
        h("div", { className: "flex flex-col gap-1",
 -                 title: "Filter by assigned Hermes profile. Profiles are the named agent identities that claim and work on tasks." },
-+                 title: "Filter by assigned Hermes profile. Profiles are the named agent identities that claim and work on tasks. (작업을 맡아 처리하는 Hermes 에이전트 프로필별로 작업을 걸러 봅니다.)" },
++                 title: "Filter by assigned Hermes profile. Profiles are the named agent identities that claim and work on tasks. (작업을 맡은 Hermes 프로필별로 걸러 봅니다. 프로필 하나가 이름과 역할을 가진 에이전트 한 명입니다.)" },
          h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "assignee", "Assignee")),
          h(Select, Object.assign({
            value: props.assigneeFilter,
@@ -145,7 +344,7 @@ index 658ae11c5b..dea1c802cd 100644
        ),
        h("label", { className: "flex items-center gap-2 text-xs",
 -                   title: "Include archived tasks in the board view. Archived tasks are hidden by default." },
-+                   title: "Include archived tasks in the board view. Archived tasks are hidden by default. (기본 화면에서 숨기는 보관된 작업도 함께 표시합니다.)" },
++                   title: "Include archived tasks in the board view. Archived tasks are hidden by default. (완료하거나 치워 둔 작업은 기본적으로 숨겨집니다. 체크하면 보관된 작업도 함께 표시합니다.)" },
          h(Checkbox, {
            checked: props.includeArchived,
            onCheckedChange: function (checked) { props.setIncludeArchived(checked === true); },
@@ -154,7 +353,7 @@ index 658ae11c5b..dea1c802cd 100644
        ),
        h("label", { className: "flex items-center gap-2 text-xs",
 -                   title: "Group the Running column by assigned profile" },
-+                   title: "Group the Running column by assigned profile (실행 중인 작업을 담당 프로필별로 나눠 표시합니다.)" },
++                   title: "Group the Running column by assigned profile (실행 중인 작업을 담당 에이전트별로 나눠 표시합니다.)" },
          h(Checkbox, {
            checked: props.laneByProfile,
            onCheckedChange: function (checked) { props.setLaneByProfile(checked === true); },
@@ -163,13 +362,13 @@ index 658ae11c5b..dea1c802cd 100644
          onClick: props.onNudgeDispatch,
          size: "sm",
 -        title: "Wake the dispatcher to claim ready tasks now instead of waiting for the next tick. Use this after adding tasks if you want them picked up immediately.",
-+        title: "Wake the dispatcher to claim ready tasks now instead of waiting for the next tick. Use this after adding tasks if you want them picked up immediately. (다음 자동 확인 시점까지 기다리지 않고 디스패처가 지금 바로 처리 가능한 작업을 가져오게 합니다. 새 작업을 추가한 뒤 즉시 배정하고 싶을 때 누르세요.)",
++        title: "Wake the dispatcher to claim ready tasks now instead of waiting for the next tick. Use this after adding tasks if you want them picked up immediately. (디스패처가 다음 자동 확인까지 기다리지 않고 지금 준비된 작업을 맡아 처리하게 합니다. 새 작업을 바로 시작시키려면 누르세요.)",
        }, tx(t, "nudgeDispatcher", "Nudge dispatcher")),
        h(Button, {
          onClick: props.onRefresh,
          size: "sm",
 -        title: "Reload the board from the database. The board auto-refreshes on task events; this is for forcing a re-read.",
-+        title: "Reload the board from the database. The board auto-refreshes on task events; this is for forcing a re-read. (데이터베이스에서 작업판을 다시 읽습니다. 작업 변경 때 자동으로 갱신되지만, 즉시 다시 읽게 할 때 사용합니다.)",
++        title: "Reload the board from the database. The board auto-refreshes on task events; this is for forcing a re-read. (작업 변경은 자동 반영됩니다. 화면에 바로 반영되지 않을 때 데이터베이스에서 다시 읽습니다.)",
        }, tx(t, "refresh", "Refresh")),
        h(Button, {
          onClick: function () {
@@ -178,7 +377,7 @@ index 658ae11c5b..dea1c802cd 100644
          },
          size: "sm",
 -        title: "Clear all active filters (search, tenant, assignee, archived).",
-+        title: "Clear all active filters (search, tenant, assignee, archived). (검색어·테넌트·담당자·보관 항목 필터를 모두 지웁니다.)",
++        title: "Clear all active filters (search, tenant, assignee, archived). (검색어·고객/프로젝트 태그·담당자·보관 항목 필터를 모두 지웁니다.)",
        }, tx(t, "clearFilters", "Clear filters")),
      );
    }
@@ -366,6 +565,17 @@ index 658ae11c5b..dea1c802cd 100644
                timeAgo ? timeAgo(t.created_at) : ""),
            ),
          ),
+@@ -3401,8 +3401,8 @@
+                   : tx(t, "assigneePlaceholder", "assignee"),
+                 className: "h-8 text-sm",
+                 title: props.columnName === "triage"
+-                  ? "Hermes profile that will spec this task (default: the dispatcher's configured specifier). Leave blank to let the dispatcher pick."
+-                  : "Hermes profile to assign. Leave blank and the dispatcher will pick from available profiles when the task is Ready.",
++                  ? "Hermes profile that will spec this task (default: the dispatcher's configured specifier). Leave blank to let the dispatcher pick. (이 작업의 요청 내용을 구체적인 사양으로 정리할 프로필입니다. 비워 두면 디스패처 설정을 따릅니다.)"
++                  : "Hermes profile to assign. Leave blank and the dispatcher will pick from available profiles when the task is Ready. (작업을 맡길 프로필입니다. 비워 두면 작업이 준비 상태가 됐을 때 디스패처가 담당자를 고릅니다.)",
+                 style: { textTransform: "none" },
+                 autoCapitalize: "none",
+                 autoCorrect: "off",
 @@ -3417,7 +3417,7 @@
                  onChange: function (e) { setPriority(e.target.value); },
                  placeholder: "pri",
@@ -420,6 +630,15 @@ index 658ae11c5b..dea1c802cd 100644
                min: 1,
              }) : null,
            ),
+@@ -3505,7 +3505,7 @@
+             type: "button",
+             onClick: props.onCancel,
+             size: "sm",
+-          }, tx(t, "cancel", "Cancel")),
++          }, tx(t, "cancel", "Cancel (취소)")),
+           h(Button, {
+             type: "submit",
+             size: "sm",
 @@ -4314,7 +4314,7 @@
            type: "button",
            onClick: load,

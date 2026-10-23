@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..356232c5d1 100644
+index 18475fe8f4..df27728603 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1965 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -1317,7 +1317,7 @@ index 18475fe8f4..356232c5d1 100644
 +  "tts.neutts.ref_audio": "NeuTTS가 목소리를 참고할 오디오 파일 경로입니다. 비우면 내장된 기본 음성을 사용합니다.",
 +  "tts.neutts.ref_text": "참고 오디오에서 말한 내용을 적은 텍스트 파일 경로입니다. 비우면 내장된 기본 문장을 사용합니다.",
 +  "tts.neutts.model": "NeuTTS에서 내려받아 사용할 음성 합성 모델 ID입니다.",
-+  "tts.neutts.device": "NeuTTS 계산에 사용할 장치를 CPU·CUDA·Apple MPS 중에서 선택합니다.",
++  "tts.neutts.device": "NeuTTS 계산에 사용할 장치를 CPU(컴퓨터의 일반 처리 장치), CUDA(NVIDIA 그래픽카드 연산), Apple MPS(Apple GPU 가속) 중에서 고릅니다.",
 +  "tts.piper.voice": "Piper 음성 이름 또는 사용할 .onnx 음성 파일의 전체 경로입니다. 이름을 지정하면 첫 사용 시 내려받을 수 있습니다.",
 +  "tts.deepinfra.model": "DeepInfra 음성 합성에 사용할 모델 ID입니다. 비우면 현재 모델 목록에서 음성 합성용 첫 모델을 선택합니다.",
 +  "tts.deepinfra.voice": "DeepInfra 음성 합성에서 사용할 목소리 이름입니다.",
@@ -1356,7 +1356,7 @@ index 18475fe8f4..356232c5d1 100644
 +  "stt.echo_transcripts": "메신저로 받은 음성을 글자로 바꾼 뒤, 인식 결과를 🎙️ 표시가 붙은 별도 메시지로 보내 확인할 수 있게 합니다. 끄면 확인용 메시지만 보내지 않으며 음성 인식 자체는 계속됩니다.",
 +  "stt.language": "모든 음성 인식에서 기본으로 참고할 언어 코드입니다. 현재 기본값은 `en`(영어)입니다. 비우면 서비스가 언어를 자동으로 찾고, Groq·OpenAI처럼 제공자별 언어를 따로 지정하면 그 값이 우선합니다. 화면 메뉴 언어와는 별개입니다.",
 +  "stt.streaming": "지원하는 OpenAI·xAI·ElevenLabs 서비스에서 녹음이 끝날 때까지 기다리지 않고 말하는 중 인식된 글자를 조금씩 전달합니다. 지원하지 않는 서비스이거나 실시간 인식이 실패하면 녹음 파일을 보내 한 번에 인식합니다.",
-+  "stt.cloud_trim_silence": "클라우드 음성 인식 서비스에 보내기 전에 녹음에서 긴 무음 구간을 줄여 파일 크기와 전송 대기를 줄입니다. 로컬 faster-whisper는 이 옵션 대신 VAD로 무음을 거릅니다. 무음 정리에 실패하면 녹음을 자르지 않고 원본을 보냅니다.",
++  "stt.cloud_trim_silence": "클라우드 음성 인식 서비스에 보내기 전에 녹음에서 긴 무음 구간을 줄여 파일 크기와 전송 대기를 줄입니다. 로컬 faster-whisper(이 컴퓨터에서 실행하는 음성 인식 엔진)는 클라우드 무음 정리 대신 VAD(말소리 구간 감지)로 무음을 거릅니다. 무음 정리에 실패하면 녹음을 자르지 않고 원본을 보냅니다.",
 +  "stt.cloud_trim_threshold_db": "이 값보다 음량이 작은 구간을 무음으로 보고 줄입니다. 단위 dB(데시벨)에서 숫자가 더 낮을수록 작은 소리까지 무음으로 취급합니다. 너무 낮게 잡으면 조용한 말소리도 잘릴 수 있습니다.",
 +  "stt.cloud_trim_keep_ms": "무음 구간을 줄이고도 말의 앞뒤에 남겨 둘 시간입니다. 기본값은 300밀리초입니다. 너무 짧게 줄이면 단어 앞뒤가 잘리거나 말 사이가 어색하게 붙을 수 있습니다.",
 +  "stt.local.language": "로컬 faster-whisper가 녹음에서 찾을 언어 코드입니다. 비우면 자동 감지합니다. `ko`처럼 입력 언어를 지정하면 짧은 음성에서 언어를 잘못 짐작하는 일을 줄일 수 있습니다.",

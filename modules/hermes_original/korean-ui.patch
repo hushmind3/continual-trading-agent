@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..13cfc234bf 100644
+index 18475fe8f4..b2523f6e87 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1208 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1239 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -228,8 +228,39 @@ index 18475fe8f4..13cfc234bf 100644
 +  "memory.user_char_limit": "사용자 프로필 최대 글자 수",
 +  "memory.nudge_interval": "대화 기억 검토 간격",
 +  "memory.provider": "기억 관리 플러그인",
-+  "terminal.backend": "명령 실행 환경",
-+  "terminal.modal_mode": "Modal 샌드박스 방식",
++  "terminal.backend": "명령·코드 실행 위치",
++  "terminal.modal_mode": "Modal 원격 실행 방식",
++  "terminal.degraded_mode": "원격 실행 연결 실패 시 처리",
++  "terminal.cwd": "기본 작업 폴더",
++  "terminal.temp_dir": "임시 파일 저장 폴더",
++  "terminal.font_family": "터미널 글꼴 종류",
++  "terminal.timeout": "명령 실행 제한 시간(초)",
++  "terminal.daemon_term_grace_seconds": "백그라운드 프로그램 종료 대기 시간(초)",
++  "terminal.oneshot_completion_wait_seconds": "일회 실행의 백그라운드 작업 대기 시간(초)",
++  "terminal.process_wait_auto_notify": "오래 걸리는 작업의 자동 완료 알림",
++  "terminal.env_passthrough": "격리 환경에 전달할 환경 변수",
++  "terminal.client_env_passthrough": "사용자 도구에 추가로 전달할 환경 변수",
++  "terminal.sync_back_max_bytes": "원격에서 가져올 결과 묶음의 최대 크기(바이트)",
++  "terminal.home_mode": "명령에서 사용할 사용자 홈 폴더",
++  "terminal.shell_init_files": "추가로 읽을 셸 설정 파일",
++  "terminal.auto_source_bashrc": "bash 설정 자동 불러오기",
++  "terminal.docker_image": "Docker 실행 환경 꾸러미",
++  "terminal.docker_forward_env": "내 환경 변수를 Docker에 전달",
++  "terminal.modal_image": "Modal 실행 환경 꾸러미",
++  "terminal.daytona_image": "Daytona 실행 환경 꾸러미",
++  "terminal.container_cpu": "격리 환경에 할당할 CPU 수",
++  "terminal.container_memory": "격리 환경 메모리 용량(MB)",
++  "terminal.container_disk": "격리 환경 저장 공간(MB)",
++  "terminal.container_persistent": "격리 환경 파일 유지",
++  "terminal.docker_volumes": "내 컴퓨터 폴더 연결 목록",
++  "terminal.docker_mount_cwd_to_workspace": "현재 폴더를 격리 환경에 연결",
++  "terminal.docker_network": "격리 환경의 인터넷 연결 허용",
++  "terminal.docker_extra_args": "Docker 추가 실행 옵션",
++  "terminal.docker_shm_size": "임시 공유 메모리 크기",
++  "terminal.docker_run_as_host_user": "내 사용자 권한으로 실행",
++  "terminal.docker_snap_compat": "Snap 설치 Docker 호환 처리",
++  "terminal.docker_shared_container_key": "프로필 간 격리 환경 공유 키",
++  "terminal.persistent_shell": "명령 사이에 셸 상태 유지",
 +  "display.resume_display": "이전 대화 기록 표시 방식",
 +  "display.busy_input_mode": "작업 중 새 입력 처리 방식",
 +  "display.skin": "터미널 화면 테마",
@@ -260,8 +291,8 @@ index 18475fe8f4..13cfc234bf 100644
 +  "auth.adopt_external_logins": "외부 로그인 가져오기",
 +  "browser.headed": "브라우저 창 표시",
 +  "proxy.enabled": "외부 통신 방화벽",
-+  "terminal.vercel_runtime": "Vercel Sandbox 실행 환경",
-+  "terminal.vercel_image": "Vercel Sandbox 이미지",
++  "terminal.vercel_runtime": "Vercel 실행 버전",
++  "terminal.vercel_image": "Vercel 격리 환경 꾸러미",
 +  model_context_length: "모델 문맥 길이",
 +  fallback_providers: "대체 제공자 목록",
 +  toolsets: "사용할 도구 모음",
@@ -577,25 +608,25 @@ index 18475fe8f4..13cfc234bf 100644
 +  "terminal.env_passthrough": "격리된 명령 실행 환경에도 전달할 호스트 환경 변수 이름 목록입니다. 변수의 값이 실행 환경으로 전달됩니다.",
 +  "terminal.client_env_passthrough": "CLI·TUI 사용자의 도구 실행에 추가로 전달할 환경 변수 이름 목록입니다.",
 +  "terminal.sync_back_max_bytes": "원격 실행 환경에서 내려받아 복원할 데이터 묶음의 최대 크기(바이트)입니다.",
-+  "terminal.home_mode": "터미널 명령에서 HOME 경로를 실제 사용자 폴더로 쓸지, Hermes 프로필 폴더로 분리할지 정합니다.",
++  "terminal.home_mode": "명령을 실행할 때 사용자 홈 폴더(HOME)를 어느 위치로 볼지 정합니다. auto는 내 컴퓨터에서는 실제 사용자 폴더, 격리 환경에서는 Hermes 전용 폴더를 쓰고, real은 항상 실제 폴더, profile은 항상 Hermes 전용 폴더를 씁니다.",
 +  "terminal.shell_init_files": "터미널 명령의 실행 환경을 준비할 때 추가로 읽을 셸 설정 파일 경로입니다.",
-+  "terminal.auto_source_bashrc": "bash 명령 실행 환경을 준비할 때 사용자 프로필·bash 설정 파일을 읽어 PATH 등의 설정을 가져옵니다.",
-+  "terminal.docker_image": "Docker 격리 환경을 만들 때 사용할 컨테이너 이미지 이름입니다.",
-+  "terminal.docker_forward_env": "현재 컴퓨터에서 같은 이름의 값을 읽어 Docker 환경으로 전달할 환경 변수 목록입니다.",
-+  "terminal.modal_image": "Modal 원격 격리 환경에서 사용할 컨테이너 이미지 이름입니다.",
-+  "terminal.daytona_image": "Daytona 원격 격리 환경에서 사용할 컨테이너 이미지 이름입니다.",
++  "terminal.auto_source_bashrc": "bash 명령을 시작할 때 사용자 셸 설정 파일을 읽어 프로그램 위치 목록(PATH), 별칭 등 평소 터미널 설정을 가져옵니다. 설정 파일 때문에 비대화형 명령이 멈추면 끄세요.",
++  "terminal.docker_image": "Docker 격리 환경을 만들 때 사용할 컨테이너 이미지(프로그램 실행에 필요한 도구와 설정을 미리 담은 환경 꾸러미) 이름입니다.",
++  "terminal.docker_forward_env": "내 컴퓨터에 설정된 같은 이름의 환경 변수(프로그램 실행 시 전달하는 설정값)를 Docker 격리 환경에도 전달할 목록입니다. 비밀 값이 포함된 변수는 주의해서 허용하세요.",
++  "terminal.modal_image": "Modal 원격 격리 환경을 만들 때 사용할 컨테이너 이미지(실행 도구가 준비된 환경 꾸러미) 이름입니다.",
++  "terminal.daytona_image": "Daytona 원격 격리 환경을 만들 때 사용할 컨테이너 이미지(실행 도구가 준비된 환경 꾸러미) 이름입니다.",
 +  "terminal.container_cpu": "지원되는 컨테이너 실행 환경에 할당할 CPU 수입니다.",
 +  "terminal.container_memory": "지원되는 컨테이너 실행 환경에 할당할 메모리 용량(MB)입니다.",
 +  "terminal.container_disk": "지원되는 컨테이너 실행 환경에 할당할 디스크 용량(MB)입니다.",
 +  "terminal.container_persistent": "컨테이너 파일을 대화나 재시작 뒤에도 보존할지 정합니다.",
-+  "terminal.docker_volumes": "호스트 폴더를 Docker 안의 폴더에 연결할 경로 목록입니다. 각 항목은 호스트 경로:컨테이너 경로 형식입니다.",
-+  "terminal.docker_mount_cwd_to_workspace": "현재 작업 폴더를 Docker 안의 /workspace에 연결합니다. 호스트 파일이 컨테이너에 보이므로 격리가 약해집니다.",
-+  "terminal.docker_network": "Docker 안에서 실행하는 명령이 네트워크에 접속할 수 있게 합니다. 끄면 네트워크 사용을 차단합니다.",
-+  "terminal.docker_extra_args": "Docker 컨테이너를 시작할 때 docker run 명령에 그대로 추가할 인수 목록입니다.",
-+  "terminal.docker_shm_size": "Docker 컨테이너 안에서 브라우저나 데이터 처리 도구가 공유 메모리로 사용할 크기입니다. 비우거나 0으로 두면 Docker 기본값을 씁니다.",
-+  "terminal.docker_run_as_host_user": "Docker 안의 명령을 호스트 사용자와 같은 사용자 ID로 실행해 연결 폴더의 파일 소유자가 root가 되지 않도록 합니다.",
-+  "terminal.docker_snap_compat": "Snap 패키지로 설치한 Docker에서 허용되지 않는 일부 실행 옵션을 제외해 호환성을 높입니다.",
-+  "terminal.docker_shared_container_key": "같은 키를 지정한 신뢰 프로필끼리 Docker 컨테이너를 공유합니다. 비우면 프로필마다 분리합니다.",
++  "terminal.docker_volumes": "내 컴퓨터의 폴더를 Docker 안에서도 보이게 연결할 목록입니다. 각 줄에 `내 컴퓨터 경로:격리 환경 안의 경로`를 적습니다. 예: `/home/me/files:/output`.",
++  "terminal.docker_mount_cwd_to_workspace": "현재 작업 폴더를 Docker 안의 `/workspace`에 연결합니다. 파일을 주고받기 쉽지만, 격리 환경에서 내 컴퓨터의 파일을 볼 수 있어 분리 수준이 낮아집니다.",
++  "terminal.docker_network": "Docker 안에서 실행한 명령이 인터넷이나 다른 네트워크에 접속하도록 허용합니다. 끄면 네트워크 연결을 막습니다.",
++  "terminal.docker_extra_args": "Docker 실행 명령(`docker run`)에 추가로 그대로 전달할 선택 사항 목록입니다. Docker 옵션을 모르면 비워 두세요.",
++  "terminal.docker_shm_size": "격리 환경 안에서 브라우저 등이 함께 쓰는 임시 메모리 크기입니다. 너무 작으면 브라우저나 데이터 처리 프로그램이 오류를 낼 수 있습니다. 비우거나 0으로 두면 Docker 기본값을 씁니다.",
++  "terminal.docker_run_as_host_user": "격리 환경 안의 명령을 현재 로그인한 사용자 권한으로 실행합니다. 연결한 폴더에 만든 파일이 관리자(root) 소유가 되는 일을 막지만, 일부 환경은 이 방식으로 시작할 수 없습니다.",
++  "terminal.docker_snap_compat": "Ubuntu의 Snap 방식으로 설치한 Docker에서 특정 보안 옵션이 거부될 때 호환 처리를 적용합니다. 이를 켜도 다른 보안 제한은 유지됩니다.",
++  "terminal.docker_shared_container_key": "같은 키를 입력한 Hermes 프로필끼리 Docker 실행 환경을 공유합니다. 신뢰하는 프로필에만 같은 키를 쓰고, 비우면 프로필마다 따로 만듭니다.",
 +  "terminal.persistent_shell": "SSH에서는 명령 사이에 내보낸 환경 변수 값을 유지하고, 로컬에서는 설정된 지속 셸 동작을 사용합니다.",
 +  "stt.enabled": "메신저 음성 메시지를 글자로 바꾸는 음성 인식을 사용합니다.",
 +  "stt.echo_transcripts": "음성 메시지에서 인식한 원문을 별도의 마이크 표시 메시지로 다시 보여줍니다.",
@@ -1054,9 +1085,9 @@ index 18475fe8f4..13cfc234bf 100644
 +  "plugins.clone_timeout_seconds": "플러그인 저장소를 내려받을 때 허용할 최대 시간(초)입니다.",
 +  "plugins.auto_update_check_hours": "플러그인 업데이트가 있는지 자동으로 확인하는 간격(시간)입니다.",
 +  "plugins.auto_apply": "켜면 확인 없이 플러그인 업데이트를 적용합니다.",
-+  "plugins.isolation": "플러그인 코드를 Hermes 본체와 어떤 방식으로 분리해 실행할지 정합니다.",
++  "plugins.isolation": "추가 기능(플러그인)을 Hermes 본체와 분리된 환경에서 실행할지, 어떤 방식으로 분리할지 정합니다. 분리하면 플러그인의 영향을 줄일 수 있지만 일부 기능이 제한될 수 있습니다.",
 +  "plugins.host.launcher": "격리된 플러그인을 시작할 때 사용할 실행 프로그램 경로입니다.",
-+  "cron.catch_up_missed": "Hermes가 꺼져 있거나 바빠서 지나친 예약 작업을 다시 실행할지 정합니다.",
++  "cron.catch_up_missed": "Hermes가 꺼져 있었거나 다른 작업 중이라 예약 시각을 놓친 작업을 다시 실행할지 정합니다. 켜면 놓친 작업이 뒤늦게 시작될 수 있습니다.",
 +  "cron.allow_agent_scheduling": "에이전트가 새 예약 작업을 만들거나 일정을 바꿀 수 있도록 허용합니다.",
 +  "cron.preflight": "예약 작업을 실행하기 전에 필요한 조건과 실행 가능 여부를 확인합니다.",
 +  "cron.model": "예약 작업을 수행할 때 사용할 모델 ID입니다.",
@@ -1087,7 +1118,7 @@ index 18475fe8f4..13cfc234bf 100644
 +  "onboarding.run": "처음 실행할 때 안내 절차를 시작할지 정합니다.",
 +  "computer_use.cua_telemetry": "컴퓨터 조작 기능의 사용 정보를 전송할지 정합니다.",
 +  "computer_use.autostart": "켜면 Hermes가 시작될 때 컴퓨터 조작 기능도 함께 시작합니다.",
-+  "computer_use.native_wayland": "Linux Wayland에서 기본 입력·화면 읽기 방식을 사용할지 정합니다.",
++  "computer_use.native_wayland": "Linux의 화면·입력 시스템 Wayland에서 기본 조작 방식을 사용할지 정합니다. 끄면 다른 호환 방식을 사용합니다.",
 +  "computer_use.max_image_dimension": "화면 분석 전에 이미지의 가로·세로 중 긴 쪽을 줄일 최대 크기(픽셀)입니다.",
 +  "computer_use.capture_after_mode": "마우스나 키보드 조작 뒤 화면을 다시 읽는 시점을 정합니다.",
 +  "computer_use.ax_max_elements": "화면 구조에서 한 번에 읽어들일 수 있는 항목의 최대 개수입니다.",
@@ -1096,10 +1127,10 @@ index 18475fe8f4..13cfc234bf 100644
 +  "computer_use.capability_manifest": "컴퓨터 조작 기능에서 사용할 수 있도록 허용할 동작 목록입니다.",
 +  "computer_use.allow_unsigned_driver": "켜면 서명 확인이 되지 않은 컴퓨터 조작 드라이버도 허용합니다. 보안 위험을 이해할 때만 사용하세요.",
 +  "nous.keepalive_interval_seconds": "Nous 서비스 연결이 끊기지 않도록 상태를 확인하는 간격(초)입니다.",
-+  "nous.anthropic_wire": "Anthropic 호환 서비스와 주고받을 때 사용할 API 통신 형식입니다.",
++  "nous.anthropic_wire": "Anthropic API 호환 서비스와 데이터를 주고받을 때 사용할 요청 형식(메시지 규격)입니다. 연결할 서비스가 요구하는 형식과 맞춰야 합니다.",
 +  "nous.guest": "Nous 서비스에 게스트 방식으로 연결합니다. 계정별 기능은 제한될 수 있습니다.",
 +  "terminal.backend": "터미널 명령과 코드 실행을 맡길 환경을 선택합니다. 실행 위치와 지원 기능은 선택한 환경에 따라 달라집니다.",
-+  "terminal.modal_mode": "Modal에서 사용할 격리 실행 모드를 선택합니다. 사용할 수 있는 값은 Modal 계정과 실행 설정에 따라 다릅니다.",
++  "terminal.modal_mode": "Modal 원격 터미널에 사용할 실행 방식을 고릅니다. 실제로 쓸 수 있는 방식은 Modal 계정 연결과 게이트웨이 설정에 따라 달라질 수 있습니다.",
 +  "tts.provider": "답변을 음성으로 읽을 때 사용할 음성 합성 서비스를 정합니다.",
 +  "stt.local.model": "로컬 faster-whisper 음성 인식에 사용할 모델 크기입니다. 큰 모델은 보통 더 정확하지만 메모리와 처리 시간이 더 필요합니다.",
 +  "stt.groq.model": "Groq 서비스에 음성을 보내 글자로 바꿀 때 사용할 모델 ID입니다.",
@@ -1113,7 +1144,7 @@ index 18475fe8f4..13cfc234bf 100644
 +  "delegation.reasoning_effort": "하위 에이전트가 문제를 생각하는 데 사용할 추론 강도입니다. 높일수록 복잡한 작업에 더 많은 시간을 쓸 수 있습니다.",
 +  "approvals.mode": "위험할 수 있는 명령을 실행하기 전에 승인을 받는 규칙을 정합니다. 선택지별 허용 범위는 화면에 표시된 값과 안내를 확인하세요.",
 +  "logging.level": "에이전트 로그에 기록할 최소 심각도입니다. 더 자세한 수준을 고르면 정보가 많이 기록되고 로그가 빠르게 커질 수 있습니다.",
-+  "agent.service_tier": "fast는 항상 빠른 응답 모드를 사용하고, auto는 각 대화 차례 시작 후 지정한 시간 동안 사용합니다. cold는 첫 대화 차례에서만 빠른 모드를 사용합니다.",
++  "agent.service_tier": "빠른 응답 모드를 언제 쓸지 정합니다. fast(항상 사용), auto(각 대화 차례 시작 후 정한 시간 동안 사용), cold(첫 대화 차례에서만 사용)입니다. 지원하지 않는 제공자는 이 선택을 무시할 수 있습니다.",
 +  "agent.fast_auto_seconds": "빠른 응답 모드를 auto로 설정했을 때, 각 대화 차례 시작 후 빠른 모드를 유지할 시간(초)입니다.",
 +  "agent.max_turns": "한 대화에서 에이전트가 작업을 이어갈 수 있는 최대 횟수입니다.",
 +  "agent.budget_warning_ratio": "실행 예산 중 이 비율을 사용하면 예산 경고를 표시합니다.",
@@ -1167,15 +1198,15 @@ index 18475fe8f4..13cfc234bf 100644
 +  "context.engine": "대화 기록이 길어졌을 때 내용을 어떻게 정리해 모델에 전달할지 정합니다.",
 +  "updates.non_interactive_local_changes": "채팅 앱이나 게이트웨이가 확인창 없이 Hermes를 업데이트할 때, 아직 커밋하지 않은 소스 변경을 어떻게 처리할지 정합니다. stash는 변경을 임시 보관했다가 업데이트 후 다시 적용하고, discard는 변경을 버립니다. 터미널에서 실행하는 업데이트는 이 설정과 관계없이 항상 확인을 요청합니다.",
 +  "updates.refresh_cua_driver": "Hermes 업데이트 중 이미 설치된 cua-driver도 새로 고칩니다. macOS 관리자 권한이 없고 /Applications 폴더에 쓸 수 없는 계정이라면 이 옵션을 끄세요.",
-+  "plugins.hook_callback_timeout": "플러그인 훅(빠른 경로 감시 및 pre_tool_call)이 프로세스 안에서 실행될 수 있는 최대 시간(초)입니다. 시간이 초과된 pre_tool_call은 안전을 위해 거부됩니다. 0은 시간 제한 없음이며, 600을 넘기면 600으로 제한됩니다. subagent_stop처럼 호출한 스레드에서 실행되는 훅은 별도의 제한 시간 작업으로 옮기지 않습니다.",
++  "plugins.hook_callback_timeout": "플러그인 훅(도구 실행 전후에 끼어드는 확장 기능)이 한 번 실행될 수 있는 최대 시간(초)입니다. pre_tool_call(도구 실행 전 검사)이 시간을 넘기면 안전을 위해 도구 실행을 막습니다. 0은 시간 제한 없음이며, 600보다 크게 입력해도 600초까지만 적용합니다. subagent_stop(하위 에이전트 종료)처럼 현재 대화 안에서 실행되는 훅에는 이 제한 시간을 따로 걸지 않습니다.",
 +  "plugins.load_timeout_seconds": "플러그인 하나를 가져와 등록하는 데 허용되는 최대 시간(초)입니다. 시간을 넘긴 플러그인은 '불러오기 시간 초과' 사유와 함께 건너뛰며, 나머지 플러그인은 계속 불러옵니다. 0은 시간 제한 없음이며, 600을 넘기면 600으로 제한됩니다.",
 +  "auth.adopt_external_logins": "Hermes에 사용할 수 있는 로그인이 없을 때 Codex CLI 또는 Claude Code의 로그인을 가져와 갱신합니다. 끄면 hermes auth add <provider> 명령으로 Hermes에 직접 등록한 로그인만 사용합니다.",
 +  "browser.headed": "로컬 브라우저를 실제 창이 보이는 상태로 실행합니다. 대화 차례가 끝나도 창을 열어 두지만, 사용하지 않는 세션은 browser.inactivity_timeout 설정에 따라 정리됩니다.",
 +  "proxy.enabled": "Docker에서만 사용하는 외부 통신 자격 증명 방화벽입니다. hermes egress setup과 hermes egress start 명령을 먼저 실행해야 합니다. 현재 Modal·SSH·Daytona 실행 환경에는 연결되어 있지 않습니다.",
 +  "proxy.credential_source": "iron-proxy가 시작할 때 외부 서비스에 접속할 실제 인증 정보를 가져올 위치입니다.",
 +  "proxy.enforce_on_docker": "외부 통신 프록시를 켰는데 설정이나 실행이 빠져 있으면 Docker 실행을 거부합니다.",
-+  "terminal.vercel_runtime": "지원이 종료된 기존 Vercel Sandbox 실행 환경 설정입니다. 실행 환경을 고정하면 이미지 설정보다 이 값이 우선합니다. 이미지 설정을 사용하려면 이 값을 비우세요.",
-+  "terminal.vercel_image": "Vercel Sandbox에서 사용할 이미지입니다. Vercel 제공 이미지(예: vercel/sandbox/universal:latest) 또는 VCR 저장소[:태그]를 지정합니다.",
++  "terminal.vercel_runtime": "예전 Vercel Sandbox에서 쓰던 Node.js·Python 실행 버전을 고정합니다. 현재는 지원이 종료된 설정입니다. 값을 비우면 아래 이미지에 들어 있는 실행 버전을 사용합니다.",
++  "terminal.vercel_image": "Vercel Sandbox를 만들 때 사용할 실행 환경 이미지(프로그램과 도구를 미리 담은 꾸러미)입니다. Vercel 기본 이미지나 Vercel 컨테이너 저장소(VCR)의 `이름:태그`를 적습니다.",
 +  "session.terminal_continue": "터미널에서 실행한 작업이 아직 끝나지 않았다면 다음 대화 차례에서 이어서 확인하도록 합니다.",
 +  "doctor.live_probe_timeout": "상태 점검에서 서비스 응답을 기다리는 최대 시간(초)입니다.",
 +  "updates.check": "새 Hermes 버전을 자동으로 확인합니다.",
@@ -1297,7 +1328,7 @@ index 18475fe8f4..13cfc234bf 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1235,7 @@ function NestedValueEditor({
+@@ -42,7 +1266,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1306,7 +1337,7 @@ index 18475fe8f4..13cfc234bf 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1252,7 @@ function NestedValueEditor({
+@@ -59,7 +1283,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1315,7 +1346,7 @@ index 18475fe8f4..13cfc234bf 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1281,7 @@ export function AutoField({
+@@ -88,8 +1312,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1325,7 +1356,7 @@ index 18475fe8f4..13cfc234bf 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1314,7 @@ export function AutoField({
+@@ -122,7 +1345,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1334,7 +1365,7 @@ index 18475fe8f4..13cfc234bf 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1375,7 @@ export function AutoField({
+@@ -183,7 +1406,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

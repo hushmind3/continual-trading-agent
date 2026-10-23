@@ -2348,7 +2348,7 @@ index 7883f5886a..a96efe86f8 100644
        <Select
          className="ml-auto min-w-0"
 diff --git a/web/src/components/ToolsetConfigDrawer.tsx b/web/src/components/ToolsetConfigDrawer.tsx
-index 86ee09c26d..83d0de4566 100644
+index 86ee09c26d..575b43a0f5 100644
 --- a/web/src/components/ToolsetConfigDrawer.tsx
 +++ b/web/src/components/ToolsetConfigDrawer.tsx
 @@ -28,6 +28,106 @@ interface Props {
@@ -2397,15 +2397,15 @@ index 86ee09c26d..83d0de4566 100644
 +
 +const envLabels: Record<string, string> = {
 +  FIRECRAWL_API_URL: "(Firecrawl 서버 주소)",
-+  FIRECRAWL_API_KEY: "(Firecrawl API 키)",
-+  BRAVE_SEARCH_API_KEY: "(Brave Search API 키)",
-+  TAVILY_API_KEY: "(Tavily API 키)",
-+  SEARXNG_URL: "(SearXNG 서버 주소)",
-+  EXA_API_KEY: "(Exa API 키)",
-+  PARALLEL_API_KEY: "(Parallel API 키)",
-+  KEENABLE_API_KEY: "(Keenable API 키)",
-+  XAI_API_KEY: "(xAI API 키)",
-+  PERPLEXITY_API_KEY: "(Perplexity API 키)",
++  FIRECRAWL_API_KEY: "(Firecrawl API 키, 서비스 연결용 비밀 키)",
++  BRAVE_SEARCH_API_KEY: "(Brave Search API 키, 서비스 연결용 비밀 키)",
++  TAVILY_API_KEY: "(Tavily API 키, 서비스 연결용 비밀 키)",
++  SEARXNG_URL: "(SearXNG 검색 서버 주소)",
++  EXA_API_KEY: "(Exa API 키, 서비스 연결용 비밀 키)",
++  PARALLEL_API_KEY: "(Parallel API 키, 서비스 연결용 비밀 키)",
++  KEENABLE_API_KEY: "(Keenable API 키, 서비스 연결용 비밀 키)",
++  XAI_API_KEY: "(xAI API 키, 서비스 연결용 비밀 키)",
++  PERPLEXITY_API_KEY: "(Perplexity API 키, 서비스 연결용 비밀 키)",
 +};
 +
 +const envPrompts: Record<string, string> = {

@@ -83,14 +83,15 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..4d89b32e9c 100644
+index 18475fe8f4..69307a6fb2 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1948 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1949 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
 +const CONFIG_LABELS_KO: Record<string, string> = {
++  "attachments.storage": "첨부 파일 저장 위치",
 +  model: "주 대화 모델",
 +  "bedrock.region": "Bedrock region (AWS 요청 지역)",
 +  "bedrock.discovery.enabled": "Model discovery (사용 가능한 모델 자동 검색)",
@@ -1634,7 +1635,7 @@ index 18475fe8f4..4d89b32e9c 100644
 +  "database.journal_mode": "대화 데이터베이스가 쓰기 중에도 읽기 요청을 처리하는 방식을 정합니다. 데이터베이스 엔진이 지원하는 모드만 사용할 수 있습니다.",
 +  "database.wal_autocheckpoint": "데이터베이스 변경 기록을 본 파일에 합칠 기준 페이지 수입니다.",
 +  "database.journal_size_limit": "데이터베이스 변경 기록 파일이 사용할 수 있는 최대 크기(바이트)입니다.",
-+  "attachments.storage": "대화에 첨부한 파일을 저장할 위치나 저장 방식을 선택합니다.",
++  "attachments.storage": "대화에 올린 파일이나 붙여넣은 내용을 어디에 보관할지 정합니다. hermes-home(기본값)은 현재 프로필의 Hermes 홈 폴더에 저장해 격리된 실행 환경에서도 파일을 찾을 수 있게 합니다. workspace는 작업 폴더의 `.hermes/attachments`에 저장해 작업 파일과 함께 관리하기 쉽습니다. 다만 SSH 원격 폴더처럼 이 컴퓨터에서 쓸 수 없는 작업 공간이면 hermes-home에 저장합니다. 이 설정은 새로 첨부하는 파일의 위치만 정하며 기존 파일을 옮기지 않습니다.",
 +  "worktrees.archive_dirty": "사용하지 않는 작업 폴더에 커밋하지 않은 변경이 있어도 복구용으로 보관한 뒤 정리합니다. 끄면 변경된 폴더는 남겨 둡니다.",
 +  "worktrees.archive_max_file_mb": "작업 폴더를 보관할 때 포함할 수 있는 파일 하나의 최대 크기(MB)입니다. 큰 파일이 있으면 해당 폴더를 보존합니다.",
 +  "worktrees.archive_retention_days": "보관한 작업 폴더의 복구 기록을 유지할 기간(일)입니다. 0이면 자동 만료시키지 않습니다.",
@@ -2037,7 +2038,7 @@ index 18475fe8f4..4d89b32e9c 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1975,7 @@ function NestedValueEditor({
+@@ -42,7 +1976,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -2046,7 +2047,7 @@ index 18475fe8f4..4d89b32e9c 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1992,7 @@ function NestedValueEditor({
+@@ -59,7 +1993,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -2055,7 +2056,7 @@ index 18475fe8f4..4d89b32e9c 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +2021,7 @@ export function AutoField({
+@@ -88,8 +2022,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -2065,7 +2066,7 @@ index 18475fe8f4..4d89b32e9c 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +2054,7 @@ export function AutoField({
+@@ -122,7 +2055,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -2074,7 +2075,7 @@ index 18475fe8f4..4d89b32e9c 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +2115,7 @@ export function AutoField({
+@@ -183,7 +2116,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

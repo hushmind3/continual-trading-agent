@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..a536208893 100644
+index 18475fe8f4..b6e8118bf2 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1631 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1671 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -377,8 +377,8 @@ index 18475fe8f4..a536208893 100644
 +  "voice.voice_chat_mode": "음성 대화 처리 방식",
 +  "delegation.max_spawn_depth": "하위 에이전트 생성 단계 상한",
 +  "curator.prune_builtins": "기본 제공 항목 정리",
-+  "discord.allow_any_attachment": "첨부 파일 종류 제한 없음",
-+  "discord.voice_fx.duck_gain": "음성 재생 중 배경 소리 크기",
++  "discord.allow_any_attachment": "이전 버전 호환용 첨부 파일 옵션",
++  "discord.voice_fx.duck_gain": "음성 재생 중 배경음 음량",
 +  "gateway.auto_multiplex_migration": "여러 프로필 구성 자동 이전",
 +  "lsp.broken_retry_seconds": "LSP 오류 후 재시도 대기 시간(초)",
 +  "proxy.tunnel_port": "인증 정보 중계 터널 포트",
@@ -437,6 +437,46 @@ index 18475fe8f4..a536208893 100644
 +  "dashboard.public_url": "외부 접속용 대시보드 주소",
 +  "human_delay.min_ms": "최소 입력 지연(밀리초)",
 +  "human_delay.max_ms": "최대 입력 지연(밀리초)",
++  "discord.require_mention": "답변에 필요한 봇 멘션",
++  "discord.free_response_channels": "봇을 멘션하지 않아도 답할 채널",
++  "discord.allowed_channels": "봇 응답을 허용할 채널",
++  "discord.auto_thread": "멘션을 받으면 대화 스레드 자동 생성",
++  "discord.free_response_auto_thread": "멘션 없는 응답마다 스레드 생성",
++  "discord.thread_require_mention": "대화 스레드에서도 봇 멘션 요구",
++  "discord.bots_require_inline_mention": "다른 봇 호출 때 본문에 멘션 요구",
++  "discord.history_backfill": "응답 전 최근 대화 기록 확인",
++  "discord.history_backfill_limit": "응답 전 확인할 최근 메시지 수",
++  "discord.missed_message_backfill.enabled": "놓친 메시지 다시 처리",
++  "discord.missed_message_backfill.channels": "놓친 메시지를 다시 확인할 채널",
++  "discord.missed_message_backfill.window_seconds": "놓친 메시지를 찾을 과거 시간 범위(초)",
++  "discord.missed_message_backfill.limit": "재연결 때 확인할 메시지 최대 수",
++  "discord.missed_message_backfill.max_dispatches": "재연결 때 다시 처리할 메시지 최대 수",
++  "discord.missed_message_backfill.max_attempts": "메시지별 재처리 최대 횟수",
++  "discord.reactions": "메시지 처리 상태 반응 표시",
++  "discord.websocket_liveness_interval_seconds": "Discord 연결 점검 간격(초)",
++  "discord.websocket_liveness_failure_threshold": "끊김 판정 전 연속 점검 실패 수",
++  "discord.websocket_heartbeat_ack_max_age_seconds": "마지막 연결 확인 응답 허용 시간(초)",
++  "discord.websocket_max_latency_seconds": "최대 연결 응답 지연(초)",
++  "discord.websocket_event_max_silence_seconds": "Discord 이벤트 무응답 허용 시간(초)",
++  "discord.dm_role_auth_guild": "개인 메시지에서 역할 인증을 인정할 서버 ID",
++  "discord.server_actions": "봇에 허용할 서버 관리 작업",
++  "discord.max_attachment_bytes": "첨부 파일 최대 크기(바이트)",
++  "discord.approval_mentions": "승인 요청을 알릴 사용자 멘션",
++  "discord.voice_channel_inactivity_timeout_seconds": "음성 채널에서 나가기까지 대기 시간(초)",
++  "discord.voice_playback_timeout_seconds": "음성 답변 재생 제한 시간(초)",
++  "discord.voice_fx.enabled": "Discord 음성 믹서 사용",
++  "discord.voice_fx.ambient_enabled": "작업 중 배경음 재생",
++  "discord.voice_fx.ambient_path": "작업 중 배경음 파일 경로",
++  "discord.voice_fx.ambient_gain": "작업 중 배경음 음량",
++  "discord.voice_fx.speech_gain": "음성 답변·안내 음량",
++  "discord.voice_fx.ack_enabled": "도구 작업 시작 음성 안내",
++  "discord.voice_fx.ack_phrases": "작업 시작 때 읽을 짧은 안내 문구",
++  "telegram.reactions": "메시지 처리 상태 반응 표시",
++  "telegram.allowed_chats": "답변을 허용할 Telegram 그룹 대화 ID",
++  "telegram.extra.rich_messages": "표·목록 등을 지원하는 새 Telegram 메시지 형식",
++  "telegram.extra.rich_drafts": "생성 중 답변 미리보기에 새 서식 사용",
++  "telegram.extra.allow_cjk_rich_messages": "한국어·중국어·일본어 새 서식 지원",
++  "telegram.extra.dm_topic_auto_transfer": "개인 대화 메시지를 새 주제로 옮기기",
 +};
 +
 +const CONFIG_LABEL_WORDS_KO: Record<string, string> = {
@@ -1720,7 +1760,7 @@ index 18475fe8f4..a536208893 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1658,7 @@ function NestedValueEditor({
+@@ -42,7 +1698,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1729,7 +1769,7 @@ index 18475fe8f4..a536208893 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1675,7 @@ function NestedValueEditor({
+@@ -59,7 +1715,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1738,7 +1778,7 @@ index 18475fe8f4..a536208893 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1704,7 @@ export function AutoField({
+@@ -88,8 +1744,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1748,7 +1788,7 @@ index 18475fe8f4..a536208893 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1737,7 @@ export function AutoField({
+@@ -122,7 +1777,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1757,7 +1797,7 @@ index 18475fe8f4..a536208893 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1798,7 @@ export function AutoField({
+@@ -183,7 +1838,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

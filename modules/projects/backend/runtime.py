@@ -34,7 +34,8 @@ class AppWorker:
             arguments = [str(python), '-I', '-X', 'utf8', '-B', str(Path(__file__).with_name('mcp_worker.py')), json.dumps(command(source, spec))]
         elif spec['kind'] == 'node-http':
             import shutil
-            node = shutil.which('node')
+            node = environment.get('PLATFORM_NODE_EXECUTABLE') or shutil.which('node')
+            if node and not Path(node).is_file(): raise ValueError('지정한 Node.js 실행 파일이 없습니다.')
             if not node: raise ValueError('Node.js 실행 환경이 없습니다.')
             arguments = [node, str(Path(__file__).with_name('node_http_worker.cjs')), str(folder), spec['entry']]
         else:
@@ -179,7 +180,8 @@ def render_html(text, identifier, has_api, korean=False):
     bridge = '<script>' + Path(__file__).with_name('assets_bridge.js').read_text(encoding='utf8').replace('__PROJECT_ID__', json.dumps(identifier)) + '</script>' if has_api else ''
     text = re.sub(r'<base\b[^>]*>', '', text, flags=re.I)
     if has_api:
-        text = re.sub(r'((?:href|src|action)\s*=\s*[\"\'])/(?!/)', lambda m: m[1] + '/assets/projects/' + identifier + '/', text, flags=re.I)
+        text = re.sub(r'((?:href|src|action)\s*=\s*[\"\'])/(?!/|assets/projects/' + re.escape(identifier) + r'/)',
+                      lambda m: m[1] + '/assets/projects/' + identifier + '/', text, flags=re.I)
     return re.sub(r'(<head\b[^>]*>)', lambda match: match[1] + base + bridge, text, count=1, flags=re.I) if '<head' in text.lower() else base + bridge + text
 
 
@@ -202,7 +204,8 @@ def verify_ui(source, spec, environment, run, project_id='verification'):
         'python': sys.executable, 'environment': environment, 'screenshot': str(source.parent / 'ui-verification.png'),
         'index_html': render_html(index, project_id, spec['kind'] in ('fastapi', 'node-http'))}
     if spec['kind'] == 'node-http':
-        config['node_app'] = {'folder': str(owned(source, spec.get('directory', '.'))), 'entry': spec['entry']}
+        config['node_app'] = {'folder': str(owned(source, spec.get('directory', '.'))), 'entry': spec['entry'],
+                              'node': environment.get('PLATFORM_NODE_EXECUTABLE') or shutil.which('node')}
     if spec['kind'] == 'fastapi':
         from .python_packages import folder as packages
         config['app'] = {'folder': str(owned(source, spec.get('directory', '.'))), 'target': spec['app'], 'packages': str(packages(source))}

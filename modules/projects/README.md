@@ -8,6 +8,10 @@
 
 Node 서버와 Vite 화면을 함께 가진 앱도 원본 서버를 포함해 설치합니다. 화면의 API 요청은 기존 단일 `/api`로 전달하며 앱별 웹 포트를 추가하지 않습니다. 실패 후 **다시 시도**는 내려받은 소스·준비된 Node 의존성과 빌드 결과에서 이어갑니다. 연결 구현과 제한은 [백엔드 안내](backend/README.md)를 따릅니다.
 
+FreeLLMAPI 로컬 설치는 `runtime/projects/manage/projects/freellmapi/`가 소유합니다. 원본은 `versions/version-1/source/`, 사용자 DB는 `data/`에 보존하며 키와 암호화 설정은 비공개 설치 레코드로 관리합니다. 원본이 지원하는 기존 OpenClaw Node 24 실행기와 설치된 Brave를 검증에 재사용합니다. 별도의 Chrome 설치나 업체 계정 자동 가입은 수행하지 않습니다. FreeLLMAPI는 업체별 API 키를 통합 사용하는 앱이며, 설치만으로 업체 계정·키가 생기지는 않습니다.
+
+실제 확인(2026-10-24): 원본 서버·화면 검증 통과, 설치 상태 `ready`·메뉴 연결 완료. `#projects/app/p_tashfeenahmed_freellmapi_7e9a60d5`에서 원본의 첫 관리자 계정 생성 화면을 확인했습니다. 관리자 계정 생성·업체별 가입·API 키 입력·모델 호출은 미실행입니다. Node 실행기를 소유한 OpenClaw 도구 폴더를 제거하면 이 설치의 실행 경로도 함께 변경해야 합니다.
+
 ## 구현과 연결
 
 - `backend/adapters.py`, `node_mcp.py`: 정적 HTML·Vite·FastAPI·Python CLI·Node stdio MCP·플랫폼 모듈 탐지. MCP는 원본 manifest의 정확한 npm 버전과 배포 저장소를 확인합니다.

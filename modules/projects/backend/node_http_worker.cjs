@@ -59,7 +59,8 @@ async function main(){
  const folder=path.resolve(process.argv[2]),entry=path.resolve(folder,process.argv[3]);
  if(!entry.startsWith(folder+path.sep))throw Error('프로젝트 밖의 Node 진입점입니다.');
  process.chdir(folder);await import(pathToFileURL(entry).href);
- if(!server)throw Error('원본 Node 앱이 HTTP 서버를 시작하지 않았습니다.');
+ // Async entry points may finish DB preparation after their module import resolves.
+ // call() already waits for the real listening event with a bounded timeout.
  const input=readline.createInterface({input:process.stdin});
  for await(const line of input){try{write(JSON.stringify(await call(JSON.parse(line)))+'\n')}catch(error){write(JSON.stringify({error:error.message})+'\n')}}
  server.close();process.exit(0);

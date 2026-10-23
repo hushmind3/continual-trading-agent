@@ -4,13 +4,14 @@ const {chromium}=require('@playwright/test');
 async function main(){
  const cfg=JSON.parse(fs.readFileSync(process.argv[2],'utf8')),origin='http://project.invalid',errors=[],prefix='/assets/projects/'+cfg.project_id+'/';
  let worker,reader;const pending=[];
- if(cfg.app||cfg.node_app){worker=cfg.node_app?spawn(process.execPath,[path.join(__dirname,'node_http_worker.cjs'),cfg.node_app.folder,cfg.node_app.entry],{env:{...process.env,...cfg.environment},stdio:['pipe','pipe','inherit']}):spawn(cfg.python,['-I','-X','utf8','-B',path.join(__dirname,'app_worker.py'),cfg.app.folder,cfg.app.target,...(cfg.app.packages?[cfg.app.packages]:[])],{env:{...process.env,...cfg.environment,PYTHONUTF8:'1'},stdio:['pipe','pipe','inherit']});
+ if(cfg.app||cfg.node_app){worker=cfg.node_app?spawn(cfg.node_app.node||process.execPath,[path.join(__dirname,'node_http_worker.cjs'),cfg.node_app.folder,cfg.node_app.entry],{env:{...process.env,...cfg.environment},stdio:['pipe','pipe','inherit']}):spawn(cfg.python,['-I','-X','utf8','-B',path.join(__dirname,'app_worker.py'),cfg.app.folder,cfg.app.target,...(cfg.app.packages?[cfg.app.packages]:[])],{env:{...process.env,...cfg.environment,PYTHONUTF8:'1'},stdio:['pipe','pipe','inherit']});
   reader=readline.createInterface({input:worker.stdout});reader.on('line',line=>{try{const next=pending.shift();if(next)next.resolve(JSON.parse(line))}catch(e){errors.push(e.message)}});
   worker.on('exit',()=>{for(const job of pending.splice(0))job.reject(Error('앱 실행기가 종료됐습니다.'))});
  }
  const call=payload=>new Promise((resolve,reject)=>{if(!worker)return reject(Error('API 실행기가 없습니다.'));pending.push({resolve,reject});worker.stdin.write(JSON.stringify(payload)+'\n')});
- const browser=await chromium.launch({headless:true});
- try{const page=await browser.newPage();page.on('pageerror',e=>errors.push(e.message));
+ let browser;
+ try{browser=await chromium.launch({headless:true,...(cfg.environment.PLATFORM_VERIFY_BROWSER_EXECUTABLE?{executablePath:cfg.environment.PLATFORM_VERIFY_BROWSER_EXECUTABLE}:{})});
+  const page=await browser.newPage();page.on('pageerror',e=>errors.push(e.message));
   page.on('requestfailed',r=>errors.push(r.url()+': '+r.failure()?.errorText));
   await page.route(origin+'/**',async route=>{try{const request=route.request(),url=new URL(request.url());
    if(url.pathname==='/api'){
@@ -44,6 +45,6 @@ async function main(){
   await page.screenshot({path:cfg.screenshot,fullPage:false});
   if(errors.length)throw Error([...new Set(errors)].join('\n'));
   console.log('UI_VERIFIED: original page rendered; no JavaScript or resource failures');
- }finally{await browser.close();reader?.close();if(worker){worker.stdin.end();const killer=setTimeout(()=>worker.kill(),3000);killer.unref()}}
+ }finally{await browser?.close();reader?.close();if(worker){worker.stdin.end();const killer=setTimeout(()=>worker.kill(),3000);killer.unref()}}
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1});

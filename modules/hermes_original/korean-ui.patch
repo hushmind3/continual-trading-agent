@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..6b5cf90c54 100644
+index 18475fe8f4..d9e6bbc808 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1965 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -568,7 +568,7 @@ index 18475fe8f4..6b5cf90c54 100644
 +  "updates.non_interactive_local_changes": "확인창 없는 업데이트 때 변경사항 처리",
 +  "updates.auto_switch_parked_branch": "보류된 브랜치로 자동 전환",
 +  "updates.parked_branch_strategy": "보류 브랜치 처리 방식",
-+  "updates.refresh_cua_driver": "CUA 드라이버 새로고침",
++  "updates.refresh_cua_driver": "CUA(화면·키보드·마우스 제어) 드라이버 새로고침",
 +  paste_collapse_threshold: "여러 줄 붙여넣기를 파일로 바꿀 기준",
 +  paste_collapse_threshold_fallback: "붙여넣기 감지가 안 될 때 파일로 바꿀 기준",
 +  paste_collapse_char_threshold: "글자 수로 붙여넣기를 파일로 바꿀 기준",

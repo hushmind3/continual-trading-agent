@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..e51397d0cc 100644
+index 18475fe8f4..0f7cd48c43 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1732 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1737 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -100,6 +100,11 @@ index 18475fe8f4..e51397d0cc 100644
 +  "bedrock.guardrail.guardrail_version": "Guardrail version (안전 규칙 버전)",
 +  "bedrock.guardrail.stream_processing_mode": "Stream processing mode (실시간 검사 방식)",
 +  "bedrock.guardrail.trace": "Guardrail trace (안전 검사 기록)",
++  "display.interface": "Interface (터미널에서 사용할 대화 화면)",
++  "display.cli_layout": "CLI layout (명령줄 화면 배치)",
++  "display.tui_native": "Native TUI (터미널 자체 화면 사용)",
++  "display.language": "UI language (고정 안내 문구 언어)",
++  "display.reasoning_style": "Reasoning style (추론 요약 표시 모양)",
 +  "fallback.min_switch_reset_seconds": "대체 제공자 전환 기준 초기화 시간(초)",
 +  "runtime.nofile_soft_limit": "프로세스가 열 수 있는 파일 수의 완화된 상한",
 +  "checkpoints.enabled": "복구 지점 저장 사용 여부",
@@ -269,7 +274,7 @@ index 18475fe8f4..e51397d0cc 100644
 +  "terminal.docker_snap_compat": "Snap 설치 Docker 호환 처리",
 +  "terminal.docker_shared_container_key": "프로필 간 격리 환경 공유 키",
 +  "terminal.persistent_shell": "명령 사이에 셸 상태 유지",
-+  "display.resume_display": "이전 대화 기록 표시 방식",
++  "display.resume_display": "이전 대화를 다시 열 때 표시 방식",
 +  "display.busy_input_mode": "작업 중 새 입력 처리 방식",
 +  "display.skin": "터미널 화면 테마",
 +  "dashboard.theme": "웹 대시보드 테마",
@@ -423,13 +428,13 @@ index 18475fe8f4..e51397d0cc 100644
 +  "display.reasoning_full": "추론 요약 전체 표시",
 +  "display.persistent_output": "터미널 기록 다시 표시",
 +  "display.persistent_output_max_lines": "다시 표시할 기록 최대 줄 수",
-+  "display.cli_rebuild_scrollback_on_redraw": "화면 다시 그릴 때 터미널 기록 복원",
-+  "display.persist_prompts": "승인·추가 질문 기록 보존",
++  "display.cli_rebuild_scrollback_on_redraw": "화면 갱신 때 터미널 기록 비우기",
++  "display.persist_prompts": "승인·질문 처리 결과 기록",
 +  "display.show_commentary": "중간 진행 설명 표시",
 +  "display.spinner_token_flow": "대기 표시 옆 생성 토큰 수",
 +  "display.tool_progress_grouping": "도구 진행 내용 묶는 방식",
 +  "display.ephemeral_system_ttl": "임시 안내 자동 삭제까지 시간(초)",
-+  "display.tui_status_indicator": "TUI 작업 상태 표시 모양",
++  "display.tui_status_indicator": "작업 중 표시 모양",
 +  "display.suppress_warning_notifications": "경고 알림 숨기기",
 +  "display.turn_summary": "대화 차례 요약 표시",
 +  "display.credits_notices": "사용량 안내 표시",
@@ -439,7 +444,7 @@ index 18475fe8f4..e51397d0cc 100644
 +  "display.file_mutation_verifier": "파일 수정 결과 확인 경고",
 +  "display.show_cost": "예상 비용 표시",
 +  "display.focus_saved_tool_progress": "집중 화면 종료 후 도구 진행 표시",
-+  "display.final_response_markdown": "최종 답변 Markdown 표시 방식",
++  "display.final_response_markdown": "최종 답변 Markdown 서식 처리 방식",
 +  "display.resume_max_assistant_lines": "이전 에이전트 답변 최대 줄 수",
 +  "display.resume_max_assistant_chars": "이전 에이전트 답변 최대 글자 수",
 +  "display.resume_max_user_chars": "이전 사용자 메시지 최대 글자 수",
@@ -927,8 +932,8 @@ index 18475fe8f4..e51397d0cc 100644
 +  "local_runtime.models_max": "동시에 띄워 둘 수 있는 로컬 모델 수의 상한입니다.",
 +  "local_runtime.port": "로컬 모델 서비스가 사용할 네트워크 포트입니다. 0이면 실행할 때 사용 가능한 포트를 찾습니다.",
 +  "local_runtime.detect_ports": "시작할 때 사용할 수 있는 포트를 찾아 중복 실행을 피합니다.",
-+  "display.resume_display": "이전 대화를 다시 열 때 기록을 모두 표시할지, 일부만 표시할지, 표시하지 않을지 정합니다.",
-+  "display.busy_input_mode": "에이전트가 작업 중일 때 새 입력을 현재 작업에 전달할지, 다음 차례에 대기시킬지, 현재 작업을 중단하고 새 요청으로 바꿀지 정합니다.",
++  "display.resume_display": "이전 대화를 다시 열 때 화면에 보여 줄 기록의 양을 정합니다. full은 최근 대화 내용을 다시 보여 주고, minimal은 기록 요약 패널을 생략합니다. 대화 기록을 모델에 불러올지와는 별개의 화면 설정입니다.",
++  "display.busy_input_mode": "에이전트가 답변을 만드는 중 새 메시지가 오면 어떻게 할지 정합니다. interrupt는 현재 작업을 멈추고 새 요청을 처리하고, queue는 현재 작업 뒤에 처리하며, steer는 현재 작업을 계속하면서 새 지시를 전달합니다.",
 +  "display.skin": "터미널에서 Hermes가 사용하는 글꼴·색상 등 화면 모양을 정합니다.",
 +  "display.compact": "화면에서 여백과 보조 표시를 줄여 더 간결하게 보여줍니다.",
 +  "display.personality": "답변의 말투와 성격을 정하는 내장 또는 사용자 지정 프리셋을 선택합니다.",
@@ -938,51 +943,51 @@ index 18475fe8f4..e51397d0cc 100644
 +  "display.resume_max_assistant_lines": "이전 대화 요약에서 마지막이 아닌 에이전트 답변 하나에 표시할 최대 줄 수입니다.",
 +  "display.resume_skip_tool_only": "켜면 답변 없이 도구만 호출한 대화 항목을 요약에서 생략합니다.",
 +  "display.busy_steer_ack_enabled": "켜면 진행 중인 작업에 새 지시를 전달했을 때 알림 말풍선을 표시합니다. 끄더라도 지시 전달은 계속됩니다.",
-+  "display.cli_multiline_shortcuts": "CLI에서 여러 줄 입력을 만들 때 Ctrl+J, Shift+Enter, 줄 끝 역슬래시 같은 단축키를 사용합니다.",
-+  "display.interface": "hermes 명령을 실행할 기본 터미널 화면을 대화형 CLI 또는 TUI로 정합니다.",
-+  "display.cli_layout": "대화형 CLI의 입력창과 상태 표시 배치를 현대식 또는 기존 상자형으로 정합니다.",
-+  "display.tui_native": "TUI가 터미널 기본 화면과 스크롤 기록을 사용하도록 합니다.",
-+  "display.tui_auto_resume_recent": "TUI를 시작할 때 가장 최근의 사용자 대화를 자동으로 이어 엽니다.",
++  "display.cli_multiline_shortcuts": "CLI(명령줄 화면)에서 Ctrl+J는 새 줄을 넣고, 줄 끝의 역슬래시 뒤에 Enter를 누르면 입력을 이어 씁니다. Shift+Enter도 별도 입력으로 처리합니다. 끄면 일부 터미널에서 Ctrl+J 입력이 전송 키로 처리될 수 있습니다.",
++  "display.interface": "`hermes` 명령을 실행할 터미널 대화 화면을 고릅니다. cli는 한 화면에서 입력하고 답하는 방식이고, tui는 화면을 여러 영역으로 나눠 보여 주는 TUI(터미널 UI)입니다.",
++  "display.cli_layout": "CLI(명령줄 화면)에서 입력창과 상태 표시를 배치하는 모양을 고릅니다. modern은 간결한 줄 형태, classic은 상자 테두리로 구분하는 형태입니다.",
++  "display.tui_native": "TUI(터미널 UI)를 터미널의 기본 화면에 표시합니다. 켜면 터미널 자체의 이전 화면 기록을 위로 올려 볼 수 있고, 끄면 별도 화면 영역을 사용합니다.",
++  "display.tui_auto_resume_recent": "TUI(터미널 UI)를 시작할 때 가장 최근에 사용자가 진행한 대화를 자동으로 이어 엽니다. 끄면 새 대화 화면으로 시작합니다.",
 +  "display.resume_last_session": "데스크톱 앱을 다시 열 때 마지막으로 보던 대화나 화면을 복원합니다.",
 +  "display.tui_agents_nudge": "처음 하위 에이전트에 작업을 맡길 때 진행 상황을 보는 방법을 한 번 안내합니다.",
 +  "display.bell_on_complete": "작업이 끝났을 때 터미널 알림음을 울립니다.",
 +  "display.bell_on_prompt": "승인이나 추가 설명을 기다리는 질문이 나타날 때 터미널 알림음을 울립니다.",
 +  "display.show_reasoning": "모델이 답을 만드는 동안 추론 내용을 실시간으로 표시합니다. 도구 실행 기록 표시와는 별도 설정입니다.",
-+  "display.reasoning_full": "답변 뒤에 표시하는 추론 요약을 정해진 줄 수로 줄이지 않고 모두 보여줍니다.",
-+  "display.memory_notifications": "대화 중 기억 내용이 갱신되었을 때 알리는 정도를 정합니다. 알림을 꺼도 기억 검토 작업은 계속됩니다.",
-+  "display.background_process_notifications": "백그라운드 명령이 끝날 때 실행 중 알림과 최종 결과를 어느 정도 보여줄지 정합니다.",
++  "display.reasoning_full": "답변 뒤에 표시하는 모델의 추론 요약을 줄여 보여주지 않고 전체 표시합니다. 모델이 추론 내용을 보내지 않으면 표시할 내용이 없습니다.",
++  "display.memory_notifications": "대화 중 기억을 자동으로 다듬은 뒤 알림을 얼마나 보여줄지 정합니다. off는 알림만 끄고 검토는 계속하며, on은 '기억을 갱신했습니다'라는 안내를, verbose는 갱신한 내용의 미리보기를 표시합니다. 메신저별 설정은 display.platforms 아래에서 따로 정할 수 있습니다.",
++  "display.background_process_notifications": "백그라운드로 실행한 명령의 진행·완료 알림 방식을 정합니다. concise는 완료 한 줄(실패하면 출력 일부 포함), all은 실행 중 알림과 최종 출력, result는 최종 출력만, error는 실패한 경우에만 출력, off는 알림을 표시하지 않습니다.",
 +  "display.streaming": "모델이 답을 생성하는 동안 완성된 문장을 기다리지 않고 내용을 순서대로 표시합니다.",
 +  "display.timestamps": "대화 메시지에 작성 시각을 함께 표시합니다.",
 +  "display.timestamp_format": "메시지 시각을 표시할 때 사용할 시간 형식입니다. 예: %H:%M은 시와 분을 표시합니다.",
-+  "display.final_response_markdown": "최종 답변에 포함된 Markdown 표기(제목·목록·코드 등)를 화면에서 처리하는 방식을 정합니다.",
-+  "display.persistent_output": "CLI 화면을 지우거나 크기를 바꾼 뒤에도 이전 출력 내용을 다시 표시합니다.",
++  "display.final_response_markdown": "최종 답변의 Markdown(제목·목록·코드 같은 문서 서식)을 터미널에서 처리하는 방식을 정합니다. render는 서식대로 꾸미고, strip은 서식 기호를 지우며, raw는 받은 문자를 그대로 표시합니다.",
++  "display.persistent_output": "classic CLI(명령줄 화면)에서 화면을 지우거나 창 크기를 바꾼 뒤에도 이전 출력 내용을 다시 그려 보여줍니다.",
 +  "display.persistent_output_max_lines": "화면을 다시 그릴 때 복원할 이전 출력의 최대 줄 수입니다.",
-+  "display.cli_rebuild_scrollback_on_redraw": "CLI 화면을 다시 그릴 때 터미널의 스크롤 기록도 함께 지웁니다.",
-+  "display.persist_prompts": "승인·추가 질문을 기다리는 내용을 한 줄 요약으로 터미널 기록에 남깁니다.",
-+  "display.inline_diffs": "파일을 수정하는 도구가 변경한 내용을 답변 안에 간단한 비교 형태로 표시합니다.",
++  "display.cli_rebuild_scrollback_on_redraw": "classic CLI(명령줄 화면)를 전체 다시 그릴 때 터미널의 이전 스크롤 기록도 비웁니다. 화면 잔상이 스크롤 기록에 남는 터미널에서만 켜세요.",
++  "display.persist_prompts": "승인이나 추가 질문 창이 닫힌 뒤에도 요청 내용과 처리 결과를 한 줄로 터미널 기록에 남깁니다. 꺼도 승인·질문 기능 자체는 계속 동작합니다.",
++  "display.inline_diffs": "write_file·patch·skill_manage 도구가 파일을 바꿀 때 변경 전후 차이를 답변에 간단히 표시합니다. 파일 수정은 그대로 진행되고, 이 설정은 변경 내용의 표시 여부만 바꿉니다.",
 +  "display.file_mutation_verifier": "파일 수정이 실패한 채 끝났는데 성공한 것처럼 답하는 경우 최종 답변에 경고를 덧붙입니다.",
-+  "display.credits_notices": "Nous 크레딧 사용 가능량이 줄거나 소진·복구될 때 상태 알림을 표시합니다.",
-+  "display.turn_completion_explainer": "응답을 만들지 못한 채 대화 차례가 끝났을 때 빈 응답 대신 이유를 설명합니다.",
++  "display.credits_notices": "Nous 크레딧 사용량 구간이 바뀌거나 지급된 크레딧이 소진·복구될 때 상태 알림을 표시합니다. 끄면 알림만 숨기며 잔액 조회와 `/usage`는 계속 쓸 수 있습니다.",
++  "display.turn_completion_explainer": "재시도 뒤에도 답변이 비었거나, 응답이 중간에 끊겼거나, 도구 결과를 기다리거나, 반복·사용량 한도에 걸려 차례가 끝났을 때 빈 답변 대신 이유를 표시합니다.",
 +  "display.show_cost": "터미널 상태 표시줄에 추정 비용을 표시합니다.",
 +  "display.battery": "지원되는 기기에서 상태 표시줄에 배터리 잔량을 표시합니다.",
-+  "display.focus_view": "집중 화면을 켜 도구 진행 표시를 숨기고 현재 대화 차례에 집중하도록 합니다. 모델에 전달되는 내용은 바뀌지 않습니다.",
-+  "display.focus_saved_tool_progress": "집중 화면을 끌 때 복원할 도구 진행 표시 수준입니다.",
-+  "display.language": "일부 고정 안내 문구에 사용할 언어입니다. 에이전트 답변·로그·도구 출력의 언어를 바꾸지는 않습니다.",
-+  "display.tui_status_indicator": "TUI에서 작업 중임을 나타내는 표시 모양을 정합니다.",
++  "display.focus_view": "집중 화면을 켜면 도구 진행 줄을 숨기고 현재 대화 차례에 집중할 수 있습니다. 화면에만 적용되므로 모델에 전달되는 내용이나 도구 실행은 바뀌지 않습니다.",
++  "display.focus_saved_tool_progress": "집중 화면을 끄면 복원할 원래 도구 진행 표시 수준입니다. 집중 화면을 켜기 전 설정을 기억했다가 다시 적용합니다.",
++  "display.language": "승인 안내나 일부 메신저 명령 응답처럼 미리 정해진 문구에 사용할 언어입니다. 에이전트 답변·로그·도구 결과의 언어는 바꾸지 않습니다.",
++  "display.tui_status_indicator": "TUI(터미널 UI)에서 작업 중일 때 표시할 모양을 고릅니다. kaomoji는 문자 얼굴, emoji는 그림문자, unicode는 점자 무늬, ascii는 기본 영문 문자로 표시합니다.",
 +  "display.cli_refresh_interval": "대기 중인 CLI 화면과 상태 표시를 다시 그리는 간격(초)입니다. 0이면 주기적으로 다시 그리지 않습니다.",
 +  "display.vim_mode": "CLI 입력창에서 Vim 방식의 키 입력을 사용합니다.",
 +  "display.user_message_preview.first_lines": "CLI 기록에 사용자가 보낸 메시지의 처음부터 표시할 줄 수입니다.",
 +  "display.user_message_preview.last_lines": "CLI 기록에 사용자가 보낸 메시지의 끝부분에서 추가로 표시할 줄 수입니다.",
 +  "display.interim_assistant_messages": "작업 도중 도구 호출 사이에 에이전트가 보내는 진행 설명을 표시합니다.",
 +  "display.suppress_warning_notifications": "엔진의 경고·오류 알림을 숨깁니다. 작업 결과, 직접 실행한 명령, 기존 로그에는 적용되지 않습니다.",
-+  "display.show_commentary": "모델의 중간 진행 설명을 답변이 끝나기 전에 별도 메시지로 표시합니다.",
++  "display.show_commentary": "지원되는 모델의 진행 설명을 최종 답변 전에 별도 중간 메시지로 보여줍니다. 끄면 해당 설명을 추론 표시 쪽으로 보내며, 실제 모델 답변은 바꾸지 않습니다.",
 +  "display.tool_progress_command": "메신저 게이트웨이에서 /verbose 명령으로 도구 진행 표시를 바꿀 수 있게 합니다.",
-+  "display.tool_preview_length": "도구 진행 내용에서 미리 보여줄 도구 입력의 최대 글자 수입니다. 0은 길이 제한이 없다는 뜻입니다.",
-+  "display.friendly_tool_labels": "도구 이름 대신 '파일 읽는 중'처럼 이해하기 쉬운 진행 문구를 표시합니다.",
++  "display.tool_preview_length": "도구가 실행 중일 때 진행 표시 옆에 미리 보여줄 입력 내용의 최대 글자 수입니다. 0이면 글자 수로 자르지 않습니다.",
++  "display.friendly_tool_labels": "Hermes 기본 도구의 기술 이름을 '파일 읽는 중'처럼 알아보기 쉬운 문구로 바꿔 보여줍니다. 직접 추가한 도구·플러그인·MCP 도구는 원래 이름이나 미리보기를 사용합니다.",
 +  "display.turn_summary": "CLI에서 대화 차례가 끝난 뒤 걸린 시간과 파일·명령 처리량을 한 줄로 요약합니다.",
 +  "display.spinner_token_flow": "CLI에서 작업 중 표시 옆에 지금까지 생성한 답변 토큰 수를 표시합니다.",
-+  "display.tool_progress_grouping": "지원되는 메신저에서 여러 파일 수정 도구의 진행 내용을 한 메시지에 모을지 각각 보낼지 정합니다.",
-+  "display.reasoning_style": "메신저에서 추론 요약을 코드 블록·인용문·작은 글씨 중 어떤 모양으로 표시할지 정합니다.",
++  "display.tool_progress_grouping": "지원되는 메신저에서 여러 파일 수정 진행 알림을 모아 보낼지 정합니다. accumulate는 한 메시지를 갱신해 모으고, separate는 도구마다 새 메시지를 보냅니다. 도구 진행 표시도 켜져 있어야 적용됩니다.",
++  "display.reasoning_style": "메신저에서 모델의 추론 요약을 코드 블록·인용문·작은 글씨 중 어떤 모양으로 표시할지 정합니다. 모델이 추론 내용을 보내지 않으면 표시되지 않습니다.",
 +  "display.ephemeral_system_ttl": "지원되는 메신저에서 '새 대화 시작' 같은 임시 시스템 안내를 지우기까지 기다릴 시간(초)입니다. 0이면 자동으로 지우지 않습니다.",
 +  "display.platforms.telegram.streaming": "Telegram에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
 +  "display.platforms.discord.streaming": "Discord에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
@@ -1821,7 +1826,7 @@ index 18475fe8f4..e51397d0cc 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1759,7 @@ function NestedValueEditor({
+@@ -42,7 +1764,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1830,7 +1835,7 @@ index 18475fe8f4..e51397d0cc 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1776,7 @@ function NestedValueEditor({
+@@ -59,7 +1781,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1839,7 +1844,7 @@ index 18475fe8f4..e51397d0cc 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1805,7 @@ export function AutoField({
+@@ -88,8 +1810,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1849,7 +1854,7 @@ index 18475fe8f4..e51397d0cc 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1838,7 @@ export function AutoField({
+@@ -122,7 +1843,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1858,7 +1863,7 @@ index 18475fe8f4..e51397d0cc 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1899,7 @@ export function AutoField({
+@@ -183,7 +1904,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

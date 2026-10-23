@@ -1,8 +1,55 @@
-import { ServerResponse } from 'node:http';
+import { Server, ServerResponse } from 'node:http';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 const originalSetHeader = ServerResponse.prototype.setHeader;
 const platformOrigins = (process.env.PLATFORM_EMBED_ORIGINS || 'http://127.0.0.1:8766')
   .split(',').map((origin) => origin.trim()).filter(Boolean);
+let remoteCookieKey = '';
+try {
+  const access = JSON.parse(readFileSync(process.env.PLATFORM_REMOTE_ACCESS_FILE, 'utf8'));
+  remoteCookieKey = access.cookie_key || '';
+} catch {}
+
+function hasRemoteCookie(request) {
+  if (!remoteCookieKey) return false;
+  const value = request.headers.cookie?.split(';')
+    .map((part) => part.trim()).find((part) => part.startsWith('platform_access='))
+    ?.slice('platform_access='.length) || '';
+  const separator = value.indexOf('.');
+  if (separator < 1) return false;
+  const expires = value.slice(0, separator);
+  const supplied = Buffer.from(value.slice(separator + 1));
+  if (!/^\d+$/.test(expires) || Number(expires) < Date.now() / 1000) return false;
+  const expected = Buffer.from(createHmac('sha256', remoteCookieKey).update(expires).digest('hex'));
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+}
+
+function requireRemoteLogin(request, responseOrSocket, isUpgrade = false) {
+  const hostHeader = request.headers.host || '';
+  let url;
+  try { url = new URL(`https://${hostHeader}${request.url || '/'}`); } catch { return false; }
+  if (!url.hostname.endsWith('.ts.net') || hasRemoteCookie(request)) return false;
+  const next = `https://${url.host}${url.pathname}${url.search}`;
+  const login = new URL('/__remote_login', `https://${url.hostname}`);
+  login.searchParams.set('next', next);
+  if (isUpgrade) {
+    responseOrSocket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+  } else {
+    responseOrSocket.writeHead(303, { Location: login.toString(), 'Cache-Control': 'no-store' });
+    responseOrSocket.end();
+  }
+  return true;
+}
+
+const originalEmit = Server.prototype.emit;
+Server.prototype.emit = function (event, request, socket, head) {
+  if ((event === 'request' || event === 'upgrade') && request &&
+      requireRemoteLogin(request, socket, event === 'upgrade')) {
+    return true;
+  }
+  return originalEmit.call(this, event, request, socket, head);
+};
 
 ServerResponse.prototype.setHeader = function (name, value) {
   const request = this.req;

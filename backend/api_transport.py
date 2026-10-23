@@ -64,7 +64,7 @@ async def local_writes(request: Request, call_next):
     if method != "GET" and origin and origin not in {
         "http://127.0.0.1:5173", "http://localhost:5173",
         "http://127.0.0.1:8766", "http://localhost:8766"
-    }:
+    } and not getattr(request.state, 'remote_access_authenticated', False):
         return JSONResponse({"detail": "로컬 화면에서 요청하세요."}, status_code=403)
     if method!='GET':
         allowed_stop=path in ('/api/stop','/api/system/stop','/api/system/prepare-restart','/api/library/stop') or path.startswith('/api/controls/') and parameters.get('enabled') is False

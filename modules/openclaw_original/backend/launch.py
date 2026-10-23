@@ -86,6 +86,7 @@ def launch(arguments):
         'OPENCLAW_SKIP_CHANNELS': '1',
         'OPENCLAW_GATEWAY_PORT': '19021',
         'OPENCLAW_DISABLE_BONJOUR': '1',
+        'PLATFORM_REMOTE_ACCESS_FILE': str(ROOT / 'runtime/platform/remote_access.json'),
     })
     if arguments[:2] == ['gateway', 'run']:
         _prepare_embedded_gateway()

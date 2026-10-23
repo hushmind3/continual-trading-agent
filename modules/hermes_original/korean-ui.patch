@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..1f1b405a23 100644
+index 18475fe8f4..1b694793f2 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1965 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -558,7 +558,7 @@ index 18475fe8f4..1f1b405a23 100644
 +  mcp_discovery_timeout: "첫 답변 전에 MCP 도구를 기다릴 시간",
 +  mcp_single_query_discovery_timeout: "한 번 답하는 명령에서 MCP 도구를 기다릴 시간",
 +  prefill_messages_file: "매 요청에 넣을 예시 대화 파일",
-+  timezone: "시간대",
++  timezone: "예약 작업과 시각 표시에 쓸 시간대",
 +  command_allowlist: "확인 없이 자동 실행할 명령 목록",
 +  hooks_auto_accept: "셸 훅 실행 전 확인 생략",
 +  "doctor.live_probe_timeout": "상태 점검 실시간 확인 제한 시간",
@@ -1673,7 +1673,7 @@ index 18475fe8f4..1f1b405a23 100644
 +  "loops.max_ticks": "반복 실행 한 번에서 허용할 최대 실행 횟수입니다.",
 +  "loops.self_paced_floor_seconds": "반복 실행이 스스로 다음 실행 시간을 정할 때 사용할 시작 간격(초)입니다.",
 +  "loops.self_paced_ceiling_seconds": "반복 실행이 점차 간격을 늘릴 때 허용할 가장 긴 간격(초)입니다.",
-+  timezone: "예약 작업과 시각 표시에 적용할 표준 시간대 코드입니다. Asia/Seoul은 한국 표준시를 뜻합니다. 비우면 Hermes를 실행한 서버의 시간대를 사용합니다.",
++  timezone: "예약 작업을 실행할 현지 시각과 대화에 표시할 시간대입니다. IANA timezone(전 세계에서 쓰는 표준 시간대 이름) 형식으로 적습니다. 예: Asia/Seoul(한국 표준시), America/New_York(미국 뉴욕 시간). 비워 두면 Hermes가 실행되는 컴퓨터의 시간대를 사용합니다.",
 +  "mattermost.require_mention": "Mattermost 채널에서 봇을 멘션한 메시지에만 답합니다.",
 +  "mattermost.free_response_channels": "봇을 멘션하지 않아도 답할 Mattermost 채널 ID 목록입니다.",
 +  "mattermost.allowed_channels": "봇이 응답할 수 있는 Mattermost 채널 ID 허용 목록입니다. 비우면 목록으로 제한하지 않습니다.",

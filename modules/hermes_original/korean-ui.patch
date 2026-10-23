@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..07238967e2 100644
+index 18475fe8f4..dc63bd0ff8 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,9 +3,1135 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,9 +3,1155 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -362,6 +362,26 @@ index 18475fe8f4..07238967e2 100644
 +  single: "단일", query: "조회", exact: "동일한", sec: "초", avg: "평균",
 +  failures: "실패", cooldown: "재시도 대기", status: "상태", current: "현재",
 +  minimum: "최소", maximum: "최대",
++  same: "동일한", idempotent: "같은 결과를 내는", subagents: "하위 에이전트",
++  notices: "안내", target: "대상", tail: "최근 대화", protect: "보존",
++  first: "처음", gpt55: "GPT 5.5", autoraise: "자동 상향", notice: "안내",
++  responses: "Responses API", native: "기본 제공", region: "지역", filter: "필터",
++  refresh: "새로고침", guardrail: "안전 규칙", stream: "응답 흐름", trace: "추적 기록",
++  bell: "알림음", final: "최종", inline: "본문 안에", focus: "집중", flow: "흐름",
++  fields: "항목", compute: "계산", heartbeat: "연결 확인 신호", trusted: "신뢰할",
++  ping: "연결 확인", redact: "가리기", sample: "표본", optimize: "최적화",
++  latency: "응답 지연", ref: "참조", device: "장치", vad: "음성 활동 감지",
++  beep: "알림음", phrases: "문구", surface: "화면", start: "시작", child: "하위 에이전트",
++  children: "하위 에이전트", orchestrator: "작업 조율자", self: "자동", paced: "간격 조절",
++  preset: "설정 묶음", mentions: "멘션", reactions: "반응 표시", liveness: "작동 여부",
++  dm: "개인 대화", attachment: "첨부 파일", cjk: "한국어·중국어·일본어", rooms: "대화방",
++  deny: "거부", confirm: "확인", protected: "보호된", instruction: "지침",
++  profiles: "프로필", decompose: "하위 작업으로 나누기", same_tool: "같은 도구",
++  max_gap: "최대 간격", auto_continue: "자동 이어하기", min_idle: "최소 유휴 시간",
++  min_tail: "최근 대화 최소 분량", max_tail: "최근 대화 최대 분량", ws_orphan: "연결 끊긴 대화",
++  tool_progress: "도구 진행 상황", status_bar: "상태 표시줄", user_message: "사용자 메시지",
++  missed_message: "놓친 메시지", voice_fx: "음성 효과", ack_enabled: "작업 전 음성 안내",
++  startup_orphan: "시작 전 남은 대화", archive_ttl: "보관 만료 시간", auto_prune: "자동 정리",
 +};
 +
 +function configFieldLabel(schemaKey: string): string {
@@ -1223,7 +1243,7 @@ index 18475fe8f4..07238967e2 100644
  
    if (!keyPath && !description) return null;
  
-@@ -42,7 +1168,7 @@ function NestedValueEditor({
+@@ -42,7 +1188,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1232,7 +1252,7 @@ index 18475fe8f4..07238967e2 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1185,7 @@ function NestedValueEditor({
+@@ -59,7 +1205,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1241,7 +1261,7 @@ index 18475fe8f4..07238967e2 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1214,7 @@ export function AutoField({
+@@ -88,8 +1234,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1251,7 +1271,7 @@ index 18475fe8f4..07238967e2 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1247,7 @@ export function AutoField({
+@@ -122,7 +1267,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1260,7 +1280,7 @@ index 18475fe8f4..07238967e2 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1308,7 @@ export function AutoField({
+@@ -183,7 +1328,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

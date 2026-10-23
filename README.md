@@ -32,6 +32,8 @@
 
 기존 금융·REA·이식 Hermes는 각 모듈이 소스와 전용 패키지를 소유합니다. 원본 AI 연결은 `modules/ai_agent/<중메뉴>/` 안에 backend·frontend·패치·등록 정보를 함께 소유합니다. 나자릭의 실제 백엔드는 `backend/overlord/nazarick/`이며 등록·화면은 해당 모듈이 소유합니다.
 
+시장조사·사업 검토 등 실행 코드에서 사용하지 않는 결과물은 소스 배포에서 제외합니다. 새 결과물은 담당 메뉴의 `runtime/` 아래에 보관하고, 기존 루트 `research/` 자료는 로컬 `휴지통/research/`에 원래 상대 경로대로 보존했습니다. 루트 `research/`와 휴지통은 Git 추적 대상에서 제외합니다.
+
 ## GitHub에서 소스 받기
 
 ```sh

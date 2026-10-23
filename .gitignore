@@ -50,3 +50,6 @@ results/
 
 # Every module owns its installed Node packages; never publish installation output.
 node_modules/
+
+# Local research outputs are not platform source.
+/research/

@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..69307a6fb2 100644
+index 18475fe8f4..e2f1b2d375 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1949 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -1667,8 +1667,8 @@ index 18475fe8f4..69307a6fb2 100644
 +  "matrix.require_mention": "Matrix 방에서 봇을 멘션한 메시지에만 답합니다.",
 +  "matrix.free_response_rooms": "봇을 멘션하지 않아도 답할 Matrix 방 ID 목록입니다.",
 +  "matrix.allowed_rooms": "봇이 응답할 수 있는 Matrix 방 ID 허용 목록입니다. 비우면 목록으로 제한하지 않습니다.",
-+  command_allowlist: "승인 절차 없이 실행하도록 영구 허용한 위험 명령 패턴 목록입니다. 등록한 명령은 확인 없이 실행될 수 있습니다.",
-+  hooks_auto_accept: "셸 훅을 등록할 때 대화형 확인 없이 자동으로 허용합니다. 신뢰하는 훅만 등록된 경우에 사용하세요.",
++  command_allowlist: "모델이 실행하려는 터미널 명령 가운데, 매번 확인하지 않고 실행해도 되는 것을 등록하는 목록입니다. 여기에 등록한 명령은 이후 별도 승인 없이 실행됩니다. 명령이 할 일을 확인한 뒤 믿을 수 있는 항목만 추가하세요.",
++  hooks_auto_accept: "셸 훅(도구 실행 전후에 자동으로 실행되는 명령)을 등록할 때 확인을 생략하고 허용합니다. 훅이 어떤 명령을 실행하는지 확인하고 신뢰할 수 있는 경우에만 켜세요.",
 +  "auth.codex_login_flow": "Codex에 로그인할 방법입니다. device_code(웹사이트에 코드를 입력)는 기본 방식이고, browser(브라우저 로그인)는 로그인 결과를 이 컴퓨터로 돌려받습니다. 조직에서 기기 코드 로그인을 막았을 때 브라우저 방식을 쓸 수 있습니다.",
 +  "logging.max_size_mb": "각 로그 파일 하나가 이 크기(MB)에 도달하면 새 파일로 교체합니다. 기본값은 5MB입니다. 전체 로그 폴더의 총용량이 아니라 파일 하나의 교체 기준이며, 이전 파일을 몇 개 보관할지는 logging.backup_count가 정합니다.",
 +  "logging.backup_count": "로그 파일이 크기 한도에 도달해 교체될 때 남겨 둘 이전 파일 수입니다. 기본값은 파일마다 3개입니다. logging.max_size_mb와 함께 로그 보관량을 정합니다.",

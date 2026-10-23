@@ -54,6 +54,8 @@ git submodule update --init
 
 Git 복원은 소스 복원입니다. Python/Node 패키지·원본 PM 도구·모델·계정·사용자 데이터는 설치 또는 별도 준비가 필요합니다. 원본별 준비 방법과 실행 경계는 위 실제 백엔드 README를 따릅니다. Hermes 한국어 화면 변경은 상위 저장소의 패치로 보존하며 현재 공식 원본 bf0203a에 맞춰 적용·빌드했습니다. 이후 기준 버전이 다르면 패치를 건너뛰고 공식 원본을 실행합니다. 단순 언어 JSON만이 아니라 화면에 직접 작성된 문구와 설정 설명도 포함합니다.
 
+한국어 패치 별도 보관 폴더는 [`modules/ai_agent/HermesOriginal/patches/2026-10-24_한국어패치/`](modules/ai_agent/HermesOriginal/patches/2026-10-24_한국어패치/)입니다. 패치 사본과 복원 안내를 함께 보관하며, 현재 실행용 파일은 위 표의 한국어 화면 패치입니다.
+
 ## 설치와 실행
 
 - macOS: `설치.command` → `서버켜기.command`.

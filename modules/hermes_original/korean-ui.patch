@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..1788343094 100644
+index 18475fe8f4..2e2a6b0975 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1760 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1770 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -321,6 +321,16 @@ index 18475fe8f4..1788343094 100644
 +  "local_runtime.models_max": "Models max (동시에 메모리에 올릴 모델 수)",
 +  "local_runtime.port": "Port (로컬 모델 서버 포트)",
 +  "local_runtime.detect_ports": "Detect ports (외부 서버를 찾을 추가 포트)",
++  "streaming.enabled": "Streaming enabled (메신저 답변을 만드는 중에도 표시)",
++  "streaming.transport": "Transport (생성 중 답변을 임시로 보낼 방식)",
++  "streaming.edit_interval": "Edit interval (메시지 갱신 최소 간격)",
++  "streaming.buffer_threshold": "Buffer threshold (한 번 갱신할 글자 수)",
++  "streaming.cursor": "Cursor (생성 중 표시 끝에 붙일 기호)",
++  "streaming.fresh_final_after_seconds": "Fresh final after seconds (완료 답변을 새 메시지로 보낼 기준)",
++  "display.platforms.telegram.streaming": "Telegram streaming (텔레그램 생성 중 답변 표시)",
++  "display.platforms.discord.streaming": "Discord streaming (디스코드 생성 중 답변 표시)",
++  "display.platforms.slack.streaming": "Slack streaming (슬랙 생성 중 답변 표시)",
++  "display.platforms.wecom.streaming": "WeCom streaming (기업용 위챗 생성 중 답변 표시)",
 +  "context.engine": "대화 기록이 길어졌을 때 문맥을 관리하는 방식",
 +  "plugins.hook_callback_timeout": "플러그인 훅 실행 제한 시간",
 +  "plugins.load_timeout_seconds": "플러그인 불러오기 제한 시간",
@@ -1012,10 +1022,10 @@ index 18475fe8f4..1788343094 100644
 +  "display.tool_progress_grouping": "지원되는 메신저에서 여러 파일 수정 진행 알림을 모아 보낼지 정합니다. accumulate는 한 메시지를 갱신해 모으고, separate는 도구마다 새 메시지를 보냅니다. 도구 진행 표시도 켜져 있어야 적용됩니다.",
 +  "display.reasoning_style": "메신저에서 모델의 추론 요약을 코드 블록·인용문·작은 글씨 중 어떤 모양으로 표시할지 정합니다. 모델이 추론 내용을 보내지 않으면 표시되지 않습니다.",
 +  "display.ephemeral_system_ttl": "지원되는 메신저에서 '새 대화 시작' 같은 임시 시스템 안내를 지우기까지 기다릴 시간(초)입니다. 0이면 자동으로 지우지 않습니다.",
-+  "display.platforms.telegram.streaming": "Telegram에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
-+  "display.platforms.discord.streaming": "Discord에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
-+  "display.platforms.slack.streaming": "Slack에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
-+  "display.platforms.wecom.streaming": "WeCom에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
++  "display.platforms.telegram.streaming": "전역 생성 중 표시 기능(streaming.enabled)이 켜졌을 때 텔레그램에서 중간 답변을 보여줄지 정합니다. false면 텔레그램에서만 끄며, true로 설정해도 전역 기능이 꺼져 있으면 켜지지 않습니다.",
++  "display.platforms.discord.streaming": "전역 생성 중 표시 기능(streaming.enabled)이 켜졌을 때 디스코드에서 중간 답변을 보여줄지 정합니다. false면 디스코드에서만 끄며, true로 설정해도 전역 기능이 꺼져 있으면 켜지지 않습니다.",
++  "display.platforms.slack.streaming": "전역 생성 중 표시 기능(streaming.enabled)이 켜졌을 때 슬랙에서 중간 답변을 보여줄지 정합니다. false면 슬랙에서만 끄며, true로 설정해도 전역 기능이 꺼져 있으면 켜지지 않습니다.",
++  "display.platforms.wecom.streaming": "전역 생성 중 표시 기능(streaming.enabled)이 켜졌을 때 WeCom(기업용 위챗)에서 중간 답변을 보여줄지 정합니다. false면 WeCom에서만 끄며, true로 설정해도 전역 기능이 꺼져 있으면 켜지지 않습니다.",
 +  "display.runtime_footer.enabled": "메신저에 보내는 최종 답변 아래에 모델·문맥 사용량·작업 폴더 정보를 덧붙입니다.",
 +  "display.runtime_footer.fields": "최종 답변 아래에 표시할 실행 정보를 선택합니다. 목록 순서대로 출력됩니다.",
 +  "display.status_bar.fields": "CLI·TUI 상태 표시줄에 표시할 정보 항목을 지정합니다. 비우면 기본 항목을 사용합니다.",
@@ -1406,12 +1416,12 @@ index 18475fe8f4..1788343094 100644
 +  "tools.tool_search.listing_max_tokens": "검색 연결에 미리 넣는 도구 목록 설명의 절대 상한입니다. 기본값은 4,000토큰이며, threshold_pct로 계산한 상한보다 클 수 없습니다. 토큰은 모델이 글을 처리할 때 쓰는 단위라 글자 수와 정확히 같지 않습니다.",
 +  "tools.tool_search.defer": "처음부터 모델에 도구 설명을 모두 보내는 대신, 검색을 통해 필요할 때 불러올 도구 이름 목록입니다. 기본 목록에는 컴퓨터 조작이나 세션 검색처럼 상황에 따라 쓰는 도구가 들어갑니다. 직접 목록을 지정하면 기본 목록 전체를 대체하며, 빈 목록([])이면 모든 도구 설명을 처음부터 보냅니다. 도구 설치나 권한을 바꾸지는 않습니다.",
 +  "tools.connectors.enabled": "Hermes에 등록된 외부 서비스 연결 도구를 사용할 수 있게 합니다.",
-+  "streaming.enabled": "메신저 답변을 완성된 뒤 한 번에 보내지 않고 생성 중인 내용으로 갱신해 보여줍니다. 켠 뒤에는 게이트웨이를 재시작해야 할 수 있습니다.",
-+  "streaming.transport": "메신저에서 생성 중인 답변을 보여줄 때 임시 초안·메시지 수정 중 어떤 전송 방식을 쓸지 정합니다.",
-+  "streaming.edit_interval": "생성 중인 메시지를 다시 전송하거나 수정하기 사이에 둘 최소 시간(초)입니다.",
-+  "streaming.buffer_threshold": "이 글자 수만큼 답변이 쌓이면 생성 중 메시지를 갱신합니다.",
-+  "streaming.cursor": "아직 생성 중인 메시지 끝에 붙여 현재 작성 중임을 나타낼 문자입니다.",
-+  "streaming.fresh_final_after_seconds": "Telegram에서 생성 중 미리 보기가 이 시간 이상 보였으면 완료 답변을 새 메시지로 보냅니다. 0이면 기존 메시지를 갱신합니다.",
++  "streaming.enabled": "메신저 답변을 완성된 뒤 한 번에 보내지 않고 생성되는 중간 내용을 계속 보여줄지 정합니다. 기본값은 꺼짐입니다. 켜도 게이트웨이를 다시 시작해야 적용될 수 있습니다. display.platforms 아래 서비스별 설정은 전역 기능을 켜는 대신 해당 서비스에서 끌 수 있습니다.",
++  "streaming.transport": "생성 중 답변을 메신저에 임시로 보여주는 방식을 고릅니다. auto는 지원되는 텔레그램 개인 대화에서 임시 초안을 쓰고, 디스코드·슬랙·텔레그램 그룹 등에서는 메시지를 고쳐 보여줍니다. draft는 초안 전송을 우선하고 안 되면 메시지 수정으로 대체하며, edit는 계속 메시지를 수정합니다. off는 생성 중 표시를 끕니다. 이 설정만으로는 전역 streaming.enabled가 꺼진 상태에서 기능이 켜지지 않습니다.",
++  "streaming.edit_interval": "메시지를 수정해 생성 중 답변을 보여줄 때, 연속 수정 사이에 둘 최소 시간(초)입니다. 기본값은 0.8초입니다. 텔레그램 등 메신저의 과도한 수정 요청 제한을 피하는 데 쓰이며, 서버가 제한하면 실제 간격은 더 길어질 수 있습니다.",
++  "streaming.buffer_threshold": "메시지 수정 방식에서 답변이 이 글자 수만큼 쌓이면 중간 내용을 보내기 시작합니다. 기본값은 24자입니다. 짧은 답변도 빨리 보이게 하는 기준이며, 지원되는 네이티브 초안 전송은 매번의 수정 대기 제한을 따르지 않을 수 있습니다.",
++  "streaming.cursor": "답변 생성 중임을 나타내려고 임시 메시지 끝에 붙일 문자입니다. 기본값은 블록 모양 커서이며, 최종 답변을 보낼 때는 제거됩니다. 비우면 커서 표시를 붙이지 않습니다.",
++  "streaming.fresh_final_after_seconds": "텔레그램에서만 사용합니다. 생성 중 미리 보기가 이 시간(초) 이상 표시됐다면, 완료 답변을 기존 미리 보기 수정 대신 새 메시지로 보냅니다. 기본값 0은 새 메시지를 만들지 않고 기존 미리 보기를 완료 답변으로 바꿉니다. 다른 메신저는 이 값을 무시합니다.",
 +  "slack.require_mention": "Slack 채널에서 봇을 멘션한 메시지에만 답합니다. 멘션 없이 답할 채널은 free_response_channels에 지정할 수 있습니다.",
 +  "slack.free_response_channels": "봇을 멘션하지 않아도 답할 Slack 채널 ID 목록입니다. 쉼표로 구분합니다.",
 +  "slack.allowed_channels": "봇이 메시지를 받을 수 있는 Slack 채널 ID 허용 목록입니다. 비우면 이 목록으로 제한하지 않습니다.",
@@ -1849,7 +1859,7 @@ index 18475fe8f4..1788343094 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1787,7 @@ function NestedValueEditor({
+@@ -42,7 +1797,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1858,7 +1868,7 @@ index 18475fe8f4..1788343094 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1804,7 @@ function NestedValueEditor({
+@@ -59,7 +1814,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1867,7 +1877,7 @@ index 18475fe8f4..1788343094 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1833,7 @@ export function AutoField({
+@@ -88,8 +1843,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1877,7 +1887,7 @@ index 18475fe8f4..1788343094 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1866,7 @@ export function AutoField({
+@@ -122,7 +1876,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1886,7 +1896,7 @@ index 18475fe8f4..1788343094 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1927,7 @@ export function AutoField({
+@@ -183,7 +1937,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

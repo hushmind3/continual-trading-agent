@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "nazarick",
+  "group": {"id": "overlord", "title": "오버로드"},
+  "backend": {"namespace": "platform_plugins.nazarick", "entry": "manager"},
+  "frontend": {"entry": "frontend/register.ts"},
+  "data": ["runtime/overlord/nazarick"],
+  "legacy_shared_code": true,
+  "order": 35
+}

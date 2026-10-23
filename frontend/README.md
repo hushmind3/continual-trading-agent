@@ -11,6 +11,7 @@
 | 금융 화면 | [modules/finance/frontend/](../modules/finance/frontend/README.md) |
 | REA 화면 | [modules/rea/frontend/](../modules/rea/frontend/README.md) |
 | Hermes 화면 | [modules/hermes/frontend/](../modules/hermes/frontend/README.md) |
+| 오버로드 / 나자릭 | [modules/nazarick/frontend/](../modules/nazarick/frontend/README.md) |
 | 프로젝트 설치·앱 화면 | [modules/projects/](../modules/projects/README.md) |
 
 업무 화면은 각 모듈이 소유하며 호스트의 자동 등록기를 통해 연결합니다. 모듈이 없으면 그 모듈을 강제 import하지 않습니다. `@platform`은 `frontend/src` 별칭입니다. 모든 화면은 기존 `src/ui/` 공통 컴포넌트와 `src/tailwind.css`의 디자인 값을 사용합니다. 모듈별 임의 CSS나 별도 프론트 서버를 추가하지 않습니다. 업무 호출은 기존 단일 `/api`를 사용합니다.

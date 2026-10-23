@@ -8,6 +8,7 @@
 | [modules/rea/](../modules/rea/README.md) | 독립 REA 프로젝트: program_analysis/, project_explorer/ |
 | [modules/hermes/](../modules/hermes/README.md) | Hermes 프로그램: 엔진·채팅·모델·세션·MCP·스킬. 데이터는 runtime에 보존 |
 | [modules/projects/](../modules/projects/README.md) | 공개 GitHub 검색·주소 등록·설치·실행 확인·원본 화면 연결·분리 |
+| [오버로드](overlord/README.md) | 나자릭 중메뉴·공통 기반·연결 정의·등록 확인·기록 |
 | [platform_modules.py](platform_modules.py) | modules/*/module.json 탐색·Python 등록·실행 보호 훅 |
 | [menu_registry.py](menu_registry.py) | 모듈 등록 정보를 취합하는 총괄 |
 | [web_api.py](web_api.py) | 단일 /api 진입점; 총괄만 통해 기능 등록 |
@@ -35,6 +36,7 @@
 | runtime/rea/program_analysis/ | 분석 입력·도구·임시 자료 |
 | runtime/rea/project_explorer/projects/ | 저장한 분석 프로젝트 |
 | runtime/ai_agent/Hermes/ | 헤르메스 대화·세션·설정·MCP·스킬 |
+| runtime/overlord/nazarick/ | 나자릭 연결 정의·실제 확인 기록 |
 | runtime/shared/engines/ | 여러 메뉴가 공유하는 실행기 |
 
 별도 생성 파일이 없는 메뉴는 빈 런타임 폴더를 만들지 않습니다. 원본 모델과 모델별 JSON은 사용자 지정 모델 폴더를 사용하며 현재 Mac은 프로젝트 모델/을 사용합니다. 기존 런타임 이동은 development/scripts/runtime_layout.py가 담당하며 서버·감시기·작업 프로세스를 중지한 상태에서만 사용합니다. 같은 이름의 목적지가 있으면 덮어쓰지 않습니다. 원본 모델을 역직렬화하거나 변환하지 않습니다.

@@ -1,6 +1,6 @@
 # 프로젝트 플랫폼
 
-용도: 현재 실행 구조·소스 소유·설치 진입점을 안내합니다. 대메뉴는 금융·REA 역공학·AI 에이전트·GitHub입니다.
+용도: 현재 실행 구조·소스 소유·설치 진입점을 안내합니다. 대메뉴는 금융·REA 역공학·AI 에이전트·오버로드·GitHub입니다.
 
 | 위치 | 담당 |
 | --- | --- |
@@ -11,6 +11,7 @@
 | [금융](modules/finance/README.md) | 금융 소스·패키지·설정; [FinRL](modules/finance/backend/finrl/README.md) |
 | [REA](modules/rea/README.md) | 프로그램 분석·프로젝트 탐색; 외부 설치 앱 morluto/rea와 별개 |
 | [Hermes](modules/hermes/README.md) | 이식 엔진·대화·모델·작업 환경·MCP·스킬·프롬프트 |
+| [오버로드 / 나자릭](backend/overlord/nazarick/README.md) | 공급자 미정 공통 기반·연결 대상·등록 확인·작업 기록 |
 | [GitHub 프로젝트 관리](modules/projects/README.md) | 검색·설치·실행·분리·재연결·제거·지원 앱 ZIP 내보내기 |
 
 Mac 실행: **서버켜기.command**, 설치: **설치.command**. Windows 실행: **서버켜기.cmd**, 설치: **설치.cmd**. 세부 명령과 작업 보호는 [실행 안내](development/scripts/README.md)를 따릅니다.

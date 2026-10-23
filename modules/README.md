@@ -16,6 +16,8 @@ Hermes 코드는 hermes/backend와 hermes/frontend에 들어 있습니다. 원�
 
 금융과 REA의 실제 backend/frontend 소스는 각 modules/finance·modules/rea에 있습니다. 각 Python 가상환경, Node 패키지, 의존성 명세와 설정을 모듈 내부에 소유합니다. 이전 backend/stockrl·backend/rea에는 import 호환 연결만 남습니다. frontend/src/pages/finance·rea는 이동 안내 문서만 남겨, 모듈 폴더가 없어도 빌드가 중단되지 않습니다. 업무 구현을 두 곳에서 유지하지 않습니다. 호스트는 공통 UI/등록 규격과 IPC만 제공하고 업무 라이브러리를 import하지 않습니다.
 
+오버로드 → 나자릭은 [등록·화면](nazarick/README.md)과 [실제 백엔드](../backend/overlord/nazarick/README.md)를 연결합니다. 백엔드 중메뉴·소메뉴 소스는 `backend/overlord/nazarick/`, 데이터는 `runtime/overlord/nazarick/`이며 자동 등록 폴더에는 등록 연결과 화면만 둡니다.
+
 ## 최종 목표와 현재 경계
 
 외부 저장소의 최초 구조 분석·변환도 플랫폼이 수행해야 합니다. 사용자가 직접 어댑터를 만드는 것을 최종 사용 흐름으로 삼지 않습니다. 기존 화면·공식 실행기를 우선 재사용하고, 변환한 프로그램의 실행을 확인한 뒤 등록합니다. 실패한 변환은 이유를 표시하며 성공으로 등록하지 않습니다.

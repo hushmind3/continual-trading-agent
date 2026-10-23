@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..0377b6f1fa 100644
+index 18475fe8f4..741b03375a 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,9 +3,613 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,9 +3,804 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -456,6 +456,197 @@ index 18475fe8f4..0377b6f1fa 100644
 +  "dashboard.public_url": "외부에서 대시보드에 접속할 때 사용할 공개 주소입니다.",
 +  "human_delay.min_ms": "메신저에 메시지를 보낼 때 적용할 입력 지연의 최소값(밀리초)입니다.",
 +  "human_delay.max_ms": "메신저에 메시지를 보낼 때 적용할 입력 지연의 최대값(밀리초)입니다.",
++  "discord.require_mention": "Discord 서버 채널에서 봇을 @멘션한 메시지에만 답합니다. 멘션 없이 답할 채널은 free_response_channels에 따로 지정할 수 있습니다.",
++  "discord.free_response_channels": "봇을 @멘션하지 않아도 답할 Discord 채널 ID 목록입니다. 쉼표로 구분합니다.",
++  "discord.allowed_channels": "봇이 메시지를 받을 수 있는 Discord 채널 ID 허용 목록입니다. 비우면 이 목록으로 제한하지 않습니다.",
++  "discord.auto_thread": "서버 채널에서 봇을 멘션하면 해당 대화용 스레드를 자동으로 만듭니다.",
++  "discord.free_response_auto_thread": "멘션 없이 답하는 채널에서도 새 메시지마다 별도 스레드를 만듭니다.",
++  "discord.thread_require_mention": "이미 열린 스레드 안에서도 답변을 받으려면 봇을 멘션하도록 요구합니다.",
++  "discord.bots_require_inline_mention": "다른 봇의 메시지는 답글 알림만으로 처리하지 않고, 메시지 본문에 이 봇을 직접 멘션해야 답합니다.",
++  "discord.history_backfill": "멘션이 없어 처리되지 않은 메시지를 보완하기 위해, 답변을 시작할 때 채널의 최근 대화를 함께 확인합니다.",
++  "discord.history_backfill_limit": "답변을 시작할 때 누락 여부를 확인하기 위해 훑어볼 최근 메시지의 최대 개수입니다.",
++  "discord.missed_message_backfill.enabled": "오프라인이나 재연결 중 놓친 Discord 메시지를 다시 찾아 처리합니다. 기본적으로 꺼져 있습니다.",
++  "discord.missed_message_backfill.channels": "놓친 메시지를 다시 확인할 Discord 채널 ID 목록입니다. 비우면 free_response_channels에 지정한 채널을 사용합니다.",
++  "discord.missed_message_backfill.window_seconds": "다시 확인할 메시지를 현재 시각에서 거슬러 찾는 시간 범위(초)입니다.",
++  "discord.missed_message_backfill.limit": "재연결 한 번에 놓친 메시지인지 확인할 최대 개수입니다.",
++  "discord.missed_message_backfill.max_dispatches": "재연결 한 번에 실제 처리를 다시 시작할 메시지의 최대 개수입니다.",
++  "discord.missed_message_backfill.max_attempts": "메시지 하나를 놓친 메시지 처리 대상으로 다시 전달할 수 있는 총 횟수입니다.",
++  "discord.reactions": "메시지를 처리하는 동안 확인 중·완료·실패를 나타내는 반응 표시를 추가합니다.",
++  "discord.websocket_liveness_interval_seconds": "Discord 연결에서 이벤트 수신이 멈췄는지 점검하는 간격(초)입니다. 0이면 점검하지 않습니다.",
++  "discord.websocket_liveness_failure_threshold": "연속해서 이 횟수만큼 연결 상태 확인에 실패하면 Discord 연결이 끊긴 것으로 처리합니다.",
++  "discord.websocket_heartbeat_ack_max_age_seconds": "Discord 서버의 연결 확인 응답이 이 시간보다 오래되면 연결 이상으로 판단합니다.",
++  "discord.websocket_max_latency_seconds": "Discord 연결의 응답 지연이 이 시간보다 길면 연결 이상으로 판단합니다.",
++  "discord.websocket_event_max_silence_seconds": "연결 확인 응답은 오지만 Discord 이벤트가 이 시간 동안 오지 않으면 수신이 멈춘 연결로 판단합니다. 0이면 이 점검을 끕니다.",
++  "discord.dm_role_auth_guild": "이 서버 ID에 속한 사용자는 허용된 역할을 보유한 경우 개인 메시지에서도 인증된 사용자로 인정합니다. 비우면 이 예외를 사용하지 않습니다.",
++  "discord.server_actions": "Discord 서버 관리 도구가 수행할 수 있는 작업 목록입니다. 비우면 봇 권한이 허용하는 전체 작업을 사용할 수 있습니다.",
++  "discord.allow_any_attachment": "현재는 사용되지 않는 호환 설정입니다. 첨부 파일은 항상 캐시되며, 메시지 인증 규칙은 그대로 적용됩니다.",
++  "discord.max_attachment_bytes": "Discord에서 받은 첨부 파일 하나를 캐시에 보관할 수 있는 최대 크기(바이트)입니다. 0이면 크기를 제한하지 않습니다.",
++  "discord.approval_mentions": "공유 채널에서 승인 요청이 생기면 허용된 사용자들을 멘션해 확인을 알립니다.",
++  "discord.voice_channel_inactivity_timeout_seconds": "음성 채널에서 활동이 없으면 자동으로 나가기까지 기다릴 시간(초)입니다. 0이면 /voice leave를 실행할 때까지 연결을 유지합니다.",
++  "discord.voice_playback_timeout_seconds": "음성 채널 재생이 끝나기를 기다리는 기본 제한 시간(초)입니다. 긴 음성 답변은 실제 길이에 맞춰 더 기다릴 수 있습니다.",
++  "discord.voice_fx.enabled": "Discord 음성 채널의 배경음·짧은 안내 음성 믹서 기능을 켭니다.",
++  "discord.voice_fx.ambient_enabled": "도구 작업 중 생각 중임을 알리는 잔잔한 배경음을 재생합니다.",
++  "discord.voice_fx.ambient_path": "배경음으로 사용할 오디오 파일 경로입니다. 비우면 기본 생성음을 사용합니다.",
++  "discord.voice_fx.ambient_gain": "대화 음성이 재생되지 않을 때 배경음의 음량입니다. 0은 무음, 1은 최대 음량입니다.",
++  "discord.voice_fx.duck_gain": "대화 음성이 재생되는 동안 낮출 배경음의 음량입니다. 0은 무음, 1은 최대 음량입니다.",
++  "discord.voice_fx.speech_gain": "음성 답변과 짧은 안내 문구의 재생 음량입니다. 0은 무음, 1은 최대 음량입니다.",
++  "discord.voice_fx.ack_enabled": "첫 도구 작업을 시작하기 전에 짧은 음성 안내를 재생합니다.",
++  "discord.voice_fx.ack_phrases": "작업 시작 전에 무작위로 골라 말할 짧은 안내 문구 목록입니다. 빈 목록이면 말하지 않습니다.",
++  "tts.keep_warm_seconds": "Piper·KittenTTS 같은 로컬 음성 엔진을 마지막 사용 뒤에도 메모리에 유지할 시간(초)입니다. 0이면 바로 내립니다.",
++  "tts.streaming.min_len": "생성 중인 문장을 따로 음성으로 읽기 시작할 최소 글자 수입니다. 짧은 문장은 다음 문장과 합쳐 읽습니다.",
++  "tts.edge.voice": "Edge 음성 합성에서 사용할 음성 이름입니다. 예: en-US-AriaNeural.",
++  "tts.elevenlabs.voice_id": "ElevenLabs 음성 합성에 사용할 음성 ID입니다.",
++  "tts.elevenlabs.model_id": "ElevenLabs에 음성 생성을 요청할 때 사용할 모델 ID입니다.",
++  "tts.openai.model": "OpenAI 음성 합성에 사용할 모델 ID입니다.",
++  "tts.openai.voice": "OpenAI 음성 합성에서 사용할 목소리 이름입니다.",
++  "tts.openai.consent_attestation": "복제 음성을 허용하는 호환 API가 요구할 때 요청에 함께 보내는 동의 확인 값입니다. 비우면 보내지 않습니다.",
++  "tts.openai.pcm_sample_rate": "실시간 음성 재생에 사용할 PCM 오디오의 초당 표본 수입니다. 호환 서버가 실제 표본 수를 알려주면 그 값이 우선합니다.",
++  "tts.gemini.model": "Gemini 음성 합성에 사용할 모델 ID입니다.",
++  "tts.gemini.voice": "Gemini 음성 합성에서 사용할 목소리 이름입니다.",
++  "tts.gemini.audio_tags": "음성 대본에 감정이나 표현을 나타내는 오디오 태그를 모델을 통해 추가합니다.",
++  "tts.gemini.persona_prompt_file": "음성 낭독 방식이나 말투를 지정할 안내문 파일 경로입니다. 비우면 별도 안내문을 사용하지 않습니다.",
++  "tts.xai.voice_id": "xAI 음성 합성에서 사용할 기본 또는 사용자 지정 목소리 ID입니다.",
++  "tts.xai.language": "xAI 음성 합성에 사용할 언어 코드입니다. auto는 자동 감지를 요청합니다.",
++  "tts.xai.speed": "xAI 음성 합성의 말하기 속도입니다. 허용 범위는 0.7부터 1.5까지입니다.",
++  "tts.xai.auto_speech_tags": "음성 대본을 다듬어 표현·감정 태그를 자동으로 추가합니다.",
++  "tts.xai.optimize_streaming_latency": "xAI 음성 스트리밍의 지연을 줄이는 수준입니다. 높이면 음성 품질과 속도 사이의 균형이 달라집니다.",
++  "tts.xai.sample_rate": "xAI가 생성할 오디오의 초당 표본 수입니다. 지원 값은 22050·24000·44100·48000입니다.",
++  "tts.xai.bit_rate": "MP3 음성 파일에 사용할 초당 비트 수입니다. MP3 형식일 때만 적용됩니다.",
++  "tts.mistral.model": "Mistral 음성 합성에 사용할 모델 ID입니다.",
++  "tts.mistral.voice_id": "Mistral 음성 합성에 사용할 목소리 ID입니다.",
++  "tts.minimax.model": "MiniMax 음성 합성에 사용할 모델 ID입니다.",
++  "tts.minimax.voice_id": "MiniMax 음성 합성에 사용할 목소리 ID입니다.",
++  "tts.kittentts.model": "로컬 KittenTTS 음성 합성에 사용할 모델 이름 또는 저장소 ID입니다.",
++  "tts.kittentts.voice": "KittenTTS가 사용할 목소리 이름입니다.",
++  "tts.neutts.ref_audio": "NeuTTS가 목소리를 참고할 오디오 파일 경로입니다. 비우면 내장된 기본 음성을 사용합니다.",
++  "tts.neutts.ref_text": "참고 오디오에서 말한 내용을 적은 텍스트 파일 경로입니다. 비우면 내장된 기본 문장을 사용합니다.",
++  "tts.neutts.model": "NeuTTS에서 내려받아 사용할 음성 합성 모델 ID입니다.",
++  "tts.neutts.device": "NeuTTS 계산에 사용할 장치를 CPU·CUDA·Apple MPS 중에서 선택합니다.",
++  "tts.piper.voice": "Piper 음성 이름 또는 사용할 .onnx 음성 파일의 전체 경로입니다. 이름을 지정하면 첫 사용 시 내려받을 수 있습니다.",
++  "tts.deepinfra.model": "DeepInfra 음성 합성에 사용할 모델 ID입니다. 비우면 현재 모델 목록에서 음성 합성용 첫 모델을 선택합니다.",
++  "tts.deepinfra.voice": "DeepInfra 음성 합성에서 사용할 목소리 이름입니다.",
++  "terminal.degraded_mode": "원격 명령 실행 환경에 연결할 수 없을 때 경고 결과로 알릴지, 작업을 오류로 중단할지 정합니다.",
++  "terminal.cwd": "터미널 명령을 시작할 기본 작업 폴더 경로입니다.",
++  "terminal.temp_dir": "터미널 세션 로그·임시 파일을 저장할 폴더입니다. 비우면 시스템 임시 폴더 등을 사용합니다.",
++  "terminal.font_family": "데스크톱 터미널 화면에 사용할 글꼴 이름 목록입니다. 비우면 기본 글꼴을 사용합니다.",
++  "terminal.timeout": "터미널 명령이 끝나기를 기다리는 제한 시간(초)입니다.",
++  "terminal.daemon_term_grace_seconds": "백그라운드 프로그램을 종료할 때 정상 종료 신호 뒤 강제 종료로 바꾸기까지 기다리는 시간(초)입니다. 0이면 강제 종료하지 않습니다.",
++  "terminal.oneshot_completion_wait_seconds": "한 번만 실행하고 끝나는 CLI가 결과 전달이 필요한 백그라운드 작업을 기다리는 최대 시간(초)입니다. 0이면 기다리지 않습니다.",
++  "terminal.process_wait_auto_notify": "같은 백그라운드 작업을 두 번 확인해도 끝나지 않으면 완료 알림을 자동으로 등록하고 기다립니다.",
++  "terminal.env_passthrough": "격리된 명령 실행 환경에도 전달할 호스트 환경 변수 이름 목록입니다. 변수의 값이 실행 환경으로 전달됩니다.",
++  "terminal.client_env_passthrough": "CLI·TUI 사용자의 도구 실행에 추가로 전달할 환경 변수 이름 목록입니다.",
++  "terminal.sync_back_max_bytes": "원격 실행 환경에서 내려받아 복원할 데이터 묶음의 최대 크기(바이트)입니다.",
++  "terminal.home_mode": "터미널 명령에서 HOME 경로를 실제 사용자 폴더로 쓸지, Hermes 프로필 폴더로 분리할지 정합니다.",
++  "terminal.shell_init_files": "터미널 명령의 실행 환경을 준비할 때 추가로 읽을 셸 설정 파일 경로입니다.",
++  "terminal.auto_source_bashrc": "bash 명령 실행 환경을 준비할 때 사용자 프로필·bash 설정 파일을 읽어 PATH 등의 설정을 가져옵니다.",
++  "terminal.docker_image": "Docker 격리 환경을 만들 때 사용할 컨테이너 이미지 이름입니다.",
++  "terminal.docker_forward_env": "현재 컴퓨터에서 같은 이름의 값을 읽어 Docker 환경으로 전달할 환경 변수 목록입니다.",
++  "terminal.modal_image": "Modal 원격 격리 환경에서 사용할 컨테이너 이미지 이름입니다.",
++  "terminal.daytona_image": "Daytona 원격 격리 환경에서 사용할 컨테이너 이미지 이름입니다.",
++  "terminal.container_cpu": "지원되는 컨테이너 실행 환경에 할당할 CPU 수입니다.",
++  "terminal.container_memory": "지원되는 컨테이너 실행 환경에 할당할 메모리 용량(MB)입니다.",
++  "terminal.container_disk": "지원되는 컨테이너 실행 환경에 할당할 디스크 용량(MB)입니다.",
++  "terminal.container_persistent": "컨테이너 파일을 대화나 재시작 뒤에도 보존할지 정합니다.",
++  "terminal.docker_volumes": "호스트 폴더를 Docker 안의 폴더에 연결할 경로 목록입니다. 각 항목은 호스트 경로:컨테이너 경로 형식입니다.",
++  "terminal.docker_mount_cwd_to_workspace": "현재 작업 폴더를 Docker 안의 /workspace에 연결합니다. 호스트 파일이 컨테이너에 보이므로 격리가 약해집니다.",
++  "terminal.docker_network": "Docker 안에서 실행하는 명령이 네트워크에 접속할 수 있게 합니다. 끄면 네트워크 사용을 차단합니다.",
++  "terminal.docker_extra_args": "Docker 컨테이너를 시작할 때 docker run 명령에 그대로 추가할 인수 목록입니다.",
++  "terminal.docker_shm_size": "Docker 컨테이너 안에서 브라우저나 데이터 처리 도구가 공유 메모리로 사용할 크기입니다. 비우거나 0으로 두면 Docker 기본값을 씁니다.",
++  "terminal.docker_run_as_host_user": "Docker 안의 명령을 호스트 사용자와 같은 사용자 ID로 실행해 연결 폴더의 파일 소유자가 root가 되지 않도록 합니다.",
++  "terminal.docker_snap_compat": "Snap 패키지로 설치한 Docker에서 허용되지 않는 일부 실행 옵션을 제외해 호환성을 높입니다.",
++  "terminal.docker_shared_container_key": "같은 키를 지정한 신뢰 프로필끼리 Docker 컨테이너를 공유합니다. 비우면 프로필마다 분리합니다.",
++  "terminal.persistent_shell": "SSH에서는 명령 사이에 내보낸 환경 변수 값을 유지하고, 로컬에서는 설정된 지속 셸 동작을 사용합니다.",
++  "stt.enabled": "메신저 음성 메시지를 글자로 바꾸는 음성 인식을 사용합니다.",
++  "stt.echo_transcripts": "음성 메시지에서 인식한 원문을 별도의 마이크 표시 메시지로 다시 보여줍니다.",
++  "stt.language": "음성 인식에서 기본으로 사용할 언어 코드입니다. 비우면 서비스가 자동으로 감지하며, 제공자별 설정이 있으면 그 값이 우선합니다.",
++  "stt.streaming": "지원 서비스에서 말하는 도중에 인식된 문장을 부분 결과로 전달합니다. 지원하지 않거나 실패하면 음성 파일을 한 번에 처리합니다.",
++  "stt.cloud_trim_silence": "클라우드 음성 인식에 보내기 전에 음성 앞뒤와 중간의 긴 무음을 줄입니다.",
++  "stt.cloud_trim_threshold_db": "이 음량보다 작은 소리를 무음으로 보고 줄입니다. 데시벨 값이며 더 낮을수록 조용한 소리도 보존됩니다.",
++  "stt.cloud_trim_keep_ms": "무음 구간을 줄일 때 자연스러운 말 간격을 위해 남겨 둘 길이(밀리초)입니다.",
++  "stt.local.language": "로컬 faster-whisper 인식에 사용할 언어 코드입니다. 비우면 음성에서 언어를 자동 감지합니다.",
++  "stt.local.initial_prompt": "로컬 음성 인식에 미리 알려줄 단어나 문맥입니다. 고유명사 등 인식에 참고할 내용을 적습니다.",
++  "stt.local.vad": "로컬 음성 인식 전에 음성 활동 감지를 사용해 무음 구간을 걸러냅니다. 음악이나 배경음은 끄는 편이 적합할 수 있습니다.",
++  "stt.local.vad_min_silence_ms": "로컬 음성 인식에서 음성 구간을 나눌 때 필요한 최소 무음 길이(밀리초)입니다.",
++  "stt.local.no_speech_prob_threshold": "음성 인식기가 말이 없다고 판단하는 확률 기준입니다. 로그 확률 기준과 함께 만족할 때 해당 구간을 버립니다.",
++  "stt.local.logprob_threshold": "인식 결과가 신뢰하기 어렵다고 판단하는 로그 확률 기준입니다. 무음 확률 기준과 함께 만족할 때 해당 구간을 버립니다.",
++  "stt.local.unload_after_idle_seconds": "사용하지 않는 로컬 음성 인식 모델을 메모리에서 내리기까지 기다릴 시간(초)입니다. 0이면 계속 메모리에 둡니다.",
++  "stt.groq.language": "Groq 음성 인식에 사용할 언어 코드입니다. 비우면 자동 감지합니다.",
++  "stt.openai.language": "OpenAI 음성 인식에 사용할 언어 코드입니다. 비우면 자동 감지합니다.",
++  "stt.openai.timeout": "OpenAI 호환 음성 인식 서비스의 응답을 기다리는 최대 시간(초)입니다.",
++  "stt.openai.max_retries": "OpenAI 음성 인식 요청이 일시적으로 실패했을 때 다시 시도할 횟수입니다.",
++  "stt.mistral.language": "Mistral 음성 인식에 사용할 언어 코드입니다. 비우면 자동 감지합니다.",
++  "stt.xai.language": "xAI 음성 인식에 사용할 언어 코드입니다. 비우면 자동 감지합니다.",
++  "stt.elevenlabs.language_code": "ElevenLabs 음성 인식에 사용할 언어 코드입니다. 비우면 자동 감지합니다.",
++  "stt.elevenlabs.tag_audio_events": "ElevenLabs가 웃음·박수 같은 비언어적 소리도 인식 결과에 표시하도록 합니다.",
++  "stt.elevenlabs.diarize": "한 녹음에 여러 사람이 있으면 화자를 구분해 인식 결과에 표시합니다.",
++  "stt.deepinfra.model": "DeepInfra 음성 인식에 사용할 모델 ID입니다. 비우면 현재 목록에서 음성 인식용 첫 모델을 선택합니다.",
++  "gateway.unmanaged_idle_exit_seconds": "서비스 관리자에 등록되지 않은 채 자동으로 시작된 게이트웨이가 한가할 때 종료되기까지 기다리는 시간(초)입니다. 0이면 자동 종료하지 않습니다.",
++  "gateway.signal_interrupt_grace_timeout": "종료 신호를 받은 뒤 에이전트 작업이 정리되기를 기다린 후 프로세스를 종료할 시간(초)입니다.",
++  "gateway.service_install_choice": "게이트웨이 서비스 설치 안내에서 선택한 결과를 저장합니다. 일반 실행만으로 서비스를 자동 설치하도록 허가하는 설정은 아닙니다.",
++  "gateway.delivery_ledger": "메신저 전송 확인 전에 게이트웨이가 종료되더라도 최종 답변을 기록해 다음 시작 때 다시 전달하도록 합니다. 끄면 종료 시점의 답변이 사라질 수 있습니다.",
++  "gateway.platform_connect_timeout": "시작하거나 재연결할 때 각 메신저 서비스가 연결되기를 기다리는 제한 시간(초)입니다. 0 이하는 제한 없이 기다립니다.",
++  "gateway.loop_watchdog": "게이트웨이의 비동기 작업이 멈췄는지 감시하고, 응답이 끊긴 상태가 지속되면 프로세스를 종료해 서비스 관리자가 다시 시작하도록 합니다.",
++  "gateway.loop_watchdog_probe_interval_s": "게이트웨이 작업이 살아 있는지 확인 신호를 보내는 간격(초)입니다.",
++  "gateway.loop_watchdog_probe_timeout_s": "확인 신호가 처리되기를 기다릴 시간(초)입니다. 넘기면 한 차례 감시 실패로 셉니다.",
++  "gateway.loop_watchdog_max_strikes": "감시 확인이 연속으로 실패해도 허용할 횟수입니다. 초과하면 멈춘 프로세스를 종료합니다.",
++  "gateway.allow_all_users": "사용자 허용 목록 없이 누구나 봇을 사용할 수 있게 합니다. 공개 채널에서 켜면 예상치 못한 사용자가 요청할 수 있습니다.",
++  "gateway.bot_loop_guard.enabled": "대화에서 봇끼리 답변을 반복하는 상황을 감지해 잠시 응답을 막습니다.",
++  "gateway.bot_loop_guard.max_events": "정해진 시간 안에 허용할 봇 메시지 수입니다. 이를 넘으면 반복 대화로 보고 잠시 차단합니다.",
++  "gateway.bot_loop_guard.window_seconds": "봇 간 반복 메시지 횟수를 계산할 시간 범위(초)입니다.",
++  "gateway.bot_loop_guard.cooldown_seconds": "봇 간 반복이 감지된 뒤 응답을 멈출 시간(초)입니다.",
++  "gateway.startup_watchdog": "게이트웨이가 시작된 뒤 제한 시간 안에 정상 작동하지 않으면 멈춘 것으로 보고 프로세스를 종료합니다.",
++  "gateway.startup_watchdog_timeout_seconds": "시작한 게이트웨이가 정상 작동 상태가 되기를 기다리는 최대 시간(초)입니다.",
++  "gateway.write_sessions_json": "세션 연결 정보를 담은 기존 sessions.json 파일도 계속 갱신합니다. 새 기본 저장소는 데이터베이스입니다.",
++  "gateway.multiplex_profiles": "한 게이트웨이에서 이 컴퓨터의 여러 프로필에 등록된 메신저 봇을 함께 연결하는 운영 방식을 사용합니다. 현재 지원되는 기본 구조입니다.",
++  "gateway.auto_multiplex_migration": "업데이트 뒤 조건이 갖춰지면 여러 프로필의 게이트웨이를 하나로 통합하는 작업을 자동으로 진행합니다.",
++  "gateway.profile_routes": "기본 프로필의 봇으로 들어온 대화를 지정한 프로필로 보내는 규칙 목록입니다. 더 구체적인 규칙이 우선 적용됩니다.",
++  "gateway.scale_to_zero.idle_timeout_minutes": "실험 기능과 전용 환경 조건이 활성화된 경우, 일정 시간 대화가 없으면 중계 연결을 쉬게 할 시간(분)입니다. 이 값만으로 기능이 켜지지는 않습니다.",
++  "gateway.restart_loop_guard.max_restarts": "자동 재시작이 짧은 시간에 반복될 때 자동 대화 복구를 건너뛰기 전까지 허용할 재시작 횟수입니다. 0이면 이 제한을 끕니다.",
++  "gateway.restart_loop_guard.window_seconds": "자동 재시작 반복 횟수를 계산할 기본 시간 범위(초)입니다.",
++  "gateway.restart_loop_guard.max_gap_seconds": "재시작 간격이 이 시간 이내이면 느린 재시작 반복도 같은 연속 장애로 계산합니다.",
++  "gateway.respawn_storm.max_starts": "정해진 시간 안에 허용할 게이트웨이 시작 횟수입니다. 초과하면 다음 시작 전에 대기해 재시작 폭주를 줄입니다.",
++  "gateway.respawn_storm.window_seconds": "게이트웨이 시작 횟수를 계산할 시간 범위(초)입니다.",
++  "gateway.message_timestamps.enabled": "메신저에서 받은 사용자 메시지의 시각을 모델 입력에 덧붙여 시간 흐름을 참고하게 합니다. 저장된 대화 원문을 바꾸지는 않습니다.",
++  "gateway.max_inbound_media_bytes": "메신저에서 받은 사진·음성·영상 파일 하나의 최대 처리 크기(바이트)입니다. 큰 파일이 메모리를 과도하게 사용하는 일을 막습니다. 0이면 제한하지 않습니다.",
++  "gateway.trust_env": "컴퓨터 환경 변수에 지정된 HTTP·HTTPS 프록시와 인증서 설정을 메신저 연결에 사용합니다.",
++  "gateway.strict": "메신저로 보낼 파일을 허용된 폴더나 최근 생성 파일로 제한합니다. 공개 게이트웨이에서 호스트의 민감한 파일이 전송되는 위험을 줄입니다.",
++  "gateway.media_delivery_allow_dirs": "메신저로 파일을 보낼 수 있도록 추가로 허용할 절대 경로 목록입니다. Hermes 캐시는 항상 허용됩니다.",
++  "gateway.trust_recent_files": "엄격한 파일 전송 제한이 켜져 있을 때 허용 폴더 밖의 최근 생성 파일도 보낼 수 있게 합니다.",
++  "gateway.trust_recent_files_seconds": "허용 폴더 밖 파일을 최근 생성 파일로 인정할 시간(초)입니다. trust_recent_files가 켜져 있을 때만 사용합니다.",
++  "gateway.api_server.max_concurrent_runs": "OpenAI 호환 API 서버에서 동시에 실행할 수 있는 에이전트 작업 수입니다. 초과 요청은 잠시 후 다시 시도하라는 응답을 받습니다. 0이면 제한하지 않습니다.",
++  "gateway.api_server.history_tool_output_max_chars": "이전 응답을 이어서 처리하기 위해 API 서버가 보관하는 대화 기록에서 도구 결과 하나당 저장할 최대 글자 수입니다. 0이면 줄이지 않습니다.",
++  "compression.enabled": "대화 기록이 모델의 처리 한도에 가까워지면 오래된 내용을 요약해 줄입니다.",
++  "compression.checkpoint_required": "내용을 요약해 줄이기 전에 복구 지점 저장이 성공해야만 진행합니다. 지원되는 기억 저장소가 복구 지점을 확인할 수 없으면 요약을 중단합니다.",
++  "compression.progress_notices": "대화 내용을 정리하는 일반 진행 상황을 메신저 대화에 표시합니다. 실패 알림과 직접 요청한 정리 결과는 이 옵션과 관계없이 표시됩니다.",
++  "compression.threshold": "모델 문맥 한도 중 이 비율을 넘으면 오래된 대화 내용을 요약합니다. 작은 문맥을 가진 모델에는 너무 일찍 정리하지 않도록 별도의 최저 기준이 적용될 수 있습니다.",
++  "compression.threshold_tokens": "비율 기준과 함께 사용할 토큰 수 기준입니다. 지정하면 비율 기준과 이 수치 중 먼저 도달하는 쪽에서 정리를 시작합니다.",
++  "compression.target_ratio": "정리 후 문맥을 시작 기준의 어느 정도까지 줄일지 정하는 비율입니다. 낮출수록 더 많이 요약합니다.",
++  "compression.tail_mode": "요약 뒤 최근 대화를 원문 그대로 남기는 방식과 양을 정합니다. lean은 짧은 최근 구간과 요약을 사용하고, legacy는 더 긴 최근 구간을 보존합니다.",
++  "compression.protect_last_n": "자동 요약에서도 원문 그대로 남길 최근 메시지의 최소 개수입니다. 실제 보존량은 모델 문맥 한도에 맞춰 제한됩니다.",
++  "compression.min_tail_user_messages": "최근 원문 구간에 반드시 남겨 둘 실제 사용자 요청의 최소 개수입니다. 도구 출력이 길어도 최근 요청을 잃지 않도록 합니다.",
++  "compression.max_attempts": "한 대화 차례에서 요약 정리를 다시 시도할 최대 횟수입니다. 모두 실패하면 현재 차례의 자동 정리를 포기합니다.",
++  "compression.proactive_prune_tokens": "이 토큰 수를 넘으면 모델 호출 없이 오래된 도구 결과를 먼저 줄이는 기능을 시작합니다. 0이면 사용하지 않습니다.",
++  "compression.proactive_prune_min_result_chars": "먼저 요약할 대상으로 인정할 도구 결과의 최소 글자 수입니다.",
++  "compression.proactive_prune_min_reclaim_tokens": "도구 결과를 줄인 뒤 이만큼의 토큰을 확보할 수 있을 때만 변경을 반영합니다. 0이면 최소 확보량을 요구하지 않습니다.",
++  "compression.micro_compact": "대화 차례가 끝날 때마다 오래된 대화 일부를 이어지는 요약으로 접어 관리합니다. 매번 대화 기록과 프롬프트 캐시가 다시 만들어질 수 있습니다.",
++  "compression.micro_compact_every_n_turns": "소형 정리를 몇 번의 대화 차례마다 실행할지 정합니다. micro_compact을 켰을 때만 사용합니다.",
++  "compression.micro_compact_defrag_threshold_tokens": "이어지는 요약이 이 토큰 수보다 커지면 다음 정리 때 요약 자체도 다시 줄입니다.",
++  "compression.hygiene_hard_message_limit": "게이트웨이 대화에 메시지가 이 개수 이상 쌓이면 대화를 정리해 기록 크기를 줄입니다.",
++  "compression.hygiene_timeout_seconds": "게이트웨이가 응답 생성 전에 대화 정리를 기다리는 동안 진행이 없을 때 적용할 대기 한도(초)입니다. 모델이 계속 응답하면 대기를 연장할 수 있습니다.",
++  "compression.hygiene_total_ceiling_seconds": "대화 정리 중 응답이 조금씩 계속되더라도 기다릴 수 있는 전체 시간 상한(초)입니다.",
++  "compression.hygiene_failure_cooldown_seconds": "대화 정리에 실패한 뒤 같은 자동 정리를 다시 시도하기 전 기다리는 시간(초)입니다.",
++  "compression.hygiene_max_turn_hold_seconds": "대화 정리 요약이 끝나기를 기다리느라 새 사용자 요청을 붙잡아 둘 최대 시간(초)입니다. 시간이 지나면 새 요청을 먼저 처리합니다.",
++  "compression.context_timeout_seconds": "에이전트가 대화 정리 도구를 호출했을 때 진행이 멈춘 상태로 기다릴 시간(초)입니다. 0이면 이 감시를 끕니다.",
++  "compression.context_total_ceiling_seconds": "대화 정리 요약을 만들고 저장하기 전까지 기다릴 전체 시간 상한(초)입니다. 저장이 이미 시작된 뒤에는 안전하게 끝날 때까지 기다립니다.",
++  "compression.protect_first_n": "시스템 안내 외에도 대화 시작 부분에서 요약하지 않고 원문 그대로 보존할 메시지 수입니다.",
++  "compression.abort_on_summary_failure": "자동 요약에 실패하면 중간 대화를 버리는 대신 자동 정리를 중단하고 기존 대화를 유지합니다.",
++  "compression.codex_gpt55_autoraise": "ChatGPT Codex 경로에서 특정 GPT·Astra 모델의 문맥 한도에 맞춰 자동 요약 시작점을 높입니다. 다른 제공자 경로에는 적용되지 않습니다.",
++  "compression.codex_gpt55_autoraise_notice": "Codex 경로의 자동 요약 시작점을 높였다는 안내 배너를 표시합니다. 끄더라도 자동 조정 자체는 유지됩니다.",
++  "compression.codex_app_server_auto": "Codex 앱 서버 대화의 자동 요약을 누가 관리할지 정합니다. native는 Codex, hermes는 Hermes가 담당하고 off는 자동 실행하지 않습니다.",
++  "compression.codex_responses_native": "지원되는 OpenAI Responses API에서 서버가 대화 내용을 직접 압축하도록 요청합니다. 사용할 수 없으면 로컬 요약이 대체 경로가 됩니다.",
++  "compression.codex_responses_compact_threshold": "Responses API 서버 압축을 요청할 입력 토큰 기준입니다. 비우면 로컬 정리 기준에 여유를 둔 값을 사용합니다.",
++  "compression.in_place": "대화 내용을 줄일 때 대화 ID를 유지합니다. 이전 기록은 같은 대화 안에서 보관되어 검색할 수 있습니다.",
++  "compression.idle_compact_after_seconds": "대화가 이 시간(초) 동안 멈춘 뒤 다시 시작되면 첫 답변 전에 미리 정리합니다. 0이면 사용하지 않습니다.",
 +  "memory.memory_enabled": "켜면 저장된 기억을 대화에 불러와 답변에 활용합니다.",
 +  "memory.user_profile_enabled": "켜면 사용자 프로필을 대화 문맥에 포함해 사용자에 관한 정보를 참고합니다.",
 +  "memory.prefetch_spill_enabled": "켜면 기억 검색 결과가 도구 출력에 넘칠 때 초과 내용을 별도 기억 자료로 보관해 후속 처리에 활용합니다.",
@@ -701,7 +892,7 @@ index 18475fe8f4..0377b6f1fa 100644
  
    if (!keyPath && !description) return null;
  
-@@ -42,7 +646,7 @@ function NestedValueEditor({
+@@ -42,7 +837,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -710,7 +901,7 @@ index 18475fe8f4..0377b6f1fa 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +663,7 @@ function NestedValueEditor({
+@@ -59,7 +854,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -719,7 +910,7 @@ index 18475fe8f4..0377b6f1fa 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +692,7 @@ export function AutoField({
+@@ -88,8 +883,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -729,7 +920,7 @@ index 18475fe8f4..0377b6f1fa 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +725,7 @@ export function AutoField({
+@@ -122,7 +916,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -738,7 +929,7 @@ index 18475fe8f4..0377b6f1fa 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +786,7 @@ export function AutoField({
+@@ -183,7 +977,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

@@ -523,10 +523,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..46b8700d3e 100644
+index 18475fe8f4..b7763ed7c9 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1984 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,2032 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -1192,6 +1192,54 @@ index 18475fe8f4..46b8700d3e 100644
 +  "gateway.trust_recent_files_seconds": "최근 파일로 인정할 시간(초)",
 +  "gateway.api_server.max_concurrent_runs": "API 서버 동시 에이전트 작업 수",
 +  "gateway.api_server.history_tool_output_max_chars": "대화 기록에 저장할 도구 결과 최대 글자 수",
++  "database.journal_mode": "SQLite 데이터 기록·복구 방식",
++  "worktrees.archive_retention_days": "보관한 작업 공간 유지 기간(일)",
++  "worktrees.max_total_gb": "작업 공간 전체 용량 한도(GB)",
++  "tool_loop_guardrails.warn_after.exact_failure": "같은 입력·결과의 실패에 경고할 반복 횟수",
++  "tool_loop_guardrails.hard_stop_after.exact_failure": "같은 입력·결과의 실패를 중단할 반복 횟수",
++  "tool_loop_guardrails.loop_caps.max_subagents": "요청 한 번에 만들 하위 에이전트 최대 수",
++  "voice.gpt_live.model": "실시간 음성 대화에 사용할 모델",
++  "voice.gpt_live.voice": "실시간 음성 대화의 목소리",
++  "voice.record_key": "음성 녹음 시작·종료 단축키",
++  "voice.auto_tts": "답변 자동 음성 읽기",
++  "voice.silence_threshold": "음성 입력에서 무음으로 볼 기준",
++  "voice.stop_phrases": "음성 대화를 끝낼 말",
++  "wake_word.enabled": "호출어로 음성 대화 시작",
++  "wake_word.surface": "호출어를 감지할 화면",
++  "wake_word.input_device": "호출어 감지에 사용할 마이크",
++  "wake_word.openwakeword.model": "openWakeWord 호출어 감지 모델",
++  "wake_word.sherpa.model_dir": "Sherpa 호출어 모델 폴더",
++  "loops.min_interval_seconds": "반복 실행 최소 간격(초)",
++  "loops.self_paced_ceiling_seconds": "자동 간격 최대 대기 시간(초)",
++  "tools.connectors.enabled": "외부 서비스 연결 도구 사용",
++  "model_catalog.enabled": "모델 정보 목록 사용",
++  "model_catalog.url": "모델 정보 목록 주소",
++  "model_catalog.ttl_minutes": "모델 정보 갱신 주기(분)",
++  "monitoring.install_id": "모니터링 설치 구분값",
++  "monitoring.gateway_health_export.enabled": "게이트웨이 상태·진단 정보 내보내기",
++  "monitoring.gateway_health_export.resource_attributes.service.name": "서비스 이름 표기",
++  "monitoring.gateway_health_export.resource_attributes.deployment.environment.name": "실행 환경 이름 표기",
++  "monitoring.export.otlp.enabled": "OTLP 형식 운영 정보 내보내기",
++  "lsp.enabled": "LSP(코드 분석 서버) 사용",
++  "lsp.wait_mode": "LSP 작업 완료를 기다리는 범위",
++  "lsp.wait_timeout": "LSP 응답 대기 시간(초)",
++  "lsp.install_strategy": "LSP 서버 설치 방식",
++  "x_search.model": "X 검색에 사용할 모델",
++  "x_search.timeout_seconds": "X 검색 응답 대기 제한(초)",
++  "x_search.retries": "X 검색 재시도 횟수",
++  "vault.onepassword.enabled": "1Password에서 인증 정보 가져오기",
++  "vault.bitwarden.enabled": "Bitwarden에서 인증 정보 가져오기",
++  "secrets.bitwarden.enabled": "Bitwarden 비밀 정보 연결 사용",
++  "secrets.bitwarden.cache_ttl_seconds": "Bitwarden 인증 정보 캐시 유지 시간(초)",
++  "secrets.bitwarden.encrypted_cache.enabled": "Bitwarden 캐시 암호화 사용",
++  "secrets.bitwarden.auto_install": "Bitwarden 명령줄 도구 자동 설치",
++  "secrets.onepassword.enabled": "1Password 비밀 정보 연결 사용",
++  "secrets.onepassword.cache_ttl_seconds": "1Password 인증 정보 캐시 유지 시간(초)",
++  "bot_desktop.auto_start": "게이트웨이 시작 때 Bot Desktop 자동 실행",
++  "desktop.font_family": "Desktop 화면 글꼴",
++  "desktop.auto_continue.enabled": "중단된 대화 자동 이어가기",
++  "desktop.auto_continue.freshness_minutes": "자동 이어가기 대상으로 인정할 시간(분)",
++  "vertex.region": "Vertex AI 요청 지역",
 +};
 +
 +const CONFIG_LABEL_WORDS_KO: Record<string, string> = {
@@ -2513,7 +2561,7 @@ index 18475fe8f4..46b8700d3e 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +2011,7 @@ function NestedValueEditor({
+@@ -42,7 +2059,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -2522,7 +2570,7 @@ index 18475fe8f4..46b8700d3e 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +2028,7 @@ function NestedValueEditor({
+@@ -59,7 +2076,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -2531,7 +2579,7 @@ index 18475fe8f4..46b8700d3e 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +2057,7 @@ export function AutoField({
+@@ -88,8 +2105,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -2541,7 +2589,7 @@ index 18475fe8f4..46b8700d3e 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +2090,7 @@ export function AutoField({
+@@ -122,7 +2138,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -2550,7 +2598,7 @@ index 18475fe8f4..46b8700d3e 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +2151,7 @@ export function AutoField({
+@@ -183,7 +2199,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

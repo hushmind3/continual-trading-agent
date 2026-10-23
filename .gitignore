@@ -53,3 +53,9 @@ node_modules/
 
 # Local research outputs are not platform source.
 /research/
+
+# Completed development records and generated reports stay local.
+/development/docs/work_records/
+/development/docs/*_report.*
+/development/docs/*_audit.*
+/development/docs/*_verification.json

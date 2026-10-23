@@ -1,15 +1,10 @@
-# Documentation
+# 개발 문서
 
-- [settings.md](settings.md): 설정 안내.
-- [project_review.md](project_review.md): 변경·확인·미실행 기록.
-- [history.md](history.md): 이전 구현과 실행 기록; 현재 구조는 루트 README를 기준으로 확인합니다.
+용도: 소스 배포에 필요한 설정 안내와 현재 구현의 기준 문서를 연결합니다.
 
-각 기능의 현재 연결·핵심 파일은 backend/와 frontend/의 해당 작은 메뉴 README에 기록합니다.
+- [settings.md](settings.md): 금융 학습·연결 설정과 공식 기본값의 구분.
+- [프로젝트 구조](../../README.md): 실제 소스·설치·실행·GitHub 복원 경계.
+- [실행 안내](../scripts/README.md): 설치·서버 적용과 기존 검사 실행 방법.
+- [모듈 소유 규격](../../modules/README.md): 등록·탈착·소스와 환경의 소속.
 
-- [platform_cleanup_audit.md](platform_cleanup_audit.md): 전수 참조 조사·폐기 경로·보류 목록.
-
-[work_records/](work_records/README.md): 외부 Temp에서 옮긴 완료된 프로젝트 작업 기록. 플랫폼 실행에 연결하지 않습니다.
-
-[module_usage_audit.md](module_usage_audit.md): 모듈 사용·실행·인증 분류와 실제 정리 판단 근거.
-
-[root_cleanup.md](root_cleanup.md): 루트 통합·미사용 소스 44개 제거·환경 충돌·가격 DB 유지 근거.
+각 기능의 현재 구현·확인 결과는 담당 메뉴 README를 기준으로 합니다. 과거 정리·검사 보고서와 완료된 임시 작업 기록은 실행 의존성이 없어 로컬 `휴지통/development/docs/`에 상대 경로대로 보존하고 Git 배포에서 제외했습니다. 새 검사·조사 결과는 담당 메뉴의 `runtime/` 아래에 저장합니다.

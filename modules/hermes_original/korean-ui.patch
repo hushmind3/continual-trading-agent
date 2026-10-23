@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..b8024548ac 100644
+index 18475fe8f4..bed452b368 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1982 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -410,15 +410,15 @@ index 18475fe8f4..b8024548ac 100644
 +  "stt.language": "Language (기본 음성 인식 언어 코드)",
 +  "stt.streaming": "Streaming transcription (말하는 중 인식 결과 표시)",
 +  "stt.cloud_trim_silence": "클라우드로 보내기 전에 녹음의 긴 무음 줄이기",
-+  "stt.cloud_trim_threshold_db": "무음으로 판단할 음량 기준(dB)",
-+  "stt.cloud_trim_keep_ms": "무음 구간마다 남길 길이(ms)",
++  "stt.cloud_trim_threshold_db": "무음으로 판단할 음량 기준(데시벨)",
++  "stt.cloud_trim_keep_ms": "말 앞뒤에 남길 시간(밀리초)",
 +  "stt.local.model": "Local model (로컬 음성 인식 모델)",
 +  "stt.local.language": "Local language (로컬 음성 인식 언어 코드)",
 +  "stt.local.initial_prompt": "Initial prompt (인식 전에 알려줄 단어·문맥)",
 +  "stt.local.vad": "VAD (말소리 구간 감지)",
-+  "stt.local.vad_min_silence_ms": "말을 나눌 때 필요한 최소 무음 길이(ms)",
-+  "stt.local.no_speech_prob_threshold": "음성이 없다고 판단할 확률 기준",
-+  "stt.local.logprob_threshold": "인식 결과를 버릴 낮은 신뢰도 기준",
++  "stt.local.vad_min_silence_ms": "말을 나눌 최소 무음 길이(밀리초)",
++  "stt.local.no_speech_prob_threshold": "무음일 가능성 기준",
++  "stt.local.logprob_threshold": "인식 확신도 하한",
 +  "stt.local.unload_after_idle_seconds": "사용하지 않는 모델을 메모리에서 내릴 시간",
 +  "stt.groq.model": "Groq model (음성 인식 모델)",
 +  "stt.groq.language": "Groq language (음성 인식 언어 코드)",
@@ -1374,14 +1374,14 @@ index 18475fe8f4..b8024548ac 100644
 +  "stt.language": "모든 음성 인식에서 기본으로 참고할 언어 코드입니다. 현재 기본값은 `en`(영어)입니다. 비우면 서비스가 언어를 자동으로 찾고, Groq·OpenAI처럼 제공자별 언어를 따로 지정하면 그 값이 우선합니다. 화면 메뉴 언어와는 별개입니다.",
 +  "stt.streaming": "지원하는 OpenAI·xAI·ElevenLabs 서비스에서 녹음이 끝날 때까지 기다리지 않고 말하는 중 인식된 글자를 조금씩 전달합니다. 지원하지 않는 서비스이거나 실시간 인식이 실패하면 녹음 파일을 보내 한 번에 인식합니다.",
 +  "stt.cloud_trim_silence": "클라우드 음성 인식 서비스에 보내기 전에 녹음에서 긴 무음 구간을 줄여 파일 크기와 전송 대기를 줄입니다. 로컬 faster-whisper(이 컴퓨터에서 실행하는 음성 인식 엔진)는 클라우드 무음 정리 대신 VAD(말소리 구간 감지)로 무음을 거릅니다. 무음 정리에 실패하면 녹음을 자르지 않고 원본을 보냅니다.",
-+  "stt.cloud_trim_threshold_db": "이 값보다 음량이 작은 구간을 무음으로 보고 줄입니다. 단위 dB(데시벨)에서 숫자가 더 낮을수록 작은 소리까지 무음으로 취급합니다. 너무 낮게 잡으면 조용한 말소리도 잘릴 수 있습니다.",
-+  "stt.cloud_trim_keep_ms": "무음 구간을 줄이고도 말의 앞뒤에 남겨 둘 시간입니다. 기본값은 300밀리초입니다. 너무 짧게 줄이면 단어 앞뒤가 잘리거나 말 사이가 어색하게 붙을 수 있습니다.",
++  "stt.cloud_trim_threshold_db": "클라우드로 보내기 전에 이 값보다 작은 음량을 무음으로 보고 줄입니다. 기본값은 -40dB(데시벨)입니다. dB는 숫자가 더 낮을수록 소리가 작다는 뜻이므로, 값을 낮추면 아주 작은 소리만 무음으로 처리하고 높이면 조용한 말소리도 잘릴 수 있습니다.",
++  "stt.cloud_trim_keep_ms": "무음 구간을 줄인 뒤에도 각 쉼의 앞뒤에 남겨 둘 시간입니다. 기본값은 300밀리초(0.3초)입니다. 너무 짧게 줄이면 말의 시작이나 끝이 잘리거나 쉼이 어색해질 수 있습니다.",
 +  "stt.local.language": "로컬 faster-whisper가 녹음에서 찾을 언어 코드입니다. 비우면 자동 감지합니다. `ko`처럼 입력 언어를 지정하면 짧은 음성에서 언어를 잘못 짐작하는 일을 줄일 수 있습니다.",
 +  "stt.local.initial_prompt": "로컬 음성 인식에 미리 알려줄 단어나 문맥입니다. 고유명사 등 인식에 참고할 내용을 적습니다.",
 +  "stt.local.vad": "VAD(말소리 구간 감지)를 켜면 로컬 음성 인식 전에 무음 구간을 걸러냅니다. 음악·환경음처럼 말이 아닌 소리도 인식해야 한다면 끄세요.",
-+  "stt.local.vad_min_silence_ms": "로컬 음성 인식에서 말소리가 멈춘 뒤 다음 음성 구간으로 나누기 위해 필요한 무음의 최소 길이입니다. 기본값은 500밀리초입니다. 값을 늘리면 짧은 말 사이 쉼을 한 구간으로 묶고, 줄이면 더 자주 나눕니다.",
-+  "stt.local.no_speech_prob_threshold": "인식기가 구간을 무음으로 판단한 확률 기준입니다. 해당 확률이 이 값보다 높고 인식 확신도도 아래 기준보다 낮을 때에만 그 구간을 버립니다. 두 조건을 함께 써서 조용한 실제 말소리가 잘리는 일을 줄입니다.",
-+  "stt.local.logprob_threshold": "음성 인식 결과에 대한 확신 점수의 기준입니다. 점수가 이 값보다 낮고 무음 가능성도 위 기준보다 높을 때에만 해당 구간을 버립니다. 점수가 낮다고 단독으로 인식 결과를 버리지는 않습니다.",
++  "stt.local.vad_min_silence_ms": "VAD(말소리 구간 감지)가 켜져 있을 때, 말 사이의 쉼이 이 시간 이상이어야 새 구간으로 나눕니다. 기본값은 500밀리초(0.5초)입니다. 값을 늘리면 짧은 쉼을 같은 말로 묶고, 줄이면 더 자주 나눕니다.",
++  "stt.local.no_speech_prob_threshold": "인식기가 구간을 무음으로 볼 가능성의 기준입니다. 기본값은 0.6입니다. 이 가능성이 기준보다 높고 아래의 인식 확신도 점수도 기준보다 낮을 때에만 그 구간을 버립니다. 두 조건을 함께 확인해 조용한 실제 말이 잘리는 일을 줄입니다.",
++  "stt.local.logprob_threshold": "음성 인식 결과가 얼마나 확실한지 보는 점수의 하한입니다. 기본값은 -1.0이며, 점수가 이 값보다 낮고 위의 무음 가능성도 기준보다 높을 때에만 해당 구간을 버립니다. 점수가 낮다는 이유만으로 인식 결과를 버리지는 않습니다.",
 +  "stt.local.unload_after_idle_seconds": "사용을 마친 로컬 음성 인식 모델을 메모리에서 내리기까지 기다릴 시간입니다. 기본값 0은 모델을 계속 메모리에 둔다는 뜻이고, 예를 들어 300이면 5분 동안 사용하지 않을 때 내립니다. 내리면 메모리는 아끼지만 다음 음성 인식 시작이 느려질 수 있습니다.",
 +  "stt.groq.language": "Groq 음성 인식에 사용할 언어 코드입니다. 비우면 자동 감지합니다.",
 +  "stt.openai.language": "OpenAI 음성 인식에 사용할 언어 코드입니다. 비우면 자동 감지합니다.",

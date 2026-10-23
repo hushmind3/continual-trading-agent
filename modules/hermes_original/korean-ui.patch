@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..b27b61d321 100644
+index 18475fe8f4..f003d56b5c 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1815 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1839 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -322,6 +322,30 @@ index 18475fe8f4..b27b61d321 100644
 +  "tts.provider": "텍스트 음성 변환 제공자",
 +  "tts.keep_warm_seconds": "로컬 음성 엔진을 메모리에 유지할 시간(초)",
 +  "tts.streaming.min_len": "음성으로 읽기 시작할 최소 문장 길이",
++  "tts.deepinfra.model": "DeepInfra model (사용할 음성 합성 모델)",
++  "tts.deepinfra.voice": "DeepInfra voice (읽을 때 사용할 목소리)",
++  "tts.edge.voice": "Edge voice (읽을 때 사용할 목소리)",
++  "tts.elevenlabs.model_id": "ElevenLabs model ID (음성 생성 모델 식별자)",
++  "tts.elevenlabs.voice_id": "ElevenLabs voice ID (사용할 목소리 식별자)",
++  "tts.gemini.model": "Gemini model (사용할 음성 합성 모델)",
++  "tts.gemini.voice": "Gemini voice (읽을 때 사용할 목소리)",
++  "tts.kittentts.model": "KittenTTS model (로컬 음성 합성 모델)",
++  "tts.kittentts.voice": "KittenTTS voice (읽을 때 사용할 목소리)",
++  "tts.minimax.model": "MiniMax model (사용할 음성 합성 모델)",
++  "tts.minimax.voice_id": "MiniMax voice ID (사용할 목소리 식별자)",
++  "tts.mistral.model": "Mistral model (사용할 음성 합성 모델)",
++  "tts.mistral.voice_id": "Mistral voice ID (사용할 목소리 식별자)",
++  "tts.neutts.device": "NeuTTS device (음성 합성에 쓸 연산 장치)",
++  "tts.neutts.model": "NeuTTS model (내려받아 사용할 음성 합성 모델)",
++  "tts.neutts.ref_audio": "Reference audio (목소리 참고용 오디오 파일)",
++  "tts.neutts.ref_text": "Reference text (참고 오디오에서 읽은 문장 파일)",
++  "tts.openai.model": "OpenAI model (사용할 음성 합성 모델)",
++  "tts.openai.voice": "OpenAI voice (읽을 때 사용할 목소리)",
++  "tts.piper.voice": "Piper voice (사용할 목소리 또는 음성 파일)",
++  "tts.xai.auto_speech_tags": "Automatic speech tags (읽는 문장에 감정·말투 지시 추가)",
++  "tts.xai.language": "xAI language (음성 합성 언어 코드)",
++  "tts.xai.speed": "xAI speed (말하기 속도)",
++  "tts.xai.voice_id": "xAI voice ID (사용할 목소리 식별자)",
 +  "tts.openai.consent_attestation": "Voice consent attestation (복제 음성 동의 확인값)",
 +  "tts.gemini.audio_tags": "Audio tags (낭독 감정·표현 태그)",
 +  "tts.gemini.persona_prompt_file": "Persona prompt file (목소리 연기 안내문 파일)",
@@ -1904,7 +1928,7 @@ index 18475fe8f4..b27b61d321 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1842,7 @@ function NestedValueEditor({
+@@ -42,7 +1866,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1913,7 +1937,7 @@ index 18475fe8f4..b27b61d321 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1859,7 @@ function NestedValueEditor({
+@@ -59,7 +1883,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1922,7 +1946,7 @@ index 18475fe8f4..b27b61d321 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1888,7 @@ export function AutoField({
+@@ -88,8 +1912,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1932,7 +1956,7 @@ index 18475fe8f4..b27b61d321 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1921,7 @@ export function AutoField({
+@@ -122,7 +1945,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1941,7 +1965,7 @@ index 18475fe8f4..b27b61d321 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1982,7 @@ export function AutoField({
+@@ -183,7 +2006,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

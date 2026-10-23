@@ -1,0 +1,32 @@
+# 헤르메스 원본 중메뉴
+
+용도: AI 에이전트 → 헤르메스 원본 → 원본 화면의 실제 백엔드, 공식 원본·업데이트 경계와 한국어 패치를 관리합니다.
+
+## 구현과 경로
+
+- `original/manager.py`: 원본 화면 소메뉴의 `status/start/stop` API.
+- `manager.py` → `../manager.py` → `modules/hermes_original/backend/manager.py`의 자동 등록 → 전체 메뉴 총괄 → 단일 `/api`.
+- `launch.py`: 공식 PM 환경·한국어 패치를 사용해 원본 CLI를 실행합니다. CLI: 프로젝트 루트에서 `.venv/platform/bin/python backend/ai_agent/HermesOriginal/launch.py <원본 인수>`.
+- `runtime.py`: 원본 대시보드 시작·상태·명시적 중지만 담당합니다. Git 서브모듈의 `.git` 파일과 기존 `.git` 디렉터리를 모두 허용합니다.
+- `korean-ui.patch`: 원본 484de065a821b4245697351d08327b465ffd41ba 기준 한국어 변경. 원본 작업 트리의 수정·추가 파일 54개를 보존합니다.
+- 등록·React 화면: [모듈 안내](../../../modules/hermes_original/README.md).
+
+공식 원본 설치·업데이트 위치는 `runtime/ai_agent/HermesOriginal/source/`로 유지합니다. 사용자 상태는 같은 담당 메뉴의 `home/`, 공식 PM 설치 도구는 `tools/`입니다. 이식 Hermes의 소스·환경·대화와 공유하거나 복제하지 않습니다. 원본 소스는 `.gitmodules`의 고정 버전 의존성이고, 설치된 패키지·홈·키·기록은 GitHub에 포함하지 않습니다.
+
+## GitHub 복원과 처음 준비
+
+프로젝트 루트에서 `git submodule update --init`으로 등록된 공식 소스를 받습니다. 플랫폼 설치 뒤 공식 PM 환경이 없는 새 설치에서만 다음을 실행합니다. 현재 설치본을 정리하는 과정에서 재설치하지 않습니다.
+
+```sh
+platform_root="$PWD"
+cd runtime/ai_agent/HermesOriginal/source
+HERMES_HOME="$platform_root/runtime/ai_agent/HermesOriginal/home" HERMES_RUNTIME_DIR="$platform_root/runtime/ai_agent/HermesOriginal/tools" "$platform_root/.venv/platform/bin/python" -m pm.cli install
+```
+
+한국어 패치는 대시보드 실행기가 적용 여부를 검사한 뒤 미적용일 때만 적용합니다. 웹 패키지·화면 빌드는 원본 `web/README.md`의 `npm install`, `npm run build`를 따릅니다. 계정·모델·메신저 연결은 원본 설정에서 별도로 준비합니다.
+
+## 업데이트와 확인
+
+공식 업데이트는 기존 `source/`에서 원본의 기능으로 수행합니다. 업데이트 후 패치가 충돌하면 파일을 덮어쓰지 않고 중단하므로 새 원본에 맞춰 패치를 갱신해야 합니다. 새 공식 버전과 패치가 실제로 동작하는지 확인한 뒤 상위 플랫폼의 Git 의존성 커밋도 함께 갱신합니다. 실행 중인 기존 소스에 `git submodule update --remote`나 강제 checkout을 임의로 실행하지 않습니다.
+
+확인: 단일 API의 `ai_agent/HermesOriginal/status`, `#ai_agent/HermesOriginal`의 실제 원본 화면, 원본 `git rev-parse HEAD`, 패치의 `git apply --reverse --check`를 사용합니다. 현재 정리의 실제 실행 확인은 모듈 README의 최신 항목을 따릅니다. 원본 업데이트·모델 추론·외부 메신저 전체를 이번 정리에서 실행하지 않습니다.

@@ -1,10 +1,11 @@
-# AI Agent
+# AI 에이전트 대메뉴
 
-AI Agent compatibility namespace. Actual program ownership and automatic registration now live under modules/. Finance and REA do not own this project.
+용도: 원본 AI 프로그램의 중메뉴를 취합하고 기존 이식 Hermes와의 소스 경계를 안내합니다.
 
-- [Hermes](../../modules/hermes/README.md): transplanted engine, chat, models, sessions, MCP and skills.
+- `manager.py`: [헤르메스 원본](HermesOriginal/README.md)과 [OpenClaw 원본](OpenClawOriginal/README.md) 중메뉴 매니저를 import합니다.
+- 각 중메뉴의 `original/manager.py`가 원본 화면 소메뉴를 담당합니다. 중메뉴 → 대메뉴 → 모듈 자동 등록 → 전체 메뉴 총괄 → 단일 `/api`로 연결합니다.
+- 원본들의 `modules/<id>/backend/manager.py`는 자동 등록용 연결이며 실제 업무 코드를 복제하지 않습니다. 화면·등록 정보는 해당 modules 폴더가 소유합니다.
+- [기존 이식 Hermes](../../modules/hermes/README.md)는 기존 모듈의 `backend/` 구현·전용 환경·등록을 유지합니다. `platform_modules.mount_namespaces()`가 `ai_agent.Hermes` 소스를 연결합니다.
+- 공식 원본 체크아웃은 각 `runtime/ai_agent/<중메뉴>/source/`, 사용자 설정은 `home/`, 도구는 `tools/`입니다. 기존 공식 설치·업데이트 경로를 유지하며 원본 Git 의존성과 플랫폼 연결 코드를 구분합니다.
 
-Call flow: feature → Hermes manager → module manifest → platform registry → existing single `/api`. `platform_modules.mount_namespaces()` preserves the `ai_agent.Hermes` Python imports without a fixed Hermes path in the coordinator.
-
-- [헤르메스 원본](../../modules/hermes_original/README.md): 전체 공식 체크아웃·공식 PM·원본 dashboard/CLI. 기존 이식본과 별도 홈을 사용합니다.
-- [OpenClaw 원본](../../modules/openclaw_original/README.md): 공식 OpenClaw 저장소와 독립 Node 실행 환경. 원본 Control UI를 기존 단일 `/api` lifecycle에 연결합니다.
+실제 실행과 미확인 범위는 각 중메뉴 README를 따릅니다. 다른 PC 설치·원본 업데이트·모델 응답을 이번 디렉터리 정리의 성공으로 표시하지 않습니다.

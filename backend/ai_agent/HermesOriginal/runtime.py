@@ -58,7 +58,7 @@ def start():
         current = status()
         if current['state'] != 'stopped':
             return current
-        if not (SOURCE / '.git').is_dir():
+        if not (SOURCE / '.git').exists():
             raise ValueError('Hermes 공식 원본 체크아웃을 먼저 설치하세요.')
         BASE.mkdir(parents=True, exist_ok=True)
         HOME.mkdir(parents=True, exist_ok=True)

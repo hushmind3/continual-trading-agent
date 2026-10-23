@@ -1,0 +1,6 @@
+[submodule "openclaw-original"]
+	path = runtime/ai_agent/OpenClawOriginal/source
+	url = https://github.com/openclaw/openclaw.git
+[submodule "hermes-original"]
+	path = runtime/ai_agent/HermesOriginal/source
+	url = https://github.com/NousResearch/hermes-agent.git

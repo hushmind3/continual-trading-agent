@@ -18,6 +18,8 @@ Hermes 코드는 hermes/backend와 hermes/frontend에 들어 있습니다. 원�
 
 오버로드 → 나자릭은 [등록·화면](nazarick/README.md)과 [실제 백엔드](../backend/overlord/nazarick/README.md)를 연결합니다. 백엔드 중메뉴·소메뉴 소스는 `backend/overlord/nazarick/`, 데이터는 `runtime/overlord/nazarick/`이며 자동 등록 폴더에는 등록 연결과 화면만 둡니다.
 
+AI 에이전트의 공식 원본 등록·화면은 [Hermes 원본](hermes_original/README.md)과 [OpenClaw 원본](openclaw_original/README.md), 실제 중메뉴 구현은 `backend/ai_agent/`가 소유합니다. 원본 체크아웃은 `.gitmodules`의 고정 커밋, 한국어 변경은 추적되는 패치로 보존하며 사용자 상태·도구와 구분합니다.
+
 ## 최종 목표와 현재 경계
 
 외부 저장소의 최초 구조 분석·변환도 플랫폼이 수행해야 합니다. 사용자가 직접 어댑터를 만드는 것을 최종 사용 흐름으로 삼지 않습니다. 기존 화면·공식 실행기를 우선 재사용하고, 변환한 프로그램의 실행을 확인한 뒤 등록합니다. 실패한 변환은 이유를 표시하며 성공으로 등록하지 않습니다.
@@ -29,7 +31,7 @@ Hermes 코드는 hermes/backend와 hermes/frontend에 들어 있습니다. 원�
 
 ## 모듈 실행 규격과 환경 소유
 
-`runtime`은 `{language, protocol:"module-jsonl-v1", command:[...], state, package?, entry?}`를 선언합니다. command는 shell 문자열이 아니며 모듈 폴더를 cwd로 사용하고 `{module}`을 실제 폴더로 치환합니다. Python은 모듈 `.venv`를, Node는 자체 코드·node_modules를 사용합니다. 표준 입력/출력의 `id,operation,payload` / `id,result|error`로 describe·request·hook·shutdown을 교환합니다. 원본 엔진에는 해당 언어의 얇은 어댑터가 필요하며 Node 업무 코드를 Python으로 번역하지 않습니다. OpenClaw 설치·실제 원본 엔진 어댑터는 아직 수행하지 않았습니다.
+`runtime`은 `{language, protocol:"module-jsonl-v1", command:[...], state, package?, entry?}`를 선언합니다. command는 shell 문자열이 아니며 모듈 폴더를 cwd로 사용하고 `{module}`을 실제 폴더로 치환합니다. Python은 모듈 `.venv`를, Node는 자체 코드·node_modules를 사용합니다. 표준 입력/출력의 `id,operation,payload` / `id,result|error`로 describe·request·hook·shutdown을 교환합니다. 원본 엔진에는 해당 언어의 얇은 어댑터가 필요하며 Node 업무 코드를 Python으로 번역하지 않습니다. 공식 OpenClaw 원본 설치·Gateway 연결은 전용 중메뉴가 담당하며 범용 Node JSONL 변환과 구분합니다.
 
 금융·REA의 worker.py는 자신의 API와 상태만 제공하며 추가 HTTP 포트가 없습니다. 호스트 module_runtime.py가 단일 `/api`에 연결하고 원본 입력 스키마·상태 코드·응답을 유지합니다. 모듈 하나의 의존성 로딩이 실패하면 오류를 표시하고 나머지 호스트/모듈을 유지합니다. 재시작은 전체 busy 확인 → 예약 → 전용 실행기 종료 → 적용 순서이며 실패 시 성공으로 표시하지 않습니다.
 

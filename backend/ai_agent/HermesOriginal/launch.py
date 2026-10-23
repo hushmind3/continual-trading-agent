@@ -21,7 +21,7 @@ def environment():
 
 def launch(arguments):
     if arguments and arguments[0] == 'dashboard':
-        patch = Path(__file__).resolve().parents[1] / 'korean-ui.patch'
+        patch = Path(__file__).resolve().with_name('korean-ui.patch')
         # Reuse the already-applied patch; never overwrite upstream/local conflicts.
         applied = subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)],
                                  cwd=SOURCE, capture_output=True)

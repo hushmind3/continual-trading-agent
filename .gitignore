@@ -7,6 +7,7 @@
 *.gguf
 
 # Installed dependencies and generated caches.
+.DS_Store
 .venv/
 .venv-*/
 __pycache__/
@@ -18,6 +19,9 @@ frontend/coverage/
 frontend/test-results/
 frontend/playwright-report/
 *.tsbuildinfo
+
+# Agent worktrees are separate checkouts, never part of the platform source.
+/.worktrees/
 
 # Active machine state and credentials.
 runtime/

@@ -11,6 +11,7 @@
 | 금융 화면 | [modules/finance/frontend/](../modules/finance/frontend/README.md) |
 | REA 화면 | [modules/rea/frontend/](../modules/rea/frontend/README.md) |
 | Hermes 화면 | [modules/hermes/frontend/](../modules/hermes/frontend/README.md) |
+| 원본 Hermes·OpenClaw | [Hermes 원본](../modules/hermes_original/README.md) · [OpenClaw 원본](../modules/openclaw_original/README.md) |
 | 오버로드 / 나자릭 | [modules/nazarick/frontend/](../modules/nazarick/frontend/README.md) |
 | 프로젝트 설치·앱 화면 | [modules/projects/](../modules/projects/README.md) |
 

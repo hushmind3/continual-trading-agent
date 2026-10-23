@@ -6,7 +6,7 @@
     "title": "AI 에이전트"
   },
   "backend": {
-    "namespace": "ai_agent.HermesOriginal",
+    "namespace": "platform_plugins.hermes_original",
     "entry": "manager"
   },
   "frontend": {
@@ -15,5 +15,6 @@
   "data": [
     "runtime/ai_agent/HermesOriginal"
   ],
+  "legacy_shared_code": true,
   "order": 31
 }

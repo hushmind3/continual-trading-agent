@@ -7,7 +7,7 @@
     "title": "AI 에이전트"
   },
   "backend": {
-    "namespace": "ai_agent.OpenClawOriginal",
+    "namespace": "platform_plugins.openclaw_original",
     "entry": "manager"
   },
   "frontend": {
@@ -16,5 +16,6 @@
   "data": [
     "runtime/ai_agent/OpenClawOriginal"
   ],
+  "legacy_shared_code": true,
   "order": 32
 }

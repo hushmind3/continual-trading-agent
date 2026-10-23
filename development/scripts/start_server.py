@@ -263,7 +263,10 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                 for record in current:stop_verified(record)
                 env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_APPLY_ID=operation['id'])
                 with (RUNTIME/'server.stdout.log').open('ab') as output,(RUNTIME/'server.stderr.log').open('ab') as errors:
-                    child=subprocess.Popen([HOST_PYTHON,'-m','uvicorn','web_api:app','--host','127.0.0.1','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),start_new_session=os.name!='nt')
+                    # The platform UI is also used from other devices on the same LAN.
+                    # Keep the existing port and API; bind all interfaces so both
+                    # loopback and the Mac's Wi-Fi address reach the same server.
+                    child=subprocess.Popen([HOST_PYTHON,'-m','uvicorn','web_api:app','--host','0.0.0.0','--port',str(PORT)],cwd=ROOT,env=env,stdout=output,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),start_new_session=os.name!='nt')
                 for _ in range(100):
                     if child.poll() is not None:raise RuntimeError('서버 시작 실패: runtime/platform/server.stderr.log')
                     if ready():break

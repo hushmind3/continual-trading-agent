@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..778d69cfa0 100644
+index 18475fe8f4..bb56cc9891 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1737 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1752 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -279,6 +279,21 @@ index 18475fe8f4..778d69cfa0 100644
 +  "display.skin": "터미널 화면 테마",
 +  "dashboard.theme": "웹 대시보드 테마",
 +  "tts.provider": "텍스트 음성 변환 제공자",
++  "tts.keep_warm_seconds": "로컬 음성 엔진을 메모리에 유지할 시간(초)",
++  "tts.streaming.min_len": "음성으로 읽기 시작할 최소 문장 길이",
++  "tts.openai.consent_attestation": "Voice consent attestation (복제 음성 동의 확인값)",
++  "tts.gemini.audio_tags": "Audio tags (낭독 감정·표현 태그)",
++  "tts.gemini.persona_prompt_file": "Persona prompt file (목소리 연기 안내문 파일)",
++  "tts.xai.optimize_streaming_latency": "Streaming latency optimization (첫 음성 지연 최적화)",
++  "tts.xai.sample_rate": "Sample rate (초당 음성 표본 수)",
++  "stt.streaming": "Streaming transcription (말하는 중 부분 인식)",
++  "stt.cloud_trim_silence": "클라우드 전송 전 긴 무음 줄이기",
++  "stt.cloud_trim_threshold_db": "무음으로 볼 음량 기준(dB)",
++  "stt.cloud_trim_keep_ms": "무음 구간마다 남겨둘 길이(밀리초)",
++  "stt.local.vad": "VAD (말소리 구간 감지)",
++  "stt.local.no_speech_prob_threshold": "No-speech probability (무음으로 판단할 확률 기준)",
++  "stt.local.logprob_threshold": "Log probability (인식 결과를 버릴 낮은 확신 기준)",
++  "stt.local.initial_prompt": "음성 인식 전에 알려줄 단어·문맥",
 +  "stt.local.model": "faster-whisper 음성 인식 모델 크기",
 +  "stt.groq.model": "Groq 음성 인식 모델",
 +  "stt.openai.model": "OpenAI 음성 인식 모델",
@@ -385,7 +400,7 @@ index 18475fe8f4..778d69cfa0 100644
 +  paste_collapse_char_threshold: "붙여넣기 접기 글자 수 기준",
 +  "display.vim_mode": "Vim 단축키 사용",
 +  "display.pet.unicode_cols": "이모지·문자 폭 강제값",
-+  "tts.openai.pcm_sample_rate": "PCM 음성의 초당 표본 수",
++  "tts.openai.pcm_sample_rate": "PCM sample rate (초당 음성 표본화 횟수)",
 +  "tts.xai.bit_rate": "압축 음성 전송률(초당 비트 수)",
 +  "voice.voice_chat_mode": "음성 대화 처리 방식",
 +  "delegation.max_spawn_depth": "하위 에이전트 생성 단계 상한",
@@ -1061,26 +1076,27 @@ index 18475fe8f4..778d69cfa0 100644
 +  "discord.voice_fx.speech_gain": "음성 답변과 짧은 안내 문구의 재생 음량입니다. 0은 무음, 1은 최대 음량입니다.",
 +  "discord.voice_fx.ack_enabled": "첫 도구 작업을 시작하기 전에 짧은 음성 안내를 재생합니다.",
 +  "discord.voice_fx.ack_phrases": "작업 시작 전에 무작위로 골라 말할 짧은 안내 문구 목록입니다. 빈 목록이면 말하지 않습니다.",
-+  "tts.keep_warm_seconds": "Piper·KittenTTS 같은 로컬 음성 엔진을 마지막 사용 뒤에도 메모리에 유지할 시간(초)입니다. 0이면 바로 내립니다.",
-+  "tts.streaming.min_len": "생성 중인 문장을 따로 음성으로 읽기 시작할 최소 글자 수입니다. 짧은 문장은 다음 문장과 합쳐 읽습니다.",
++  "tts.provider": "답변이나 음성 파일에 사용할 음성 합성 서비스 또는 로컬 엔진입니다. Edge는 온라인 무료 음성, Piper·KittenTTS·NeuTTS는 이 컴퓨터에서 실행하는 엔진입니다. 다른 서비스는 계정 키와 해당 서비스 설정이 필요할 수 있습니다.",
++  "tts.keep_warm_seconds": "Piper·KittenTTS 같은 로컬 음성 엔진을 사용 후에도 메모리에 잠시 유지하는 시간입니다. 다시 쓸 때 불러오는 시간을 줄이는 대신 그동안 메모리를 사용합니다. 기본값은 60초이고 0이면 사용 직후 메모리에서 내립니다.",
++  "tts.streaming.min_len": "답변을 만들면서 음성으로 읽을 때, 짧은 문장을 다음 문장과 합쳐 한 번에 읽기 시작할 최소 글자 수입니다. 기본값은 20자이며 한국어·일본어처럼 글자당 정보가 많은 언어는 6자 안팎으로 낮출 수 있습니다. 낮추면 더 일찍 읽지만 짧은 음성 조각이 늘 수 있습니다.",
 +  "tts.edge.voice": "Edge 음성 합성에서 사용할 음성 이름입니다. 예: en-US-AriaNeural.",
 +  "tts.elevenlabs.voice_id": "ElevenLabs 음성 합성에 사용할 음성 ID입니다.",
 +  "tts.elevenlabs.model_id": "ElevenLabs에 음성 생성을 요청할 때 사용할 모델 ID입니다.",
 +  "tts.openai.model": "OpenAI 음성 합성에 사용할 모델 ID입니다.",
 +  "tts.openai.voice": "OpenAI 음성 합성에서 사용할 목소리 이름입니다.",
-+  "tts.openai.consent_attestation": "복제 음성을 허용하는 호환 API가 요구할 때 요청에 함께 보내는 동의 확인 값입니다. 비우면 보내지 않습니다.",
-+  "tts.openai.pcm_sample_rate": "실시간 음성 재생에 사용할 PCM 오디오의 초당 표본 수입니다. 호환 서버가 실제 표본 수를 알려주면 그 값이 우선합니다.",
++  "tts.openai.consent_attestation": "복제 음성을 지원하는 OpenAI 호환 서비스가 동의 확인값을 요구할 때 요청에 입력한 내용을 그대로 보냅니다. 이 칸은 동의를 대신 받지 않으므로, 서비스가 안내한 값을 입력하세요. 비우면 항목을 보내지 않습니다.",
++  "tts.openai.pcm_sample_rate": "PCM(압축하지 않은 디지털 음성)에서 1초 동안 측정할 소리 표본 수입니다. 기본값은 24,000Hz입니다. 호환 서버가 응답에 실제 표본 수를 알려주면 그 값을 우선합니다.",
 +  "tts.gemini.model": "Gemini 음성 합성에 사용할 모델 ID입니다.",
 +  "tts.gemini.voice": "Gemini 음성 합성에서 사용할 목소리 이름입니다.",
-+  "tts.gemini.audio_tags": "음성 대본에 감정이나 표현을 나타내는 오디오 태그를 모델을 통해 추가합니다.",
-+  "tts.gemini.persona_prompt_file": "음성 낭독 방식이나 말투를 지정할 안내문 파일 경로입니다. 비우면 별도 안내문을 사용하지 않습니다.",
++  "tts.gemini.audio_tags": "Gemini 3.1 음성 합성에서만 지원됩니다. 보조 모델이 음성으로 읽을 문장에 `[whispers]`(속삭임)나 `[excitedly]`(신나게) 같은 표현 지시를 넣습니다. 원래 답변 글은 바꾸지 않으며, 다른 모델에서는 적용하지 않습니다.",
++  "tts.gemini.persona_prompt_file": "Gemini 음성의 말투·속도·연기 방식을 적은 안내문 파일입니다. `{transcript}`를 넣으면 그 자리에 실제 읽을 문장을 채웁니다. 표시를 넣지 않으면 읽을 문장을 안내문 뒤에 붙입니다. 비우면 별도 안내문 없이 읽습니다.",
 +  "tts.xai.voice_id": "xAI 음성 합성에서 사용할 기본 또는 사용자 지정 목소리 ID입니다.",
-+  "tts.xai.language": "xAI 음성 합성에 사용할 언어 코드입니다. auto는 자동 감지를 요청합니다.",
-+  "tts.xai.speed": "xAI 음성 합성의 말하기 속도입니다. 허용 범위는 0.7부터 1.5까지입니다.",
-+  "tts.xai.auto_speech_tags": "음성 대본을 다듬어 표현·감정 태그를 자동으로 추가합니다.",
-+  "tts.xai.optimize_streaming_latency": "xAI 음성 스트리밍의 지연을 줄이는 수준입니다. 높이면 음성 품질과 속도 사이의 균형이 달라집니다.",
-+  "tts.xai.sample_rate": "xAI가 생성할 오디오의 초당 표본 수입니다. 지원 값은 22050·24000·44100·48000입니다.",
-+  "tts.xai.bit_rate": "MP3 음성 파일에 사용할 초당 비트 수입니다. MP3 형식일 때만 적용됩니다.",
++  "tts.xai.language": "xAI 음성 합성에 사용할 언어 코드입니다. 예: `en`, `pt-BR`. `auto`는 언어를 자동으로 감지합니다.",
++  "tts.xai.speed": "xAI 음성 합성의 말하기 속도입니다. 1.0은 기본 속도이며 0.7~1.5 범위에서 조절합니다.",
++  "tts.xai.auto_speech_tags": "xAI에 보내기 전에 보조 모델이 읽을 문장에 감정·말투 지시를 덧붙입니다. 이 기능은 음성 표현을 바꾸기 위한 것으로, 필요 없으면 끌 수 있습니다.",
++  "tts.xai.optimize_streaming_latency": "첫 음성이 나오기까지 기다리는 시간을 줄일지 정합니다. 0은 추가 최적화를 요청하지 않고, 1·2는 더 빨리 소리를 받도록 요청하는 대신 음질과의 균형이 달라질 수 있습니다.",
++  "tts.xai.sample_rate": "초당 음성 표본 수(Hz)로, 재생 장치가 소리를 해석할 기준을 정합니다. 지원 값은 22050·24000·44100·48000Hz입니다.",
++  "tts.xai.bit_rate": "MP3 파일에 1초마다 담을 음성 데이터량입니다. 기본값은 128,000bit/s(128kbps)이며 MP3 형식에서만 사용합니다. 값이 커지면 파일도 커집니다.",
 +  "tts.mistral.model": "Mistral 음성 합성에 사용할 모델 ID입니다.",
 +  "tts.mistral.voice_id": "Mistral 음성 합성에 사용할 목소리 ID입니다.",
 +  "tts.minimax.model": "MiniMax 음성 합성에 사용할 모델 ID입니다.",
@@ -1125,19 +1141,19 @@ index 18475fe8f4..778d69cfa0 100644
 +  "terminal.docker_snap_compat": "Ubuntu의 Snap 방식으로 설치한 Docker에서 특정 보안 옵션이 거부될 때 호환 처리를 적용합니다. 이를 켜도 다른 보안 제한은 유지됩니다.",
 +  "terminal.docker_shared_container_key": "같은 키를 입력한 Hermes 프로필끼리 Docker 실행 환경을 공유합니다. 신뢰하는 프로필에만 같은 키를 쓰고, 비우면 프로필마다 따로 만듭니다.",
 +  "terminal.persistent_shell": "SSH에서는 명령 사이에 내보낸 환경 변수 값을 유지하고, 로컬에서는 설정된 지속 셸 동작을 사용합니다.",
-+  "stt.enabled": "메신저 음성 메시지를 글자로 바꾸는 음성 인식을 사용합니다.",
-+  "stt.echo_transcripts": "음성 메시지에서 인식한 원문을 별도의 마이크 표시 메시지로 다시 보여줍니다.",
++  "stt.enabled": "메신저로 받은 음성 메시지를 글자로 바꾸는 STT(음성 인식)를 사용합니다.",
++  "stt.echo_transcripts": "메신저 음성 메시지에서 인식한 문장을 마이크 표시가 붙은 별도 메시지로 다시 보여줍니다. 끄면 이 확인용 메시지만 생략합니다.",
 +  "stt.language": "음성 인식에서 기본으로 사용할 언어 코드입니다. 비우면 서비스가 자동으로 감지하며, 제공자별 설정이 있으면 그 값이 우선합니다.",
-+  "stt.streaming": "지원 서비스에서 말하는 도중에 인식된 문장을 부분 결과로 전달합니다. 지원하지 않거나 실패하면 음성 파일을 한 번에 처리합니다.",
-+  "stt.cloud_trim_silence": "클라우드 음성 인식에 보내기 전에 음성 앞뒤와 중간의 긴 무음을 줄입니다.",
-+  "stt.cloud_trim_threshold_db": "이 음량보다 작은 소리를 무음으로 보고 줄입니다. 데시벨 값이며 더 낮을수록 조용한 소리도 보존됩니다.",
-+  "stt.cloud_trim_keep_ms": "무음 구간을 줄일 때 자연스러운 말 간격을 위해 남겨 둘 길이(밀리초)입니다.",
++  "stt.streaming": "지원하는 OpenAI·xAI·ElevenLabs 서비스에서 말하는 도중 인식 결과를 조금씩 전달합니다. 끄거나 실시간 인식에 실패하면 녹음 파일을 한 번에 보내 처리합니다.",
++  "stt.cloud_trim_silence": "클라우드 음성 인식 서비스에 녹음을 보내기 전에 ffmpeg로 긴 무음 구간을 줄여 전송량과 대기 시간을 아낍니다. 로컬 faster-whisper는 이 옵션 대신 아래 VAD를 사용합니다. 무음 정리가 실패하면 원본 녹음을 보냅니다.",
++  "stt.cloud_trim_threshold_db": "이 기준보다 작은 소리를 무음으로 간주합니다. dB(데시벨)는 음량 단위이며, 더 낮은 음량 기준을 쓰면 작은 소리도 녹음에 남습니다.",
++  "stt.cloud_trim_keep_ms": "무음 구간을 줄인 뒤에도 말 사이에 남겨 둘 시간(밀리초)입니다. 너무 짧으면 말 사이가 부자연스럽게 붙을 수 있습니다.",
 +  "stt.local.language": "로컬 faster-whisper 인식에 사용할 언어 코드입니다. 비우면 음성에서 언어를 자동 감지합니다.",
 +  "stt.local.initial_prompt": "로컬 음성 인식에 미리 알려줄 단어나 문맥입니다. 고유명사 등 인식에 참고할 내용을 적습니다.",
-+  "stt.local.vad": "로컬 음성 인식 전에 음성 활동 감지를 사용해 무음 구간을 걸러냅니다. 음악이나 배경음은 끄는 편이 적합할 수 있습니다.",
++  "stt.local.vad": "VAD(말소리 구간 감지)를 켜면 로컬 음성 인식 전에 무음 구간을 걸러냅니다. 음악·환경음처럼 말이 아닌 소리도 인식해야 한다면 끄세요.",
 +  "stt.local.vad_min_silence_ms": "로컬 음성 인식에서 음성 구간을 나눌 때 필요한 최소 무음 길이(밀리초)입니다.",
-+  "stt.local.no_speech_prob_threshold": "음성 인식기가 말이 없다고 판단하는 확률 기준입니다. 로그 확률 기준과 함께 만족할 때 해당 구간을 버립니다.",
-+  "stt.local.logprob_threshold": "인식 결과가 신뢰하기 어렵다고 판단하는 로그 확률 기준입니다. 무음 확률 기준과 함께 만족할 때 해당 구간을 버립니다.",
++  "stt.local.no_speech_prob_threshold": "인식기가 구간을 무음으로 판단한 확률 기준입니다. 해당 확률이 이 값보다 높고 인식 확신도도 아래 기준보다 낮을 때에만 그 구간을 버립니다. 두 조건을 함께 써서 조용한 실제 말소리가 잘리는 일을 줄입니다.",
++  "stt.local.logprob_threshold": "음성 인식 결과에 대한 확신 점수의 기준입니다. 점수가 이 값보다 낮고 무음 가능성도 위 기준보다 높을 때에만 해당 구간을 버립니다. 점수가 낮다고 단독으로 인식 결과를 버리지는 않습니다.",
 +  "stt.local.unload_after_idle_seconds": "사용하지 않는 로컬 음성 인식 모델을 메모리에서 내리기까지 기다릴 시간(초)입니다. 0이면 계속 메모리에 둡니다.",
 +  "stt.groq.language": "Groq 음성 인식에 사용할 언어 코드입니다. 비우면 자동 감지합니다.",
 +  "stt.openai.language": "OpenAI 음성 인식에 사용할 언어 코드입니다. 비우면 자동 감지합니다.",
@@ -1629,7 +1645,6 @@ index 18475fe8f4..778d69cfa0 100644
 +  "nous.guest": "Nous 서비스에 게스트 방식으로 연결합니다. 계정별 기능은 제한될 수 있습니다.",
 +  "terminal.backend": "터미널 명령과 코드 실행을 맡길 환경을 선택합니다. 실행 위치와 지원 기능은 선택한 환경에 따라 달라집니다.",
 +  "terminal.modal_mode": "Modal 원격 터미널에 사용할 실행 방식을 고릅니다. 실제로 쓸 수 있는 방식은 Modal 계정 연결과 게이트웨이 설정에 따라 달라질 수 있습니다.",
-+  "tts.provider": "답변을 음성으로 읽을 때 사용할 음성 합성 서비스를 정합니다.",
 +  "stt.local.model": "로컬 faster-whisper 음성 인식에 사용할 모델 크기입니다. 큰 모델은 보통 더 정확하지만 메모리와 처리 시간이 더 필요합니다.",
 +  "stt.groq.model": "Groq 서비스에 음성을 보내 글자로 바꿀 때 사용할 모델 ID입니다.",
 +  "stt.openai.model": "OpenAI 음성 인식 API에 사용할 모델 ID입니다.",
@@ -1826,7 +1841,7 @@ index 18475fe8f4..778d69cfa0 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1764,7 @@ function NestedValueEditor({
+@@ -42,7 +1779,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1835,7 +1850,7 @@ index 18475fe8f4..778d69cfa0 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1781,7 @@ function NestedValueEditor({
+@@ -59,7 +1796,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1844,7 +1859,7 @@ index 18475fe8f4..778d69cfa0 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1810,7 @@ export function AutoField({
+@@ -88,8 +1825,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1854,7 +1869,7 @@ index 18475fe8f4..778d69cfa0 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1843,7 @@ export function AutoField({
+@@ -122,7 +1858,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1863,7 +1878,7 @@ index 18475fe8f4..778d69cfa0 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1904,7 @@ export function AutoField({
+@@ -183,7 +1919,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

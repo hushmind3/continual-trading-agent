@@ -19,4 +19,4 @@ AI 에이전트 화면 구성과 주소를 관리합니다. `ai_agent_menu_manag
 
 2026-10-16 확인: TypeScript·Vite 빌드 성공, Hermes 브라우저 검사 24개 통과. 3단계 메뉴 접기·펼치기, 여섯 실행 수치, 모델 미실행 표시, 문서·첨부·설정 초안 보존을 확인했습니다. HTML 보고서는 채팅 옆에서 실제로 열어 확인했습니다. 프론트 독립 적용 완료. 실제 GGUF 추론·학습·매매는 이번 UI 검사에서 실행하지 않았습니다.
 
-헤르메스 원본은 별도 중메뉴 `#ai_agent/HermesOriginal`에 등록합니다. [원본 모듈](../../../../modules/hermes_original/README.md)의 register.ts가 전체 원본 dashboard를 열며, 기존 Hermes 메뉴·실행·기록은 유지합니다.
+헤르메스 원본은 별도 중메뉴 `#ai_agent/HermesOriginal`에 등록합니다. [원본 모듈](../../../../modules/hermes_original/README.md)의 register.ts가 전체 원본 dashboard를 엽니다. OpenClaw 원본도 별도 중메뉴 `#ai_agent/OpenClawOriginal`과 독립 mountKey로 등록하며 [원본 실행 안내](../../../../runtime/ai_agent/OpenClawOriginal/README.md)에 따라 전용 상태 폴더에서 공식 Control UI를 엽니다. 두 원본의 설정·대화·실행 상태는 분리하며 기존 Hermes 작업공간은 유지합니다.

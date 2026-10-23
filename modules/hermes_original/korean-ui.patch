@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..b3c250beda 100644
+index 18475fe8f4..cbbba39e3b 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1774 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1783 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -167,6 +167,15 @@ index 18475fe8f4..b3c250beda 100644
 +  "code_execution.max_session_kernels": "대화 하나에서 허용할 코드 커널 수",
 +  "models_dev.url": "모델 사양·가격 정보 출처 주소",
 +  "network.force_ipv4": "네트워크 연결에 IPv4 우선 사용",
++  "web.backend": "Backend (검색·페이지 읽기 공통 서비스)",
++  "web.search_backend": "Search backend (웹 검색 서비스)",
++  "web.extract_backend": "Extract backend (웹페이지 본문 읽기 서비스)",
++  "web.extract_char_limit": "Extract char limit (모델에 전달할 페이지 글자 수)",
++  "web.keyless_fallback": "Keyless fallback (API 키 없이 무료 검색 서비스 사용)",
++  "web.keyless_rescue": "Keyless rescue (선택한 서비스 실패 시 무료 재시도)",
++  "web.cache_enabled": "Cache enabled (웹 검색·읽기 결과 임시 저장)",
++  "web.cache_ttl_minutes": "Cache TTL minutes (결과를 임시 보관할 시간)",
++  "web.cache_exempt_hosts": "Cache exempt hosts (항상 최신 페이지를 읽을 사이트)",
 +  "onboarding.profile_build": "처음 설정할 때 프로필 만드는 방식",
 +  "onboarding.run": "시작 안내 실행 방식",
 +  "computer_use.cua_telemetry": "컴퓨터 조작 기능 사용 정보 전송",
@@ -1377,15 +1386,15 @@ index 18475fe8f4..b3c250beda 100644
 +  "lsp.install_strategy": "필요한 언어 서버 실행 파일이 없을 때 자동 설치할지, 사용자가 준비한 파일만 사용할지 정합니다.",
 +  "lsp.package_manager": "자동 설치할 언어 서버 패키지를 내려받을 패키지 관리자입니다.",
 +  "lsp.idle_timeout": "사용하지 않는 언어 서버를 종료하기 전 기다릴 시간입니다.",
-+  "web.backend": "웹 검색과 페이지 내용 읽기에서 기본으로 사용할 서비스를 지정합니다. 기능별 설정이 있으면 해당 값이 우선합니다.",
-+  "web.search_backend": "web_search 도구가 검색을 요청할 서비스를 지정합니다. 비우면 web.backend를 사용합니다.",
-+  "web.extract_backend": "web_extract 도구가 웹페이지 내용을 가져올 서비스를 지정합니다. 비우면 web.backend를 사용합니다.",
-+  "web.extract_char_limit": "웹페이지에서 가져와 문맥에 넣을 글자의 최대 수입니다. 페이지가 더 길면 잘라 표시하고 전체 내용은 캐시에 보관합니다.",
-+  "web.keyless_fallback": "유료 키나 별도 검색 서비스를 설정하지 않았을 때 공개 무료 검색 서비스를 차례로 사용합니다.",
-+  "web.keyless_rescue": "설정된 검색 서비스의 요청이 실패하면 해당 요청 한 번만 무료 공개 서비스로 다시 시도합니다.",
-+  "web.cache_enabled": "성공한 동일 웹 검색과 페이지 읽기 결과를 잠시 저장해 같은 요청의 재조회와 중복 요청을 줄입니다.",
-+  "web.cache_ttl_minutes": "웹 검색·페이지 읽기 결과를 캐시에 보관할 시간(분)입니다.",
-+  "web.cache_exempt_hosts": "캐시를 사용하지 않고 항상 최신 페이지를 직접 가져올 사이트 목록입니다. 정확한 호스트명이나 도메인 패턴을 지정합니다.",
++  "web.backend": "웹 검색(web_search)과 웹페이지 본문 읽기(web_extract)에 공통으로 쓸 서비스를 정합니다. Search backend나 Extract backend에 별도 값을 넣으면 그 기능은 해당 값을 우선합니다. 비워 두면 저장된 서비스 선택과 사용 가능한 연결 정보를 바탕으로 Hermes가 경로를 정합니다. 서비스를 직접 지정했는데 연결할 수 없으면 조용히 다른 곳으로 바꾸지 않고 오류를 돌려줍니다.",
++  "web.search_backend": "검색어로 웹페이지를 찾는 web_search 도구에만 쓸 서비스입니다. 비우면 공통 Backend 설정을 따르고, 그것도 지정하지 않았다면 사용 가능한 연결을 찾아 선택합니다. 값을 지정하면 공통 Backend보다 우선하며 검색할 때만 적용됩니다.",
++  "web.extract_backend": "URL을 받아 웹페이지 본문을 읽는 web_extract 도구에만 쓸 서비스입니다. 비우면 공통 Backend 설정을 따르고, 그것도 지정하지 않았다면 사용 가능한 연결을 찾아 선택합니다. 값을 지정하면 공통 Backend보다 우선하며 페이지 읽기에만 적용됩니다.",
++  "web.extract_char_limit": "웹페이지 한 곳에서 읽어 모델의 대화 문맥에 전달할 최대 글자 수입니다. 기본값은 15,000자입니다. 페이지가 더 길면 앞부분과 뒷부분만 전달하고 전체 본문은 웹 캐시에 보관합니다. 웹페이지 자체의 크기나 검색 결과 수를 제한하는 설정은 아닙니다.",
++  "web.keyless_fallback": "사용할 서비스를 직접 지정하지 않았고 쓸 수 있는 API 키도 없을 때, API 키 없이 쓸 수 있는 공개 무료 검색 서비스들을 차례로 이용할지 정합니다. 기본값은 켜짐입니다. 유료·로그인 연결이 가능한 서비스를 대신 먼저 쓰지는 않으며, 끄면 이 무료 서비스 묶음을 사용하지 않습니다.",
++  "web.keyless_rescue": "선택해 둔 웹 서비스의 요청이 실패했을 때, 해당 요청 한 번만 API 키가 필요 없는 공개 무료 서비스로 다시 시도할지 정합니다. 기본값은 켜짐이며 keyless_fallback도 켜져 있어야 작동합니다. 다음 요청은 무료 서비스에 고정되지 않고 원래 선택한 서비스부터 다시 시도합니다.",
++  "web.cache_enabled": "성공한 웹 검색·페이지 읽기 결과를 잠시 저장해 같은 요청을 다시 보낼 때 재사용할지 정합니다. 기본값은 켜짐입니다. 실패한 요청은 저장하지 않으며, 동시에 들어온 같은 검색 요청은 한 번만 서비스에 보낼 수 있습니다. localhost·사내망 주소는 항상 새로 읽고, 지정한 사이트도 캐시에서 제외합니다.",
++  "web.cache_ttl_minutes": "성공한 웹 검색·페이지 읽기 결과를 다시 가져오지 않고 재사용할 시간(분)입니다. 기본값은 20분입니다. 지난 결과는 만료되어 다음 요청에서 새로 가져오며, 실제 허용 범위는 1분에서 24시간입니다.",
++  "web.cache_exempt_hosts": "캐시에 저장하거나 재사용하지 않고 요청할 때마다 실제 사이트에서 최신 내용을 가져올 호스트 목록입니다. 정확한 호스트(`news.example.com`), 와일드카드(`*.example.com`), 도메인(`example.com`, 하위 도메인 포함)을 지정할 수 있습니다. localhost와 사내망·개인 주소는 이 목록과 관계없이 항상 캐시하지 않습니다.",
 +  "moa.default_preset": "MoA(여러 모델 협업)는 참고 모델들이 의견을 내면 종합 모델이 이를 주 대화 모델에 전달할 안내로 정리하는 실행 방식입니다. 실제 사용자 답변은 주 대화 모델이 작성합니다. 기본 설정 묶음은 `/moa`를 쓰거나 모델로 `moa`를 선택할 때 불러올 이름입니다. MoA 자체는 모델이 아니며 추가 모델 요청으로 시간과 비용이 늘 수 있습니다.",
 +  "moa.active_preset": "현재 활성으로 저장된 MoA 설정 묶음의 이름입니다. 비우면 별도로 활성 지정한 묶음이 없는 상태이며, 기본 실행 묶음은 위의 default_preset으로 정합니다.",
 +  "moa.save_traces": "켜면 한 번의 MoA 실행에서 각 참고 모델과 종합 모델에 보낸 입력, 받은 답변, 사용량을 JSONL 기록 파일에 저장합니다. 대화 내용과 모델 답변이 파일에 남을 수 있으니 보관 위치와 접근 권한을 확인하세요.",
@@ -1863,7 +1872,7 @@ index 18475fe8f4..b3c250beda 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1801,7 @@ function NestedValueEditor({
+@@ -42,7 +1810,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1872,7 +1881,7 @@ index 18475fe8f4..b3c250beda 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1818,7 @@ function NestedValueEditor({
+@@ -59,7 +1827,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1881,7 +1890,7 @@ index 18475fe8f4..b3c250beda 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1847,7 @@ export function AutoField({
+@@ -88,8 +1856,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1891,7 +1900,7 @@ index 18475fe8f4..b3c250beda 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1880,7 @@ export function AutoField({
+@@ -122,7 +1889,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1900,7 +1909,7 @@ index 18475fe8f4..b3c250beda 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1941,7 @@ export function AutoField({
+@@ -183,7 +1950,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

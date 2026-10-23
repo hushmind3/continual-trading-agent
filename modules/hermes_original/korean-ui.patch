@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..d9e6bbc808 100644
+index 18475fe8f4..9a1a73c450 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1965 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -566,8 +566,8 @@ index 18475fe8f4..d9e6bbc808 100644
 +  "updates.pre_update_backup": "업데이트 전 백업 방식",
 +  "updates.backup_keep": "보관할 백업 개수",
 +  "updates.non_interactive_local_changes": "확인창 없는 업데이트 때 변경사항 처리",
-+  "updates.auto_switch_parked_branch": "보류된 브랜치로 자동 전환",
-+  "updates.parked_branch_strategy": "보류 브랜치 처리 방식",
++  "updates.auto_switch_parked_branch": "보류된 Git 작업 갈래에서 업데이트 대상으로 자동 전환",
++  "updates.parked_branch_strategy": "다른 Git 작업 갈래에 있을 때 업데이트 방식",
 +  "updates.refresh_cua_driver": "CUA(화면·키보드·마우스 제어) 드라이버 새로고침",
 +  paste_collapse_threshold: "여러 줄 붙여넣기를 파일로 바꿀 기준",
 +  paste_collapse_threshold_fallback: "붙여넣기 감지가 안 될 때 파일로 바꿀 기준",
@@ -1937,8 +1937,8 @@ index 18475fe8f4..d9e6bbc808 100644
 +  "updates.check": "새 버전이 있는지 배너에 표시하기 위해 조용히 확인합니다. 자동으로 업데이트하지는 않습니다. 끄더라도 직접 실행하는 hermes update --check는 계속 사용할 수 있습니다.",
 +  "updates.pre_update_backup": "업데이트 중 문제가 생겼을 때 되돌릴 수 있도록 미리 보관할 자료의 범위입니다. quick은 설정·상태 데이터의 작은 복구 지점을 저장하고, full은 여기에 Hermes 홈 폴더의 전체 압축 백업을 더합니다. off는 백업하지 않습니다. 기본값 quick은 큰 파일을 복사하지 않아 업데이트를 오래 기다리지 않게 합니다.",
 +  "updates.backup_keep": "full 백업으로 만든 Hermes 홈 폴더 압축본을 최신 순으로 보관할 개수입니다. 새 백업이 이 수를 넘으면 오래된 압축본부터 정리합니다. quick 복구 지점의 보관 개수는 별도로 관리합니다.",
-+  "updates.auto_switch_parked_branch": "업데이트 프로그램이 다른 작업 브랜치에 머물러 있을 때, 업데이트 대상 브랜치로 안전하게 전환할 수 있는지 확인하고 자동 처리합니다. 끄면 자동 전환하지 않으며, 안전을 위해 코드 업데이트를 건너뛸 수 있습니다. 수정 중인 파일이 있으면 이 옵션과 관계없이 전환하지 않습니다.",
-+  "updates.parked_branch_strategy": "다른 작업 브랜치에서 업데이트할 때, 그 브랜치에만 있는 커밋을 어떻게 다룰지 정합니다. switch는 기본값으로 작업 브랜치를 보존하고 자동으로 대상 브랜치에 합치지 않습니다. update_in_place는 대상 브랜치의 업데이트를 현재 작업 브랜치에 병합해 브랜치를 바꾸지 않습니다. 미저장 수정이 있으면 안전을 위해 업데이트를 진행하지 않습니다.",
++  "updates.auto_switch_parked_branch": "현재 Git 브랜치(코드를 나누어 작업하는 갈래)가 업데이트 대상과 다를 때, 대상 갈래로 자동 전환할지 정합니다. 켜면 저장하지 않은 수정이 없을 때 전환합니다. 대상에 아직 합쳐지지 않은 커밋(저장된 코드 변경)도 원래 갈래에 보존되지만, 이후 작업은 업데이트 대상 갈래에서 이어집니다. 끄거나 저장하지 않은 수정이 있으면 안전을 위해 전환하지 않고 코드 업데이트를 건너뜁니다.",
++  "updates.parked_branch_strategy": "Hermes가 업데이트 대상과 다른 Git 브랜치(코드를 나누어 작업하는 갈래)에 있을 때 적용할 방식입니다. switch(현재 갈래 유지)는 대상 갈래의 업데이트를 자동으로 합치지 않습니다. update_in_place(현재 갈래에 반영)는 대상 갈래의 새 버전을 현재 갈래에 병합하고 갈래를 바꾸지 않습니다. 저장하지 않은 수정이 있으면 어떤 방식을 골라도 안전을 위해 업데이트를 중단합니다.",
 +};
 +
 +const AUXILIARY_TASKS_KO: Record<string, string> = {

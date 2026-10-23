@@ -1,6 +1,6 @@
 diff --git a/plugins/kanban/dashboard/README.md b/plugins/kanban/dashboard/README.md
 new file mode 100644
-index 0000000000..86e441034f
+index 0000000000..d14195fbb9
 --- /dev/null
 +++ b/plugins/kanban/dashboard/README.md
 @@ -0,0 +1,10 @@
@@ -13,9 +13,9 @@ index 0000000000..86e441034f
 +- `plugin_api.py`: 작업판 화면이 사용하는 플러그인 API를 제공합니다.
 +- 확인: 공식 Hermes 웹 빌드 후 실행 중인 대시보드의 `/kanban` 화면에서 도구 설명을 확인합니다. 실행 중인 화면은 플랫폼 8766의 Hermes 원본 탭이 연결하는 원본 대시보드에서 제공합니다.
 +
-+현재 확인: 웹 빌드 성공. 실행 중 원본 대시보드에서 검색·테넌트·담당자·보관 항목·디스패처·새로 고침 설명의 한글 풀이를 확인했습니다.
++현재 확인: 공식 웹 빌드 성공. 8766에서 연결되는 실행 중 Hermes 원본 대시보드의 60750 `/kanban` 화면에서 작업 자동 배정·검색·담당자·보관·디스패처 안내와 `Review` 상태의 한국어 풀이를 확인했습니다. 작업 상태·배정·삭제 기능은 변경하지 않았습니다.
 diff --git a/plugins/kanban/dashboard/dist/index.js b/plugins/kanban/dashboard/dist/index.js
-index 658ae11c5b..58c29bcbfa 100644
+index 658ae11c5b..dea1c802cd 100644
 --- a/plugins/kanban/dashboard/dist/index.js
 +++ b/plugins/kanban/dashboard/dist/index.js
 @@ -129,7 +129,7 @@
@@ -288,6 +288,84 @@ index 658ae11c5b..58c29bcbfa 100644
            "aria-label": `Select all tasks in ${colLabel || props.column.name}`,
            checked: props.column.tasks.length > 0 && props.column.tasks.every(function (t) { return props.selectedIds.has(t.id); }),
            onCheckedChange: function () {
+@@ -3032,7 +3032,7 @@
+         h("span", { className: "hermes-kanban-column-label" },
+           colLabel || props.column.name),
+         h("span", { className: "hermes-kanban-column-count",
+-                    title: `${props.column.tasks.length} task${props.column.tasks.length === 1 ? "" : "s"} in this column` },
++                    title: `${props.column.tasks.length} task${props.column.tasks.length === 1 ? "" : "s"} in this column (이 열의 작업 ${props.column.tasks.length}개)` },
+           props.column.tasks.length),
+         h("button", {
+           type: "button",
+@@ -3208,7 +3208,7 @@
+               }),
+             ),
+             h("span", { className: "hermes-kanban-card-id",
+-                        title: `Task id: ${t.id}. Use this id with kanban_show, /kanban show, or hermes kanban show.` }, t.id),
++                        title: `Task id: ${t.id}. Use this id with kanban_show, /kanban show, or hermes kanban show. (작업 ID입니다. kanban_show, /kanban show 또는 hermes kanban show에서 이 ID로 작업을 조회합니다.)` }, t.id),
+             t.warnings && t.warnings.count > 0
+               ? h("span", {
+                   className: cn(
+@@ -3219,18 +3219,18 @@
+                     `${t.warnings.count} active diagnostic` +
+                     (t.warnings.count === 1 ? "" : "s") +
+                     ` (severity: ${t.warnings.highest_severity || "warning"}). ` +
+-                    `Click to open for details.`
++                    `Click to open for details. (자세한 내용을 보려면 클릭하세요.)`
+                   ),
+                 }, t.warnings.highest_severity === "critical" ? "!!!" :
+                    t.warnings.highest_severity === "error" ? "!!" : "⚠")
+               : null,
+             t.priority > 0
+               ? h(Badge, { className: "hermes-kanban-priority",
+-                           title: `Priority ${t.priority}. Higher-priority tasks are claimed first by the dispatcher.` }, `P${t.priority}`)
++                           title: `Priority ${t.priority}. Higher-priority tasks are claimed first by the dispatcher. (우선순위 ${t.priority}입니다. 숫자가 높을수록 디스패처가 먼저 배정합니다.)` }, `P${t.priority}`)
+               : null,
+             t.tenant
+               ? h(Badge, { variant: "outline", className: "hermes-kanban-tag",
+-                           title: `Tenant: ${t.tenant}. Free-form tag for grouping tasks (customer, project, team).` }, t.tenant)
++                           title: `Tenant: ${t.tenant}. Free-form tag for grouping tasks (customer, project, team). (테넌트 ${t.tenant}: 고객·프로젝트·팀별 작업 묶음에 쓰는 태그입니다.)` }, t.tenant)
+               : null,
+             progress
+               ? h("span", {
+@@ -3238,7 +3238,7 @@
+                     "hermes-kanban-progress",
+                     progress.done === progress.total ? "hermes-kanban-progress--full" : "",
+                   ),
+-                  title: `${progress.done} of ${progress.total} child tasks done`,
++                  title: `${progress.done} of ${progress.total} child tasks done (하위 작업 ${progress.total}개 중 ${progress.done}개 완료)`,
+                 }, `${progress.done}/${progress.total}`)
+               : null,
+             needsAssignee
+@@ -3254,23 +3254,23 @@
+           h("div", { className: "hermes-kanban-card-row hermes-kanban-card-meta" },
+             t.assignee
+               ? h("span", { className: "hermes-kanban-assignee",
+-                            title: `Assigned to Hermes profile @${t.assignee}` }, "@", t.assignee)
++                            title: `Assigned to Hermes profile @${t.assignee} (담당 Hermes 프로필: @${t.assignee})` }, "@", t.assignee)
+               : h("span", { className: "hermes-kanban-unassigned",
+                             title: needsAssignee
+                               ? tx(i18n, "needsAssigneeHint", "Dependencies are satisfied, but the dispatcher skips this task until you assign a profile.")
+-                              : "No profile assigned." },
++                              : "No profile assigned. (담당 프로필이 지정되지 않았습니다.)" },
+                   tx(i18n, "unassigned", "unassigned")),
+             t.comment_count > 0
+               ? h("span", { className: "hermes-kanban-count",
+-                            title: `${t.comment_count} comment${t.comment_count === 1 ? "" : "s"} on this task` }, "💬 ", t.comment_count)
++                            title: `${t.comment_count} comment${t.comment_count === 1 ? "" : "s"} on this task (댓글 ${t.comment_count}개)` }, "💬 ", t.comment_count)
+               : null,
+             t.link_counts && (t.link_counts.parents + t.link_counts.children) > 0
+               ? h("span", { className: "hermes-kanban-count",
+-                            title: `${t.link_counts.parents} parent${t.link_counts.parents === 1 ? "" : "s"}, ${t.link_counts.children} child${t.link_counts.children === 1 ? "" : "ren"}. Children stay blocked until their parent is done.` },
++                            title: `${t.link_counts.parents} parent${t.link_counts.parents === 1 ? "" : "s"}, ${t.link_counts.children} child${t.link_counts.children === 1 ? "" : "ren"}. Children stay blocked until their parent is done. (선행 작업 ${t.link_counts.parents}개, 하위 작업 ${t.link_counts.children}개입니다. 선행 작업이 끝나야 하위 작업의 차단이 풀립니다.)` },
+                   "↔ ", t.link_counts.parents + t.link_counts.children)
+               : null,
+             h("span", { className: "hermes-kanban-ago",
+-                        title: t.created_at ? `Created ${t.created_at}` : "" },
++                        title: t.created_at ? `Created ${t.created_at} (생성 시각)` : "" },
+               timeAgo ? timeAgo(t.created_at) : ""),
+           ),
+         ),
 @@ -3417,7 +3417,7 @@
                  onChange: function (e) { setPriority(e.target.value); },
                  placeholder: "pri",
@@ -342,6 +420,24 @@ index 658ae11c5b..58c29bcbfa 100644
                min: 1,
              }) : null,
            ),
+@@ -4314,7 +4314,7 @@
+           type: "button",
+           onClick: load,
+           className: "hermes-kanban-edit-link",
+-          title: "Refresh log",
++          title: "Refresh log (작업 기록 새로 고침)",
+         }, "refresh"),
+       ),
+       body,
+@@ -4621,7 +4621,7 @@
+               type: "button",
+               onClick: function () { setEditing(true); },
+               className: "hermes-kanban-edit-link",
+-              title: "Edit description",
++              title: "Edit description (설명 수정)",
+             }, tx(t, "edit", "edit")),
+       ),
+       editing
 diff --git a/web/src/App.tsx b/web/src/App.tsx
 index 49b23a4037..9ac5974881 100644
 --- a/web/src/App.tsx
@@ -3263,7 +3359,7 @@ index 3cb96bf9b9..2da05dea12 100644
      rawYaml: "生の YAML 設定",
      searchResults: "検索結果",
 diff --git a/web/src/i18n/ko.ts b/web/src/i18n/ko.ts
-index 5d2e99113e..2d502243fa 100644
+index 5d2e99113e..035c32c940 100644
 --- a/web/src/i18n/ko.ts
 +++ b/web/src/i18n/ko.ts
 @@ -2,6 +2,11 @@ import type { Translations } from "./types";
@@ -3500,7 +3596,7 @@ index 5d2e99113e..2d502243fa 100644
      title: "테마",
      switchTheme: "테마 전환",
    },
-@@ -616,6 +726,30 @@ export const ko: Translations = {
+@@ -616,6 +726,31 @@ export const ko: Translations = {
      },
    },
    kanban: {
@@ -3527,11 +3623,12 @@ index 5d2e99113e..2d502243fa 100644
 +    trash: {
 +      confirmTitle: "작업을 삭제할까요?",
 +      confirmManyTitle: "작업 {n}개를 삭제할까요?",
++      dropHint: "Drop to delete (여기에 끌어놓으면 삭제)",
 +    },
      loading: "Kanban 보드를 불러오는 중입니다…",
      loadFailed: "Kanban 보드를 불러오지 못했습니다: ",
      loadFailedHint:
-@@ -652,6 +786,7 @@ export const ko: Translations = {
+@@ -652,6 +787,7 @@ export const ko: Translations = {
      showArchived: "보관된 항목 표시",
      lanesByProfile: "프로필별 레인",
      nudgeDispatcher: "디스패처 깨우기",
@@ -3539,6 +3636,22 @@ index 5d2e99113e..2d502243fa 100644
      refresh: "새로 고침",
      selected: "선택됨",
      complete: "완료",
+@@ -746,6 +882,7 @@ export const ko: Translations = {
+       ready: "준비됨",
+       running: "진행 중",
+       blocked: "차단됨",
++      review: "Review (검토 대기)",
+       done: "완료",
+       archived: "보관됨",
+     },
+@@ -756,6 +893,7 @@ export const ko: Translations = {
+       ready: "종속성이 충족됨; 디스패치하려면 프로필을 지정하세요",
+       running: "워커가 점유 중 — 실행 중",
+       blocked: "워커가 사람의 입력을 요청함",
++      review: "Implementation complete — awaiting review (구현은 끝났으며 검토를 기다리는 중입니다.)",
+       done: "완료됨",
+       archived: "보관됨",
+     },
 diff --git a/web/src/i18n/mcp-catalog.ko.json b/web/src/i18n/mcp-catalog.ko.json
 new file mode 100644
 index 0000000000..658ab82210
@@ -6878,7 +6991,7 @@ index e6034c59c6..f936f37a40 100644
      rawYaml: "Ham YAML Yapılandırması",
      searchResults: "Arama Sonuçları",
 diff --git a/web/src/i18n/types.ts b/web/src/i18n/types.ts
-index cac661b053..4e637fa723 100644
+index cac661b053..25fdc524d3 100644
 --- a/web/src/i18n/types.ts
 +++ b/web/src/i18n/types.ts
 @@ -94,17 +94,23 @@ export interface Translations {
@@ -6921,6 +7034,30 @@ index cac661b053..4e637fa723 100644
      refresh: string;
      selected: string;
      complete: string;
+@@ -863,6 +871,7 @@ export interface Translations {
+       ready: string;
+       running: string;
+       blocked: string;
++      review?: string;
+       done: string;
+       archived: string;
+     };
+@@ -873,6 +882,7 @@ export interface Translations {
+       ready: string;
+       running: string;
+       blocked: string;
++      review?: string;
+       done: string;
+       archived: string;
+     };
+@@ -921,6 +931,7 @@ export interface Translations {
+     trash?: {
+       confirmTitle?: string;
+       confirmManyTitle?: string;
++      dropHint?: string;
+     };
+   };
+ }
 diff --git a/web/src/i18n/uk.ts b/web/src/i18n/uk.ts
 index 1c21a45b2d..e507dcd767 100644
 --- a/web/src/i18n/uk.ts

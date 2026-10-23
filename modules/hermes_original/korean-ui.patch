@@ -7589,7 +7589,7 @@ index 7e8b38e96d..ea37dcc0e1 100644
          )}
        </div>
 diff --git a/web/src/pages/SkillsPage.tsx b/web/src/pages/SkillsPage.tsx
-index 65598e90ba..7cd9012cff 100644
+index 65598e90ba..7da038f84d 100644
 --- a/web/src/pages/SkillsPage.tsx
 +++ b/web/src/pages/SkillsPage.tsx
 @@ -71,6 +71,17 @@ import { errorMessage } from "@/lib/api-error";
@@ -7610,7 +7610,72 @@ index 65598e90ba..7cd9012cff 100644
    mlops: "MLOps",
    "mlops/cloud": "MLOps / Cloud",
    "mlops/evaluation": "MLOps / Evaluation",
-@@ -92,7 +103,8 @@ function prettyCategory(
+@@ -87,12 +98,73 @@ const CATEGORY_LABELS: Record<string, string> = {
+   ui: "UI",
+ };
+ 
++const TOOLSET_LABELS_KO: Record<string, string> = {
++  "Web Search & Scraping": "Web Search & Scraping (웹 검색·페이지 읽기)",
++  "Browser Automation": "Browser Automation (브라우저 자동화)",
++  "Terminal & Processes": "Terminal & Processes (터미널·프로세스 관리)",
++  "File Operations": "File Operations (파일 관리)",
++  "Code Execution": "Code Execution (코드 실행)",
++  "Vision / Image Analysis": "Vision / Image Analysis (이미지·화면 분석)",
++  "Video Analysis": "Video Analysis (영상 분석)",
++  "Image Generation": "Image Generation (이미지 생성)",
++  "Video Generation": "Video Generation (영상 생성)",
++  "X (Twitter) Search": "X (Twitter) Search (X 게시물 검색)",
++  "Text-to-Speech": "Text-to-Speech (글을 음성으로 변환)",
++  "Speech-to-Text": "Speech-to-Text (음성을 글자로 변환)",
++  Skills: "Skills (스킬 관리)",
++  "Task Planning": "Task Planning (할 일 관리)",
++  Kanban: "Kanban (칸반 작업 보드)",
++  Memory: "Memory (대화 기억)",
++  "Context Engine": "Context Engine (대화 맥락 엔진)",
++  "Session Search": "Session Search (이전 대화 검색)",
++  Connections: "Connections (외부 서비스 연결)",
++  "Clarifying Questions": "Clarifying Questions (요청 확인 질문)",
++  "Task Delegation": "Task Delegation (작업 맡기기)",
++  "Cron Jobs": "Cron Jobs (예약 작업)",
++  "Discord (read/participate)": "Discord (read/participate) (Discord 읽기·참여)",
++  "Discord Server Admin": "Discord Server Admin (Discord 서버 관리)",
++  Yuanbao: "Yuanbao (위안바오)",
++  "Computer Use (macOS/Windows/Linux)": "Computer Use (macOS/Windows/Linux) (컴퓨터 직접 조작)",
++  A2A: "A2A (에이전트 간 통신)",
++};
++
++const TOOLSET_DESCRIPTIONS_KO: Record<string, string> = {
++  "Web Search & Scraping": "인터넷에서 정보를 검색하고, 검색 결과 페이지의 본문을 읽습니다. 검색과 본문 읽기에 서로 다른 제공자를 선택할 수 있습니다.",
++  "Browser Automation": "브라우저에서 웹페이지를 열어 살펴보고 버튼 클릭, 글 입력, 스크롤 같은 작업을 수행합니다.",
++  "Terminal & Processes": "명령줄에서 프로그램을 실행하고, 실행 중인 작업을 확인하거나 관리합니다.",
++  "File Operations": "작업 폴더의 파일을 검색하고 내용을 읽거나 새로 쓰며, 필요한 부분을 수정합니다.",
++  "Code Execution": "코드를 실행하고 실행 결과를 확인합니다.",
++  "Vision / Image Analysis": "이미지와 화면을 살펴보고, 그림이나 스크린샷에서 필요한 정보를 찾습니다.",
++  "Video Analysis": "영상 내용을 분석합니다. 영상 입력을 지원하는 모델이 필요합니다.",
++  "Image Generation": "글로 설명한 내용이나 참고 이미지를 바탕으로 새 이미지를 만듭니다.",
++  "Video Generation": "글·이미지·참고 영상을 바탕으로 영상을 만들거나 기존 영상을 편집하고 이어 만듭니다.",
++  "X (Twitter) Search": "X(구 Twitter) 게시물을 검색합니다. xAI 계정 로그인(OAuth) 또는 XAI_API_KEY가 필요합니다.",
++  "Text-to-Speech": "텍스트를 음성으로 읽어 줍니다.",
++  "Speech-to-Text": "게이트웨이에 도착한 음성 메시지와 음성 모드의 말을 글자로 바꿉니다.",
++  Skills: "사용할 수 있는 스킬을 찾고, 설명을 확인하거나 스킬을 관리합니다.",
++  "Task Planning": "대화 중 할 일을 목록으로 만들고 완료 여부를 관리합니다.",
++  Kanban: "칸반 작업 보드를 사용해 작업 카드를 만들고, 옮기고, 담당자와 진행 상태를 관리합니다. 선택해서 켜는 기능입니다.",
++  Memory: "대화가 끝난 뒤에도 필요한 내용을 기억해 두고 다음 대화에서 다시 찾아옵니다.",
++  "Context Engine": "현재 선택된 대화 맥락 엔진이 제공하는 도구를 사용합니다.",
++  "Session Search": "이전 대화 내용을 검색합니다.",
++  Connections: "외부 서비스 연결을 관리하고 해당 계정의 인증을 진행합니다.",
++  "Clarifying Questions": "요청을 정확히 이해하는 데 필요한 질문을 사용자에게 확인합니다.",
++  "Task Delegation": "다른 에이전트에게 작업을 맡기고 진행 결과를 확인합니다.",
++  "Cron Jobs": "예약 작업을 만들고 조회·수정·일시정지·재개하거나 바로 실행합니다. 실행할 때 스킬을 함께 지정할 수도 있습니다.",
++  "Discord (read/participate)": "Discord 메시지를 가져오고 검색하며 대화 스레드를 만들 수 있습니다.",
++  "Discord Server Admin": "Discord 서버의 채널과 역할을 확인하고, 메시지를 고정하거나 멤버 역할을 지정합니다.",
++  Yuanbao: "Yuanbao 대화방 정보와 멤버를 조회하고, 개인 메시지나 스티커를 주고받습니다.",
++  "Computer Use (macOS/Windows/Linux)": "컴퓨터 화면을 살펴보고 앱과 브라우저를 직접 조작합니다. 백그라운드 데스크톱 제어 기능을 사용합니다.",
++  A2A: "A2A(에이전트 간 통신) 표준으로 다른 에이전트에 작업을 보내고, Hermes가 외부 요청도 받을 수 있게 합니다. 외부 에이전트의 기능을 찾아 JSON-RPC로 호출하며, 들어온 요청은 현재 대화 세션에서 처리합니다. 인증 토큰이 없으면 로컬 컴퓨터에서만 접속할 수 있습니다. 요청 내용의 프롬프트 공격과 인증 정보 노출을 막고, 통신 기록을 저장합니다.",
++};
++
+ function prettyCategory(
+   raw: string | null | undefined,
    generalLabel: string,
  ): string {
    if (!raw) return generalLabel;
@@ -7620,7 +7685,7 @@ index 65598e90ba..7cd9012cff 100644
    return raw
      .split(/[-_/]/)
      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-@@ -130,6 +142,7 @@ function toolsetIcon(
+@@ -130,6 +202,7 @@ function toolsetIcon(
  
  export default function SkillsPage() {
    const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -7628,7 +7693,7 @@ index 65598e90ba..7cd9012cff 100644
    const [toolsets, setToolsets] = useState<ToolsetInfo[]>([]);
    const [loading, setLoading] = useState(true);
    // Humanized error from the last skills/toolsets load; drives a persistent
-@@ -145,7 +158,7 @@ export default function SkillsPage() {
+@@ -145,7 +218,7 @@ export default function SkillsPage() {
    const [editorOpen, setEditorOpen] = useState(false);
    const [editorSkill, setEditorSkill] = useState<string | null>(null);
    const { toast, showToast } = useToast();
@@ -7637,7 +7702,7 @@ index 65598e90ba..7cd9012cff 100644
    const { setAfterTitle, setEnd } = usePageHeader();
  
    // ── Profile scoping ──
-@@ -159,6 +172,18 @@ export default function SkillsPage() {
+@@ -159,6 +232,18 @@ export default function SkillsPage() {
      profile: selectedProfile,
    } = useProfileScope();
  
@@ -7656,7 +7721,7 @@ index 65598e90ba..7cd9012cff 100644
    useEffect(() => {
      // Promise-chain shape: setState fires only inside async callbacks so the
      // effect body stays lint-clean (react-hooks/set-state-in-effect). On a
-@@ -434,7 +459,7 @@ export default function SkillsPage() {
+@@ -434,7 +519,7 @@ export default function SkillsPage() {
                  />
                  <PanelItem
                    icon={Search}
@@ -7665,7 +7730,7 @@ index 65598e90ba..7cd9012cff 100644
                    active={view === "hub"}
                    onClick={() => {
                      setView("hub");
-@@ -513,6 +538,7 @@ export default function SkillsPage() {
+@@ -513,6 +598,7 @@ export default function SkillsPage() {
                        <SkillRow
                          key={skill.name}
                          skill={skill}
@@ -7673,7 +7738,7 @@ index 65598e90ba..7cd9012cff 100644
                          toggling={togglingSkills.has(skill.name)}
                          onToggle={() => handleToggleSkill(skill)}
                          onEdit={() => openEditEditor(skill.name)}
-@@ -549,7 +575,7 @@ export default function SkillsPage() {
+@@ -549,7 +635,7 @@ export default function SkillsPage() {
                        onClick={openLearn}
                        prefix={<Sparkles />}
                      >
@@ -7682,7 +7747,7 @@ index 65598e90ba..7cd9012cff 100644
                      </Button>
                      <Button
                        size="sm"
-@@ -557,7 +583,7 @@ export default function SkillsPage() {
+@@ -557,7 +643,7 @@ export default function SkillsPage() {
                        onClick={openCreateEditor}
                        prefix={<Plus />}
                      >
@@ -7691,7 +7756,7 @@ index 65598e90ba..7cd9012cff 100644
                      </Button>
                    </div>
                  </div>
-@@ -587,6 +613,7 @@ export default function SkillsPage() {
+@@ -587,6 +673,7 @@ export default function SkillsPage() {
                        <SkillRow
                          key={skill.name}
                          skill={skill}
@@ -7699,7 +7764,37 @@ index 65598e90ba..7cd9012cff 100644
                          toggling={togglingSkills.has(skill.name)}
                          onToggle={() => handleToggleSkill(skill)}
                          onEdit={() => openEditEditor(skill.name)}
-@@ -704,11 +731,11 @@ export default function SkillsPage() {
+@@ -610,7 +697,10 @@ export default function SkillsPage() {
+                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                   {filteredToolsets.map((ts) => {
+                     const TsIcon = toolsetIcon(ts.name);
+-                    const labelText = ts.label.trim() || ts.name;
++                    const rawLabel = ts.label.trim() || ts.name;
++                    const labelText = TOOLSET_LABELS_KO[rawLabel] ?? rawLabel;
++                    const descriptionText =
++                      TOOLSET_DESCRIPTIONS_KO[rawLabel] ?? ts.description;
+ 
+                     return (
+                       <Card key={ts.name} className="relative rounded-none">
+@@ -632,7 +722,7 @@ export default function SkillsPage() {
+                                 </Badge>
+                               </div>
+                               <p className="text-xs text-text-secondary mb-2">
+-                                {ts.description}
++                                {descriptionText}
+                               </p>
+                               {ts.enabled && !ts.configured && (
+                                 <p className="text-xs text-amber-300 mb-2">
+@@ -669,7 +759,7 @@ export default function SkillsPage() {
+                                   onClick={() => setConfigToolset(ts)}
+                                   prefix={<Wrench />}
+                                 >
+-                                  Configure
++                                  설정
+                                 </Button>
+                               </div>
+                             </div>
+@@ -704,11 +794,11 @@ export default function SkillsPage() {
        <Dialog open={learnOpen} onOpenChange={setLearnOpen}>
          <DialogContent className="max-w-lg">
            <DialogHeader>
@@ -7715,7 +7810,7 @@ index 65598e90ba..7cd9012cff 100644
              </DialogDescription>
            </DialogHeader>
            <div className="grid gap-3 py-2">
-@@ -764,8 +791,31 @@ export default function SkillsPage() {
+@@ -764,8 +854,31 @@ export default function SkillsPage() {
    );
  }
  
@@ -7747,7 +7842,7 @@ index 65598e90ba..7cd9012cff 100644
    toggling,
    onToggle,
    onEdit,
-@@ -791,7 +841,7 @@ function SkillRow({
+@@ -791,7 +904,7 @@ function SkillRow({
            </span>
          </div>
          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
@@ -7756,7 +7851,7 @@ index 65598e90ba..7cd9012cff 100644
          </p>
        </div>
        <Button
-@@ -833,6 +883,7 @@ interface PanelItemProps {
+@@ -833,6 +946,7 @@ interface PanelItemProps {
  }
  
  interface SkillRowProps {

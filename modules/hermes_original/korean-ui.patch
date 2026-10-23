@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..4c81bc01b8 100644
+index 18475fe8f4..8df0799d00 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1949 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -1100,7 +1100,7 @@ index 18475fe8f4..4c81bc01b8 100644
 +  transient_retries: "일시 오류 재시도 횟수",
 +  free_only: "무료 모델만 사용",
 +  openrouter_model: "OpenRouter 대체 모델 ID",
-+  stream_only_base_urls: "실시간 전송을 지원하지 않는 주소",
++  stream_only_base_urls: "실시간 연결이 필요한 서비스 주소",
 +  download_timeout: "이미지 내려받기 대기 시간",
 +  no_progress_timeout: "응답 중단 감지 시간",
 +  api_mode: "API 요청 형식",
@@ -1946,8 +1946,8 @@ index 18475fe8f4..4c81bc01b8 100644
 +  curator: "스킬 사용 기록을 검토해 보관할 지식과 개선점 정리",
 +  monitor: "중요 메일의 우선순위를 0~10점으로 판단",
 +  background_review: "작업 뒤 기억에 저장할 내용과 스킬 개선점 검토",
-+  moa_reference: "MoA가 답변을 비교할 때 참고할 독립 의견 작성",
-+  moa_aggregator: "MoA의 여러 참고 의견을 비교해 최종 답변 작성",
++  moa_reference: "여러 모델이 함께 답을 만드는 방식(MoA)에서 참고 답변 작성",
++  moa_aggregator: "여러 모델의 참고 답변을 모아 최종 답변 구성",
 +};
 +
 +function auxiliaryFieldDescription(schemaKey: string): string {
@@ -1963,22 +1963,22 @@ index 18475fe8f4..4c81bc01b8 100644
 +      explanation = "이 작업을 맡길 AI 서비스입니다. auto는 주 대화에 설정된 서비스를 우선 이용하고, 연결할 수 없으면 보조 작업용 대체 경로를 시도합니다.";
 +      break;
 +    case "model":
-+      explanation = "이 작업에 사용할 모델 이름 또는 ID입니다. 비우면 선택한 서비스의 보조 작업용 기본 모델을 사용합니다.";
++      explanation = "이 보조 작업에 연결할 AI 모델의 이름 또는 ID(서비스가 모델을 구분하는 이름)입니다. 비우면 선택한 서비스가 기본으로 정한 모델을 사용합니다.";
 +      break;
 +    case "base_url":
 +      explanation = "AI 서비스에 요청을 보낼 API 주소를 직접 지정합니다. 제공자의 기본 주소를 쓰려면 비워 둡니다.";
 +      break;
 +    case "api_key":
-+      explanation = "이 작업이 AI 서비스에 접속할 때 사용할 비밀 키입니다. 비우면 OPENAI_API_KEY 환경 변수에서 가져옵니다.";
++      explanation = "이 보조 작업이 AI 서비스에 접속할 때 쓰는 비밀 키입니다. 비우면 OPENAI_API_KEY 환경 변수(프로그램을 실행할 때 읽는 설정값)에 저장된 키를 사용합니다.";
 +      break;
 +    case "timeout":
 +      explanation = "AI 서비스에 요청한 뒤 응답을 기다릴 전체 제한 시간(초)입니다. 답변이 중간에 멈춘 경우의 no_progress_timeout과는 별도입니다.";
 +      break;
 +    case "reasoning_effort":
-+      explanation = "이 작업에서 모델에 요청할 추론 강도입니다. none은 제공자가 지원하는 가장 낮은 단계이고, 빈 값은 제공자의 기본 설정을 사용합니다. 선택지가 높을수록 시간이 더 걸리거나 비용이 늘 수 있습니다.";
++      explanation = "모델에게 얼마나 깊이 생각할지 요청하는 정도입니다. none(추론 최소화)은 서비스가 지원하는 가장 낮은 단계이고, 비우면 서비스 기본값을 씁니다. 강도를 높이면 답변이 늦어지거나 비용이 늘 수 있습니다.";
 +      break;
 +    case "api_mode":
-+      explanation = "검토 모델과 통신할 API 형식입니다. chat_completions는 일반 대화 API, anthropic_messages는 Anthropic 형식, codex_responses는 Codex Responses 형식입니다. 비우면 제공자 설정을 따릅니다.";
++      explanation = "보조 모델에 요청을 보낼 때 사용할 통신 형식입니다. chat_completions(일반 채팅 형식), anthropic_messages(Anthropic 메시지 형식), codex_responses(Codex Responses 형식) 중 서비스가 요구하는 방식을 고릅니다. 비우면 선택한 서비스 설정을 따릅니다.";
 +      break;
 +    case "transient_retries":
 +      explanation = "보조 AI 요청에서 연결 끊김·시간 초과 같은 일시 오류가 나면 대체 서비스로 넘어가기 전에 같은 서비스에 다시 요청할 횟수입니다. 0이면 재시도하지 않습니다.";
@@ -1990,7 +1990,7 @@ index 18475fe8f4..4c81bc01b8 100644
 +      explanation = "설정한 AI 서비스에 연결할 수 없어 OpenRouter로 자동 대체할 때 사용할 모델 ID입니다. 무료 모델만 원하면 free_only도 켜세요.";
 +      break;
 +    case "stream_only_base_urls":
-+      explanation = "실시간 전송을 끄면 요청을 거부하는 서비스 주소의 일부를 적습니다. 주소에 이 문자열이 포함되면 실시간으로 받아 모아 표시하는 방식으로 요청합니다. 대소문자는 구분하지 않습니다.";
++      explanation = "일반 요청(답변을 한 번에 받는 방식)을 거부하는 AI 서비스의 주소 일부를 적습니다. 이 주소가 포함된 서비스에는 답변을 실시간 연결 방식으로 요청합니다. 주소 비교는 대소문자를 구분하지 않습니다.";
 +      break;
 +    case "download_timeout":
 +      explanation = "이미지 분석을 시작하기 전에 이미지 파일을 내려받으며 기다릴 최대 시간(초)입니다.";

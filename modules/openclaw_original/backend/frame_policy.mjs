@@ -1,17 +1,27 @@
 import { Server, ServerResponse } from 'node:http';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 
 const originalSetHeader = ServerResponse.prototype.setHeader;
 const platformOrigins = (process.env.PLATFORM_EMBED_ORIGINS || 'http://127.0.0.1:8766')
   .split(',').map((origin) => origin.trim()).filter(Boolean);
 let remoteCookieKey = '';
-try {
-  const access = JSON.parse(readFileSync(process.env.PLATFORM_REMOTE_ACCESS_FILE, 'utf8'));
-  remoteCookieKey = access.cookie_key || '';
-} catch {}
+let remoteCookieConfigMtime = -1;
+function reloadRemoteCookieKey() {
+  try {
+    const path = process.env.PLATFORM_REMOTE_ACCESS_FILE;
+    const modified = statSync(path).mtimeMs;
+    if (modified === remoteCookieConfigMtime) return;
+    remoteCookieKey = JSON.parse(readFileSync(path, 'utf8')).cookie_key || '';
+    remoteCookieConfigMtime = modified;
+  } catch {
+    remoteCookieKey = '';
+    remoteCookieConfigMtime = -1;
+  }
+}
 
 function hasRemoteCookie(request) {
+  reloadRemoteCookieKey();
   if (!remoteCookieKey) return false;
   const value = request.headers.cookie?.split(';')
     .map((part) => part.trim()).find((part) => part.startsWith('platform_access='))

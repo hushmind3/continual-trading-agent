@@ -20,13 +20,25 @@ class RemoteAccessMiddleware:
 
     def __init__(self, app: ASGIApp, config_path: str):
         self.app = app
+        self.config_path = Path(config_path)
+        self.config_mtime_ns = None
+        self.password = b''
+        self.cookie_key = b''
+        self._reload_config()
+
+    def _reload_config(self) -> None:
         try:
-            config = json.loads(Path(config_path).read_text(encoding='utf-8'))
+            modified = self.config_path.stat().st_mtime_ns
+            if modified == self.config_mtime_ns:
+                return
+            config = json.loads(self.config_path.read_text(encoding='utf-8'))
             self.password = str(config['password']).encode('utf-8')
             self.cookie_key = str(config['cookie_key']).encode('utf-8')
+            self.config_mtime_ns = modified
         except (OSError, KeyError, TypeError, ValueError):
             self.password = b''
             self.cookie_key = b''
+            self.config_mtime_ns = None
 
     @staticmethod
     def _host(scope: Scope) -> str:
@@ -94,6 +106,7 @@ class RemoteAccessMiddleware:
         return page.encode('utf-8')
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        self._reload_config()
         if scope['type'] not in ('http', 'websocket') or not self._is_public(scope):
             await self.app(scope, receive, send)
             return

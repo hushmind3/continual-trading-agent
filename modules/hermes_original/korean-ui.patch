@@ -2359,7 +2359,7 @@ index 7883f5886a..a96efe86f8 100644
        <Select
          className="ml-auto min-w-0"
 diff --git a/web/src/components/ToolsetConfigDrawer.tsx b/web/src/components/ToolsetConfigDrawer.tsx
-index 86ee09c26d..575b43a0f5 100644
+index 86ee09c26d..20d0ad4e30 100644
 --- a/web/src/components/ToolsetConfigDrawer.tsx
 +++ b/web/src/components/ToolsetConfigDrawer.tsx
 @@ -28,6 +28,106 @@ interface Props {
@@ -2388,22 +2388,22 @@ index 86ee09c26d..575b43a0f5 100644
 +};
 +
 +const providerTags: Record<string, string> = {
-+  "Managed web search and extract billed to your subscription": "구독에 포함된 관리형 웹 검색 및 페이지 본문 읽기 서비스입니다.",
-+  "Run your own Firecrawl instance (Docker)": "Docker로 Firecrawl을 직접 실행해 연결합니다.",
-+  "Free-tier API key — 2k queries/mo, search only.": "무료 요금제는 월 2,000회 검색을 제공하며, 페이지 본문 읽기는 지원하지 않습니다.",
-+  "Search + extract. Opt-in keyless; set TAVILY_API_KEY for higher limits.": "검색과 페이지 본문 읽기를 지원합니다. 키 없이도 쓸 수 있으며, 한도를 높이려면 TAVILY_API_KEY를 설정하세요.",
-+  "Search via the ddgs Python package — no API key (pair with any extract provider)": "ddgs Python 패키지로 API 키 없이 검색합니다. 페이지 본문 읽기 제공자와 함께 사용할 수 있습니다.",
-+  "Agentic web search via Grok's web_search tool — uses xAI Grok OAuth or XAI_API_KEY.": "Grok의 web_search 기능으로 검색합니다. xAI Grok 로그인 또는 XAI_API_KEY가 필요합니다.",
-+  "Full search + extract; supports keyless cloud, direct API, and Nous tool-gateway routing.": "검색과 페이지 본문 읽기를 모두 지원합니다. 키 없는 클라우드, 직접 API, Nous 도구 게이트웨이 연결을 사용할 수 있습니다.",
-+  "Free, privacy-respecting metasearch. Point SEARXNG_URL at your instance.": "개인정보를 보호하는 무료 메타 검색입니다. SEARXNG_URL에 직접 운영 중인 서버 주소를 입력하세요.",
-+  "Search runs on the provider side (needs the Codex Responses transport + an openai-codex login); search only, extraction still uses another backend": "검색은 제공자 측에서 처리합니다. Codex Responses 연결과 openai-codex 로그인이 필요합니다. 검색 전용이며 본문 읽기는 다른 제공자를 사용합니다.",
-+  "Perplexity Search API — ranked, date-stamped web results plus query-relevant page snippets for extract.": "검색어와 관련성이 높은 결과를 순서대로 보여 주고 게시 날짜와 페이지 일부 내용도 함께 제공합니다. 페이지 전체를 읽는 기능은 별도 제공자가 담당합니다.",
-+  "Semantic + neural web search with content extraction on Exa's anonymous free tier. Rate-limited under burst load.": "Exa 무료 익명 요금제로 의미 기반·신경망 웹 검색과 본문 읽기를 제공합니다. 사용량이 몰리면 속도 제한이 적용됩니다.",
-+  "Semantic + neural web search with content extraction via the Exa SDK. Unthrottled, guaranteed service.": "Exa SDK로 의미 기반·신경망 웹 검색과 본문 읽기를 제공합니다. 속도 제한 없이 안정적으로 사용할 수 있습니다.",
-+  "Objective-tuned search + page extraction on Parallel's anonymous free tier. Rate-limited under burst load.": "Parallel 무료 익명 요금제로 목적 맞춤 검색과 페이지 본문 읽기를 제공합니다. 사용량이 몰리면 속도 제한이 적용됩니다.",
-+  "Objective-tuned search + parallel page extraction via the Parallel SDK. Unthrottled, guaranteed service.": "Parallel SDK로 목적 맞춤 검색과 병렬 페이지 본문 읽기를 제공합니다. 속도 제한 없이 안정적으로 사용할 수 있습니다.",
-+  "Independent web index for AI apps — fast search + page fetch on Keenable's anonymous free tier.": "AI 앱을 위한 독립 웹 색인입니다. Keenable 무료 익명 요금제로 빠른 검색과 페이지 가져오기를 제공합니다.",
-+  "Independent web index for AI apps. Keyed access with higher limits and guaranteed service.": "AI 앱을 위한 독립 웹 색인입니다. API 키를 등록하면 더 높은 한도와 안정적인 서비스를 이용할 수 있습니다.",
++  "Managed web search and extract billed to your subscription": "Nous 구독에 포함되어, 별도 제공자 키를 입력하지 않고 웹을 검색하고 페이지 내용을 읽는 서비스입니다.",
++  "Run your own Firecrawl instance (Docker)": "Firecrawl을 Docker로 내 컴퓨터나 서버에서 직접 실행해 연결합니다.",
++  "Free-tier API key — 2k queries/mo, search only.": "무료 요금제에서는 한 달에 최대 2,000번 검색할 수 있습니다. 검색 결과 페이지의 본문을 읽는 기능은 없습니다.",
++  "Search + extract. Opt-in keyless; set TAVILY_API_KEY for higher limits.": "검색 결과를 찾고 페이지 본문도 읽습니다. 키 없이 시작할 수 있고, TAVILY_API_KEY를 등록하면 더 높은 이용 한도를 받을 수 있습니다.",
++  "Search via the ddgs Python package — no API key (pair with any extract provider)": "ddgs 프로그램을 설치하면 API 키 없이 검색할 수 있습니다. 검색 결과의 본문을 읽으려면 본문 읽기 제공자도 함께 선택하세요.",
++  "Agentic web search via Grok's web_search tool — uses xAI Grok OAuth or XAI_API_KEY.": "Grok에 검색을 맡깁니다. xAI 계정으로 로그인하거나 XAI_API_KEY를 등록해야 합니다.",
++  "Full search + extract; supports keyless cloud, direct API, and Nous tool-gateway routing.": "웹 검색과 페이지 본문 읽기를 모두 지원합니다. 키 없이 클라우드로 쓰거나, API 키로 직접 연결하거나, Nous 중계 서비스를 이용할 수 있습니다.",
++  "Free, privacy-respecting metasearch. Point SEARXNG_URL at your instance.": "여러 검색 사이트의 결과를 모아 찾아주는 무료 검색 서버입니다. SEARXNG_URL에 직접 운영하는 서버 주소를 입력하세요.",
++  "Search runs on the provider side (needs the Codex Responses transport + an openai-codex login); search only, extraction still uses another backend": "웹 검색은 OpenAI 쪽에서 처리합니다. Codex Responses 연결과 openai-codex 로그인이 필요합니다. 검색만 지원하므로 페이지 본문은 다른 제공자로 읽습니다.",
++  "Perplexity Search API — ranked, date-stamped web results plus query-relevant page snippets for extract.": "검색어와 관련 있는 결과를 순서대로 보여 주며 게시 날짜와 페이지 일부도 함께 제공합니다. 페이지 전체를 읽으려면 별도 본문 읽기 제공자가 필요합니다.",
++  "Semantic + neural web search with content extraction on Exa's anonymous free tier. Rate-limited under burst load.": "Exa 무료 사용으로 검색어의 뜻과 관련된 웹페이지를 찾고 본문도 읽습니다. API 키 없이 쓸 수 있지만 사용자가 몰리면 요청이 제한될 수 있습니다.",
++  "Semantic + neural web search with content extraction via the Exa SDK. Unthrottled, guaranteed service.": "Exa API 키로 검색어와 관련된 웹페이지를 찾고 본문도 읽습니다. 무료 사용량 제한 없이 안정적으로 이용할 수 있습니다.",
++  "Objective-tuned search + page extraction on Parallel's anonymous free tier. Rate-limited under burst load.": "Parallel 무료 사용은 요청한 목적에 맞는 웹페이지를 찾고 본문도 읽습니다. API 키 없이 쓸 수 있지만 사용자가 몰리면 요청이 제한될 수 있습니다.",
++  "Objective-tuned search + parallel page extraction via the Parallel SDK. Unthrottled, guaranteed service.": "Parallel API 키를 사용해 요청한 목적에 맞는 웹페이지를 찾고 본문도 읽습니다. 무료 사용량 제한 없이 안정적으로 이용할 수 있습니다.",
++  "Independent web index for AI apps — fast search + page fetch on Keenable's anonymous free tier.": "Keenable 무료 사용은 별도 웹 검색 자료를 바탕으로 빠르게 페이지를 찾고 내용을 가져옵니다. API 키 없이 쓸 수 있습니다.",
++  "Independent web index for AI apps. Keyed access with higher limits and guaranteed service.": "Keenable API 키를 등록하면 별도 웹 검색 자료를 바탕으로 페이지를 찾고 내용을 가져올 수 있으며, 이용 한도도 높아집니다.",
 +};
 +
 +const envLabels: Record<string, string> = {

@@ -29,4 +29,6 @@ HERMES_HOME="$platform_root/runtime/ai_agent/HermesOriginal/home" HERMES_RUNTIME
 
 공식 업데이트는 기존 `source/`에서 원본의 기능으로 수행합니다. 새 공식 버전과 패치가 실제로 동작하는지 확인한 뒤 상위 플랫폼의 Git 의존성 커밋도 함께 갱신합니다. 실행 중인 기존 소스에 `git submodule update --remote`나 강제 checkout을 임의로 실행하지 않습니다. 한국어 패치의 버전 불일치·충돌 처리와 최신 적용 결과는 [기준 안내](../README.md#한국어-패치)에서 관리합니다.
 
+macOS 게이트웨이는 모든 프로필을 처리하는 호스트 서비스 하나를 사용합니다. 이 설치본의 LaunchAgent는 `HERMES_HOME=runtime/ai_agent/HermesOriginal/home`, `HERMES_RUNTIME_DIR=runtime/ai_agent/HermesOriginal/tools`의 절대 경로를 사용하며 실행 인수는 `-p default gateway run --external-supervisor`입니다. 프로필 전용 게이트웨이를 시작해 오류 78이 난 경우 별도 프로필 서비스를 추가하지 않고 이 호스트 서비스의 경로와 상태를 확인합니다. 현재 경로를 맞춘 뒤 웹 화면에서 게이트웨이 실행 중을 확인했습니다. 설치·업데이트로 서비스 정의를 다시 생성하면 이 사용자 지정 도구 경로도 확인해야 합니다.
+
 확인: 단일 API의 `ai_agent/HermesOriginal/status`, `#ai_agent/HermesOriginal`의 실제 원본 화면, 원본 `git rev-parse HEAD`, 패치의 `git apply --reverse --check`를 사용합니다. 현재 정리의 실제 실행 확인은 모듈 README의 최신 항목을 따릅니다. 원본 업데이트·모델 추론·외부 메신저 전체를 이번 정리에서 실행하지 않습니다.

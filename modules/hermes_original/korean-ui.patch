@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..1b694793f2 100644
+index 18475fe8f4..4dcbb22a91 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1965 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -565,7 +565,7 @@ index 18475fe8f4..1b694793f2 100644
 +  "updates.check": "업데이트 확인",
 +  "updates.pre_update_backup": "업데이트 전 복구 자료 보관 범위",
 +  "updates.backup_keep": "보관할 전체 백업 개수",
-+  "updates.non_interactive_local_changes": "확인창 없는 업데이트 때 변경사항 처리",
++  "updates.non_interactive_local_changes": "앱·게이트웨이에서 확인 없이 업데이트할 때의 수정 처리",
 +  "updates.auto_switch_parked_branch": "보류된 Git 작업 갈래에서 업데이트 대상으로 자동 전환",
 +  "updates.parked_branch_strategy": "다른 Git 작업 갈래에 있을 때 업데이트 방식",
 +  "updates.refresh_cua_driver": "CUA(화면·키보드·마우스 제어) 드라이버 새로고침",
@@ -1921,7 +1921,7 @@ index 18475fe8f4..1b694793f2 100644
 +  "agent.turn_liveness.timeout_s": "한 번의 요청을 처리하는 동안 이 시간(초) 내내 아무 진행도 감지되지 않으면 멈춘 작업으로 기록하고 실행을 중단해 화면에서 다시 시도할 수 있게 합니다. 일반적인 모델 응답 대기 시간이 아니라, 아무 변화 없이 걸려 있는 작업을 찾아내는 감시 시간입니다. 기본값은 600초이고 0 이하는 감시를 끕니다.",
 +  "agent.turn_liveness.poll_s": "멈춘 작업인지 판단하려고 진행 상태를 확인하는 간격(초)입니다. 기본값은 15초입니다. 짧게 할수록 더 자주 확인하며, 0 이하이거나 잘못된 값이면 기본값을 사용합니다.",
 +  "context.engine": "대화 기록이 길어졌을 때 내용을 어떻게 정리해 모델에 전달할지 정합니다.",
-+  "updates.non_interactive_local_changes": "채팅 앱이나 게이트웨이가 확인창 없이 Hermes를 업데이트할 때, Git에 아직 저장(커밋)하지 않은 소스 수정을 어떻게 처리할지 정합니다. stash(임시 보관)는 업데이트 뒤 수정을 다시 돌려놓고, discard(버리기)는 수정을 지웁니다. 터미널에서 직접 시작한 업데이트는 이 설정과 관계없이 항상 먼저 확인을 요청합니다.",
++  "updates.non_interactive_local_changes": "채팅 앱이나 게이트웨이가 확인을 기다리지 않고 업데이트할 때, 업데이트 전에 Git에 커밋하지 않은 코드 수정을 어떻게 보존할지 정합니다. stash(임시 보관 후 복원)는 수정을 잠시 치워 두었다가 업데이트가 성공하면 다시 적용합니다. discard(삭제)는 업데이트가 성공한 뒤 수정을 버립니다. 업데이트가 실패하면 보관한 수정은 자동 복원되지 않으므로 직접 복원해야 합니다. 터미널에서 시작한 업데이트는 이 설정을 따르지 않고 항상 먼저 확인을 요청합니다.",
 +  "updates.refresh_cua_driver": "Hermes 업데이트 중 컴퓨터 조작 도구인 cua-driver(화면·키보드·마우스 제어 도구)도 새로 고칩니다. macOS 관리자 권한이 없어 /Applications 폴더에 쓸 수 없다면 이 옵션을 끄세요.",
 +  "plugins.hook_callback_timeout": "플러그인 훅(도구 실행 전후에 끼어드는 확장 기능)이 한 번 실행될 수 있는 최대 시간(초)입니다. pre_tool_call(도구 실행 전 검사)이 시간을 넘기면 안전을 위해 도구 실행을 막습니다. 0은 시간 제한 없음이며, 600보다 크게 입력해도 600초까지만 적용합니다. subagent_stop(하위 에이전트 종료)처럼 현재 대화 안에서 실행되는 훅에는 이 제한 시간을 따로 걸지 않습니다.",
 +  "plugins.load_timeout_seconds": "플러그인 하나를 가져와 등록하는 데 허용되는 최대 시간(초)입니다. 시간을 넘긴 플러그인은 '불러오기 시간 초과' 사유와 함께 건너뛰며, 나머지 플러그인은 계속 불러옵니다. 0은 시간 제한 없음이며, 600을 넘기면 600으로 제한됩니다.",

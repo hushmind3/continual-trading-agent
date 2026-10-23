@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..aef1e41d58 100644
+index 18475fe8f4..0377b6f1fa 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,9 +3,524 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,9 +3,613 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -366,7 +366,96 @@ index 18475fe8f4..aef1e41d58 100644
 +  "display.resume_display": "이전 대화를 다시 열 때 기록을 모두 표시할지, 일부만 표시할지, 표시하지 않을지 정합니다.",
 +  "display.busy_input_mode": "에이전트가 작업 중일 때 새 입력을 현재 작업에 전달할지, 다음 차례에 대기시킬지, 현재 작업을 중단하고 새 요청으로 바꿀지 정합니다.",
 +  "display.skin": "터미널에서 Hermes가 사용하는 글꼴·색상 등 화면 모양을 정합니다.",
++  "display.compact": "화면에서 여백과 보조 표시를 줄여 더 간결하게 보여줍니다.",
++  "display.personality": "답변의 말투와 성격을 정하는 내장 또는 사용자 지정 프리셋을 선택합니다.",
++  "display.resume_exchanges": "이전 대화를 다시 열 때 요약 화면에 표시할 사용자·에이전트 대화 쌍의 최대 개수입니다.",
++  "display.resume_max_user_chars": "이전 대화 요약에서 사용자 메시지 하나를 표시할 최대 글자 수입니다.",
++  "display.resume_max_assistant_chars": "이전 대화 요약에서 마지막이 아닌 에이전트 답변 하나를 표시할 최대 글자 수입니다.",
++  "display.resume_max_assistant_lines": "이전 대화 요약에서 마지막이 아닌 에이전트 답변 하나에 표시할 최대 줄 수입니다.",
++  "display.resume_skip_tool_only": "켜면 답변 없이 도구만 호출한 대화 항목을 요약에서 생략합니다.",
++  "display.busy_steer_ack_enabled": "켜면 진행 중인 작업에 새 지시를 전달했을 때 알림 말풍선을 표시합니다. 끄더라도 지시 전달은 계속됩니다.",
++  "display.cli_multiline_shortcuts": "CLI에서 여러 줄 입력을 만들 때 Ctrl+J, Shift+Enter, 줄 끝 역슬래시 같은 단축키를 사용합니다.",
++  "display.interface": "hermes 명령을 실행할 기본 터미널 화면을 대화형 CLI 또는 TUI로 정합니다.",
++  "display.cli_layout": "대화형 CLI의 입력창과 상태 표시 배치를 현대식 또는 기존 상자형으로 정합니다.",
++  "display.tui_native": "TUI가 터미널 기본 화면과 스크롤 기록을 사용하도록 합니다.",
++  "display.tui_auto_resume_recent": "TUI를 시작할 때 가장 최근의 사용자 대화를 자동으로 이어 엽니다.",
++  "display.resume_last_session": "데스크톱 앱을 다시 열 때 마지막으로 보던 대화나 화면을 복원합니다.",
++  "display.tui_agents_nudge": "처음 하위 에이전트에 작업을 맡길 때 진행 상황을 보는 방법을 한 번 안내합니다.",
++  "display.bell_on_complete": "작업이 끝났을 때 터미널 알림음을 울립니다.",
++  "display.bell_on_prompt": "승인이나 추가 설명을 기다리는 질문이 나타날 때 터미널 알림음을 울립니다.",
++  "display.show_reasoning": "모델이 답을 만드는 동안 추론 내용을 실시간으로 표시합니다. 도구 실행 기록 표시와는 별도 설정입니다.",
++  "display.reasoning_full": "답변 뒤에 표시하는 추론 요약을 정해진 줄 수로 줄이지 않고 모두 보여줍니다.",
++  "display.memory_notifications": "대화 중 기억 내용이 갱신되었을 때 알리는 정도를 정합니다. 알림을 꺼도 기억 검토 작업은 계속됩니다.",
++  "display.background_process_notifications": "백그라운드 명령이 끝날 때 실행 중 알림과 최종 결과를 어느 정도 보여줄지 정합니다.",
++  "display.streaming": "모델이 답을 생성하는 동안 완성된 문장을 기다리지 않고 내용을 순서대로 표시합니다.",
++  "display.timestamps": "대화 메시지에 작성 시각을 함께 표시합니다.",
++  "display.timestamp_format": "메시지 시각을 표시할 때 사용할 시간 형식입니다. 예: %H:%M은 시와 분을 표시합니다.",
++  "display.final_response_markdown": "최종 답변에 포함된 Markdown 표기(제목·목록·코드 등)를 화면에서 처리하는 방식을 정합니다.",
++  "display.persistent_output": "CLI 화면을 지우거나 크기를 바꾼 뒤에도 이전 출력 내용을 다시 표시합니다.",
++  "display.persistent_output_max_lines": "화면을 다시 그릴 때 복원할 이전 출력의 최대 줄 수입니다.",
++  "display.cli_rebuild_scrollback_on_redraw": "CLI 화면을 다시 그릴 때 터미널의 스크롤 기록도 함께 지웁니다.",
++  "display.persist_prompts": "승인·추가 질문을 기다리는 내용을 한 줄 요약으로 터미널 기록에 남깁니다.",
++  "display.inline_diffs": "파일을 수정하는 도구가 변경한 내용을 답변 안에 간단한 비교 형태로 표시합니다.",
++  "display.file_mutation_verifier": "파일 수정이 실패한 채 끝났는데 성공한 것처럼 답하는 경우 최종 답변에 경고를 덧붙입니다.",
++  "display.credits_notices": "Nous 크레딧 사용 가능량이 줄거나 소진·복구될 때 상태 알림을 표시합니다.",
++  "display.turn_completion_explainer": "응답을 만들지 못한 채 대화 차례가 끝났을 때 빈 응답 대신 이유를 설명합니다.",
++  "display.show_cost": "터미널 상태 표시줄에 추정 비용을 표시합니다.",
++  "display.battery": "지원되는 기기에서 상태 표시줄에 배터리 잔량을 표시합니다.",
++  "display.focus_view": "집중 화면을 켜 도구 진행 표시를 숨기고 현재 대화 차례에 집중하도록 합니다. 모델에 전달되는 내용은 바뀌지 않습니다.",
++  "display.focus_saved_tool_progress": "집중 화면을 끌 때 복원할 도구 진행 표시 수준입니다.",
++  "display.language": "일부 고정 안내 문구에 사용할 언어입니다. 에이전트 답변·로그·도구 출력의 언어를 바꾸지는 않습니다.",
++  "display.tui_status_indicator": "TUI에서 작업 중임을 나타내는 표시 모양을 정합니다.",
++  "display.cli_refresh_interval": "대기 중인 CLI 화면과 상태 표시를 다시 그리는 간격(초)입니다. 0이면 주기적으로 다시 그리지 않습니다.",
++  "display.vim_mode": "CLI 입력창에서 Vim 방식의 키 입력을 사용합니다.",
++  "display.user_message_preview.first_lines": "CLI 기록에 사용자가 보낸 메시지의 처음부터 표시할 줄 수입니다.",
++  "display.user_message_preview.last_lines": "CLI 기록에 사용자가 보낸 메시지의 끝부분에서 추가로 표시할 줄 수입니다.",
++  "display.interim_assistant_messages": "작업 도중 도구 호출 사이에 에이전트가 보내는 진행 설명을 표시합니다.",
++  "display.suppress_warning_notifications": "엔진의 경고·오류 알림을 숨깁니다. 작업 결과, 직접 실행한 명령, 기존 로그에는 적용되지 않습니다.",
++  "display.show_commentary": "모델의 중간 진행 설명을 답변이 끝나기 전에 별도 메시지로 표시합니다.",
++  "display.tool_progress_command": "메신저 게이트웨이에서 /verbose 명령으로 도구 진행 표시를 바꿀 수 있게 합니다.",
++  "display.tool_preview_length": "도구 진행 내용에서 미리 보여줄 도구 입력의 최대 글자 수입니다. 0은 길이 제한이 없다는 뜻입니다.",
++  "display.friendly_tool_labels": "도구 이름 대신 '파일 읽는 중'처럼 이해하기 쉬운 진행 문구를 표시합니다.",
++  "display.turn_summary": "CLI에서 대화 차례가 끝난 뒤 걸린 시간과 파일·명령 처리량을 한 줄로 요약합니다.",
++  "display.spinner_token_flow": "CLI에서 작업 중 표시 옆에 지금까지 생성한 답변 토큰 수를 표시합니다.",
++  "display.tool_progress_grouping": "지원되는 메신저에서 여러 파일 수정 도구의 진행 내용을 한 메시지에 모을지 각각 보낼지 정합니다.",
++  "display.reasoning_style": "메신저에서 추론 요약을 코드 블록·인용문·작은 글씨 중 어떤 모양으로 표시할지 정합니다.",
++  "display.ephemeral_system_ttl": "지원되는 메신저에서 '새 대화 시작' 같은 임시 시스템 안내를 지우기까지 기다릴 시간(초)입니다. 0이면 자동으로 지우지 않습니다.",
++  "display.platforms.telegram.streaming": "Telegram에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
++  "display.platforms.discord.streaming": "Discord에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
++  "display.platforms.slack.streaming": "Slack에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
++  "display.platforms.wecom.streaming": "WeCom에서 답변 생성 중 내용을 순차적으로 보여줍니다. 전역 스트리밍 설정도 켜져 있어야 합니다.",
++  "display.runtime_footer.enabled": "메신저에 보내는 최종 답변 아래에 모델·문맥 사용량·작업 폴더 정보를 덧붙입니다.",
++  "display.runtime_footer.fields": "최종 답변 아래에 표시할 실행 정보를 선택합니다. 목록 순서대로 출력됩니다.",
++  "display.status_bar.fields": "CLI·TUI 상태 표시줄에 표시할 정보 항목을 지정합니다. 비우면 기본 항목을 사용합니다.",
++  "display.copy_shortcut": "답변 복사에 사용할 키 조합을 선택합니다. auto는 운영체제별 기본 키를 사용합니다.",
++  "display.pet.enabled": "터미널과 데스크톱에 움직이는 마스코트를 표시합니다. 화면 장식만 바꾸며 모델 동작에는 영향을 주지 않습니다.",
++  "display.pet.slug": "표시할 마스코트의 설치 이름입니다. 비우면 설치된 첫 번째 마스코트를 사용합니다.",
++  "display.pet.render_mode": "마스코트를 터미널에 그릴 방식을 선택합니다. auto는 현재 터미널이 지원하는 방식을 찾습니다.",
++  "display.pet.scale": "마스코트의 표시 크기를 기본 크기에 대한 비율로 정합니다.",
++  "display.pet.unicode_cols": "문자 블록으로 마스코트를 표시할 때 사용할 터미널 너비입니다. 0이면 크기에 맞춰 자동 계산합니다.",
 +  "dashboard.theme": "웹 대시보드에 적용할 색상 테마를 정합니다.",
++  "dashboard.turn_isolation": "각 대화 차례를 별도 실행 환경에서 분리하는 기능을 켭니다.",
++  "dashboard.compute_host_heartbeat_secs": "분리 실행 환경이 살아 있는지 확인하는 신호를 보낼 간격(초)입니다.",
++  "dashboard.compute_host_respawn_max": "분리 실행 환경이 종료됐을 때 다시 시작할 최대 횟수입니다.",
++  "dashboard.show_token_analytics": "모델·분석 화면에 토큰 수와 비용의 로컬 추정치를 표시합니다. 실제 청구액보다 크게 낮을 수 있습니다.",
++  "dashboard.trusted_proxies": "대시보드 앞단에서 접속 정보를 전달하는 신뢰할 프록시 IP 또는 네트워크 범위입니다. 직접 접속하는 일반 기기의 주소를 넣는 설정이 아닙니다.",
++  "dashboard.ws_ping_interval": "외부 네트워크 대시보드 연결이 살아 있는지 WebSocket 신호를 보낼 간격(초)입니다. 로컬 접속에는 적용되지 않습니다.",
++  "dashboard.ws_ping_timeout": "WebSocket 신호에 응답이 없을 때 연결을 끊기까지 기다리는 시간(초)입니다.",
++  "dashboard.ws_orphan_reap_grace_s": "브라우저 연결이 끊긴 뒤 연결만 남은 대화 작업을 정리하기 전 기다리는 시간(초)입니다. 0이면 그대로 둡니다.",
++  "dashboard.ws_orphan_activity_stale_s": "연결이 끊긴 작업이 이 시간 동안 진행 신호를 보내지 않을 때에만 중단 대상으로 봅니다.",
++  "dashboard.startup_orphan_sweep": "게이트웨이 시작 시 이전 프로세스가 비정상 종료되어 남긴 TUI·데스크톱·하위 에이전트 기록을 정리합니다. 메신저와 진행 중인 실시간 대화는 건드리지 않습니다.",
++  "dashboard.oauth.client_id": "대시보드 OAuth 로그인에 등록된 애플리케이션 식별자입니다. 로그인 제공자가 발급한 값을 입력합니다.",
++  "dashboard.oauth.portal_url": "OAuth 로그인 또는 계정 연결을 시작할 인증 포털 주소입니다.",
++  "dashboard.basic_auth.username": "대시보드 기본 인증에 사용할 사용자 이름입니다.",
++  "dashboard.basic_auth.password_hash": "기본 인증에서 비밀번호 대신 비교할 암호화 해시 값입니다. 일반 비밀번호를 넣는 칸이 아닙니다.",
++  "dashboard.basic_auth.password": "대시보드 기본 인증에 사용할 비밀번호입니다. 저장 방식은 원본 설정 처리 규칙을 따릅니다.",
++  "dashboard.basic_auth.secret": "기본 인증 세션을 확인하는 데 쓰는 비밀 값입니다. 외부에 공개하지 마세요.",
++  "dashboard.basic_auth.session_ttl_seconds": "기본 인증을 마친 뒤 다시 로그인하지 않아도 되는 시간(초)입니다.",
++  "dashboard.drain_auth.scope": "대시보드 종료·정리 요청을 인증할 때 허용할 권한 범위입니다.",
++  "dashboard.drain_auth.min_secret_chars": "종료·정리 요청용 비밀 값에 요구할 최소 글자 수입니다.",
++  "dashboard.public_url": "외부에서 대시보드에 접속할 때 사용할 공개 주소입니다.",
++  "human_delay.min_ms": "메신저에 메시지를 보낼 때 적용할 입력 지연의 최소값(밀리초)입니다.",
++  "human_delay.max_ms": "메신저에 메시지를 보낼 때 적용할 입력 지연의 최대값(밀리초)입니다.",
 +  "memory.memory_enabled": "켜면 저장된 기억을 대화에 불러와 답변에 활용합니다.",
 +  "memory.user_profile_enabled": "켜면 사용자 프로필을 대화 문맥에 포함해 사용자에 관한 정보를 참고합니다.",
 +  "memory.prefetch_spill_enabled": "켜면 기억 검색 결과가 도구 출력에 넘칠 때 초과 내용을 별도 기억 자료로 보관해 후속 처리에 활용합니다.",
@@ -612,7 +701,7 @@ index 18475fe8f4..aef1e41d58 100644
  
    if (!keyPath && !description) return null;
  
-@@ -42,7 +557,7 @@ function NestedValueEditor({
+@@ -42,7 +646,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -621,7 +710,7 @@ index 18475fe8f4..aef1e41d58 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +574,7 @@ function NestedValueEditor({
+@@ -59,7 +663,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -630,7 +719,7 @@ index 18475fe8f4..aef1e41d58 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +603,7 @@ export function AutoField({
+@@ -88,8 +692,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -640,7 +729,7 @@ index 18475fe8f4..aef1e41d58 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +636,7 @@ export function AutoField({
+@@ -122,7 +725,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -649,7 +738,7 @@ index 18475fe8f4..aef1e41d58 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +697,7 @@ export function AutoField({
+@@ -183,7 +786,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

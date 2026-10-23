@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..568f00f084 100644
+index 18475fe8f4..4110d14b65 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1982 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -1726,18 +1726,18 @@ index 18475fe8f4..568f00f084 100644
 +  "gateway.signal_interrupt_grace_timeout": "종료 신호를 받은 뒤 에이전트 작업이 정리되기를 기다린 후 프로세스를 종료할 시간(초)입니다.",
 +  "gateway.service_install_choice": "게이트웨이 서비스 설치 안내에서 선택한 결과를 저장합니다. 일반 실행만으로 서비스를 자동 설치하도록 허가하는 설정은 아닙니다.",
 +  "gateway.delivery_ledger": "메신저 전송 확인 전에 게이트웨이가 종료되더라도 최종 답변을 기록해 다음 시작 때 다시 전달하도록 합니다. 끄면 종료 시점의 답변이 사라질 수 있습니다.",
-+  "gateway.platform_connect_timeout": "시작하거나 재연결할 때 각 메신저 서비스가 연결되기를 기다리는 제한 시간(초)입니다. 0 이하는 제한 없이 기다립니다.",
-+  "gateway.loop_watchdog": "게이트웨이의 비동기 작업이 멈췄는지 감시하고, 응답이 끊긴 상태가 지속되면 프로세스를 종료해 서비스 관리자가 다시 시작하도록 합니다.",
-+  "gateway.loop_watchdog_probe_interval_s": "게이트웨이 작업이 살아 있는지 확인 신호를 보내는 간격(초)입니다.",
-+  "gateway.loop_watchdog_probe_timeout_s": "확인 신호가 처리되기를 기다릴 시간(초)입니다. 넘기면 한 차례 감시 실패로 셉니다.",
-+  "gateway.loop_watchdog_max_strikes": "감시 확인이 연속으로 실패해도 허용할 횟수입니다. 초과하면 멈춘 프로세스를 종료합니다.",
++  "gateway.platform_connect_timeout": "게이트웨이를 시작하거나 메신저에 다시 연결할 때, 메신저 서비스 하나의 연결을 기다릴 최대 시간(초)입니다. 기본값은 30초입니다. 0 또는 음수면 시간 제한 없이 기다립니다.",
++  "gateway.loop_watchdog": "게이트웨이의 작업 처리기가 응답하지 않는 상태를 별도 감시 작업으로 확인합니다. 멈춤이 이어지면 전체 게이트웨이 프로세스를 종료해 서비스 관리자가 다시 시작하게 합니다. 프로세스 전체에 영향을 주는 복구 기능이며, 개별 대화만 재시도하지 않습니다. 기본값은 켜짐입니다.",
++  "gateway.loop_watchdog_probe_interval_s": "게이트웨이의 작업 처리기가 살아 있는지 확인하는 간격(초)입니다. 기본값은 30초입니다. 간격을 짧게 하면 멈춤을 빨리 찾지만 확인이 더 자주 실행됩니다.",
++  "gateway.loop_watchdog_probe_timeout_s": "감시 확인 신호가 처리되기를 기다릴 시간(초)입니다. 이 시간이 지나도 처리되지 않으면 한 차례 실패로 셉니다. 기본값은 10초입니다.",
++  "gateway.loop_watchdog_max_strikes": "게이트웨이를 멈춘 것으로 판정하기 전에 허용할 연속 확인 실패 횟수입니다. 기본값은 3회입니다. 한두 번의 일시 지연에는 기다리고, 기준을 넘겨도 응답하지 않을 때만 전체 프로세스를 종료합니다.",
 +  "gateway.allow_all_users": "사용자 허용 목록 없이 누구나 봇을 사용할 수 있게 합니다. 공개 채널에서 켜면 예상치 못한 사용자가 요청할 수 있습니다.",
 +  "gateway.bot_loop_guard.enabled": "대화에서 봇끼리 답변을 반복하는 상황을 감지해 잠시 응답을 막습니다.",
 +  "gateway.bot_loop_guard.max_events": "정해진 시간 안에 허용할 봇 메시지 수입니다. 이를 넘으면 반복 대화로 보고 잠시 차단합니다.",
 +  "gateway.bot_loop_guard.window_seconds": "봇 간 반복 메시지 횟수를 계산할 시간 범위(초)입니다.",
 +  "gateway.bot_loop_guard.cooldown_seconds": "봇 간 반복이 감지된 뒤 응답을 멈출 시간(초)입니다.",
 +  "gateway.startup_watchdog": "게이트웨이가 시작된 뒤 제한 시간 안에 정상 작동하지 않으면 멈춘 것으로 보고 프로세스를 종료합니다.",
-+  "gateway.startup_watchdog_timeout_seconds": "시작한 게이트웨이가 정상 작동 상태가 되기를 기다리는 최대 시간(초)입니다.",
++  "gateway.startup_watchdog_timeout_seconds": "게이트웨이를 시작한 뒤 작업 처리기가 응답을 시작하기까지 기다릴 최대 시간(초)입니다. 기본값은 300초(5분)입니다. 이 시간 안에도 응답하지 않으면 프로세스를 종료해 서비스 관리자가 다시 시작하도록 합니다.",
 +  "gateway.write_sessions_json": "세션 연결 정보를 담은 기존 sessions.json 파일도 계속 갱신합니다. 새 기본 저장소는 데이터베이스입니다.",
 +  "gateway.multiplex_profiles": "한 게이트웨이에서 이 컴퓨터의 여러 프로필에 등록된 메신저 봇을 함께 연결하는 운영 방식을 사용합니다. 현재 지원되는 기본 구조입니다.",
 +  "gateway.auto_multiplex_migration": "업데이트 뒤 조건이 갖춰지면 여러 프로필의 게이트웨이를 하나로 통합하는 작업을 자동으로 진행합니다.",

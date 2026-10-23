@@ -4,7 +4,7 @@
 
 ## 현재 구현
 
-- `manager.py`가 [개요](overview/README.md), [연결 대상](connections/README.md), [작업 기록](activity/README.md) 소메뉴 매니저를 import합니다. `../manager.py`가 오버로드 대메뉴로 취합합니다.
+- `manager.py`가 [개요](overview/README.md), [연결 대상](connections/README.md), [작업 기록](activity/README.md), [공용 설정](accounts/README.md) 소메뉴 매니저를 import합니다. `../manager.py`가 오버로드 대메뉴로 취합합니다. 공용 설정은 플랫폼 상단 서버 연결 옆 아이콘에서 엽니다.
 - `store.py`: `runtime/overlord/nazarick/foundation.sqlite3`에 연결 정의와 작업 기록을 저장합니다. 소스·비밀키와 분리합니다.
 - `adapters.py`: `Adapter`의 `targets/inspect` 규격과 명시적인 `ADAPTERS` 등록표. 현재 제공하는 `platform_module`은 기존 서버에 로드된 모듈의 등록·API 규격만 읽습니다. 엔진·모델·업무를 실행하지 않습니다.
 - 화면은 `modules/nazarick/frontend/`에 있습니다. 공통 React/Vite/Tailwind/UI와 `/api` 전송기를 재사용합니다.
@@ -20,4 +20,4 @@
 
 2026-10-24 실제 확인: TypeScript·Vite 빌드와 기존 8766 서버 적용 완료. 실제 브라우저에서 기존 프로젝트 관리 모듈을 대상 등록 → 등록 확인 → 새로고침 후 보존 → 작업 기록 표시까지 확인했습니다. 1440px/390px 화면의 가로 넘침과 JavaScript 오류는 없었습니다. 존재하지 않는 연결은 HTTP 404, 허용하지 않는 추가 입력 필드는 HTTP 422로 거절했습니다. 화면은 `runtime/overlord/nazarick/verification/`에 보관합니다. 별도 제품·서버·재설치·모델 호출은 수행하지 않았습니다.
 
-미구현: 외부 클라우드·인증·결제·범용 업무 실행과 외부 고객 제공. 현재 성공 표시는 플랫폼 모듈의 등록 확인 범위에 한정됩니다.
+공용 설정은 전용 브라우저·업체 가입 기록·로컬 키체인과 에이전트 연결 설정을 제공합니다. 외부 클라우드·결제·범용 업무 실행과 외부 고객 제공은 미구현입니다. 기존 연결 대상의 성공 표시는 플랫폼 모듈의 등록 확인 범위에 한정됩니다. 실제 로그인·가입·키 발급 확인은 공용 설정 안내의 범위를 따릅니다.

@@ -5,6 +5,7 @@
   "backend": {"namespace": "platform_plugins.nazarick", "entry": "manager"},
   "frontend": {"entry": "frontend/register.ts"},
   "data": ["runtime/overlord/nazarick"],
+  "resources": {"browser_mcp": "runtime/ai_agent/OpenClawOriginal/source/node_modules/chrome-devtools-mcp"},
   "legacy_shared_code": true,
   "order": 35
 }

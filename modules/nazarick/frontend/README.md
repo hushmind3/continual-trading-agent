@@ -1,8 +1,9 @@
 # 나자릭 화면
 
-용도: 오버로드 대메뉴 안의 나자릭 중메뉴와 세 소메뉴를 표시합니다.
+용도: 오버로드 대메뉴 안의 나자릭 중메뉴·세 기본 소메뉴와 상단 공용 설정을 표시합니다.
 
 - `register.ts`: `overlord/nazarick/{overview,connections,activity}` 등록. 세 화면은 같은 mountKey로 상태를 공유합니다.
+- [accounts/](accounts/README.md): 숨김 소메뉴 `overlord/nazarick/accounts`. 상단 공용 설정 아이콘과 Drawer에서 여는 브라우저·업체 계정 화면입니다.
 - `Nazarick.tsx`: 조회·갱신·메뉴 이동·변경 요청. 기존 `@platform/data/api`의 단일 `/api`를 사용합니다.
 - `FoundationMap.tsx`: 본체와 여섯 확장 영역. 공급자와 연결 상태를 가정하지 않습니다.
 - `ConnectionForm.tsx`, `Connections.tsx`: 대상 저장·수정·제거·등록 확인.

@@ -13,7 +13,7 @@
 | AI 에이전트 / 헤르메스 | 기존 이식 엔진·대화·모델·작업 환경·MCP·스킬 | [이식 Hermes](modules/hermes/README.md) |
 | AI 에이전트 / 헤르메스 원본 | 공식 원본 실행·한국어 대시보드 | [실제 백엔드](modules/ai_agent/HermesOriginal/backend/README.md) · [등록·화면](modules/ai_agent/HermesOriginal/README.md) |
 | AI 에이전트 / OpenClaw 원본 | 공식 Gateway·Control UI·실행 제어 | [실제 백엔드](modules/ai_agent/OpenClawOriginal/backend/README.md) · [등록·화면](modules/ai_agent/OpenClawOriginal/README.md) |
-| 오버로드 / 나자릭 | 연결 대상·어댑터 규격·등록 확인·기록 | [나자릭](backend/overlord/nazarick/README.md) |
+| 오버로드 / 나자릭 | 연결 대상·어댑터 규격·등록 확인·기록·상단 공용 계정 설정 | [나자릭](backend/overlord/nazarick/README.md) · [공용 설정](backend/overlord/nazarick/accounts/README.md) |
 | GitHub / 프로젝트 관리 | 검색·설치·실행·분리·재연결·소스 배포 | [프로젝트 관리](modules/projects/README.md) |
 
 중메뉴가 있는 기능은 **소메뉴 → 중메뉴 매니저 → 대메뉴 매니저 → 전체 메뉴 총괄 → 단일 `/api`**로 연결합니다. 자동 등록은 기존 `modules/<id>/module.json`과 중메뉴 소유형 `modules/<대메뉴>/<중메뉴>/module.json`을 함께 지원합니다. 등록용 연결 파일에는 업무 코드를 복제하지 않습니다.

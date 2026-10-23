@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..dc63bd0ff8 100644
+index 18475fe8f4..13cfc234bf 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,9 +3,1155 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1208 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -882,12 +882,12 @@ index 18475fe8f4..dc63bd0ff8 100644
 +  "bot_desktop.min_free_memory_mb": "봇 데스크톱을 시작하기 전에 컴퓨터에 남아 있어야 하는 최소 메모리(MB)입니다.",
 +  "bot_desktop.idle_stop_minutes": "봇 데스크톱에서 활동이 없으면 자동으로 닫기까지 기다릴 시간(분)입니다.",
 +  "bot_desktop.placement": "봇 데스크톱 화면이 표시될 모니터나 화면 배치를 선택합니다.",
-+  model: "새 대화에서 기본으로 사용할 AI 서비스와 모델 이름입니다. 예: openai-codex:gpt-5.5.",
-+  model_context_length: "모델이 한 번에 참고할 수 있는 문맥의 최대 토큰 수입니다. 0이면 모델 정보에서 자동으로 가져옵니다.",
-+  fallback_providers: "기본 AI 서비스에 연결할 수 없을 때 차례로 시도할 대체 서비스와 모델 목록입니다.",
-+  toolsets: "에이전트가 사용할 도구 묶음 이름 목록입니다. 비우면 기본 도구 선택을 사용합니다.",
-+  max_concurrent_sessions: "동시에 처리할 수 있는 대화의 최대 개수입니다.",
-+  max_live_sessions: "서버가 동시에 실행 상태로 유지할 대화의 최대 개수입니다.",
++  model: "대화에 답할 기본 AI 모델입니다. 서비스 이름과 모델 이름을 함께 지정합니다. 예: anthropic/claude-sonnet-4.6.",
++  model_context_length: "모델이 한 번에 참고할 수 있는 대화와 파일의 최대 분량(토큰)입니다. 0이면 모델 정보에서 자동으로 가져옵니다.",
++  fallback_providers: "기본 AI 서비스가 실패하거나 사용 한도에 걸렸을 때 대신 시도할 서비스와 모델의 순서입니다.",
++  toolsets: "에이전트가 사용할 수 있는 도구 묶음입니다. 여기서 빼면 해당 도구를 작업에 사용할 수 없습니다.",
++  max_concurrent_sessions: "터미널·대시보드·메신저 전체에서 동시에 진행할 수 있는 대화 수입니다. 비우거나 0으로 두면 제한하지 않습니다.",
++  max_live_sessions: "메모리에 유지할 대화 수의 기준입니다. 초과하면 연결이 끊긴 대화부터 메모리에서 내리며, 다시 열면 기록에서 이어집니다. 0은 제한하지 않습니다.",
 +  "database.journal_mode": "대화 데이터베이스가 쓰기 중에도 읽기 요청을 처리하는 방식을 정합니다. 데이터베이스 엔진이 지원하는 모드만 사용할 수 있습니다.",
 +  "database.wal_autocheckpoint": "데이터베이스 변경 기록을 본 파일에 합칠 기준 페이지 수입니다.",
 +  "database.journal_size_limit": "데이터베이스 변경 기록 파일이 사용할 수 있는 최대 크기(바이트)입니다.",
@@ -896,11 +896,11 @@ index 18475fe8f4..dc63bd0ff8 100644
 +  "worktrees.archive_max_file_mb": "작업 폴더를 보관할 때 포함할 수 있는 파일 하나의 최대 크기(MB)입니다. 큰 파일이 있으면 해당 폴더를 보존합니다.",
 +  "worktrees.archive_retention_days": "보관한 작업 폴더의 복구 기록을 유지할 기간(일)입니다. 0이면 자동 만료시키지 않습니다.",
 +  "worktrees.max_total_gb": "사용하지 않는 작업 폴더 전체에 허용할 용량(GB)입니다. 초과하면 오래된 항목부터 보관·정리하며 0이면 용량 한도가 없습니다.",
-+  context_file_max_chars: "대화 문맥에 포함할 각 파일 내용의 최대 글자 수입니다.",
-+  context_file_read_timeout: "문맥에 넣을 파일을 읽을 때까지 기다리는 최대 시간(초)입니다.",
-+  file_read_max_chars: "파일 읽기 도구가 한 번에 반환할 수 있는 최대 글자 수입니다.",
-+  mcp_discovery_timeout: "MCP 서버에 연결해 도구 목록을 받아오기까지 기다리는 최대 시간(초)입니다.",
-+  mcp_single_query_discovery_timeout: "MCP 도구를 하나씩 확인하는 검색에서 응답을 기다릴 최대 시간(초)입니다.",
++  context_file_max_chars: "시작할 때 자동으로 읽는 안내 파일 하나에서 가져올 최대 글자 수입니다. 초과하면 앞뒤 일부만 읽습니다. 비우면 모델 문맥 크기에 맞춰 정합니다.",
++  context_file_read_timeout: "자동 안내 파일 하나를 읽을 때 기다릴 최대 시간(초)입니다. 네트워크 폴더가 응답하지 않으면 해당 파일을 건너뜁니다.",
++  file_read_max_chars: "파일 읽기 도구 한 번으로 가져올 수 있는 최대 글자 수입니다. 더 큰 파일은 나누어 읽어야 합니다.",
++  mcp_discovery_timeout: "첫 답변을 준비할 때 MCP 서버가 도구 목록을 보내기를 기다리는 최대 시간(초)입니다. 늦게 연결된 서버도 이후 대화에서 다시 확인합니다.",
++  mcp_single_query_discovery_timeout: "한 번만 답하고 끝나는 명령에서 MCP 도구 목록을 기다리는 최대 시간(초)입니다. 후속 대화가 없으므로 일반 대화보다 길게 기다립니다.",
 +  "tool_output.max_bytes": "도구 하나가 반환해 대화에 포함할 수 있는 출력의 최대 크기(바이트)입니다.",
 +  "tool_output.max_lines": "도구 하나의 출력에서 보존할 최대 줄 수입니다.",
 +  "tool_output.max_line_length": "도구 출력에서 줄 하나에 보존할 최대 글자 수입니다.",
@@ -911,20 +911,20 @@ index 18475fe8f4..dc63bd0ff8 100644
 +  "vision.embed_target_bytes": "이미지 하나를 모델 요청에 넣을 때 목표로 삼는 최대 데이터 크기(바이트)입니다. 복잡한 화면을 자세히 읽어야 하면 늘릴 수 있습니다.",
 +  "vision.max_calls_per_image": "같은 이미지에 대해 이미지 분석을 요청할 수 있는 최대 횟수입니다. 0이면 제한하지 않습니다.",
 +  "vision.replay_recent_images": "대화 기록을 다시 불러온 뒤 모델 요청에 다시 포함할 최근 사용자 이미지 수입니다. 0이면 이미지를 다시 보내지 않습니다.",
-+  prefill_messages_file: "매 모델 요청의 앞부분에 예시 대화로 넣을 메시지 파일 경로입니다. 일반 대화 기록으로 저장하지 않습니다.",
++  prefill_messages_file: "매번 모델 요청을 시작할 때 미리 넣을 예시 대화 파일(JSON) 경로입니다. 대화 기록이나 로그에는 저장되지 않습니다.",
 +  "loops.min_interval_seconds": "반복 실행(/loop)에 허용할 최소 간격(초)입니다. 더 짧은 간격은 이 값으로 올립니다.",
 +  "loops.max_ticks": "반복 실행 한 번에서 허용할 최대 실행 횟수입니다.",
 +  "loops.self_paced_floor_seconds": "반복 실행이 스스로 다음 실행 시간을 정할 때 사용할 시작 간격(초)입니다.",
 +  "loops.self_paced_ceiling_seconds": "반복 실행이 점차 간격을 늘릴 때 허용할 가장 긴 간격(초)입니다.",
-+  timezone: "예약 작업과 날짜·시간 표시에 사용할 시간대입니다. 예: Asia/Seoul.",
++  timezone: "예약 작업과 시각 표시에 사용할 시간대입니다. 예: Asia/Seoul. 비우면 서버의 시간대를 사용합니다.",
 +  "mattermost.require_mention": "Mattermost 채널에서 봇을 멘션한 메시지에만 답합니다.",
 +  "mattermost.free_response_channels": "봇을 멘션하지 않아도 답할 Mattermost 채널 ID 목록입니다.",
 +  "mattermost.allowed_channels": "봇이 응답할 수 있는 Mattermost 채널 ID 허용 목록입니다. 비우면 목록으로 제한하지 않습니다.",
 +  "matrix.require_mention": "Matrix 방에서 봇을 멘션한 메시지에만 답합니다.",
 +  "matrix.free_response_rooms": "봇을 멘션하지 않아도 답할 Matrix 방 ID 목록입니다.",
 +  "matrix.allowed_rooms": "봇이 응답할 수 있는 Matrix 방 ID 허용 목록입니다. 비우면 목록으로 제한하지 않습니다.",
-+  command_allowlist: "자동 실행이 허용되는 터미널 명령 이름 목록입니다. 목록에 없는 명령은 별도 승인 정책을 따릅니다.",
-+  hooks_auto_accept: "사용자 승인 여부를 묻는 훅 요청을 자동으로 허용합니다.",
++  command_allowlist: "승인 절차 없이 실행하도록 영구 허용한 위험 명령 패턴 목록입니다. 등록한 명령은 확인 없이 실행될 수 있습니다.",
++  hooks_auto_accept: "셸 훅을 등록할 때 대화형 확인 없이 자동으로 허용합니다. 신뢰하는 훅만 등록된 경우에 사용하세요.",
 +  "auth.codex_login_flow": "Codex 계정에 연결할 때 기기 코드 입력 방식 또는 브라우저 로그인 방식을 선택합니다.",
 +  "logging.max_size_mb": "로그 파일 하나의 최대 크기(MB)입니다. 한도에 도달하면 이전 로그를 교체합니다.",
 +  "logging.backup_count": "로그 파일이 교체될 때 보관할 이전 로그 사본 개수입니다.",
@@ -938,9 +938,9 @@ index 18475fe8f4..dc63bd0ff8 100644
 +  "x_search.reasoning_effort": "X 검색 요청을 처리할 때 모델에 요구할 추론 강도입니다.",
 +  "x_search.timeout_seconds": "X 검색 작업이 끝나기를 기다리는 최대 시간(초)입니다.",
 +  "x_search.retries": "X 검색 요청이 일시적으로 실패했을 때 다시 시도할 횟수입니다.",
-+  paste_collapse_threshold: "붙여넣은 내용이 이 기준을 넘으면 터미널 화면에서 접어 표시합니다.",
-+  paste_collapse_threshold_fallback: "기본 붙여넣기 접기 기준을 사용할 수 없을 때 대신 적용할 값입니다.",
-+  paste_collapse_char_threshold: "붙여넣은 내용의 글자 수가 이 값을 넘으면 화면에서 접어 표시합니다.",
++  paste_collapse_threshold: "터미널에서 여러 줄 붙여넣기를 파일 참조로 접기 시작할 줄 수입니다. 0이면 접지 않습니다.",
++  paste_collapse_threshold_fallback: "터미널이 붙여넣기 감지 기능을 지원하지 않을 때 적용할 줄 수 기준입니다. 0이면 이 기준으로 접지 않습니다.",
++  paste_collapse_char_threshold: "한 줄 붙여넣기를 파일 참조로 접기 시작할 글자 수입니다. 0이면 접지 않습니다.",
 +  "proxy.tunnel_port": "외부 통신 프록시 터널이 사용할 로컬 포트 번호입니다.",
 +  "proxy.auto_install": "프록시 기능을 처음 사용할 때 필요한 실행 프로그램을 자동으로 설치합니다.",
 +  "proxy.allow_env_fallback": "프록시 자체 인증 정보가 없을 때 환경 변수에 설정된 기존 인증 정보를 대신 사용합니다.",
@@ -1185,47 +1185,91 @@ index 18475fe8f4..dc63bd0ff8 100644
 +  "updates.parked_branch_strategy": "보류된 브랜치를 업데이트 전후에 처리하는 방식입니다.",
 +};
 +
++const AUXILIARY_TASKS_KO: Record<string, string> = {
++  vision: "이미지 내용 파악",
++  compression: "긴 대화 내용을 줄여 정리",
++  skills_hub: "스킬 검색과 관리",
++  approval: "작업 승인 여부 판단",
++  review: "코드와 작업 결과 검토",
++  mcp: "MCP 도구 관련 작업",
++  title_generation: "대화 제목 생성",
++  memory_query_rewrite: "기억 검색어 다듬기",
++  tts_audio_tags: "음성 대본에 표현 태그 추가",
++  voice_chat: "음성 대화 응답 생성",
++  triage_specifier: "칸반 작업 요청을 구체적인 명세로 정리",
++  kanban_decomposer: "칸반 작업을 하위 작업으로 나누기",
++  profile_describer: "프로필 소개 문장 작성",
++  goal_judge: "목표 달성 여부와 완료 조건 판단",
++  curator: "스킬 사용 기록 검토와 정리",
++  monitor: "중요 메일의 우선순위 점수 매기기",
++  background_review: "작업 뒤 기억과 스킬 개선점 검토",
++  moa_reference: "MoA 답변 비교에 참고할 의견 작성",
++  moa_aggregator: "MoA 참고 의견을 모아 최종 답변 작성",
++};
++
 +function auxiliaryFieldDescription(schemaKey: string): string {
 +  if (!schemaKey.startsWith("auxiliary.")) return "";
-+  const field = schemaKey.split(".").at(-1);
++  const parts = schemaKey.split(".");
++  const field = parts.at(-1);
++  const taskKey = parts.slice(1, -1).join(".");
++  const task = AUXILIARY_TASKS_KO[taskKey];
++  let explanation = "";
 +  switch (field) {
 +    case "enabled":
-+      return "이 보조 기능을 자동으로 사용할지 정합니다.";
++      explanation = "이 기능을 자동으로 사용할지 정합니다.";
++      break;
 +    case "provider":
-+      return "이 보조 기능에 요청을 보낼 AI 서비스입니다.";
++      explanation = "이 작업을 맡길 AI 서비스입니다.";
++      break;
 +    case "model":
-+      return "이 보조 기능에 사용할 모델 이름 또는 ID입니다.";
++      explanation = "이 작업에 사용할 AI 모델 이름 또는 ID입니다.";
++      break;
 +    case "base_url":
-+      return "기본 주소 대신 사용할 AI 서비스 API 주소입니다. 별도 주소가 없으면 비워 둡니다.";
++      explanation = "AI 서비스의 기본 주소 대신 사용할 API 주소입니다. 별도 주소가 없으면 비워 둡니다.";
++      break;
 +    case "api_key":
-+      return "이 보조 기능이 AI 서비스에 접속할 때 사용할 비밀 키입니다.";
++      explanation = "이 작업을 위해 AI 서비스에 접속할 때 사용할 비밀 키입니다.";
++      break;
 +    case "timeout":
-+      return "AI 서비스 응답을 기다릴 최대 시간입니다.";
++      explanation = "AI 서비스의 응답을 기다릴 최대 시간입니다.";
++      break;
 +    case "reasoning_effort":
-+      return "지원하는 모델이 답을 만들 때 들일 생각의 깊이입니다. 높이면 복잡한 작업에 더 많은 시간과 비용이 들 수 있습니다.";
++      explanation = "모델이 이 작업을 풀 때 들일 생각의 깊이입니다. 높이면 복잡한 작업을 더 잘 처리할 수 있지만 시간과 비용이 늘 수 있습니다.";
++      break;
 +    case "api_mode":
-+      return "선택한 서비스와 통신할 때 사용할 API 형식입니다.";
++      explanation = "선택한 서비스와 통신할 때 사용할 API 형식입니다.";
++      break;
 +    case "transient_retries":
-+      return "일시적인 연결 오류가 났을 때 다시 시도할 횟수입니다.";
++      explanation = "보조 AI 요청에서 일시적인 연결 오류나 시간 초과가 났을 때 같은 서비스로 다시 시도할 횟수입니다.";
++      break;
 +    case "free_only":
-+      return "무료 조건에 맞는 모델만 후보로 사용합니다.";
++      explanation = "OpenRouter를 통한 자동 대체에서 무료 모델만 사용합니다. 유료 모델은 선택하지 않습니다.";
++      break;
 +    case "openrouter_model":
-+      return "OpenRouter를 통해 사용할 모델 ID입니다.";
++      explanation = "자동 대체 시 OpenRouter에서 사용할 모델 ID입니다.";
++      break;
 +    case "stream_only_base_urls":
-+      return "스트리밍 응답을 지원하는 API 주소만 사용하도록 제한합니다.";
++      explanation = "일반 요청을 거부하는 서비스 주소를 등록합니다. 해당 주소로는 응답을 실시간 전송 방식으로 요청합니다.";
++      break;
 +    case "download_timeout":
-+      return "필요한 파일을 내려받을 때 기다릴 최대 시간입니다.";
++      explanation = "이미지를 분석하기 전에 이미지 파일을 내려받을 때 기다릴 최대 시간입니다.";
++      break;
 +    case "no_progress_timeout":
-+      return "이 시간 동안 진행이 없으면 작업이 멈춘 것으로 판단합니다.";
++      explanation = "모델이 응답을 시작한 뒤 이 시간 동안 새 내용을 보내지 않으면 요청을 실패 처리하고 재시도합니다. 전체 요청 제한 시간과는 별도입니다.";
++      break;
 +    case "model_upgrade_enabled":
-+      return "현재 모델로 처리하기 어려운 요청에서 더 적합한 모델로 바꿔 사용할지 정합니다.";
++      explanation = "기본 방식으로 만든 제목이 부적절할 때 AI 모델에 더 나은 제목을 요청합니다.";
++      break;
 +    case "prefer_fast_model":
-+      return "가능하면 응답이 빠른 모델을 우선 선택합니다.";
++      explanation = "서비스가 빠른 응답용 모델을 제공하면 대화 제목을 만들 때 우선 사용합니다.";
++      break;
 +    case "language":
-+      return "이 보조 기능이 결과를 작성할 언어입니다.";
++      explanation = "대화 제목을 작성할 언어입니다. 비우면 대화 내용에 맞춰 정합니다.";
++      break;
 +    default:
 +      return "";
 +  }
++  return task ? `${task} 작업에 관한 설정입니다. ${explanation}` : explanation;
 +}
 +
  function FieldHint({ schema, schemaKey }: { schema: Record<string, unknown>; schemaKey: string }) {
@@ -1235,6 +1279,9 @@ index 18475fe8f4..dc63bd0ff8 100644
 +  const generatedLabel = (schemaKey.split(".").pop() ?? schemaKey).replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
 +  const meaningfulRawDescription = rawDescription.includes(" → ") || rawDescription === generatedLabel ? "" : rawDescription;
 +  const koreanExplanation = CONFIG_DESCRIPTIONS_KO[schemaKey] ?? auxiliaryFieldDescription(schemaKey);
++  const auxiliaryTask = keyPath.startsWith("auxiliary.")
++    ? AUXILIARY_TASKS_KO[keyPath.split(".").slice(1, -1).join(".")]
++    : "";
 +  const description = koreanExplanation
 +    ? meaningfulRawDescription
 +      ? `${meaningfulRawDescription} (${koreanExplanation})`
@@ -1243,7 +1290,14 @@ index 18475fe8f4..dc63bd0ff8 100644
  
    if (!keyPath && !description) return null;
  
-@@ -42,7 +1188,7 @@ function NestedValueEditor({
+   return (
+     <div className="flex flex-col gap-0.5">
+-      {keyPath && <span className="text-xs font-mono text-text-tertiary">{keyPath}</span>}
++      {keyPath && <span className="text-xs font-mono text-text-tertiary">{keyPath}{auxiliaryTask ? ` (${auxiliaryTask})` : ""}</span>}
+       {description && <span className="text-xs text-text-secondary">{description}</span>}
+     </div>
+   );
+@@ -42,7 +1235,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1252,7 +1306,7 @@ index 18475fe8f4..dc63bd0ff8 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1205,7 @@ function NestedValueEditor({
+@@ -59,7 +1252,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1261,7 +1315,7 @@ index 18475fe8f4..dc63bd0ff8 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1234,7 @@ export function AutoField({
+@@ -88,8 +1281,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1271,7 +1325,7 @@ index 18475fe8f4..dc63bd0ff8 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1267,7 @@ export function AutoField({
+@@ -122,7 +1314,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1280,7 +1334,7 @@ index 18475fe8f4..dc63bd0ff8 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1328,7 @@ export function AutoField({
+@@ -183,7 +1375,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

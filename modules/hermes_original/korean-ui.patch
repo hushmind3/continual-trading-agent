@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..6f135052cd 100644
+index 18475fe8f4..93bf312a56 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1949 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1962 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -180,6 +180,19 @@ index 18475fe8f4..6f135052cd 100644
 +  "compression.codex_responses_compact_threshold": "Codex Responses compact threshold (OpenAI 서버 정리 시작 토큰 수)",
 +  "compression.in_place": "In place (대화 ID를 유지하며 정리)",
 +  "compression.idle_compact_after_seconds": "대화가 멈춘 뒤 자동 정리까지 대기 시간",
++  "sessions.auto_prune": "오래된 완료 대화 자동 삭제",
++  "sessions.retention_days": "삭제 전 보관할 기간(일)",
++  "sessions.auto_archive": "오래된 대화를 목록에서 자동 숨기기",
++  "sessions.auto_archive_days": "숨기기 전 대화 미사용 기간(일)",
++  "sessions.show_subagents": "하위 에이전트 대화도 목록에 표시",
++  "sessions.vacuum_after_prune": "대화 삭제 뒤 데이터베이스 빈 공간 회수",
++  "sessions.min_vacuum_interval_days": "빈 공간 회수 작업 사이 최소 기간(일)",
++  "sessions.min_interval_hours": "자동 보관·삭제 작업 사이 최소 대기(시간)",
++  "sessions.fts_optimize_notice": "대화 검색 색인 정리 안내",
++  "sessions.cjk_fts": "한국어·중국어·일본어 검색 보조 색인",
++  "sessions.search_slow_ms": "느린 검색으로 기록할 시간 기준(밀리초)",
++  "sessions.max_resume_messages": "대화를 다시 열 때 허용할 최대 메시지 수",
++  "sessions.max_export_messages": "대화 내보내기를 허용할 최대 메시지 수",
 +  "checkpoints.enabled": "Checkpoints enabled (작업 파일 복구 지점 저장)",
 +  "checkpoints.max_snapshots": "Max snapshots (프로젝트별 복구 지점 상한)",
 +  "checkpoints.max_total_size_mb": "Max total size MB (복구 지점 전체 용량 상한)",
@@ -1486,19 +1499,19 @@ index 18475fe8f4..6f135052cd 100644
 +  "desktop.auto_continue.enabled": "데스크톱에서 작업이 중단되었을 때 조건에 맞는 대화를 자동으로 이어서 실행합니다.",
 +  "desktop.auto_continue.freshness_minutes": "이 시간(분) 안에 중단된 대화만 자동 이어하기 대상으로 인정합니다.",
 +  "desktop.auto_continue.max_attempts": "중단된 대화를 자동으로 이어서 실행할 최대 횟수입니다.",
-+  "sessions.auto_prune": "오래 끝난 대화 기록을 보관 기간에 따라 자동으로 삭제합니다. 열린 대화·고정한 대화·진행 중인 대화는 삭제하지 않습니다.",
-+  "sessions.retention_days": "끝난 대화 기록을 자동 삭제 전에 보관할 최소 기간(일)입니다.",
-+  "sessions.auto_archive": "오래 사용하지 않은 대화를 삭제하지 않고 목록에서 숨김 처리합니다. 고정한 대화는 대상에서 제외됩니다.",
-+  "sessions.auto_archive_days": "대화를 자동 숨김 처리하기 전 기다릴 비활성 기간(일)입니다.",
-+  "sessions.show_subagents": "대화 목록에 하위 에이전트가 실행한 작업도 부모 대화 아래에 표시합니다.",
-+  "sessions.vacuum_after_prune": "대화 기록을 삭제한 뒤 데이터베이스 파일 안의 빈 공간을 정리해 파일 크기를 줄입니다. 큰 파일에서는 쓰기가 잠시 멈출 수 있습니다.",
-+  "sessions.min_vacuum_interval_days": "데이터베이스 빈 공간 정리를 다시 실행하기 전 기다릴 최소 기간(일)입니다.",
-+  "sessions.min_interval_hours": "대화 기록 자동 정리 작업을 실행하는 최소 간격(시간)입니다.",
-+  "sessions.fts_optimize_notice": "대화 검색용 데이터베이스 색인을 더 작은 형식으로 바꿀 수 있을 때 안내를 표시할지 정합니다. 실제 변경은 별도 최적화 명령으로 실행합니다.",
-+  "sessions.cjk_fts": "설치되어 있다면 한국어·중국어·일본어 두 글자 검색을 빠르게 하는 추가 색인을 사용합니다.",
-+  "sessions.search_slow_ms": "대화 검색이 이 시간(밀리초) 이상 걸리면 검색 경로와 함께 느린 검색으로 로그에 기록합니다. 0이면 모든 검색을 기록합니다.",
-+  "sessions.max_resume_messages": "대화를 다시 열 때 한 번에 불러올 수 있는 활성 메시지 최대 개수입니다. 지나치게 큰 대화가 메모리를 많이 쓰는 일을 막습니다.",
-+  "sessions.max_export_messages": "대화 하나를 메모리에서 내보낼 때 처리할 수 있는 메시지 최대 개수입니다.",
++  "sessions.auto_prune": "켜면 Hermes가 보관 기간이 지난 완료 대화와 연결된 기록 파일을 실제로 삭제합니다. 열린 대화·고정한 대화·작업 중인 대화는 대상에서 제외됩니다. 삭제한 기록은 되돌릴 수 없습니다.",
++  "sessions.retention_days": "자동 삭제 기능을 켰을 때, 마지막 활동 후 며칠이 지난 완료 대화를 삭제할지 정합니다. 기간이 짧을수록 오래된 기록을 더 빨리 지웁니다.",
++  "sessions.auto_archive": "오래 사용하지 않은 대화 기록은 보관한 채 목록에서 숨깁니다. 자동 삭제와 별도로 켜고 끌 수 있으며, 고정한 대화는 숨기지 않습니다.",
++  "sessions.auto_archive_days": "마지막으로 사용한 뒤 이 기간(일)이 지난 대화를 목록에서 숨깁니다. 숨김은 기록 삭제가 아닙니다.",
++  "sessions.show_subagents": "다른 에이전트에게 맡긴 작업의 대화도 원래 요청을 보낸 대화 아래에 표시합니다.",
++  "sessions.vacuum_after_prune": "오래된 대화를 삭제한 뒤 데이터베이스 파일의 빈 공간을 회수하고 파일을 줄이는 작업을 허용합니다. 파일이 크면 처리 중 다른 저장 작업이 잠시 기다릴 수 있습니다. 실제 실행 여부는 삭제량과 데이터베이스 사용 상태에도 달려 있습니다.",
++  "sessions.min_vacuum_interval_days": "데이터베이스 파일의 빈 공간 회수 작업을 다시 할 때까지 기다릴 최소 기간(일)입니다. 이 기간이 지나도 회수할 공간이 적거나 다른 작업이 데이터베이스를 사용 중이면 건너뛸 수 있습니다.",
++  "sessions.min_interval_hours": "자동 보관·삭제 작업을 다시 실행하기 전 기다릴 최소 시간입니다. 반복 실행 주기가 아니라 너무 자주 점검하지 않게 하는 제한입니다.",
++  "sessions.fts_optimize_notice": "검색용 색인을 더 효율적인 저장 방식으로 바꿀 수 있으면 Hermes 업데이트 때 안내합니다. advise는 일반 안내, require는 필수 안내, off는 안내 끄기입니다. 실제 색인 정리는 별도 `hermes sessions optimize-storage` 명령으로 실행합니다.",
++  "sessions.cjk_fts": "시스템에 추가 검색 기능이 설치되어 있으면 한국어·중국어·일본어에서 짧은 단어(두 글자)를 찾는 보조 색인을 사용합니다. 기능이 설치되지 않은 환경에서는 켜도 효과가 없습니다.",
++  "sessions.search_slow_ms": "검색에 이 시간(밀리초) 이상 걸리면 검색에 걸린 시간과 사용한 검색 방식을 로그에 남깁니다. 0이면 느린 검색만이 아니라 모든 검색을 기록합니다.",
++  "sessions.max_resume_messages": "대화를 다시 열 때 불러올 수 있는 메시지 수의 상한입니다. 이 수를 넘는 대화는 다시 열 수 없으며, 0이면 이 제한을 끕니다.",
++  "sessions.max_export_messages": "대화를 내보내기 전에 메시지 수를 확인하는 상한입니다. 이 수를 넘으면 내보내기를 막으며, 0이면 이 제한을 끕니다.",
 +  "wake_word.enabled": "'Hey Hermes' 같은 호출어를 기기에서 계속 듣고 새 음성 대화를 시작합니다.",
 +  "wake_word.surface": "호출어 감지를 사용할 화면을 선택합니다. auto는 먼저 시작된 지원 화면에서 사용합니다.",
 +  "wake_word.input_device": "호출어 감지에 사용할 마이크 장치 이름 또는 번호입니다. 비우면 시스템 기본 마이크를 사용합니다.",
@@ -2038,7 +2051,7 @@ index 18475fe8f4..6f135052cd 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1976,7 @@ function NestedValueEditor({
+@@ -42,7 +1989,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -2047,7 +2060,7 @@ index 18475fe8f4..6f135052cd 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1993,7 @@ function NestedValueEditor({
+@@ -59,7 +2006,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -2056,7 +2069,7 @@ index 18475fe8f4..6f135052cd 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +2022,7 @@ export function AutoField({
+@@ -88,8 +2035,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -2066,7 +2079,7 @@ index 18475fe8f4..6f135052cd 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +2055,7 @@ export function AutoField({
+@@ -122,7 +2068,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -2075,7 +2088,7 @@ index 18475fe8f4..6f135052cd 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +2116,7 @@ export function AutoField({
+@@ -183,7 +2129,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

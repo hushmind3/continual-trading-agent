@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..cbbba39e3b 100644
+index 18475fe8f4..b27b61d321 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1783 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1815 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -107,6 +107,38 @@ index 18475fe8f4..cbbba39e3b 100644
 +  "display.reasoning_style": "Reasoning style (추론 요약 표시 모양)",
 +  "fallback.min_switch_reset_seconds": "대체 제공자 전환 기준 초기화 시간(초)",
 +  "runtime.nofile_soft_limit": "프로세스가 열 수 있는 파일 수의 완화된 상한",
++  "compression.enabled": "Enabled (대화 자동 요약·정리 사용)",
++  "compression.checkpoint_required": "Checkpoint required (요약 전 복구 지점 저장 필수)",
++  "compression.progress_notices": "Progress notices (대화 정리 진행 알림)",
++  "compression.threshold": "Threshold (정리를 시작할 문맥 사용률)",
++  "compression.threshold_tokens": "Threshold tokens (정리를 시작할 토큰 수)",
++  "compression.target_ratio": "Target ratio (정리 뒤 남길 문맥 비율)",
++  "compression.tail_mode": "Tail mode (요약 뒤 보존할 최근 대화 방식)",
++  "compression.protect_last_n": "Protect last N (원문으로 보존할 최근 메시지 수)",
++  "compression.min_tail_user_messages": "Minimum tail user messages (최근에 보존할 사용자 메시지 수)",
++  "compression.max_attempts": "Maximum attempts (요약 재시도 횟수)",
++  "compression.proactive_prune_tokens": "Proactive prune tokens (미리 정리를 시작할 토큰 수)",
++  "compression.proactive_prune_min_result_chars": "Minimum result characters (정리 대상 도구 결과의 최소 글자 수)",
++  "compression.proactive_prune_min_reclaim_tokens": "Minimum reclaimed tokens (정리를 완료할 최소 절약 토큰 수)",
++  "compression.micro_compact": "Micro compact (매 대화 차례마다 조금씩 정리)",
++  "compression.micro_compact_every_n_turns": "Micro compact every N turns (몇 차례마다 조금씩 정리할지)",
++  "compression.micro_compact_defrag_threshold_tokens": "Micro compact defrag threshold (요약을 다시 압축할 토큰 수)",
++  "compression.hygiene_hard_message_limit": "Hygiene hard message limit (강제 정리 전 메시지 수 상한)",
++  "compression.hygiene_timeout_seconds": "Hygiene timeout (대화 정리 응답 대기 시간)",
++  "compression.hygiene_total_ceiling_seconds": "Hygiene total ceiling (대화 정리 전체 대기 상한)",
++  "compression.hygiene_failure_cooldown_seconds": "Hygiene failure cooldown (정리 실패 뒤 재시도 대기 시간)",
++  "compression.hygiene_max_turn_hold_seconds": "Hygiene maximum turn hold (정리 때문에 새 요청을 기다리게 할 최대 시간)",
++  "compression.context_timeout_seconds": "Context timeout (대화 내용 정리 응답 대기 시간)",
++  "compression.context_total_ceiling_seconds": "Context total ceiling (대화 내용 정리 전체 대기 상한)",
++  "compression.protect_first_n": "Protect first N (원문으로 보존할 초기 메시지 수)",
++  "compression.abort_on_summary_failure": "Abort on summary failure (요약 실패 시 자동 정리 중단)",
++  "compression.codex_gpt55_autoraise": "Codex GPT-5.5 auto raise (Codex 모델 정리 기준 자동 상향)",
++  "compression.codex_gpt55_autoraise_notice": "Auto raise notice (자동 상향 안내 표시)",
++  "compression.codex_app_server_auto": "Codex app-server auto (Codex 앱 대화 자동 정리 방식)",
++  "compression.codex_responses_native": "Codex Responses native (OpenAI 서버의 대화 정리 사용)",
++  "compression.codex_responses_compact_threshold": "Codex Responses compact threshold (OpenAI 서버 정리 시작 토큰 수)",
++  "compression.in_place": "In place (대화 ID를 유지하며 정리)",
++  "compression.idle_compact_after_seconds": "Idle compact after (유휴 상태 뒤 자동 정리까지 시간)",
 +  "checkpoints.enabled": "Checkpoints enabled (작업 파일 복구 지점 저장)",
 +  "checkpoints.max_snapshots": "Max snapshots (프로젝트별 복구 지점 상한)",
 +  "checkpoints.max_total_size_mb": "Max total size MB (복구 지점 전체 용량 상한)",
@@ -1872,7 +1904,7 @@ index 18475fe8f4..cbbba39e3b 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1810,7 @@ function NestedValueEditor({
+@@ -42,7 +1842,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1881,7 +1913,7 @@ index 18475fe8f4..cbbba39e3b 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1827,7 @@ function NestedValueEditor({
+@@ -59,7 +1859,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1890,7 +1922,7 @@ index 18475fe8f4..cbbba39e3b 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1856,7 @@ export function AutoField({
+@@ -88,8 +1888,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1900,7 +1932,7 @@ index 18475fe8f4..cbbba39e3b 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1889,7 @@ export function AutoField({
+@@ -122,7 +1921,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1909,7 +1941,7 @@ index 18475fe8f4..cbbba39e3b 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1950,7 @@ export function AutoField({
+@@ -183,7 +1982,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

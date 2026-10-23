@@ -11,13 +11,13 @@
 - `integration.py`: 버튼을 눌렀을 때만 로컬 Codex MCP 설정, Hermes 프로필별 `BROWSER_CDP_URL` 및 `shared-accounts` 스킬, OpenClaw의 `platform` attach-only 브라우저 프로필·공용 계정 스킬을 병합합니다. 변경 전 설정은 소유 runtime의 `settings-before-shared/`에 보존합니다. 모델·기존 인증키는 변경하지 않습니다.
 - `cli.py`: 표준 입출력 MCP `mcp-accounts`와 `mcp-browser`, 업체 목록 `list`, 진행 기록 `update ID STATUS --notes 내용`, 키 주입 실행 `run --service ID --env API_KEY -- COMMAND`. 호출은 프로젝트 `.venv/platform/bin/python backend/overlord/nazarick/accounts/cli.py ...`를 사용합니다. 키 주입을 받은 프로그램이 자신의 환경변수를 출력하지 않도록 사용해야 합니다.
 - `mcp-browser`는 기존 OpenClaw 설치의 Google 공식 `chrome-devtools-mcp`를 재사용합니다. 현재 설치 버전 1.10.1이며 사용 통계·CrUX·성능/네트워크 도구를 끕니다. 설치본이 없으면 명시적으로 실패하고 자동 다운로드하지 않습니다. Codex 설정은 프로젝트 `.codex/config.toml`에 로컬 절대 경로로 생성하며 Git에서 제외합니다. [공식 MCP 설정 규격](https://learn.chatgpt.com/docs/extend/mcp)을 따릅니다.
-- 화면: [modules/nazarick/frontend/accounts/](../../../../modules/nazarick/frontend/accounts/README.md). 공통 Shell은 모듈이 등록한 `utility: settings` 컴포넌트를 Drawer에 표시합니다. 모듈이 빠지면 아이콘도 제거됩니다.
+- 화면: [modules/nazarick/frontend/accounts/](../../../../modules/nazarick/frontend/accounts/README.md). 모듈 명세의 `shared_settings`와 화면 등록의 `settingsPage`를 공통 로더가 자동 취합합니다. Shell은 등록 항목을 넓은 중앙 설정창에 표시하며 등록 항목이 없으면 아이콘을 제거합니다. 여섯 분류의 이름·순서는 모듈 명세에서 관리하고 API 키는 별도 탭에서 보관합니다.
 
 ## 사용·확인
 
 상단 공용 설정 → 공용 브라우저 열기 → Google/GitHub 로그인 → 에이전트 공용 연결 설정. Codex는 도구 재연결 이후, Hermes는 프로필 환경을 새로 읽는 대화부터 사용합니다. 실행 중인 대화·작업을 재시작하거나 강제 교체하지 않습니다. OpenClaw는 `platform` 브라우저 프로필을 사용합니다.
 
-업체·가입 대기 → 업체 일괄 추가에서 `업체명 https://공식주소`를 줄별로 붙여넣습니다. 최대 100개, 같은 도메인은 기존 기록을 유지하며 갱신합니다. 등록된 업체는 공용 브라우저에서 열고 상태를 기록합니다. 가입/키 발급 여부는 실제 화면에서 확인한 뒤 기록해야 합니다. API 키는 해당 업체의 키 보관 입력으로 키체인에 저장하고, 실행 시에만 환경변수로 전달합니다.
+계정·서비스 → 업체 일괄 추가에서 `업체명 https://공식주소`를 줄별로 붙여넣습니다. 최대 100개, 같은 도메인은 기존 기록을 유지하며 갱신합니다. 등록된 업체는 공용 브라우저에서 열고 상태를 기록합니다. 가입/키 발급 여부는 실제 화면에서 확인한 뒤 기록해야 합니다. API 키 탭에서 업체를 선택해 키체인에 저장하고, 실행 시에만 환경변수로 전달합니다.
 
 2026-10-24 실제 확인: 플랫폼 TypeScript·Vite 빌드·기존 8766 서버 적용, 상단 아이콘과 공용 설정 Drawer 표시, 전용 Chrome 실행·Google 로그인 화면 진입, 버튼을 통한 에이전트 설정 저장을 확인했습니다. 두 Codex용 MCP의 initialize/tools/list 연결(계정 2개·브라우저 25개 도구), 실제 Hermes 브라우저의 공용 endpoint 해석, 공식 OpenClaw config validate 성공·공용 스킬 eligible/modelVisible 인식, macOS 키체인의 임시 값 저장·읽기·검사 항목 정리를 확인했습니다. 검사에 모델·추론 호출은 사용하지 않았습니다.
 

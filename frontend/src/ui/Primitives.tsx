@@ -137,11 +137,13 @@ export function Drawer({
   open,
   onClose,
   children,
+  variant = 'drawer',
 }: {
   title: string;
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  variant?: 'drawer' | 'settings';
 }) {
   const previous=useRef<HTMLElement|null>(null),wasOpen=useRef(false),panel=useRef<HTMLElement|null>(null),closeHandler=useRef(onClose);
   closeHandler.current=onClose;
@@ -168,7 +170,7 @@ export function Drawer({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-end sm:items-stretch"
+      className={'fixed inset-0 z-50 flex items-end justify-end sm:items-stretch ' + (variant === 'settings' ? 'ui-settings-dialog' : '')}
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -179,8 +181,8 @@ export function Drawer({
         className="ui-drawer-backdrop absolute inset-0 z-0 bg-slate-950/30 backdrop-blur-sm"
         onClick={onClose}
       />
-      <section ref={panel} className="ui-drawer-panel relative z-10 max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl animate-[reveal_.2s_ease-out] sm:max-h-none sm:max-w-lg sm:rounded-none">
-        <div className="mb-6 flex items-center justify-between gap-3">
+      <section ref={panel} className={'ui-drawer-panel relative z-10 max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl animate-[reveal_.2s_ease-out] sm:max-h-none sm:max-w-lg sm:rounded-none ' + (variant === 'settings' ? 'ui-settings-dialog-panel' : '')}>
+        <div className={'mb-6 flex items-center justify-between gap-3 ' + (variant === 'settings' ? 'ui-settings-dialog-heading' : '')}>
           <h2 className="text-lg font-bold">{title}</h2>
           <Button
             autoFocus

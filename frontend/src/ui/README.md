@@ -36,6 +36,8 @@ ComposerFrame은 전체 폭 편집 영역·첨부·도구 모음·실행 옵션�
 
 SettingsSection은 설정 제목·설명·상태/액션·본문 경계를 공유합니다. SettingsLoadState는 설정 읽기 실패 시 원인과 다시 불러오기를 함께 표시합니다. ui-settings 계열 디자인은 tailwind.css에서 관리합니다.
 
+SettingsWorkspace는 등록된 설정 항목을 분류 탐색·본문으로 배치합니다. 방향키/Home/End로 항목을 전환하며 좁은 화면에서는 탐색을 상단으로 배치합니다. Drawer의 선택 인수 `variant=settings`는 같은 닫기·Escape·초점 순환을 유지하면서 넓은 중앙 설정창을 제공합니다. 기존 Drawer의 기본 배치에는 적용하지 않습니다. 디자인 값은 공통 tailwind.css의 ui-settings-dialog/workspace 계열에서 관리합니다.
+
 문서 참조는 ui-document-link 텍스트 링크로 표시해 본문을 버튼 모양으로 쪼개지 않습니다. Tabs는 선택된 항목만 강조하고 설정 화면에서 내용 폭만 사용합니다. 스킬·MCP 입력창도 별도 모달 구현 대신 공통 Drawer를 사용합니다.
 
 DocumentContent.tsx는 팝업과 나란히 보기에서 공통으로 사용하는 문서 본문입니다. HTML 미리보기와 원문 보기는 분리되며 기존 문서 읽기 API를 그대로 사용합니다.

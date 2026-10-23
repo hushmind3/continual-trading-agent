@@ -5489,10 +5489,44 @@ index 30afe5ee9e..c3584ab366 100644
                )}
              </CardContent>
 diff --git a/web/src/pages/PluginsPage.tsx b/web/src/pages/PluginsPage.tsx
-index e240dd72db..bd3141a447 100644
+index e240dd72db..f335a87f79 100644
 --- a/web/src/pages/PluginsPage.tsx
 +++ b/web/src/pages/PluginsPage.tsx
-@@ -101,7 +101,7 @@ function MemoryProviderSetupResults({ results }: { results: MemoryProviderSetupR
+@@ -40,10 +40,10 @@ const MEMORY_PROVIDER_BUILTIN = "__hermes_memory_builtin__";
+ type MemoryFormValue = string | boolean | number;
+ 
+ const MEMORY_STATUS_LABEL: Record<MemoryProviderInfo["status"], string> = {
+-  ready: "ready",
+-  needs_config: "needs setup",
+-  unavailable: "unavailable",
+-  missing: "missing",
++  ready: "사용 가능",
++  needs_config: "설정 필요",
++  unavailable: "사용할 수 없음",
++  missing: "설치되지 않음",
+ };
+ 
+ const MEMORY_STATUS_TONE: Record<MemoryProviderInfo["status"], "success" | "warning" | "destructive" | "secondary"> = {
+@@ -82,9 +82,15 @@ function SetupCommandBlock({ code, label }: { code: string; label: string }) {
+ }
+ 
+ function setupResultLabel(status: string) {
+-  if (status === "already_installed") return "already installed";
+-  if (status === "no_declared_steps") return "no declared setup";
+-  return status.replace(/_/g, " ");
++  const labels: Record<string, string> = {
++    already_installed: "이미 설치됨",
++    no_declared_steps: "설치 단계 없음",
++    installed: "설치됨",
++    verified: "확인됨",
++    missing: "누락됨",
++    failed: "실패",
++  };
++  return labels[status] ?? status.replace(/_/g, " ");
+ }
+ 
+ function setupResultClass(status: string) {
+@@ -101,7 +107,7 @@ function MemoryProviderSetupResults({ results }: { results: MemoryProviderSetupR
  
    return (
      <div className="grid gap-2 border border-border bg-background/20 p-3">
@@ -5501,7 +5535,7 @@ index e240dd72db..bd3141a447 100644
        {results.map((result, index) => {
          const detail = result.stderr || result.stdout;
          return (
-@@ -165,7 +165,7 @@ function MemoryProviderSetupHint({
+@@ -165,7 +171,7 @@ function MemoryProviderSetupHint({
    if (!hasDetails || !setup) {
      return (
        <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
@@ -5510,7 +5544,7 @@ index e240dd72db..bd3141a447 100644
        </p>
      );
    }
-@@ -179,8 +179,8 @@ function MemoryProviderSetupHint({
+@@ -179,8 +185,8 @@ function MemoryProviderSetupHint({
      >
        <p className={isBlocked ? "text-destructive" : "text-muted-foreground"}>
          {needsDependencySetup
@@ -5521,7 +5555,15 @@ index e240dd72db..bd3141a447 100644
        </p>
  
        {needsDependencySetup ? (
-@@ -199,7 +199,7 @@ function MemoryProviderSetupHint({
+@@ -192,14 +198,14 @@ function MemoryProviderSetupHint({
+         >
+           <span className="inline-flex items-center gap-2">
+             {installing ? <Spinner /> : null}
+-            {installing ? "Installing provider dependencies" : "Install provider dependencies"}
++          {installing ? "제공자 구성 요소 설치 중…" : "제공자 구성 요소 설치"}
+           </span>
+         </Button>
+       ) : null}
  
        {installing ? (
          <div className="flex items-center gap-2 text-muted-foreground">
@@ -5530,7 +5572,7 @@ index e240dd72db..bd3141a447 100644
          </div>
        ) : null}
  
-@@ -210,7 +210,7 @@ function MemoryProviderSetupHint({
+@@ -210,17 +216,17 @@ function MemoryProviderSetupHint({
            {setup.external_dependencies.map((dep, index) => (
              <div key={`${dep.name || "dependency"}-${index}`} className="grid gap-2">
                <p className="text-muted-foreground">
@@ -5539,16 +5581,28 @@ index e240dd72db..bd3141a447 100644
                </p>
                {dep.install ? (
                  <SetupCommandBlock
-@@ -229,7 +229,7 @@ function MemoryProviderSetupHint({
+-                  label={dep.name ? `Install ${dep.name}` : "Install dependency"}
++                  label={dep.name ? `${dep.name} 설치` : "구성 요소 설치"}
+                   code={dep.install}
+                 />
+               ) : null}
+               {dep.check ? (
+                 <SetupCommandBlock
+-                  label={dep.name ? `Verify ${dep.name}` : "Verify dependency"}
++                  label={dep.name ? `${dep.name} 설치 확인` : "설치 확인"}
+                   code={dep.check}
+                 />
+               ) : null}
+@@ -229,7 +235,7 @@ function MemoryProviderSetupHint({
  
            {setup.pip_dependencies.length ? (
              <div className="grid gap-2">
 -              <p className="text-muted-foreground">Python dependencies</p>
-+              <p className="text-muted-foreground">Python 종속 항목</p>
++              <p className="text-muted-foreground">Python 패키지 (필요한 구성 요소)</p>
                <div className="flex flex-wrap gap-2">
                  {setup.pip_dependencies.map((dep) => (
                    <code
-@@ -248,7 +248,7 @@ function MemoryProviderSetupHint({
+@@ -248,7 +254,7 @@ function MemoryProviderSetupHint({
        {setup.required_env.length && needsDependencySetup ? (
          <div className="grid gap-2">
            <p className="text-muted-foreground">
@@ -5557,7 +5611,7 @@ index e240dd72db..bd3141a447 100644
            </p>
            <div className="flex flex-wrap gap-2">
              {setup.required_env.map((envKey) => (
-@@ -290,11 +290,33 @@ export default function PluginsPage() {
+@@ -290,11 +296,33 @@ export default function PluginsPage() {
    const [memorySetupResults, setMemorySetupResults] = useState<MemoryProviderSetupResult[] | null>(null);
    const [contextBusy, setContextBusy] = useState(false);
    const [rowBusy, setRowBusy] = useState<string | null>(null);
@@ -5592,7 +5646,101 @@ index e240dd72db..bd3141a447 100644
    const loadHub = useCallback((memorySelection?: string) => {
      return api
        .getPluginsHub()
-@@ -570,7 +592,7 @@ export default function PluginsPage() {
+@@ -353,7 +381,7 @@ export default function PluginsPage() {
+           if (!cancelled) {
+             setMemoryConfig(null);
+             setMemoryValues({});
+-            showToast(e instanceof Error ? e.message : "Failed to load provider config", "error");
++            showToast(e instanceof Error ? e.message : "제공자 설정을 불러오지 못했습니다.", "error");
+           }
+         })
+         .finally(() => {
+@@ -379,14 +407,14 @@ export default function PluginsPage() {
+         force: installForce,
+         enable: installEnable,
+       });
+-      showToast(`${r.plugin_name ?? id} installed`, "success");
++      showToast(`${r.plugin_name ?? id} 플러그인을 설치했습니다.`, "success");
+       if ((r.warnings?.length ?? 0) > 0) showToast(r.warnings!.join(" "), "error");
+       if ((r.missing_env?.length ?? 0) > 0)
+         showToast(`${t.pluginsPage.missingEnvWarn} ${r.missing_env!.join(", ")}`, "error");
+       setInstallId("");
+       await loadHub();
+     } catch (e) {
+-      showToast(e instanceof Error ? e.message : "Install failed", "error");
++      showToast(e instanceof Error ? e.message : "플러그인을 설치하지 못했습니다.", "error");
+     } finally {
+       setInstallBusy(false);
+     }
+@@ -402,12 +430,12 @@ export default function PluginsPage() {
+         force: entry.installed,
+         enable: false,
+       });
+-      showToast(`${r.plugin_name ?? entry.name} installed`, "success");
++      showToast(`${r.plugin_name ?? entry.name} 플러그인을 설치했습니다.`, "success");
+       if ((r.missing_env?.length ?? 0) > 0)
+         showToast(`${t.pluginsPage.missingEnvWarn} ${r.missing_env!.join(", ")}`, "error");
+       await Promise.all([loadHub(), loadCatalog()]);
+     } catch (e) {
+-      showToast(e instanceof Error ? e.message : "Install failed", "error");
++      showToast(e instanceof Error ? e.message : "플러그인을 설치하지 못했습니다.", "error");
+     } finally {
+       setCatalogBusy(null);
+     }
+@@ -423,7 +451,7 @@ export default function PluginsPage() {
+       );
+       await loadHub();
+     } catch (e) {
+-      showToast(e instanceof Error ? e.message : "Rescan failed", "error");
++      showToast(e instanceof Error ? e.message : "대시보드 확장을 다시 검색하지 못했습니다.", "error");
+     } finally {
+       setRescanBusy(false);
+     }
+@@ -463,7 +491,7 @@ export default function PluginsPage() {
+       showToast(t.pluginsPage.savedProviders, "success");
+       await loadHub();
+     } catch (e) {
+-      showToast(e instanceof Error ? e.message : "Save failed", "error");
++      showToast(e instanceof Error ? e.message : "제공자 설정을 저장하지 못했습니다.", "error");
+     } finally {
+       setMemoryBusy(false);
+     }
+@@ -489,13 +517,13 @@ export default function PluginsPage() {
+       const failed = result.results.filter((row) => row.status === "failed");
+       if (failed.length) {
+         const names = Array.from(new Set(failed.map((row) => row.name))).join(", ");
+-        showToast(`Provider setup failed: ${names || provider}. See setup results below.`, "error");
++        showToast(`제공자 설정을 완료하지 못했습니다: ${names || provider}. 아래 결과를 확인하세요.`, "error");
+       } else {
+-        showToast("Provider setup finished", "success");
++        showToast("제공자 설정을 마쳤습니다.", "success");
+       }
+       await loadHub(provider);
+     } catch (e) {
+-      showToast(e instanceof Error ? e.message : "Provider setup failed", "error");
++      showToast(e instanceof Error ? e.message : "제공자 설정을 완료하지 못했습니다.", "error");
+     } finally {
+       setMemorySetupBusy(false);
+     }
+@@ -508,7 +536,7 @@ export default function PluginsPage() {
+       showToast(t.pluginsPage.savedProviders, "success");
+       await loadHub();
+     } catch (e) {
+-      showToast(e instanceof Error ? e.message : "Save failed", "error");
++      showToast(e instanceof Error ? e.message : "제공자 설정을 저장하지 못했습니다.", "error");
+     } finally {
+       setContextBusy(false);
+     }
+@@ -520,7 +548,7 @@ export default function PluginsPage() {
+       await fn();
+       await loadHub();
+     } catch (e) {
+-      showToast(e instanceof Error ? e.message : "Failed", "error");
++      showToast(e instanceof Error ? e.message : "요청을 완료하지 못했습니다.", "error");
+     } finally {
+       setRowBusy(null);
+     }
+@@ -570,7 +598,7 @@ export default function PluginsPage() {
              <CardHeader>
                <CardTitle>{t.pluginsPage.providersHeading}</CardTitle>
                <p className="text-xs tracking-[0.08em] text-text-tertiary">
@@ -5601,7 +5749,7 @@ index e240dd72db..bd3141a447 100644
                </p>
              </CardHeader>
  
-@@ -613,13 +635,13 @@ export default function PluginsPage() {
+@@ -613,13 +641,13 @@ export default function PluginsPage() {
  
                    {!selectedMemoryName && (
                      <p className="text-xs text-muted-foreground">
@@ -5617,7 +5765,129 @@ index e240dd72db..bd3141a447 100644
                      </p>
                    )}
  
-@@ -918,6 +940,12 @@ export default function PluginsPage() {
+@@ -640,19 +668,19 @@ export default function PluginsPage() {
+ 
+                   {selectedMemoryName && selectedMemoryInfo?.status === "needs_config" && (
+                     <p className="border border-warning/50 px-3 py-2 text-xs text-warning">
+-                      Provider dependencies are installed. Add the required credentials or self-hosted URL below, then save the provider.
++                      제공자 설치가 끝났습니다. 아래에 필요한 인증 정보나 직접 운영 중인 서버 주소를 입력한 뒤 제공자 설정을 저장하세요.
+                     </p>
+                   )}
+ 
+                   {selectedMemoryName && memoryConfigBusy && (
+                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
+-                      <Spinner /> Loading provider settings…
++                      <Spinner /> 제공자 설정을 불러오는 중…
+                     </div>
+                   )}
+ 
+                   {selectedMemoryName && !memoryConfigBusy && visibleMemoryFields.length === 0 && (
+                     <p className="text-xs text-muted-foreground">
+-                      This provider does not expose dashboard settings.
++                      이 제공자는 대시보드에서 설정할 항목을 제공하지 않습니다.
+                     </p>
+                   )}
+ 
+@@ -665,9 +693,9 @@ export default function PluginsPage() {
+                           <div key={field.key} className="grid gap-2 min-w-0">
+                             <div className="flex flex-wrap items-center gap-2">
+                               <Label htmlFor={`memory-${field.key}`}>{field.label}</Label>
+-                              {field.required && <Badge tone="outline">required</Badge>}
++                              {field.required && <Badge tone="outline">필수</Badge>}
+                               {field.kind === "secret" && field.is_set && !value && (
+-                                <Badge tone="success">set</Badge>
++                                <Badge tone="success">설정됨</Badge>
+                               )}
+                               {field.url && (
+                                 <a
+@@ -676,7 +704,7 @@ export default function PluginsPage() {
+                                   rel="noreferrer"
+                                   className="inline-flex items-center gap-1 text-xs underline"
+                                 >
+-                                  Open <ExternalLink className="h-3 w-3" />
++                                  링크 열기 <ExternalLink className="h-3 w-3" />
+                                 </a>
+                               )}
+                             </div>
+@@ -722,7 +750,7 @@ export default function PluginsPage() {
+                                   value={String(value ?? "")}
+                                   placeholder={
+                                     field.kind === "secret" && field.is_set
+-                                      ? "Leave blank to keep existing value"
++                                      ? "기존 값을 유지하려면 비워 두세요"
+                                       : field.placeholder
+                                   }
+                                   onChange={(event) =>
+@@ -736,7 +764,7 @@ export default function PluginsPage() {
+                                   <Button
+                                     ghost
+                                     size="icon"
+-                                    aria-label={secretIsVisible ? "Hide secret" : "Show secret"}
++                                    aria-label={secretIsVisible ? "비밀 값 숨기기" : "비밀 값 보기"}
+                                     onClick={() =>
+                                       setSecretVisible((current) => ({
+                                         ...current,
+@@ -770,7 +798,7 @@ export default function PluginsPage() {
+                     onClick={() => void onSaveMemoryProvider()}
+                     prefix={memoryBusy ? <Spinner /> : undefined}
+                   >
+-                    Save memory provider
++                    메모리 제공자 저장
+                   </Button>
+                 </div>
+ 
+@@ -801,7 +829,7 @@ export default function PluginsPage() {
+                     onClick={() => void onSaveContextEngine()}
+                     prefix={contextBusy ? <Spinner /> : undefined}
+                   >
+-                    Save context engine
++                    컨텍스트 엔진 저장
+                   </Button>
+                 </div>
+               </div>
+@@ -879,20 +907,20 @@ export default function PluginsPage() {
+         <div className="flex flex-col gap-3" data-testid="plugin-catalog-section">
+ 
+           <h3 className="font-mondwest text-display text-xs tracking-[0.12em] text-text-secondary">
+-            {t.pluginsPage.catalogHeading ?? "Plugin catalog"}
++            {t.pluginsPage.catalogHeading ?? "플러그인 목록"}
+           </h3>
+ 
+           <p className="text-xs tracking-[0.06em] text-text-tertiary">
+             {t.pluginsPage.catalogHint ??
+-              "Curated, Nous-reviewed plugins pinned to exact commits."}
++              "Nous가 검토하고 특정 코드 버전으로 고정한 플러그인입니다."}
+           </p>
+ 
+           <Input
+             className="max-w-md"
+-            placeholder={t.pluginsPage.catalogSearchPlaceholder ?? "Search catalog..."}
++            placeholder={t.pluginsPage.catalogSearchPlaceholder ?? "카탈로그에서 검색…"}
+             value={catalogSearch}
+             onChange={(e) => setCatalogSearch(e.target.value)}
+-            aria-label={t.pluginsPage.catalogSearchPlaceholder ?? "Search catalog..."}
++            aria-label={t.pluginsPage.catalogSearchPlaceholder ?? "카탈로그에서 검색…"}
+           />
+ 
+           {catalogLoading ? (
+@@ -902,14 +930,14 @@ export default function PluginsPage() {
+             </div>
+           ) : catalogEntries.length === 0 ? (
+             <p className="text-xs text-text-tertiary">
+-              {t.pluginsPage.catalogEmpty ?? "No catalog entries match."}{" "}
++              {t.pluginsPage.catalogEmpty ?? "검색 조건에 맞는 플러그인이 없습니다."}{" "}
+               <a
+                 className="underline"
+                 href="https://hermes-agent.nousresearch.com/docs/plugins"
+                 target="_blank"
+                 rel="noreferrer"
+               >
+-                {t.pluginsPage.catalogEmptyDocsLink ?? "Learn about Hermes plugins"}
++                {t.pluginsPage.catalogEmptyDocsLink ?? "Hermes 플러그인 사용법 보기"}
+               </a>
+             </p>
+           ) : (
+@@ -918,6 +946,12 @@ export default function PluginsPage() {
                  <li key={entry.name}>
                    <CatalogEntryCard
                      busy={catalogBusy === entry.name}
@@ -5630,7 +5900,7 @@ index e240dd72db..bd3141a447 100644
                      entry={entry}
                      onInstall={() => setCatalogConfirm(entry)}
                      removed={removedByName.get(entry.name) ?? null}
-@@ -955,7 +983,19 @@ export default function PluginsPage() {
+@@ -955,7 +989,19 @@ export default function PluginsPage() {
  
  
                    <PluginRowCard
@@ -5651,7 +5921,7 @@ index e240dd72db..bd3141a447 100644
                    />
  
                  </li>
-@@ -980,7 +1020,7 @@ export default function PluginsPage() {
+@@ -980,7 +1026,7 @@ export default function PluginsPage() {
                  <li className="text-xs text-text-secondary" key={m.name}>
  
  
@@ -5660,7 +5930,34 @@ index e240dd72db..bd3141a447 100644
  
  
                    {!m.tab?.hidden ? (
-@@ -1034,6 +1074,7 @@ export default function PluginsPage() {
+@@ -1010,22 +1056,22 @@ export default function PluginsPage() {
+         onConfirm={() => {
+           if (catalogConfirm) void onCatalogInstall(catalogConfirm);
+         }}
+-        title={t.pluginsPage.catalogConfirmTitle ?? "Install this plugin?"}
++        title={t.pluginsPage.catalogConfirmTitle ?? "이 플러그인을 설치할까요?"}
+         description={
+           catalogConfirm
+             ? [
+                 catalogConfirm.capability_summary,
+                 catalogConfirm.capabilities.requires_env.length
+-                  ? `${t.pluginsPage.catalogRequiresEnv ?? "Requires env"}: ${catalogConfirm.capabilities.requires_env.join(", ")}`
++                  ? `${t.pluginsPage.catalogRequiresEnv ?? "필요한 환경 변수"}: ${catalogConfirm.capabilities.requires_env.join(", ")}`
+                   : "",
+                 t.pluginsPage.catalogConfirmInstallNote ??
+-                  "Plugins install disabled; enable it after install to activate.",
++                  "설치 직후에는 비활성 상태입니다. 사용하려면 설치 후 활성화하세요.",
+               ]
+                 .filter(Boolean)
+                 .join("\n\n")
+             : ""
+         }
+-        confirmLabel={t.pluginsPage.catalogInstallBtn ?? "Install"}
++        confirmLabel={t.pluginsPage.catalogInstallBtn ?? "설치"}
+       />
+     </div>
+   );
+@@ -1034,6 +1080,7 @@ export default function PluginsPage() {
  interface PluginRowCardProps {
  
    row: HubAgentPluginRow;
@@ -5668,7 +5965,7 @@ index e240dd72db..bd3141a447 100644
    rowBusy: string | null;
    setRuntimeLoading: (
      name: string,
-@@ -1047,6 +1088,7 @@ interface PluginRowCardProps {
+@@ -1047,6 +1094,7 @@ interface PluginRowCardProps {
  function PluginRowCard(props: PluginRowCardProps) {
    const {
      row,
@@ -5676,7 +5973,16 @@ index e240dd72db..bd3141a447 100644
      rowBusy,
      setRuntimeLoading,
      showToast,
-@@ -1216,9 +1258,9 @@ function PluginRowCard(props: PluginRowCardProps) {
+@@ -1095,7 +1143,7 @@ function PluginRowCard(props: PluginRowCardProps) {
+ 
+             {row.removed_reason ? (
+               <Badge tone="destructive">
+-                {t.pluginsPage.catalogRemovedBadge ?? "Removed"}
++                {t.pluginsPage.catalogRemovedBadge ?? "목록에서 제외됨"}
+               </Badge>
+             ) : null}
+           </div>
+@@ -1216,15 +1264,15 @@ function PluginRowCard(props: PluginRowCardProps) {
            </div>
          </div>
  
@@ -5688,7 +5994,14 @@ index e240dd72db..bd3141a447 100644
            </p>
          ) : null}
  
-@@ -1272,14 +1314,46 @@ function PluginRowCard(props: PluginRowCardProps) {
+         {row.removed_reason ? (
+           <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
+-            {t.pluginsPage.removedFromCatalog ?? "Removed from catalog"}: {row.removed_reason}
++            {t.pluginsPage.removedFromCatalog ?? "목록에서 제외됨"}: {row.removed_reason}
+           </p>
+         ) : null}
+ 
+@@ -1272,14 +1320,46 @@ function PluginRowCard(props: PluginRowCardProps) {
  
  interface CatalogEntryCardProps {
    busy: boolean;
@@ -5736,7 +6049,41 @@ index e240dd72db..bd3141a447 100644
  
    const caps = entry.capabilities;
    const chips: string[] = [];
-@@ -1337,9 +1411,9 @@ function CatalogEntryCard(props: CatalogEntryCardProps) {
+@@ -1308,7 +1388,7 @@ function CatalogEntryCard(props: CatalogEntryCardProps) {
+ 
+             {isRemoved ? (
+               <Badge tone="destructive">
+-                {t.pluginsPage.catalogRemovedBadge ?? "Removed"}
++                {t.pluginsPage.catalogRemovedBadge ?? "목록에서 제외됨"}
+               </Badge>
+             ) : null}
+           </div>
+@@ -1316,14 +1396,14 @@ function CatalogEntryCard(props: CatalogEntryCardProps) {
+           <div className="flex flex-wrap items-center gap-2 shrink-0">
+             {isRemoved ? null : entry.installed && !entry.update_available ? (
+               <Badge tone="success">
+-                {t.pluginsPage.catalogInstalledBadge ?? "Installed ✓"}
++                {t.pluginsPage.catalogInstalledBadge ?? "설치됨 ✓"}
+               </Badge>
+             ) : (
+               <Button disabled={busy} ghost size="sm" onClick={onInstall}>
+                 {busy ? <Spinner /> : null}
+                 {entry.update_available
+-                  ? t.pluginsPage.catalogUpdateBtn ?? "Update available"
+-                  : t.pluginsPage.catalogInstallBtn ?? "Install"}
++                  ? t.pluginsPage.catalogUpdateBtn ?? "업데이트 가능"
++                  : t.pluginsPage.catalogInstallBtn ?? "설치"}
+               </Button>
+             )}
+           </div>
+@@ -1331,15 +1411,15 @@ function CatalogEntryCard(props: CatalogEntryCardProps) {
+ 
+         {isRemoved ? (
+           <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
+-            {t.pluginsPage.removedFromCatalog ?? "Removed from catalog"}
++            {t.pluginsPage.removedFromCatalog ?? "목록에서 제외됨"}
+             {removed.reason ? `: ${removed.reason}` : ""}
+             {removed.date ? ` (${removed.date})` : ""}
            </p>
          ) : null}
  

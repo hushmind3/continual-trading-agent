@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..e04d3a1916 100644
+index 18475fe8f4..80353c73c8 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1981 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1984 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -551,6 +551,9 @@ index 18475fe8f4..e04d3a1916 100644
 +  "browser.extension_control.developer_mode": "브라우저 확장 개발 기능 허용",
 +  "terminal.vercel_runtime": "Vercel 실행 버전",
 +  "terminal.vercel_image": "Vercel 격리 환경 꾸러미",
++  "tool_output.max_bytes": "터미널 출력 최대 글자 수",
++  "tool_output.max_lines": "파일 한 번에 읽을 최대 줄 수",
++  "tool_output.max_line_length": "파일 한 줄 최대 글자 수",
 +  model_context_length: "모델이 한 번에 참고할 최대 분량",
 +  fallback_providers: "주 모델 실패 때 대신 시도할 AI 서비스·모델 순서",
 +  toolsets: "사용할 도구 모음",
@@ -1675,9 +1678,9 @@ index 18475fe8f4..e04d3a1916 100644
 +  file_read_max_chars: "파일 읽기 도구 한 번으로 가져올 수 있는 최대 글자 수입니다. 한도를 넘는 요청은 거부되며, 파일을 위치와 크기를 나누어 읽어야 합니다.",
 +  mcp_discovery_timeout: "첫 답변을 준비할 때 MCP(외부 도구 연결 방식) 서버가 도구 목록을 보내기를 기다리는 최대 시간(초)입니다. 시간이 지나도 서버 검색을 중단하지 않습니다. 늦게 연결된 서버는 다음 대화 차례에서 다시 확인합니다.",
 +  mcp_single_query_discovery_timeout: "한 번 답하고 끝나는 명령(-q/-z)에서 MCP 서버가 도구 목록을 보내기를 기다리는 최대 시간(초)입니다. 이후 대화 차례에서 다시 확인할 수 없어 일반 대화보다 길게 기다립니다. MCP 서버의 연결 자체를 끊는 시간은 아닙니다.",
-+  "tool_output.max_bytes": "도구 하나가 반환해 대화에 포함할 수 있는 출력의 최대 크기(바이트)입니다.",
-+  "tool_output.max_lines": "`read_file` 한 번으로 읽어 올 수 있는 줄 수의 상한입니다. 범위가 긴 파일도 한 번에 최대 이 줄까지만 가져옵니다. 기본값은 2,000줄입니다. 값을 높이면 한 번에 더 읽을 수 있지만 모델에 전달되는 내용도 늘어납니다.",
-+  "tool_output.max_line_length": "`read_file` 결과에서 한 줄마다 보존할 최대 글자 수입니다. 긴 줄은 뒤를 잘라 표시하므로, 긴 한 줄 전체가 필요하면 값을 높이세요. 기본값은 줄마다 2,000자입니다.",
++  "tool_output.max_bytes": "터미널 명령 결과에서 대화에 남길 최대 글자 수입니다. 설정 이름은 `max_bytes`지만 실제 기준은 바이트가 아니라 문자 수입니다. 기본값은 50,000자입니다. 결과가 더 길면 앞뒤 일부만 대화에 남고, 전체 출력은 `cache/terminal-output` 파일에 최대 5,000,000자까지 저장해 경로를 함께 알려 줍니다. 이 임시 파일은 7일 뒤 정리됩니다.",
++  "tool_output.max_lines": "`read_file` 한 번에 가져올 수 있는 최대 줄 수입니다. 기본값은 2,000줄입니다. 이보다 많은 줄을 요청하면 오류가 나는 대신 이 한도까지만 읽습니다. 더 읽으려면 다음 범위부터 이어서 요청하세요.",
++  "tool_output.max_line_length": "`read_file` 결과에서 한 줄마다 표시할 최대 글자 수입니다. 기본값은 2,000자입니다. 더 긴 줄은 뒷부분을 생략해 표시하므로, 한 줄 전체가 필요하면 이 값을 늘리세요. 파일 전체의 줄 수 한도는 `tool_output.max_lines`에서 따로 정합니다.",
 +  "openrouter.response_cache": "OpenRouter가 동일한 요청의 응답을 캐시해 재사용하도록 요청합니다. 제공자의 캐시 지원과 조건에 따라 적용됩니다.",
 +  "openrouter.response_cache_ttl": "OpenRouter 응답 캐시를 유지할 시간(초)입니다. 캐시 기능을 켰을 때 사용합니다.",
 +  "openrouter.min_coding_score": "Pareto Code 라우터가 요청할 코딩 능력의 최소 기준입니다. 해당 라우터를 선택한 모델에서만 사용합니다.",
@@ -2070,7 +2073,7 @@ index 18475fe8f4..e04d3a1916 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +2008,7 @@ function NestedValueEditor({
+@@ -42,7 +2011,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -2079,7 +2082,7 @@ index 18475fe8f4..e04d3a1916 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +2025,7 @@ function NestedValueEditor({
+@@ -59,7 +2028,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -2088,7 +2091,7 @@ index 18475fe8f4..e04d3a1916 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +2054,7 @@ export function AutoField({
+@@ -88,8 +2057,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -2098,7 +2101,7 @@ index 18475fe8f4..e04d3a1916 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +2087,7 @@ export function AutoField({
+@@ -122,7 +2090,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -2107,7 +2110,7 @@ index 18475fe8f4..e04d3a1916 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +2148,7 @@ export function AutoField({
+@@ -183,7 +2151,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

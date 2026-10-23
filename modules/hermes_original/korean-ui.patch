@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..c4fe5f0950 100644
+index 18475fe8f4..f2eab7140e 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1970 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -1257,16 +1257,16 @@ index 18475fe8f4..c4fe5f0950 100644
 +  "human_delay.min_ms": "메신저에 메시지를 보낼 때 적용할 입력 지연의 최소값(밀리초)입니다.",
 +  "human_delay.max_ms": "메신저에 메시지를 보낼 때 적용할 입력 지연의 최대값(밀리초)입니다.",
 +  "discord.require_mention": "Discord 서버 채널에서 봇을 @멘션한 메시지에만 답합니다. 멘션 없이도 답하게 할 채널은 `free_response_channels`(멘션 없이 응답할 채널 목록)에 따로 지정할 수 있습니다.",
-+  "discord.free_response_channels": "봇을 @멘션하지 않아도 답할 Discord 채널 ID 목록입니다. 쉼표로 구분합니다.",
-+  "discord.allowed_channels": "봇이 메시지를 받을 수 있는 Discord 채널 ID 허용 목록입니다. 비우면 이 목록으로 제한하지 않습니다.",
++  "discord.free_response_channels": "`discord.free_response_channels`에는 Discord 채널을 구별하는 고유 번호(ID)를 쉼표로 나열합니다. 여기 적은 채널에서는 봇 이름을 직접 부르는 `@멘션` 없이 메시지를 보내도 답합니다. 다른 채널은 `require_mention` 설정을 따릅니다.",
++  "discord.allowed_channels": "봇이 메시지를 받고 답할 수 있는 Discord 채널의 고유 번호(ID) 목록입니다. 목록에 적힌 채널에서만 응답합니다. 비워 두면 채널을 제한하지 않습니다. 봇을 `@멘션`해야 하는지는 `require_mention`이 따로 정합니다.",
 +  "discord.auto_thread": "서버 채널에서 봇을 멘션하면 해당 대화용 스레드를 자동으로 만듭니다.",
 +  "discord.free_response_auto_thread": "멘션 없이 답하는 채널에서도 새 메시지마다 별도 스레드를 만듭니다.",
 +  "discord.thread_require_mention": "이미 열린 스레드 안에서도 답변을 받으려면 봇을 멘션하도록 요구합니다.",
 +  "discord.bots_require_inline_mention": "다른 봇의 메시지는 답글 알림만으로 처리하지 않고, 메시지 본문에 이 봇을 직접 멘션해야 답합니다.",
-+  "discord.history_backfill": "멘션이 없어 처리되지 않은 메시지를 보완하기 위해, 답변을 시작할 때 채널의 최근 대화를 함께 확인합니다.",
++  "discord.history_backfill": "봇이 응답을 시작할 때 해당 채널의 최근 대화도 함께 읽습니다. 앞선 메시지에 봇을 `@멘션`하지 않아 놓친 내용을 현재 요청의 맥락으로 보완합니다. 오프라인 동안 쌓인 메시지를 재처리하는 기능은 `missed_message_backfill` 설정입니다.",
 +  "discord.history_backfill_limit": "답변을 시작할 때 누락 여부를 확인하기 위해 훑어볼 최근 메시지의 최대 개수입니다.",
-+  "discord.missed_message_backfill.enabled": "오프라인이나 재연결 중 놓친 Discord 메시지를 다시 찾아 처리합니다. 기본적으로 꺼져 있습니다.",
-+  "discord.missed_message_backfill.channels": "놓친 메시지를 다시 확인할 Discord 채널 ID 목록입니다. 비우면 free_response_channels에 지정한 채널을 사용합니다.",
++  "discord.missed_message_backfill.enabled": "게이트웨이가 꺼져 있거나 연결이 끊긴 동안 놓친 Discord 메시지를, 다시 시작하거나 연결한 뒤 찾아 처리합니다. 기본값은 꺼짐입니다. 확인할 채널은 아래 channels 설정으로 정합니다.",
++  "discord.missed_message_backfill.channels": "오프라인 동안 놓친 메시지를 찾아볼 Discord 채널의 고유 번호(ID)를 쉼표로 나열합니다. 비워 두면 `free_response_channels`에 지정한 채널을 사용합니다.",
 +  "discord.missed_message_backfill.window_seconds": "다시 확인할 메시지를 현재 시각에서 거슬러 찾는 시간 범위(초)입니다.",
 +  "discord.missed_message_backfill.limit": "재연결 한 번에 놓친 메시지인지 확인할 최대 개수입니다.",
 +  "discord.missed_message_backfill.max_dispatches": "재연결 한 번에 실제 처리를 다시 시작할 메시지의 최대 개수입니다.",

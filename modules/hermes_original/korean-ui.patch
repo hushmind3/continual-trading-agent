@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..073cf13511 100644
+index 18475fe8f4..2572ab0600 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1984 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -2016,13 +2016,13 @@ index 18475fe8f4..073cf13511 100644
 +      explanation = "보조 모델에 요청을 보낼 때 사용할 통신 형식입니다. chat_completions(일반 채팅 형식), anthropic_messages(Anthropic 메시지 형식), codex_responses(Codex Responses 형식) 중 서비스가 요구하는 방식을 고릅니다. 비우면 선택한 서비스 설정을 따릅니다.";
 +      break;
 +    case "transient_retries":
-+      explanation = "보조 AI 요청에서 연결 끊김·시간 초과 같은 일시 오류가 나면 대체 서비스로 넘어가기 전에 같은 서비스에 다시 요청할 횟수입니다. 0이면 재시도하지 않습니다.";
++      explanation = "보조 AI 요청이 연결 끊김·시간 초과·요청 제한(408)·서버 오류(5xx)처럼 잠시 후 해결될 수 있는 문제로 실패하면, 다른 서비스로 넘어가기 전에 같은 서비스에 다시 요청할 횟수입니다. 기본값은 2회이며 0~6회로 제한됩니다. 0이면 재시도하지 않고 바로 다음 대체 경로를 시도합니다.";
 +      break;
 +    case "free_only":
-+      explanation = "자동 대체 경로에서 OpenRouter를 사용할 때 무료 모델만 선택합니다. 유료 모델로 요청하지 않습니다.";
++      explanation = "보조 작업의 자동 대체 경로가 OpenRouter에 도달했을 때 무료 모델만 사용하도록 제한합니다. 모델 ID가 `:free`로 끝나는 경우에만 요청하며, 무료 모델을 찾지 못하면 유료 모델로 바꾸지 않고 OpenRouter 대체 단계를 건너뜁니다. 주 대화 모델이나 다른 서비스에는 적용되지 않습니다.";
 +      break;
 +    case "openrouter_model":
-+      explanation = "설정한 AI 서비스에 연결할 수 없어 OpenRouter로 자동 대체할 때 사용할 모델 ID입니다. 무료 모델만 원하면 free_only도 켜세요.";
++      explanation = "보조 작업의 자동 대체 경로가 OpenRouter를 사용할 때 지정할 모델 ID입니다. 값을 비우면 기본 모델을 사용합니다. 무료 모델만 허용하려면 `free_only`도 켜고, 모델 ID 끝에 `:free`를 붙여 무료 모델임을 지정하세요. 유료 모델 ID를 지정해도 `free_only`가 켜져 있으면 무료 요청에만 사용됩니다.";
 +      break;
 +    case "stream_only_base_urls":
 +      explanation = "일반 요청(답변을 한 번에 받는 방식)을 거부하는 AI 서비스의 주소 일부를 적습니다. 이 주소가 포함된 서비스에는 답변을 실시간 연결 방식으로 요청합니다. 주소 비교는 대소문자를 구분하지 않습니다.";

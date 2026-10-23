@@ -47,7 +47,11 @@ def _prepare_embedded_gateway():
     tailscale = shutil.which('tailscale')
     if tailscale:
         try:
-            result = subprocess.run([tailscale, 'status', '--json'], capture_output=True,
+            command = [tailscale]
+            socket_path = os.environ.get('TAILSCALE_SOCKET')
+            if socket_path:
+                command.extend(['--socket', socket_path])
+            result = subprocess.run([*command, 'status', '--json'], capture_output=True,
                                     text=True, timeout=3, check=False)
             status = json.loads(result.stdout) if result.returncode == 0 else {}
             dns_name = status.get('Self', {}).get('DNSName', '').rstrip('.')

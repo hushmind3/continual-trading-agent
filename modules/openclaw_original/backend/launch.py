@@ -49,6 +49,8 @@ def _prepare_embedded_gateway():
         try:
             command = [tailscale]
             socket_path = os.environ.get('TAILSCALE_SOCKET')
+            if socket_path and not Path(socket_path).exists():
+                socket_path = str(Path.home() / '.tailscale-projectplatform.sock')
             if socket_path:
                 command.extend(['--socket', socket_path])
             result = subprocess.run([*command, 'status', '--json'], capture_output=True,

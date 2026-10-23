@@ -261,7 +261,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                     operation['status']='running';phase(stage,'8766 서버 갱신')
             if restart:
                 for record in current:stop_verified(record)
-                env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_APPLY_ID=operation['id'],TAILSCALE_SOCKET=str(RUNTIME/'tailscale/tailscaled.sock'))
+                env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_APPLY_ID=operation['id'],TAILSCALE_SOCKET=str(Path.home()/'.tailscale-projectplatform.sock'))
                 with (RUNTIME/'server.stdout.log').open('ab') as output,(RUNTIME/'server.stderr.log').open('ab') as errors:
                     # The platform UI is also used from other devices on the same LAN.
                     # Keep the existing port and API; bind all interfaces so both

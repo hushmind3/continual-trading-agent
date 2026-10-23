@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..df74cf4d1c 100644
+index 18475fe8f4..ea600f0900 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1965 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -471,7 +471,7 @@ index 18475fe8f4..df74cf4d1c 100644
 +  "tools.tool_search.listing": "Listing (처음부터 보여 줄 도구 목록)",
 +  "tools.tool_search.listing_max_tokens": "Listing max tokens (처음 안내할 도구 설명의 최대 분량)",
 +  "tools.tool_search.defer": "Defer (필요할 때 찾아 쓰도록 미룰 도구 목록)",
-+  "local_runtime.backend": "Backend (로컬 모델 실행에 쓸 CPU·GPU 방식)",
++  "local_runtime.backend": "Backend (계산을 맡길 장치)",
 +  "local_runtime.enabled": "Enabled (Hermes가 로컬 모델 서버 실행)",
 +  "local_runtime.mode": "Mode (로컬 모델 서버 실행 방식)",
 +  "local_runtime.models_max": "Models max (동시에 메모리에 올릴 모델 수)",
@@ -1153,7 +1153,7 @@ index 18475fe8f4..df74cf4d1c 100644
 +  "fallback.min_switch_reset_seconds": "대체 제공자로 전환한 기록을 이 시간이 지나면 초기화합니다. 이후 다시 실패하면 새 전환으로 계산합니다.",
 +  "runtime.nofile_soft_limit": "Hermes 프로세스가 동시에 열 수 있는 파일의 권장 상한입니다. 운영체제의 실제 제한을 넘을 수는 없습니다.",
 +  "local_runtime.enabled": "Hermes가 이 컴퓨터에서 관리하는 llama.cpp(언어 모델 실행 프로그램)의 llama-server(로컬 요청을 받는 서버)를 직접 실행할지 정합니다. 기본값은 꺼짐입니다. 꺼도 사용자가 따로 실행해 둔 외부 llama-server를 찾아 연결할 수 있습니다. 켜면 Hermes가 공식 설치 환경의 서버를 시작하고 관리합니다.",
-+  "local_runtime.backend": "로컬 모델 서버를 어느 연산 장치로 실행할지 정합니다. 기본값 auto(자동 선택)는 NVIDIA 그래픽카드면 CUDA(NVIDIA GPU 연산 방식), macOS면 Metal(Mac용 그래픽 연산 방식), 그 밖의 GPU면 Vulkan(여러 제조사에서 쓰는 그래픽 연산 방식)을 선택하고, 쓸 수 있는 GPU가 없으면 CPU(컴퓨터의 일반 처리 장치)를 사용합니다. 직접 고를 때는 cuda, metal, vulkan, hip(AMD 그래픽카드용 연산 방식), cpu 중에서 실행 환경에 맞는 값을 사용합니다.",
++  "local_runtime.backend": "이 컴퓨터에서 실행하는 로컬 언어 모델의 계산을 어떤 장치에 맡길지 정합니다. auto(자동)는 사용할 수 있는 장치를 찾아 NVIDIA 그래픽카드에는 CUDA, Mac에는 Metal, 그 밖의 그래픽카드에는 Vulkan 방식을 고릅니다. 쓸 수 있는 그래픽카드가 없으면 CPU(그래픽카드 대신 계산하는 컴퓨터의 기본 처리 장치)를 사용합니다. 직접 고를 때는 cuda(NVIDIA), metal(Mac), vulkan(그 밖의 그래픽카드), hip(AMD), cpu(컴퓨터의 기본 처리 장치) 중 현재 컴퓨터에 맞는 값을 사용하세요.",
 +  "local_runtime.mode": "로컬 모델 서비스를 어떤 실행 방식으로 시작할지 정합니다.",
 +  "local_runtime.models_max": "Hermes가 관리하는 llama.cpp 서버가 한 번에 메모리에 올려 둘 수 있는 모델 수입니다. 기본값은 4개입니다. 수를 늘리면 여러 모델을 빠르게 바꿔 쓸 수 있지만 그래픽카드 메모리(VRAM)와 컴퓨터 메모리(RAM)를 더 사용할 수 있습니다.",
 +  "local_runtime.port": "Hermes가 관리하는 로컬 모델 서버가 사용할 네트워크 포트입니다. 기본값 0은 서버를 시작할 때 비어 있는 포트를 자동으로 고른다는 뜻입니다. 이 값은 이미 실행 중인 외부 서버를 찾을 포트 목록 설정과 다릅니다.",

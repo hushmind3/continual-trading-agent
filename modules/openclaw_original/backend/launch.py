@@ -2,6 +2,8 @@
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -35,6 +37,28 @@ def _prepare_embedded_gateway():
     # The wrapper and Gateway share this machine. Do not make the Gateway
     # reachable from the network just to avoid asking the user for its token.
     auth['mode'] = 'none'
+    control_ui = gateway.setdefault('controlUi', {})
+    if not isinstance(control_ui, dict):
+        raise RuntimeError('OpenClaw Control UI 설정 형식이 올바르지 않습니다.')
+    allowed_origins = control_ui.setdefault('allowedOrigins', [])
+    if not isinstance(allowed_origins, list):
+        raise RuntimeError('OpenClaw 허용 출처 설정 형식이 올바르지 않습니다.')
+    embedded_origins = ['http://127.0.0.1:19021']
+    tailscale = shutil.which('tailscale')
+    if tailscale:
+        try:
+            result = subprocess.run([tailscale, 'status', '--json'], capture_output=True,
+                                    text=True, timeout=3, check=False)
+            status = json.loads(result.stdout) if result.returncode == 0 else {}
+            dns_name = status.get('Self', {}).get('DNSName', '').rstrip('.')
+            if dns_name.endswith('.ts.net'):
+                embedded_origins.append(f'https://{dns_name}:8443')
+                os.environ['PLATFORM_EMBED_ORIGINS'] = f'http://127.0.0.1:8766,https://{dns_name}'
+        except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+            pass
+    for origin in embedded_origins:
+        if origin not in allowed_origins:
+            allowed_origins.append(origin)
     temporary = config_path.with_name('.openclaw.json.platform-tmp')
     temporary.write_text(json.dumps(config, ensure_ascii=False, indent=2) + '\n')
     os.chmod(temporary, 0o600)
@@ -59,6 +83,8 @@ def launch(arguments):
     })
     if arguments[:2] == ['gateway', 'run']:
         _prepare_embedded_gateway()
+        if os.environ.get('PLATFORM_EMBED_ORIGINS'):
+            env['PLATFORM_EMBED_ORIGINS'] = os.environ['PLATFORM_EMBED_ORIGINS']
         policy = Path(__file__).resolve().with_name('frame_policy.mjs')
         existing = env.get('NODE_OPTIONS', '').strip()
         env['NODE_OPTIONS'] = f'{existing} --import={policy}'.strip()

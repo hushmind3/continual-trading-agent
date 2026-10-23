@@ -19,7 +19,8 @@ export function Original(){
  },[busy]);
  const act=async(command:string)=>{setBusy(true);setError('');try{setState(await request<State>(prefix+command))}
   catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}};
- const dashboardUrl=state?.url||'';
+ const dashboardUrl=state?.url&&window.location.protocol==='https:'&&window.location.hostname.endsWith('.ts.net')
+  ?`https://${window.location.hostname}:8443/`:state?.url||'';
  return <section className="ui-app-workspace hermes-original-workspace">
   {header&&createPortal(<div className="hermes-original-controls" aria-label="OpenClaw 실행 제어">
    <span className="hidden sm:inline-flex"><Status tone={state?.state==='ready'?'good':'idle'}>{state?.state==='ready'?'실행 중':state?.state==='starting'?'준비 중':'중지됨'}</Status></span>

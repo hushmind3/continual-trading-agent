@@ -1,7 +1,8 @@
 import { ServerResponse } from 'node:http';
 
 const originalSetHeader = ServerResponse.prototype.setHeader;
-const platformOrigin = 'http://127.0.0.1:8766';
+const platformOrigins = (process.env.PLATFORM_EMBED_ORIGINS || 'http://127.0.0.1:8766')
+  .split(',').map((origin) => origin.trim()).filter(Boolean);
 
 ServerResponse.prototype.setHeader = function (name, value) {
   const request = this.req;
@@ -14,7 +15,10 @@ ServerResponse.prototype.setHeader = function (name, value) {
     return this;
   }
   if (isControlUiDocument && name.toLowerCase() === 'content-security-policy' && typeof value === 'string') {
-    value = value.replace(/frame-ancestors\s+[^;]+/i, `frame-ancestors ${platformOrigin}`);
+    const ancestors = `frame-ancestors ${platformOrigins.join(' ')}`;
+    value = /frame-ancestors\s+[^;]+/i.test(value)
+      ? value.replace(/frame-ancestors\s+[^;]+/i, ancestors)
+      : `${value}; ${ancestors}`;
   }
   return originalSetHeader.call(this, name, value);
 };

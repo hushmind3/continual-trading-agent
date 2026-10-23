@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..2e2a6b0975 100644
+index 18475fe8f4..f2bda5156b 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1770 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1772 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -490,15 +490,17 @@ index 18475fe8f4..2e2a6b0975 100644
 +  "dashboard.ws_ping_timeout": "원격 WebSocket 응답 제한 시간(초)",
 +  "dashboard.ws_orphan_reap_grace_s": "끊긴 WebSocket 대화 정리 대기 시간(초)",
 +  "dashboard.ws_orphan_activity_stale_s": "끊긴 WebSocket 작업을 멈춘 것으로 판단할 시간(초)",
-+  "dashboard.oauth.portal_url": "OAuth 로그인 포털 주소",
-+  "dashboard.oauth.client_id": "OAuth 앱 식별자",
-+  "dashboard.basic_auth.password_hash": "기본 인증 비밀번호 해시값",
-+  "dashboard.drain_auth.scope": "정리 요청에 허용할 권한",
-+  "dashboard.drain_auth.min_secret_chars": "정리 인증 비밀 값 최소 글자 수",
-+  "dashboard.basic_auth.secret": "로그인 세션 확인용 비밀 값",
-+  "dashboard.basic_auth.password": "대시보드 기본 로그인 비밀번호",
-+  "dashboard.basic_auth.session_ttl_seconds": "로그인 후 재인증까지 시간(초)",
-+  "dashboard.public_url": "외부 접속용 대시보드 주소",
++  "dashboard.oauth.portal_url": "OAuth portal URL (로그인 승인 포털 주소)",
++  "dashboard.oauth.client_id": "OAuth client ID (외부 로그인 연동 식별자)",
++  "dashboard.basic_auth.username": "Basic auth username (대시보드 로그인 이름)",
++  "dashboard.trusted_proxies": "Trusted proxies (신뢰할 프록시 서버 주소)",
++  "dashboard.basic_auth.password_hash": "Basic auth password hash (로그인 비밀번호의 암호화 값)",
++  "dashboard.drain_auth.scope": "Drain auth scope (외부 정리 요청의 권한 이름)",
++  "dashboard.drain_auth.min_secret_chars": "Drain auth minimum secret characters (비밀 키 최소 길이)",
++  "dashboard.basic_auth.secret": "Basic auth secret (로그인 세션 서명용 비밀 키)",
++  "dashboard.basic_auth.password": "Basic auth password (대시보드 로그인 비밀번호)",
++  "dashboard.basic_auth.session_ttl_seconds": "Basic auth session TTL seconds (로그인 유지 시간)",
++  "dashboard.public_url": "Public URL (외부에서 접속할 대시보드 주소)",
 +  "human_delay.min_ms": "최소 입력 지연(밀리초)",
 +  "human_delay.max_ms": "최대 입력 지연(밀리초)",
 +  "discord.require_mention": "답변에 필요한 봇 멘션",
@@ -1040,22 +1042,22 @@ index 18475fe8f4..2e2a6b0975 100644
 +  "dashboard.compute_host_heartbeat_secs": "분리 실행 환경이 살아 있는지 확인하는 신호를 보낼 간격(초)입니다.",
 +  "dashboard.compute_host_respawn_max": "분리 실행 환경이 종료됐을 때 다시 시작할 최대 횟수입니다.",
 +  "dashboard.show_token_analytics": "모델·분석 화면에 토큰 수와 비용의 로컬 추정치를 표시합니다. 실제 청구액보다 크게 낮을 수 있습니다.",
-+  "dashboard.trusted_proxies": "대시보드 앞단에서 접속 정보를 전달하는 신뢰할 프록시 IP 또는 네트워크 범위입니다. 직접 접속하는 일반 기기의 주소를 넣는 설정이 아닙니다.",
++  "dashboard.trusted_proxies": "대시보드 앞에서 요청을 전달하며 X-Forwarded-Proto·X-Forwarded-For 같은 접속 정보 헤더를 붙이는 프록시 서버의 IP 주소 또는 좁은 네트워크 범위(CIDR)입니다. 브라우저 사용자 주소가 아니라 실제 프록시 주소만 적습니다. 로컬 컴퓨터는 자동으로 신뢰하며, 모든 주소(*)나 전체 인터넷 범위(/0)는 허용되지 않습니다.",
 +  "dashboard.ws_ping_interval": "외부 네트워크 대시보드 연결이 살아 있는지 WebSocket 신호를 보낼 간격(초)입니다. 로컬 접속에는 적용되지 않습니다.",
 +  "dashboard.ws_ping_timeout": "WebSocket 신호에 응답이 없을 때 연결을 끊기까지 기다리는 시간(초)입니다.",
 +  "dashboard.ws_orphan_reap_grace_s": "브라우저 연결이 끊긴 뒤 연결만 남은 대화 작업을 정리하기 전 기다리는 시간(초)입니다. 0이면 그대로 둡니다.",
 +  "dashboard.ws_orphan_activity_stale_s": "연결이 끊긴 작업이 이 시간 동안 진행 신호를 보내지 않을 때에만 중단 대상으로 봅니다.",
 +  "dashboard.startup_orphan_sweep": "게이트웨이 시작 시 이전 프로세스가 비정상 종료되어 남긴 TUI·데스크톱·하위 에이전트 기록을 정리합니다. 메신저와 진행 중인 실시간 대화는 건드리지 않습니다.",
-+  "dashboard.oauth.client_id": "대시보드 OAuth 로그인에 등록된 애플리케이션 식별자입니다. 로그인 제공자가 발급한 값을 입력합니다.",
-+  "dashboard.oauth.portal_url": "OAuth 로그인 또는 계정 연결을 시작할 인증 포털 주소입니다.",
-+  "dashboard.basic_auth.username": "대시보드 기본 인증에 사용할 사용자 이름입니다.",
-+  "dashboard.basic_auth.password_hash": "기본 인증에서 비밀번호 대신 비교할 암호화 해시 값입니다. 일반 비밀번호를 넣는 칸이 아닙니다.",
-+  "dashboard.basic_auth.password": "대시보드 기본 인증에 사용할 비밀번호입니다. 저장 방식은 원본 설정 처리 규칙을 따릅니다.",
-+  "dashboard.basic_auth.secret": "기본 인증 세션을 확인하는 데 쓰는 비밀 값입니다. 외부에 공개하지 마세요.",
-+  "dashboard.basic_auth.session_ttl_seconds": "기본 인증을 마친 뒤 다시 로그인하지 않아도 되는 시간(초)입니다.",
-+  "dashboard.drain_auth.scope": "대시보드 종료·정리 요청을 인증할 때 허용할 권한 범위입니다.",
-+  "dashboard.drain_auth.min_secret_chars": "종료·정리 요청용 비밀 값에 요구할 최소 글자 수입니다.",
-+  "dashboard.public_url": "외부에서 대시보드에 접속할 때 사용할 공개 주소입니다.",
++  "dashboard.oauth.client_id": "OAuth client ID(외부 로그인 연결 식별자)입니다. Nous Portal이 이 Hermes 설치에 발급한 값을 넣습니다. 비워 두면 OAuth 로그인 제공자를 등록하지 않습니다. 외부 주소로 접속하는 대시보드에서 OAuth 로그인을 쓸 때 필요하며, HERMES_DASHBOARD_OAUTH_CLIENT_ID 환경 변수가 있으면 그 값이 우선합니다.",
++  "dashboard.oauth.portal_url": "OAuth 로그인을 승인하고 계정을 연결할 Nous Portal 주소입니다. 비워 두면 운영용 Portal을 사용합니다. 시험용·자체 운영 Portal을 연결할 때만 별도 주소를 입력하며, HERMES_DASHBOARD_PORTAL_URL 환경 변수가 있으면 그 값이 우선합니다.",
++  "dashboard.basic_auth.username": "대시보드에 로그인할 사용자 이름입니다. 비워 두면 사용자 이름·비밀번호 방식의 로그인을 사용하지 않습니다. 이 방식을 켜려면 이름과 비밀번호 또는 password_hash를 함께 지정해야 합니다. 환경 변수가 있으면 설정 파일 값보다 우선합니다.",
++  "dashboard.basic_auth.password_hash": "로그인 비밀번호 자체가 아니라 scrypt 방식으로 계산한 암호화 검증값을 넣는 칸입니다. 평문 비밀번호를 설정 파일에 보관하는 것보다 이 값을 쓰는 편이 안전합니다. Hermes의 hash_password 기능으로 만들며, password도 있으면 설정 파일의 해시값이 우선합니다.",
++  "dashboard.basic_auth.password": "대시보드에 로그인할 비밀번호입니다. 설정 파일에 평문으로 적으면 Hermes가 실행 중 메모리에서 해시해 확인하지만, 파일에는 평문이 남을 수 있어 password_hash 사용을 권장합니다. 환경 변수의 비밀번호가 설정 파일의 해시값보다 우선합니다.",
++  "dashboard.basic_auth.secret": "로그인 세션 토큰이 Hermes에서 발급됐는지 확인하는 서명용 비밀 키입니다. 계정 비밀번호와는 다릅니다. 비우면 실행할 때마다 임의 키를 만들어 서버를 재시작할 때 로그인 세션이 모두 만료되고, 여러 작업 프로세스가 같은 세션을 확인할 수 없습니다. 지속 세션이나 여러 프로세스가 필요하면 32바이트 이상의 무작위 값을 지정하고 외부에 공개하지 마세요.",
++  "dashboard.basic_auth.session_ttl_seconds": "로그인 후 세션을 유지할 시간(초)입니다. 시간이 지나면 다시 로그인해야 합니다. 0이면 기본값 12시간을 사용합니다. HERMES_DASHBOARD_BASIC_AUTH_TTL_SECONDS 환경 변수가 있으면 그 값이 우선합니다.",
++  "dashboard.drain_auth.scope": "NAS 등 외부 운영 장치가 보내는 대시보드 정리 요청 토큰에 붙일 권한 이름입니다. 기본값은 drain입니다. 요청을 확인하는 쪽도 같은 권한 이름을 요구해야 하므로, 연동 규격이 정한 경우에만 바꾸세요. 인증 비밀 키 자체는 이 칸이 아니라 HERMES_DASHBOARD_DRAIN_SECRET 환경 변수에 둡니다.",
++  "dashboard.drain_auth.min_secret_chars": "HERMES_DASHBOARD_DRAIN_SECRET 환경 변수에 요구할 최소 글자 수입니다. 기본값 43자는 URL에 안전한 무작위 인코딩 기준으로 약 256비트 비밀 키에 해당합니다. 길이와 무작위성 검사를 통과하지 못하면 외부 정리 요청 인증 기능을 등록하지 않습니다. 이 칸에 비밀 키를 입력하는 것은 아닙니다.",
++  "dashboard.public_url": "사용자가 외부에서 접속할 대시보드의 전체 주소입니다. `https://example.com/hermes`처럼 통신 방식, 도메인, 필요한 경우 하위 경로까지 적습니다. OAuth 로그인 되돌아오기 주소와 허용된 외부 접속 주소를 확인하는 데 사용합니다. 비우면 프록시가 전달한 접속 정보로 주소를 구성하며, 전달 헤더를 제공하지 않는 프록시 앞에 둘 때는 주소를 지정해야 합니다. HERMES_DASHBOARD_PUBLIC_URL 환경 변수가 우선합니다.",
 +  "human_delay.min_ms": "메신저에 메시지를 보낼 때 적용할 입력 지연의 최소값(밀리초)입니다.",
 +  "human_delay.max_ms": "메신저에 메시지를 보낼 때 적용할 입력 지연의 최대값(밀리초)입니다.",
 +  "discord.require_mention": "Discord 서버 채널에서 봇을 @멘션한 메시지에만 답합니다. 멘션 없이 답할 채널은 free_response_channels에 따로 지정할 수 있습니다.",
@@ -1859,7 +1861,7 @@ index 18475fe8f4..2e2a6b0975 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1797,7 @@ function NestedValueEditor({
+@@ -42,7 +1799,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1868,7 +1870,7 @@ index 18475fe8f4..2e2a6b0975 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1814,7 @@ function NestedValueEditor({
+@@ -59,7 +1816,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1877,7 +1879,7 @@ index 18475fe8f4..2e2a6b0975 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1843,7 @@ export function AutoField({
+@@ -88,8 +1845,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1887,7 +1889,7 @@ index 18475fe8f4..2e2a6b0975 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1876,7 @@ export function AutoField({
+@@ -122,7 +1878,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1896,7 +1898,7 @@ index 18475fe8f4..2e2a6b0975 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1937,7 @@ export function AutoField({
+@@ -183,7 +1939,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[4]
 BASE = ROOT / 'runtime/ai_agent/HermesOriginal'
 SOURCE = BASE / 'source'
 HOME = BASE / 'home'
-KOREAN_PATCH_BASE = '484de065a821b4245697351d08327b465ffd41ba'
+KOREAN_PATCH_BASE = 'bf0203a794a07aac3ff764972ab9087baa4e4f4e'
 
 
 def environment():

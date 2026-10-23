@@ -8,7 +8,7 @@
 - `original/manager.py` → `manager.py` → 공통 `backend/ai_agent/manager.py` → `register.py`의 자동 등록 → 전체 메뉴 총괄 → 단일 `/api`.
 - `launch.py`: 공식 PM 환경·한국어 패치를 사용해 원본 CLI를 실행합니다. CLI: 프로젝트 루트에서 `.venv/platform/bin/python modules/ai_agent/HermesOriginal/backend/launch.py <원본 인수>`.
 - `runtime.py`: 원본 대시보드 시작·상태·명시적 중지만 담당합니다. 공식 업데이트가 PID를 교체하면 기존 호스트의 psutil로 소스·사용자 홈·포트·실제 대시보드 응답을 확인한 뒤 상태를 재연결합니다. 종료 시 소유 세션의 하위 프로세스도 함께 정리하고 마지막 포트를 유지합니다. Git 서브모듈의 `.git` 파일과 기존 `.git` 디렉터리를 모두 허용합니다.
-- `../korean-ui.patch`: 원본 484de065a821b4245697351d08327b465ffd41ba 기준 한국어 변경. 원본 작업 트리의 수정·추가 파일 54개를 보존합니다.
+- `../korean-ui.patch`: 원본 bf0203a794a07aac3ff764972ab9087baa4e4f4e 기준 한국어 변경. 원본 작업 트리의 수정·추가 파일 54개를 보존합니다.
 - 등록·React 화면: [중메뉴 소유 폴더](../README.md).
 
 공식 원본 설치·업데이트 위치는 `runtime/ai_agent/HermesOriginal/source/`로 유지합니다. 사용자 상태는 같은 담당 메뉴의 `home/`, 공식 PM 설치 도구는 `tools/`입니다. 이식 Hermes의 소스·환경·대화와 공유하거나 복제하지 않습니다. 원본 소스는 `.gitmodules`의 고정 버전 의존성이고, 설치된 패키지·홈·키·기록은 GitHub에 포함하지 않습니다.
@@ -27,6 +27,6 @@ HERMES_HOME="$platform_root/runtime/ai_agent/HermesOriginal/home" HERMES_RUNTIME
 
 ## 업데이트와 확인
 
-공식 업데이트는 기존 `source/`에서 원본의 기능으로 수행합니다. 현재 공식 원본은 bf0203a794a07aac3ff764972ab9087baa4e4f4e이며, 보관된 한국어 패치는 이전 484de06 기준입니다. 기준 버전이 다르면 원본 파일을 수정하지 않고 패치를 건너뛴 뒤 공식 원본을 실행합니다. 같은 기준 버전에서 예상하지 못한 로컬 충돌이 있으면 덮어쓰지 않고 중단합니다. 최신 원본에 한국어 변경을 적용하려면 별도로 패치를 갱신해야 합니다. 새 공식 버전과 패치가 실제로 동작하는지 확인한 뒤 상위 플랫폼의 Git 의존성 커밋도 함께 갱신합니다. 실행 중인 기존 소스에 `git submodule update --remote`나 강제 checkout을 임의로 실행하지 않습니다.
+공식 업데이트는 기존 `source/`에서 원본의 기능으로 수행합니다. 현재 공식 원본과 한국어 패치 기준은 bf0203a794a07aac3ff764972ab9087baa4e4f4e입니다. 기존 번역을 최신 원본과 병합하고 공식 웹 타입 검사·빌드를 통과했습니다. 기준 버전이 다르면 원본 파일을 수정하지 않고 패치를 건너뛴 뒤 공식 원본을 실행합니다. 같은 기준 버전에서 예상하지 못한 로컬 충돌이 있으면 덮어쓰지 않고 중단합니다. 향후 새 원본 버전에 한국어 변경을 적용하려면 패치를 갱신하고 웹을 다시 빌드해야 합니다. 새 공식 버전과 패치가 실제로 동작하는지 확인한 뒤 상위 플랫폼의 Git 의존성 커밋도 함께 갱신합니다. 실행 중인 기존 소스에 `git submodule update --remote`나 강제 checkout을 임의로 실행하지 않습니다.
 
 확인: 단일 API의 `ai_agent/HermesOriginal/status`, `#ai_agent/HermesOriginal`의 실제 원본 화면, 원본 `git rev-parse HEAD`, 패치의 `git apply --reverse --check`를 사용합니다. 현재 정리의 실제 실행 확인은 모듈 README의 최신 항목을 따릅니다. 원본 업데이트·모델 추론·외부 메신저 전체를 이번 정리에서 실행하지 않습니다.

@@ -50,9 +50,9 @@ git submodule update --init
 | 원본 | 고정 커밋 | 체크아웃 경로 | 로컬 수정 |
 | --- | --- | --- | --- |
 | [OpenClaw](https://github.com/openclaw/openclaw/tree/99599dbf83d67b5feb27df2ffcc22ae0f18f00d1) | `99599dbf83d67b5feb27df2ffcc22ae0f18f00d1` | `runtime/ai_agent/OpenClawOriginal/source/` | 프레임·접근 제어는 플랫폼 연결 코드가 담당 |
-| [Hermes](https://github.com/NousResearch/hermes-agent/tree/bf0203a794a07aac3ff764972ab9087baa4e4f4e) | `bf0203a794a07aac3ff764972ab9087baa4e4f4e` | `runtime/ai_agent/HermesOriginal/source/` | [이전 한국어 패치 보관](modules/ai_agent/HermesOriginal/korean-ui.patch) |
+| [Hermes](https://github.com/NousResearch/hermes-agent/tree/bf0203a794a07aac3ff764972ab9087baa4e4f4e) | `bf0203a794a07aac3ff764972ab9087baa4e4f4e` | `runtime/ai_agent/HermesOriginal/source/` | [한국어 화면 패치](modules/ai_agent/HermesOriginal/korean-ui.patch) |
 
-Git 복원은 소스 복원입니다. Python/Node 패키지·원본 PM 도구·모델·계정·사용자 데이터는 설치 또는 별도 준비가 필요합니다. 원본별 준비 방법과 실행 경계는 위 실제 백엔드 README를 따릅니다. 이전 Hermes 원본의 한국어 변경은 상위 저장소의 패치로 보존합니다. 현재 공식 원본 bf0203a에는 이전 484de06 기준 패치를 적용하지 않으며, 호환되지 않는 선택적 패치 때문에 원본 실행을 중단하지 않습니다.
+Git 복원은 소스 복원입니다. Python/Node 패키지·원본 PM 도구·모델·계정·사용자 데이터는 설치 또는 별도 준비가 필요합니다. 원본별 준비 방법과 실행 경계는 위 실제 백엔드 README를 따릅니다. Hermes 한국어 화면 변경은 상위 저장소의 패치로 보존하며 현재 공식 원본 bf0203a에 맞춰 적용·빌드했습니다. 이후 기준 버전이 다르면 패치를 건너뛰고 공식 원본을 실행합니다. 단순 언어 JSON만이 아니라 화면에 직접 작성된 문구와 설정 설명도 포함합니다.
 
 ## 설치와 실행
 

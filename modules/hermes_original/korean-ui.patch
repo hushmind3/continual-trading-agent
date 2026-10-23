@@ -6096,20 +6096,175 @@ index e240dd72db..f335a87f79 100644
          ) : null}
  
 diff --git a/web/src/pages/ProfileBuilderPage.tsx b/web/src/pages/ProfileBuilderPage.tsx
-index 7e8b38e96d..9f50216cb7 100644
+index 7e8b38e96d..ea37dcc0e1 100644
 --- a/web/src/pages/ProfileBuilderPage.tsx
 +++ b/web/src/pages/ProfileBuilderPage.tsx
-@@ -328,8 +328,7 @@ export default function ProfileBuilderPage() {
+@@ -9,6 +9,7 @@ import { Label } from "@nous-research/ui/ui/components/label";
+ import { Checkbox } from "@nous-research/ui/ui/components/checkbox";
+ import { Toast } from "@nous-research/ui/ui/components/toast";
+ import { useToast } from "@nous-research/ui/hooks/use-toast";
++import { useI18n } from "@/i18n";
+ import { api } from "@/lib/api";
+ import type {
+   McpHttpAuth,
+@@ -31,13 +32,36 @@ const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+ type StepId = "identity" | "model" | "skills" | "mcp" | "review";
+ 
+ const STEPS: { id: StepId; label: string }[] = [
+-  { id: "identity", label: "Identity" },
+-  { id: "model", label: "Model" },
+-  { id: "skills", label: "Skills" },
+-  { id: "mcp", label: "MCPs" },
+-  { id: "review", label: "Review" },
++  { id: "identity", label: "기본 정보" },
++  { id: "model", label: "모델" },
++  { id: "skills", label: "스킬" },
++  { id: "mcp", label: "MCP 도구" },
++  { id: "review", label: "검토" },
+ ];
+ 
++type SkillDescriptionTranslations = Record<string, { hash: string; text: string }>;
++
++function descriptionHash(value: string): string {
++  let hash = 14695981039346656037n;
++  for (let i = 0; i < value.length; i += 1) {
++    hash ^= BigInt(value.charCodeAt(i));
++    hash = BigInt.asUintN(64, hash * 1099511628211n);
++  }
++  return hash.toString(16).padStart(16, "0");
++}
++
++function localizedSkillDescription(
++  skill: Pick<SkillInfo | SkillHubResult, "name" | "description">,
++  locale: string,
++  translations: SkillDescriptionTranslations | null,
++): string {
++  const source = skill.description || "";
++  const translated = translations?.[skill.name];
++  return locale === "ko" && translated?.hash === descriptionHash(source)
++    ? translated.text
++    : source;
++}
++
+ interface ModelChoice {
+   provider: string;
+   model: string;
+@@ -60,6 +84,7 @@ interface ModelChoice {
+  */
+ export default function ProfileBuilderPage() {
+   const navigate = useNavigate();
++  const { locale } = useI18n();
+   const { toast, showToast } = useToast();
+ 
+   const [step, setStep] = useState<StepId>("identity");
+@@ -76,11 +101,24 @@ export default function ProfileBuilderPage() {
+ 
+   // ── Step 3: skills ────────────────────────────────────────────────
+   const [skills, setSkills] = useState<SkillInfo[] | null>(null);
++  const [skillDescriptionsKo, setSkillDescriptionsKo] = useState<SkillDescriptionTranslations | null>(null);
+   // keepAll = true: don't send a keep list (full bundle stays active).
+   const [keepAll, setKeepAll] = useState(true);
+   const [keptSkills, setKeptSkills] = useState<Set<string>>(new Set());
+   const [skillFilter, setSkillFilter] = useState("");
+   const skillsLoading = useRef(false);
++
++  useEffect(() => {
++    let cancelled = false;
++    if (locale !== "ko") {
++      setSkillDescriptionsKo(null);
++      return () => { cancelled = true; };
++    }
++    void import("@/i18n/skills.ko.json").then((module) => {
++      if (!cancelled) setSkillDescriptionsKo(module.default);
++    });
++    return () => { cancelled = true; };
++  }, [locale]);
+   // Hub search
+   const [hubQuery, setHubQuery] = useState("");
+   const [hubResults, setHubResults] = useState<SkillHubResult[]>([]);
+@@ -176,7 +214,7 @@ export default function ProfileBuilderPage() {
+       entry = buildMcpServerCreate(mcpDraft);
+     } catch (error) {
+       showToast(
+-        error instanceof Error ? error.message : "Invalid MCP server",
++        error instanceof Error ? error.message : "MCP 서버 설정을 확인하세요.",
+         "error",
+       );
+       return;
+@@ -244,7 +282,7 @@ export default function ProfileBuilderPage() {
+   const handleCreate = async () => {
+     const n = name.trim();
+     if (!PROFILE_NAME_RE.test(n)) {
+-      showToast("Invalid profile name (lowercase, digits, - and _)", "error");
++      showToast("프로필 이름은 영문 소문자나 숫자로 시작하고, 영문 소문자·숫자·하이픈·밑줄만 사용할 수 있습니다.", "error");
+       setStep("identity");
+       return;
+     }
+@@ -265,13 +303,13 @@ export default function ProfileBuilderPage() {
+       const pending = (res.hub_installs ?? []).filter((h) => h.pid).length;
+       showToast(
+         pending
+-          ? `Profile "${n}" created — ${pending} hub skill${pending === 1 ? "" : "s"} installing`
+-          : `Profile "${n}" created`,
++          ? `프로필 "${n}"을 만들었습니다. 스킬 허브에서 스킬 ${pending}개를 설치하고 있습니다.`
++          : `프로필 "${n}"을 만들었습니다.`,
+         "success",
+       );
+       navigate("/profiles");
+     } catch (e) {
+-      showToast(`Create failed: ${errorMessage(e)}`, "error");
++      showToast(`프로필을 만들지 못했습니다: ${errorMessage(e)}`, "error");
+     } finally {
+       setCreating(false);
+     }
+@@ -283,9 +321,9 @@ export default function ProfileBuilderPage() {
+   return (
+     <div className="mx-auto w-full max-w-3xl space-y-6 p-4">
+       <div className="flex items-center justify-between">
+-        <H2>New profile</H2>
++        <H2>새 프로필 만들기</H2>
+         <Button ghost onClick={() => navigate("/profiles")}>
+-          Cancel
++          취소
+         </Button>
+       </div>
+ 
+@@ -317,27 +355,24 @@ export default function ProfileBuilderPage() {
+           {step === "identity" && (
+             <div className="space-y-4">
+               <div className="space-y-1.5">
+-                <Label htmlFor="pb-name">Profile name</Label>
++                <Label htmlFor="pb-name">Profile name (프로필 이름)</Label>
+                 <Input
+                   id="pb-name"
+-                  placeholder="coder"
++                  placeholder="프로필 ID (예: coder)"
+                   value={name}
+                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                     setName(e.target.value)
+                   }
                  />
-                 {name && !nameValid && (
-                   <p className="text-xs text-destructive">
+-                {name && !nameValid && (
+-                  <p className="text-xs text-destructive">
 -                    Lowercase letters, digits, hyphens and underscores; must
 -                    start with a letter or digit.
-+                    영문 소문자, 숫자, 하이픈, 밑줄만 사용할 수 있으며 영문자나 숫자로 시작해야 합니다.
-                   </p>
-                 )}
+-                  </p>
+-                )}
++                <p className={cn("text-xs", name && !nameValid ? "text-destructive" : "text-muted-foreground")}>
++                  프로필 ID입니다. 영문 소문자나 숫자로 시작하고, 영문 소문자·숫자·하이픈·밑줄만 사용할 수 있습니다.
++                </p>
                </div>
-@@ -350,8 +349,7 @@ export default function ProfileBuilderPage() {
+               <div className="space-y-1.5">
+-                <Label htmlFor="pb-desc">Description (optional)</Label>
++                <Label htmlFor="pb-desc">Description (프로필 설명, 선택 사항)</Label>
+                 <Input
+                   id="pb-desc"
+-                  placeholder="What this agent profile is for"
++                  placeholder="이 프로필을 어떤 용도로 사용할지 적으세요"
+                   value={description}
+                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                     setDescription(e.target.value)
+@@ -350,18 +385,17 @@ export default function ProfileBuilderPage() {
            {step === "model" && (
              <div className="space-y-3">
                <p className="text-sm text-muted-foreground">
@@ -6118,7 +6273,368 @@ index 7e8b38e96d..9f50216cb7 100644
 +                이 프로필에서 사용할 모델과 제공자를 선택하세요. 기본값을 사용하려면 건너뛰세요.
                </p>
                <Input
-                 placeholder="Filter models…"
+-                placeholder="Filter models…"
++                placeholder="모델 검색…"
+                 value={modelFilter}
+                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                   setModelFilter(e.target.value)
+                 }
+               />
+               {modelChoices === null ? (
+-                <p className="text-sm text-muted-foreground">Loading models…</p>
++                <p className="text-sm text-muted-foreground">모델을 불러오는 중…</p>
+               ) : (
+                 <div className="max-h-72 space-y-1 overflow-y-auto">
+                   <button
+@@ -371,7 +405,7 @@ export default function ProfileBuilderPage() {
+                       modelChoice === "" ? "bg-primary/10" : "hover:bg-muted",
+                     )}
+                   >
+-                    Use default (set later)
++                    기본값 사용 (나중에 설정)
+                   </button>
+                   {filteredModels.map((c) => {
+                     const key = `${c.provider}\u0000${c.model}`;
+@@ -402,16 +436,15 @@ export default function ProfileBuilderPage() {
+                   checked={keepAll}
+                   onCheckedChange={(v) => setKeepAll(Boolean(v))}
+                 />
+-                Start from the full default skill bundle (recommended)
++                기본 스킬을 모두 사용 (권장)
+               </label>
+               {!keepAll && (
+                 <div className="space-y-2">
+                   <p className="text-xs text-muted-foreground">
+-                    Choose which built-in / optional skills to keep active.
+-                    Unchecked skills are disabled in the new profile.
++                    새 프로필에서 사용할 기본·선택 스킬을 고르세요. 체크하지 않은 스킬은 이 프로필에서 꺼집니다.
+                   </p>
+                   <Input
+-                    placeholder="Filter skills…"
++                    placeholder="스킬 검색…"
+                     value={skillFilter}
+                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                       setSkillFilter(e.target.value)
+@@ -419,7 +452,7 @@ export default function ProfileBuilderPage() {
+                   />
+                   {skills === null ? (
+                     <p className="text-sm text-muted-foreground">
+-                      Loading skills…
++                      스킬을 불러오는 중…
+                     </p>
+                   ) : (
+                     <div className="max-h-56 space-y-1 overflow-y-auto">
+@@ -441,7 +474,7 @@ export default function ProfileBuilderPage() {
+                             )}
+                             {s.description && (
+                               <span className="block text-xs text-muted-foreground">
+-                                {s.description}
++                                {localizedSkillDescription(s, locale, skillDescriptionsKo)}
+                               </span>
+                             )}
+                           </span>
+@@ -454,10 +487,10 @@ export default function ProfileBuilderPage() {
+ 
+               {/* Skills hub */}
+               <div className="space-y-2 border-t pt-4">
+-                <Label>Add from the skills hub</Label>
++                <Label>스킬 허브에서 추가</Label>
+                 <div className="flex gap-2">
+                   <Input
+-                    placeholder="Search the hub (e.g. linear, hyperliquid)…"
++                    placeholder="허브에서 스킬 검색 (예: linear, hyperliquid)…"
+                     value={hubQuery}
+                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                       setHubQuery(e.target.value)
+@@ -471,7 +504,7 @@ export default function ProfileBuilderPage() {
+                     onClick={runHubSearch}
+                     disabled={hubSearching}
+                   >
+-                    {hubSearching ? "Searching…" : "Search"}
++                    {hubSearching ? "검색 중…" : "검색"}
+                   </Button>
+                 </div>
+                 {hubResults.length > 0 && (
+@@ -488,7 +521,7 @@ export default function ProfileBuilderPage() {
+                           </Badge>
+                           {r.description && (
+                             <span className="block text-xs text-muted-foreground">
+-                              {r.description}
++                              {localizedSkillDescription(r, locale, skillDescriptionsKo)}
+                             </span>
+                           )}
+                         </span>
+@@ -507,7 +540,7 @@ export default function ProfileBuilderPage() {
+                         <button
+                           className="ml-1 text-xs"
+                           onClick={() => removeHubSkill(r.identifier)}
+-                          aria-label={`Remove ${r.name}`}
++                          aria-label={`${r.name} 스킬 제거`}
+                         >
+                           ×
+                         </button>
+@@ -524,30 +557,29 @@ export default function ProfileBuilderPage() {
+               <div className="flex flex-wrap items-start justify-between gap-3">
+                 <div className="space-y-1">
+                   <h3 className="font-expanded text-base font-bold tracking-[0.04em]">
+-                    MCP servers
++                    MCP 서버
+                   </h3>
+                   <p className="text-sm text-muted-foreground">
+-                    Add MCP servers to give this profile access to external
+-                    tools and data.
++                    MCP 서버를 추가하면 이 프로필에서 외부 도구와 데이터에 접근할 수 있습니다.
+                   </p>
+                 </div>
+                 <span
+                   className="text-xs text-muted-foreground"
+                   aria-live="polite"
+                 >
+-                  {mcpServers.length} configured
++                  {mcpServers.length}개 설정됨
+                 </span>
+               </div>
+ 
+               <div className="space-y-4 border border-border bg-background/20 p-4 md:p-5">
+-                <h4 className="font-medium">Add server</h4>
++                <h4 className="font-medium">MCP 서버 추가</h4>
+ 
+                 <div className="grid gap-4 md:grid-cols-2">
+                   <div className="grid gap-1.5">
+-                    <Label htmlFor="pb-mcp-name">Server name</Label>
++                    <Label htmlFor="pb-mcp-name">Server name (서버 이름)</Label>
+                     <Input
+                       id="pb-mcp-name"
+-                      placeholder="Enter server name"
++                      placeholder="구분할 서버 이름을 입력하세요"
+                       value={mcpDraft.name}
+                       onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                         setMcpDraft({ ...mcpDraft, name: e.target.value })
+@@ -555,16 +587,16 @@ export default function ProfileBuilderPage() {
+                     />
+                   </div>
+                   <div className="grid gap-1.5">
+-                    <Label>Transport</Label>
++                    <Label>Transport (연결 방식)</Label>
+                     <div
+                       className="grid grid-cols-2 border border-border bg-background/30 p-0.5"
+                       role="group"
+-                      aria-label="MCP transport"
++                      aria-label="MCP 연결 방식"
+                     >
+                       {(
+                         [
+-                          ["http", "HTTP/SSE"],
+-                          ["stdio", "stdio"],
++                          ["http", "HTTP/SSE (웹 주소로 연결)"],
++                          ["stdio", "stdio (로컬 명령으로 실행)"],
+                         ] as const
+                       ).map(([value, label]) => (
+                         <button
+@@ -589,7 +621,7 @@ export default function ProfileBuilderPage() {
+                 {mcpDraft.transport === "http" ? (
+                   <>
+                     <div className="grid gap-1.5">
+-                      <Label htmlFor="pb-mcp-url">URL</Label>
++                      <Label htmlFor="pb-mcp-url">URL (MCP 서버 주소)</Label>
+                       <Input
+                         id="pb-mcp-url"
+                         placeholder="https://example.com/mcp"
+@@ -600,17 +632,17 @@ export default function ProfileBuilderPage() {
+                       />
+                     </div>
+                     <div className="grid gap-1.5">
+-                      <Label>Authentication</Label>
++                      <Label>Authentication (인증 방식)</Label>
+                       <div
+                         className="grid grid-cols-3 border border-border bg-background/30 p-0.5 md:max-w-md"
+                         role="group"
+-                        aria-label="HTTP authentication"
++                        aria-label="HTTP 인증 방식"
+                       >
+                         {(
+                           [
+-                            ["none", "None"],
+-                            ["header", "Bearer token"],
+-                            ["oauth", "OAuth"],
++                            ["none", "인증 없음"],
++                            ["header", "Bearer token (접속 토큰)"],
++                            ["oauth", "OAuth (외부 계정 로그인)"],
+                           ] as const
+                         ).map(([value, label]) => (
+                           <button
+@@ -633,13 +665,13 @@ export default function ProfileBuilderPage() {
+                     {mcpDraft.httpAuth === "header" && (
+                       <div className="grid gap-1.5">
+                         <Label htmlFor="pb-mcp-bearer-token">
+-                          Bearer token
++                          Bearer token (접속 토큰)
+                         </Label>
+                         <Input
+                           id="pb-mcp-bearer-token"
+                           type="password"
+                           autoComplete="new-password"
+-                          placeholder="Token or Bearer token"
++                          placeholder="토큰 값 또는 Bearer 토큰"
+                           value={mcpDraft.bearerToken}
+                           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                             setMcpDraft({
+@@ -649,15 +681,13 @@ export default function ProfileBuilderPage() {
+                           }
+                         />
+                         <p className="text-xs text-muted-foreground">
+-                          Stored in the new profile&apos;s .env; config.yaml
+-                          keeps only an environment-variable reference.
++                          토큰은 새 프로필의 .env 파일에 저장합니다. config.yaml에는 실제 토큰 대신 환경 변수 이름만 기록합니다.
+                         </p>
+                       </div>
+                     )}
+                     {mcpDraft.httpAuth === "oauth" && (
+                       <p className="text-xs text-muted-foreground">
+-                        After creating the profile, open its MCP page and use
+-                        Authenticate to complete OAuth.
++                        프로필을 만든 뒤 해당 프로필의 MCP 화면을 열고 로그인 버튼을 눌러 OAuth 인증을 마치세요.
+                       </p>
+                     )}
+                   </>
+@@ -665,7 +695,7 @@ export default function ProfileBuilderPage() {
+                   <>
+                     <div className="grid gap-4 md:grid-cols-2">
+                       <div className="grid gap-1.5">
+-                        <Label htmlFor="pb-mcp-command">Command</Label>
++                        <Label htmlFor="pb-mcp-command">Command (실행할 명령)</Label>
+                         <Input
+                           id="pb-mcp-command"
+                           placeholder="npx"
+@@ -679,7 +709,7 @@ export default function ProfileBuilderPage() {
+                         />
+                       </div>
+                       <div className="grid gap-1.5">
+-                        <Label htmlFor="pb-mcp-args">Arguments</Label>
++                        <Label htmlFor="pb-mcp-args">Arguments (명령에 전달할 인수)</Label>
+                         <Input
+                           id="pb-mcp-args"
+                           placeholder="-y @modelcontextprotocol/server"
+@@ -692,7 +722,7 @@ export default function ProfileBuilderPage() {
+                     </div>
+                     <div className="grid gap-1.5">
+                       <Label htmlFor="pb-mcp-env">
+-                        Environment (KEY=VALUE per line)
++                        Environment (환경 변수, 한 줄에 KEY=VALUE)
+                       </Label>
+                       <textarea
+                         id="pb-mcp-env"
+@@ -708,7 +738,7 @@ export default function ProfileBuilderPage() {
+                 )}
+ 
+                 <div className="flex justify-end">
+-                  <Button onClick={addMcpDraft}>Add server</Button>
++                  <Button onClick={addMcpDraft}>서버 추가</Button>
+                 </div>
+               </div>
+ 
+@@ -723,11 +753,11 @@ export default function ProfileBuilderPage() {
+                         <span className="flex flex-wrap items-center gap-2">
+                           <span className="font-medium">{s.name}</span>
+                           <Badge tone="outline">
+-                            {s.url ? "HTTP" : "stdio"}
++                            {s.url ? "HTTP (웹 연결)" : "stdio (로컬 실행)"}
+                           </Badge>
+                           {s.auth && (
+                             <Badge tone="outline">
+-                              auth: {s.auth === "header" ? "bearer" : s.auth}
++                            인증: {s.auth === "header" ? "Bearer 토큰" : s.auth}
+                             </Badge>
+                           )}
+                         </span>
+@@ -741,8 +771,9 @@ export default function ProfileBuilderPage() {
+                         destructive
+                         className="shrink-0"
+                         onClick={() => removeMcp(s.name)}
++                        aria-label={`${s.name} 서버 제거`}
+                       >
+-                        Remove
++                        제거
+                       </Button>
+                     </div>
+                   ))}
+@@ -752,41 +783,41 @@ export default function ProfileBuilderPage() {
+           )}
+           {step === "review" && (
+             <div className="space-y-3 text-sm">
+-              <ReviewRow label="Name" value={name.trim() || "—"} />
++              <ReviewRow label="이름" value={name.trim() || "—"} />
+               <ReviewRow
+-                label="Description"
++                label="설명"
+                 value={description.trim() || "—"}
+               />
+               <ReviewRow
+-                label="Model"
+-                value={pickedModel ? pickedModel.label : "Default (set later)"}
++                label="모델"
++                value={pickedModel ? pickedModel.label : "기본값 (나중에 설정)"}
+               />
+               <ReviewRow
+-                label="Skills"
++                label="스킬"
+                 value={
+                   keepAll
+-                    ? "Full default bundle"
+-                    : `${keptSkills.size} built-in/optional kept` +
+-                      (hubSkills.length ? ` + ${hubSkills.length} hub` : "")
++                    ? "기본 스킬 전체 사용"
++                    : `기본·선택 스킬 ${keptSkills.size}개 사용` +
++                      (hubSkills.length ? ` + 허브 스킬 ${hubSkills.length}개` : "")
+                 }
+               />
+               {!keepAll && hubSkills.length > 0 && (
+                 <p className="pl-24 text-xs text-muted-foreground">
+-                  Hub: {hubSkills.map((s) => s.name).join(", ")}
++                  허브 스킬: {hubSkills.map((s) => s.name).join(", ")}
+                 </p>
+               )}
+               {keepAll && hubSkills.length > 0 && (
+                 <ReviewRow
+-                  label="Hub skills"
++                  label="허브 스킬"
+                   value={hubSkills.map((s) => s.name).join(", ")}
+                 />
+               )}
+               <ReviewRow
+-                label="MCP servers"
++                label="MCP 서버"
+                 value={
+                   mcpServers.length
+                     ? mcpServers.map((s) => s.name).join(", ")
+-                    : "None"
++                    : "없음"
+                 }
+               />
+             </div>
+@@ -801,11 +832,11 @@ export default function ProfileBuilderPage() {
+           disabled={stepIndex === 0}
+           onClick={() => setStep(STEPS[Math.max(0, stepIndex - 1)].id)}
+         >
+-          Back
++          이전
+         </Button>
+         {step === "review" ? (
+           <Button onClick={handleCreate} disabled={creating || !nameValid}>
+-            {creating ? "Creating…" : "Create profile"}
++            {creating ? "만드는 중…" : "프로필 만들기"}
+           </Button>
+         ) : (
+           <Button
+@@ -814,7 +845,7 @@ export default function ProfileBuilderPage() {
+               setStep(STEPS[Math.min(STEPS.length - 1, stepIndex + 1)].id)
+             }
+           >
+-            Next
++            다음
+           </Button>
+         )}
+       </div>
 diff --git a/web/src/pages/SkillsPage.tsx b/web/src/pages/SkillsPage.tsx
 index 65598e90ba..7cd9012cff 100644
 --- a/web/src/pages/SkillsPage.tsx

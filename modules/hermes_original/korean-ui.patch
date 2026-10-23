@@ -2694,6 +2694,30 @@ index 86ee09c26d..8c6675a2ea 100644
                </pre>
              </div>
            )}
+diff --git a/web/src/i18n/af.ts b/web/src/i18n/af.ts
+index 72d67ccaa1..d7a9434feb 100644
+--- a/web/src/i18n/af.ts
++++ b/web/src/i18n/af.ts
+@@ -396,6 +396,7 @@ export const af: Translations = {
+     resetDefaults: "Stel terug na verstek",
+     resetScopeTooltip: "Stel {scope} terug na verstek",
+     confirmResetScope: "Stel alle {scope}-instellings terug na hul verstek? Dit werk slegs die vorm op — veranderinge word nie na config.yaml geskryf voordat jy Stoor druk nie.",
++    resetFieldsDescription: "{count} instelling(s) sal na hul verstekwaardes teruggestel word.",
+     resetScopeToast: "{scope} teruggestel na verstek — kontroleer en Stoor om te behou",
+     rawYaml: "Rou YAML-konfigurasie",
+     searchResults: "Soekresultate",
+diff --git a/web/src/i18n/ar.ts b/web/src/i18n/ar.ts
+index 8db09d72c4..0639ccbb7d 100644
+--- a/web/src/i18n/ar.ts
++++ b/web/src/i18n/ar.ts
+@@ -337,6 +337,7 @@ export const ar = defineLocale({
+     resetScopeTooltip: "إعادة تعيين {scope} للافتراضيات",
+     confirmResetScope:
+       "إعادة تعيين جميع إعدادات {scope} للافتراضيات؟ هذا يحدِّث النموذج فقط — لا تُكتب التغييرات في config.yaml حتى تضغط على حفظ.",
++    resetFieldsDescription: "ستُعاد {count} من الإعدادات إلى قيمها الافتراضية.",
+     resetScopeToast: "تمت إعادة تعيين {scope} للافتراضيات — راجع واحفظ للتثبيت",
+     rawYaml: "إعدادات YAML الأولية",
+     searchResults: "نتائج البحث",
 diff --git a/web/src/i18n/channel-descriptions.ko.json b/web/src/i18n/channel-descriptions.ko.json
 new file mode 100644
 index 0000000000..9156eb2ba9
@@ -2726,8 +2750,104 @@ index e407988edf..0c4e516b10 100644
  });
  
  export function I18nProvider({ children }: { children: ReactNode }) {
+diff --git a/web/src/i18n/de.ts b/web/src/i18n/de.ts
+index 2acc8cba6d..8b3c41c513 100644
+--- a/web/src/i18n/de.ts
++++ b/web/src/i18n/de.ts
+@@ -396,6 +396,7 @@ export const de: Translations = {
+     resetDefaults: "Auf Standardwerte zurücksetzen",
+     resetScopeTooltip: "{scope} auf Standardwerte zurücksetzen",
+     confirmResetScope: "Alle {scope}-Einstellungen auf ihre Standardwerte zurücksetzen? Dies aktualisiert nur das Formular — Änderungen werden erst in config.yaml geschrieben, wenn du auf Speichern drückst.",
++    resetFieldsDescription: "{count} Einstellung(en) werden auf die Standardwerte zurückgesetzt.",
+     resetScopeToast: "{scope} auf Standardwerte zurückgesetzt — überprüfen und Speichern, um zu übernehmen",
+     rawYaml: "Rohe YAML-Konfiguration",
+     searchResults: "Suchergebnisse",
+diff --git a/web/src/i18n/en.ts b/web/src/i18n/en.ts
+index 9d2fe49138..fa12b41d59 100644
+--- a/web/src/i18n/en.ts
++++ b/web/src/i18n/en.ts
+@@ -510,6 +510,7 @@ export const en: Translations = {
+     resetDefaults: "Reset to defaults",
+     resetScopeTooltip: "Reset {scope} to defaults",
+     confirmResetScope: "Reset all {scope} settings to their defaults? This only updates the form — changes aren't written to config.yaml until you press Save.",
++    resetFieldsDescription: "{count} field(s) will be reset to their default values.",
+     resetScopeToast: "{scope} reset to defaults — review and Save to persist",
+     rawYaml: "Raw YAML Configuration",
+     searchResults: "Search Results",
+diff --git a/web/src/i18n/es.ts b/web/src/i18n/es.ts
+index f816a2e880..80b3bbb36c 100644
+--- a/web/src/i18n/es.ts
++++ b/web/src/i18n/es.ts
+@@ -397,6 +397,7 @@ export const es: Translations = {
+     resetDefaults: "Restablecer valores predeterminados",
+     resetScopeTooltip: "Restablecer {scope} a los valores predeterminados",
+     confirmResetScope: "¿Restablecer todos los ajustes de {scope} a sus valores predeterminados? Esto solo actualiza el formulario — los cambios no se escriben en config.yaml hasta que pulses Guardar.",
++    resetFieldsDescription: "Se restablecerán {count} ajuste(s) a sus valores predeterminados.",
+     resetScopeToast: "{scope} restablecido a los valores predeterminados — revisa y guarda para que persista",
+     rawYaml: "Configuración YAML en bruto",
+     searchResults: "Resultados de búsqueda",
+diff --git a/web/src/i18n/fr.ts b/web/src/i18n/fr.ts
+index 5b9db2f766..d0dd8560f6 100644
+--- a/web/src/i18n/fr.ts
++++ b/web/src/i18n/fr.ts
+@@ -397,6 +397,7 @@ export const fr: Translations = {
+     resetDefaults: "Réinitialiser aux valeurs par défaut",
+     resetScopeTooltip: "Réinitialiser {scope} aux valeurs par défaut",
+     confirmResetScope: "Réinitialiser tous les paramètres de {scope} aux valeurs par défaut ? Cela ne met à jour que le formulaire — les modifications ne sont écrites dans config.yaml qu'après avoir appuyé sur Enregistrer.",
++    resetFieldsDescription: "{count} paramètre(s) seront rétablis à leurs valeurs par défaut.",
+     resetScopeToast: "{scope} réinitialisé aux valeurs par défaut — vérifiez et enregistrez pour conserver",
+     rawYaml: "Configuration YAML brute",
+     searchResults: "Résultats de recherche",
+diff --git a/web/src/i18n/ga.ts b/web/src/i18n/ga.ts
+index 6896fd790a..04fa284088 100644
+--- a/web/src/i18n/ga.ts
++++ b/web/src/i18n/ga.ts
+@@ -404,6 +404,7 @@ export const ga: Translations = {
+     resetDefaults: "Athshocraigh chuig réamhshocruithe",
+     resetScopeTooltip: "Athshocraigh {scope} chuig réamhshocruithe",
+     confirmResetScope: "Athshocraigh socruithe uile {scope} chuig a réamhshocruithe? Nuashonraíonn sé seo an fhoirm amháin — ní scríobhfar athruithe chuig config.yaml go dtí go mbrúnn tú Sábháil.",
++    resetFieldsDescription: "Athshocrófar {count} socrú chuig a luachanna réamhshocraithe.",
+     resetScopeToast: "{scope} athshocraithe chuig réamhshocruithe — athbhreithnigh agus Sábháil chun é a choinneáil",
+     rawYaml: "Cumraíocht YAML amh",
+     searchResults: "Torthaí cuardaigh",
+diff --git a/web/src/i18n/hu.ts b/web/src/i18n/hu.ts
+index d8b5857329..de9ec13817 100644
+--- a/web/src/i18n/hu.ts
++++ b/web/src/i18n/hu.ts
+@@ -396,6 +396,7 @@ export const hu: Translations = {
+     resetDefaults: "Visszaállítás alapértelmezettre",
+     resetScopeTooltip: "{scope} visszaállítása alapértelmezettre",
+     confirmResetScope: "Visszaállítja az összes {scope} beállítást alapértelmezettre? Ez csak az űrlapot frissíti — a változások nem íródnak be a config.yaml fájlba, amíg meg nem nyomja a Mentés gombot.",
++    resetFieldsDescription: "{count} beállítás visszaáll az alapértelmezett értékre.",
+     resetScopeToast: "{scope} visszaállítva alapértelmezettre — ellenőrizze és mentse a megőrzéshez",
+     rawYaml: "Nyers YAML-konfiguráció",
+     searchResults: "Keresési eredmények",
+diff --git a/web/src/i18n/it.ts b/web/src/i18n/it.ts
+index 962668ebcc..29c475026a 100644
+--- a/web/src/i18n/it.ts
++++ b/web/src/i18n/it.ts
+@@ -396,6 +396,7 @@ export const it: Translations = {
+     resetDefaults: "Ripristina predefiniti",
+     resetScopeTooltip: "Ripristina {scope} ai valori predefiniti",
+     confirmResetScope: "Ripristinare tutte le impostazioni di {scope} ai valori predefiniti? Questa operazione aggiorna solo il modulo — le modifiche non vengono scritte in config.yaml finché non premi Salva.",
++    resetFieldsDescription: "{count} impostazione/i verrà/verranno ripristinata/e ai valori predefiniti.",
+     resetScopeToast: "{scope} ripristinato ai valori predefiniti — controlla e Salva per rendere persistente",
+     rawYaml: "Configurazione YAML grezza",
+     searchResults: "Risultati della ricerca",
+diff --git a/web/src/i18n/ja.ts b/web/src/i18n/ja.ts
+index 3cb96bf9b9..2da05dea12 100644
+--- a/web/src/i18n/ja.ts
++++ b/web/src/i18n/ja.ts
+@@ -395,6 +395,7 @@ export const ja: Translations = {
+     resetDefaults: "デフォルトにリセット",
+     resetScopeTooltip: "{scope} をデフォルトにリセット",
+     confirmResetScope: "すべての {scope} 設定をデフォルトにリセットしますか？フォームのみ更新されます — 保存を押すまで config.yaml には書き込まれません。",
++    resetFieldsDescription: "{count} 件の設定をデフォルト値に戻します。",
+     resetScopeToast: "{scope} をデフォルトにリセットしました — 確認して保存してください",
+     rawYaml: "生の YAML 設定",
+     searchResults: "検索結果",
 diff --git a/web/src/i18n/ko.ts b/web/src/i18n/ko.ts
-index 5d2e99113e..472aff00d4 100644
+index 5d2e99113e..9ede9ccd5f 100644
 --- a/web/src/i18n/ko.ts
 +++ b/web/src/i18n/ko.ts
 @@ -2,6 +2,11 @@ import type { Translations } from "./types";
@@ -2942,7 +3062,15 @@ index 5d2e99113e..472aff00d4 100644
      title: "스킬",
      searchPlaceholder: "스킬 및 도구 세트 검색...",
      enabledOf: "{enabled}/{total} 활성화됨",
-@@ -505,6 +607,13 @@ export const ko: Translations = {
+@@ -395,6 +497,7 @@ export const ko: Translations = {
+     resetDefaults: "기본값으로 재설정",
+     resetScopeTooltip: "{scope}을(를) 기본값으로 재설정",
+     confirmResetScope: "모든 {scope} 설정을 기본값으로 재설정하시겠습니까? 이 작업은 양식만 업데이트하며, 저장을 누르기 전까지는 변경 사항이 config.yaml에 기록되지 않습니다.",
++    resetFieldsDescription: "{count}개 설정을 기본값으로 되돌립니다.",
+     resetScopeToast: "{scope}이(가) 기본값으로 재설정되었습니다 — 검토 후 저장하여 적용하세요",
+     rawYaml: "원본 YAML 설정",
+     searchResults: "검색 결과",
+@@ -505,6 +608,13 @@ export const ko: Translations = {
    },
  
    theme: {
@@ -2956,7 +3084,7 @@ index 5d2e99113e..472aff00d4 100644
      title: "테마",
      switchTheme: "테마 전환",
    },
-@@ -616,6 +725,30 @@ export const ko: Translations = {
+@@ -616,6 +726,30 @@ export const ko: Translations = {
      },
    },
    kanban: {
@@ -3008,6 +3136,30 @@ index 0000000000..88f2932ed9
 +++ b/web/src/i18n/plugin-hub.ko.json
 @@ -0,0 +1 @@
 +{"a2a-platform":[{"hash":"c27b9d0f838d7c4a","text":"Hermes 에이전트에 대한 A2A(에이전트 간) 프로토콜 v1.0 지원 - 에이전트 간 통신을 위한 개방형 Linux Foundation 표준의 양방향입니다.\nOUTBOUND(클라이언트 도구): a2a_discover, a2a_call, a2a_list, a2a_history 및 a2a_orchestrate를 사용하면 에이전트가 다른 에이전트의 에이전트 카드를 가져와서 JSON-RPC를 통해 작업을 보낼 수 있습니다. — 모든 A2A 호환 피어(Hermes, LangChain, CrewAI, 구글 ADK, OpenClaw, ...).\nINBOUND(플랫폼 어댑터): Hermes를 A2A 검색 가능한 에이전트로 노출합니다. 에이전트 카드는 /.well-known/agent-card.json(v1.0 정식 경로, 레거시 agent.json도 답변)에서 제공되며 수신 작업은 다른 플랫폼과 마찬가지로 에이전트의 라이브 게이트웨이 세션으로 라우팅됩니다. 따라서 응답하는 에이전트는 일회용 복제본이 아닌 전체 메모리와 컨텍스트를 사용하여 사용자와 대화하는 것과 동일합니다.\n보안은 기본적으로 켜져 있습니다. 전달자 토큰이 구성되지 않음 => localhost 전용 바인딩. 인바운드 작업 텍스트는 프롬프트 삽입 필터를 통과합니다. 아웃바운드 텍스트는 자격 증명 모양의 문자열로 제거됩니다. 모든 교환은 감사 로그에 기록되고 컨텍스트 압축 파이프라인 외부의 디스크에 유지되므로 대화는 압축 후에도 유지되고 다시 시작됩니다.\n순수 stdlib 전송(http.server + urllib) - a2a-sdk 종속성이 필요하지 않습니다."},{"hash":"0588215c896a20c0","text":"Hermes 에이전트에 대한 A2A(에이전트 간) 프로토콜 v1.0 지원 - 에이전트 간 통신을 위한 개방형 Linux Foundation 표준의 양방향입니다.\nOUTBOUND(클라이언트 도구): a2a_discover, a2a_call, a2a_list, a2a_history 및 a2a_orchestrate를 사용하면 에이전트가 다른 에이전트의 에이전트 카드를 가져와 작업을 보낼 수 있습니다. JSON-RPC — 모든 A2A 호환 피어(Hermes, LangChain, CrewAI, Google ADK, OpenClaw, ...)와 작동합니다.\nINBOUND(플랫폼 어댑터): Hermes를 A2A 검색 가능한 에이전트로 노출합니다. 에이전트 카드는 /.well-known/agent-card.json(v1.0 정식 경로, 레거시 Agent.json도 응답)에서 제공되며 들어오는 작업은 다른 플랫폼과 마찬가지로 에이전트의 라이브 게이트웨이 세션으로 라우팅됩니다. 따라서 응답하는 에이전트는 일회용 복제본이 아닌 전체 메모리와 컨텍스트를 사용하여 사용자와 대화하는 것과 동일합니다.\n보안은 기본적으로 켜져 있습니다. 전달자 토큰이 구성되지 않음 => localhost 전용 바인딩. 인바운드 작업 텍스트는 프롬프트 삽입 필터를 통과합니다. 아웃바운드 텍스트는 자격 증명 모양의 문자열로 제거됩니다. 모든 교환은 감사 로그에 기록되고 컨텍스트 압축 파이프라인 외부의 디스크에 유지되므로 대화는 압축 후에도 유지되고 다시 시작됩니다.\n순수 stdlib 전송(http.server + urllib) - a2a-sdk 종속성이 필요하지 않습니다."}],"actual-provider":[{"hash":"5fd0b8cf628413ff","text":"실제 컴퓨터 추론"}],"ai-gateway-provider":[{"hash":"3714414d4bd2c41a","text":"Vercel AI 게이트웨이"}],"alibaba-coding-plan-provider":[{"hash":"1f45cce9f646498b","text":"Alibaba Cloud 코딩 계획"}],"alibaba-provider":[{"hash":"dd0001fab42d3870","text":"Alibaba DashScope(국제)"}],"anthropic-provider":[{"hash":"e924276a92a7f1d8","text":"인류학(클로드)"}],"arcee-provider":[{"hash":"0664ad93fa99fdd1","text":"아르씨 AI"}],"azure-foundry-provider":[{"hash":"0b6bd5d3429cdcca","text":"마이크로소프트 파운드리"}],"basic":[{"hash":"43229827f6beaf7f","text":"대시보드 인증 공급자 — 사용자 이름/비밀번호(OAuth IDP 없음). 자체 호스팅 '내 대시보드에 비밀번호를 입력하기만 하면 되는' 제공업체입니다. Dashboard.basic_auth.username과 비밀번호(또는 비밀번호 해시)가 config.yaml(정규 표면) 또는 HERMES_DASHBOARD_BASIC_AUTH_* 환경 변수를 통해 구성되면 활성화됩니다. 세션은 공급자가 발행한 상태 비저장 HMAC 서명 토큰입니다. 비밀번호 해싱은 stdlib scrypt를 사용합니다(타사 종속성 없음). 재시작 후에도 유지되는/다중 작업자 세션을 위해 Dashboard.basic_auth.secret를 설정합니다."}],"bedrock-provider":[{"hash":"78c7a79b6f0024d8","text":"AWS 기반암"}],"bluebubbles-platform":[{"hash":"dabca2dc8d8da7fb","text":"Hermes 에이전트용 BlueBubbles(Apple iMessage) 게이트웨이 어댑터. 로컬 BlueBubbles macOS 서버와 통신합니다. 아웃바운드는 등록된 웹후크 수신기를 통해 REST API를 통해 인바운드 메시지를 보냅니다. 미디어 첨부 파일, 입력 표시기, 읽음 확인 및 탭백(개인 API 도우미), 그룹 깨우기 단어 게이팅 및 홈 채널 크론 전달을 지원합니다."},{"hash":"3c30adc487b45e83","text":"Hermes 에이전트용 BlueBubbles(Apple iMessage) 게이트웨이 어댑터. 로컬 BlueBubbles macOS 서버와 통신합니다. 아웃바운드는 등록된 웹후크 수신기를 통해 REST API를 통해 인바운드 메시지를 보냅니다. 미디어 첨부 파일, 입력 표시기, 읽음 확인 및 탭백(개인 API 도우미), 그룹 깨우기 단어 게이팅 및 홈 채널 크론 전달을 지원합니다."}],"browser-browser-use":[{"hash":"32744cef47b549a6","text":"브라우저 사용(https://browser-use.com) 클라우드 브라우저 백엔드. 직접 BROWSER_USE_API_KEY와 관리형 Nous 도구 게이트웨이를 모두 지원합니다. 또한 Nous 구독에 사용량을 청구하는 'Nous 구독' UX 흐름을 지원합니다."}],"browser-browserbase":[{"hash":"1894f4b3c552d3dd","text":"브라우저베이스(https://browserbase.com) 클라우드 브라우저 백엔드. BROWSERBASE_API_KEY + BROWSERBASE_PROJECT_ID가 필요합니다. 스텔스, 프록시 및 연결 유지 세션을 지원합니다. 유료 기능을 사용할 수 없는 경우 자동 대체됩니다."}],"browser-firecrawl":[{"hash":"892742a837918b43","text":"Firecrawl(https://firecrawl.dev) 클라우드 브라우저 백엔드. FIRECRAWL_API_KEY가 필요합니다. Firecrawl WEB 검색/추출 플러그인과 구별됩니다. 두 플러그인은 API 키를 공유하지만 서로 다른 엔드포인트에서 작동합니다."}],"buzz-platform":[{"hash":"af602cae8fc6125c","text":"Hermes Agent용 버즈 게이트웨이 어댑터. Buzz 커뮤니티 릴레이(Nostr을 기반으로 구축된 Block의 오픈 소스 인간+에이전트 협업 플랫폼)에 연결하고 채널/DM과 Hermes 에이전트 간에 메시지를 릴레이합니다. 버즈 CLI 바이너리(JSON 입력/출력)로 릴레이 작업 셸 아웃; 검증된 인바운드 미디어는 Hermes의 번들 HTTP 클라이언트를 사용합니다."},{"hash":"c67e429e4d912822","text":"Hermes Agent용 버즈 게이트웨이 어댑터. Buzz 커뮤니티 릴레이(Nostr을 기반으로 구축된 Block의 오픈 소스 인간+에이전트 협업 플랫폼)에 연결하고 channels/DMs와 Hermes 에이전트 간에 메시지를 릴레이합니다. 릴레이 작업 쉘은 버즈 CLI 바이너리(JSON in/out)로 출력됩니다. 검증된 인바운드 미디어는 Hermes의 번들 HTTP 클라이언트를 사용합니다."}],"byterover":[{"hash":"267b9f668dd6fdc6","text":"ByteRover — brv CLI를 통한 계층형 검색 기능이 있는 영구 지식 트리입니다."}],"chronos":[{"hash":"da60ed65a2efa21a","text":"Chronos — 0으로 축소된 호스팅 에이전트를 위한 NAS 중재 관리 크론 제공자입니다. 유휴 게이트웨이가 0으로 확장되고 크론 작업을 계속 실행할 수 있도록 \"T 시간에 깨우기\" 트리거를 Nous 인프라에 위임합니다. 에이전트는 각 작업의 다음 실행 시간을 계산하고 NAS에 원샷을 준비하도록 요청합니다. NAS는 인증된 웹훅을 통해 실행 시 에이전트를 다시 호출합니다. cron.provider=chronos가 아니면 비활성입니다."}],"commandcode-provider":[{"hash":"1531f8c28ab3e6d9","text":"CommandCode — 통합 다중 모델 API(OpenAI 채팅 완료 + Anthropic 메시지)"}],"copilot-acp-provider":[{"hash":"df21fc27d910825d","text":"ACP 하위 프로세스를 통한 GitHub Copilot"}],"copilot-provider":[{"hash":"6b3bdf2516070eee","text":"GitHub 코파일럿"}],"cua":[{"hash":"6e9710f2af5c02ed","text":"cua-driver (내장) — macOS, Windows 및 Linux에서 백그라운드 컴퓨터 사용; 커서나 포커스를 훔치지 않습니다. Computer_use.backend가 설정되지 않은 경우의 기본값입니다."}],"custom-provider":[{"hash":"1ddbfcdbb345aa2f","text":"사용자 정의/Ollama/로컬 OpenAI 호환 엔드포인트"}],"deepinfra":[{"hash":"cdb7174d16cbcdeb","text":"OpenAI 호환 /v1/images/세대를 통한 DeepInfra 이미지 생성 백엔드(FLUX, Qwen-Image, …). api.deepinfra.com에서 실시간으로 발견된 카탈로그입니다."},{"hash":"23384f15c39056ec","text":"OpenAI 호환 /v1/openai/videos 엔드포인트를 통한 DeepInfra 비디오 생성(텍스트-비디오 및 이미지-비디오). api.deepinfra.com에서 실시간으로 발견된 카탈로그입니다."}],"deepinfra-provider":[{"hash":"1f50ed5985e38b03","text":"DeepInfra — 100개 이상의 공개 모델, 종량제 결제"}],"deepseek-provider":[{"hash":"7143a21fc7d9021b","text":"DeepSeek"}],"dingtalk-platform":[{"hash":"edb973187e40d749","text":"Hermes 에이전트용 DingTalk 게이트웨이 어댑터. dingtalk-stream SDK(스트림 모드)를 통해 DingTalk에 연결하고 DingTalk 채팅과 Hermes 에이전트 간에 메시지를 중계합니다. 텍스트, 이미지, 오디오, 비디오, 서식 있는 텍스트, 파일, 그룹 @mention 게이팅, 무료 응답 채팅 및 사용자별 허용 목록을 지원합니다."},{"hash":"32f5d59e882dc6d9","text":"Hermes 에이전트용 DingTalk 게이트웨이 어댑터. dingtalk-stream SDK(스트림 모드)를 통해 DingTalk에 연결하고 DingTalk 채팅과 Hermes 에이전트 간에 메시지를 중계합니다. 텍스트, 이미지, 오디오, 비디오, 서식 있는 텍스트, 파일, 그룹 @mention 게이팅, 무료 응답 채팅 및 사용자별 허용 목록을 지원합니다."}],"discord-platform":[{"hash":"5b921f08f58a10fb","text":"Hermes 에이전트용 Discord 게이트웨이 어댑터. discord.py 라이브러리를 통해 Discord에 연결하고 Discord 길드/DM과 Hermes 에이전트 간에 메시지를 중계합니다. 음성 모드, 슬래시 명령, 자유 응답 채널, 역할 기반 DM 인증, 스레드, 반응 및 채널 기술 바인딩을 지원합니다."},{"hash":"235bad39399ac983","text":"Hermes 에이전트용 Discord 게이트웨이 어댑터. discord.py 라이브러리를 통해 Discord에 연결하고 Discord guilds/DMs와 Hermes 에이전트 간에 메시지를 중계합니다. 음성 모드, 슬래시 명령, 자유 응답 채널, 역할 기반 DM 인증, 스레드, 반응 및 채널 기술 바인딩을 지원합니다."}],"disk-cleanup":[{"hash":"486922fbe486c3af","text":"Hermes 세션 중에 생성된 임시 파일(테스트 스크립트, 임시 출력, 크론 로그)을 자동 추적하고 정리합니다. 플러그인 후크를 통해 실행됩니다. 에이전트 작업이 필요하지 않습니다."}],"drain":[{"hash":"b4ccb14357c9c653","text":"대시보드 인증 공급자 — 게이트웨이 드레인 제어 엔드포인트에 대한 비대화형 공유 베어러 비밀입니다. 일반 토큰 인증 기능(supports_token/verify_token)의 첫 번째 소비자입니다. nous-account-service는 HERMES_DASHBOARD_DRAIN_SECRET를 통해 에이전트별 고유 비밀을 프로비저닝합니다. 이 공급자는 일정한 시간 비교를 통해 인바운드 권한 부여 전달자 토큰을 확인하고 /api/gateway/drain을 토큰 인증 가능으로 등록합니다. CLOSED 실패: 약한/짧은/낮은 엔트로피 비밀(< 256비트)이 등록 시 거부되고 엔드포인트는 비활성화된 상태로 유지됩니다. 환경 변수가 설정되지 않은 경우 작동하지 않습니다. 동작 노브(범위, min_secret_chars)는 config.yaml의 Dashboard.drain_auth 아래에 있습니다."}],"email-platform":[{"hash":"30905b431a7e9e49","text":"Hermes Agent용 이메일 게이트웨이 어댑터. 인바운드 메시지에 대해 IMAP 사서함을 폴링하고 SMTP를 통해 응답하여 Hermes 에이전트와 이메일 스레드를 릴레이합니다."},{"hash":"03e956060526ebd9","text":"Hermes Agent용 이메일 게이트웨이 어댑터. 인바운드 메시지에 대해 IMAP 메일함을 폴링하고 SMTP를 통해 응답하여 Hermes 에이전트와 이메일 스레드를 릴레이합니다."}],"fal":[{"hash":"51080d061a2505b6","text":"FAL.ai 이미지 생성 백엔드(flux-2-klein, flux-2-pro, nano-banana-2, nano-banana-pro, gpt-image-1.5, recraft-v3 등)."},{"hash":"49973498ccb606cf","text":"FAL.ai 비디오 생성 백엔드. 다중 모델 — Veo 3.1, Kling, Pixverse — fal_client의 대기열 API를 통해 텍스트-비디오 및 이미지-비디오를 포괄합니다."}],"feishu-platform":[{"hash":"b08f25ff78652c03","text":"Hermes Agent용 Feishu/Lark 게이트웨이 어댑터. WebSocket 또는 웹훅을 통해 공식 lark-oapi SDK를 통해 Feishu(중국) 또는 Lark(국제)에 연결하고 Feishu/Lark 채팅과 Hermes 에이전트 간에 메시지를 중계합니다. 텍스트, 이미지, 비디오, 음성, 문서, 스레드, DM 페어링, 그룹 @멘션 게이팅, 댓글 이벤트 유도 및 회의 초대를 지원합니다."},{"hash":"68699a1993e9d34b","text":"Hermes Agent용 Feishu/Lark 게이트웨이 어댑터. WebSocket 또는 웹훅을 통해 공식 lark-oapi SDK를 통해 Feishu(중국) 또는 Lark(국제)에 연결하고 Feishu/Lark 채팅과 Hermes 에이전트 간에 메시지를 중계합니다. 텍스트, 이미지, 비디오, 음성, 문서, 스레드, DM 페어링, 그룹 @멘션 게이팅, 댓글 이벤트 유도 및 회의 초대를 지원합니다."}],"fireworks-provider":[{"hash":"490485e1f6e39503","text":"Fireworks AI — 개방형 및 독점 모델에 대한 빠른 추론"}],"gemini-provider":[{"hash":"d04cf9834098264d","text":"Google Gemini(API 키 + Cloud Code OAuth)"}],"gmi-provider":[{"hash":"a2d211598f201b39","text":"GMI 클라우드"}],"google_chat-platform":[{"hash":"495d45e8e42c83b7","text":"Hermes Agent용 Google Chat 게이트웨이 어댑터입니다. 인바운드 이벤트에 대해 인증된 HTTP 콜백 또는 선택적 Cloud Pub/Sub 풀 구독을 통해 연결하고 아웃바운드 메시지에 Google Chat REST API를 사용합니다. 기본 파일 첨부는 사용자별 OAuth를 통해 전달됩니다(각 사용자는 자신의 DM에서 /setup-files를 한 번 실행합니다)."},{"hash":"d60187bbb7a3da27","text":"Hermes Agent용 Google Chat 게이트웨이 어댑터입니다. 인바운드 이벤트에 대해 인증된 HTTP 콜백 또는 선택적 Cloud Pub/Sub 풀 구독을 통해 연결하고 아웃바운드 메시지에 Google Chat REST API를 사용합니다. 기본 파일 첨부는 사용자별 OAuth를 통해 전달됩니다(각 사용자는 자신의 DM에서 /setup-files를 한 번 실행합니다)."}],"google_meet":[{"hash":"338f51b60f86c7fa","text":"Google Meet 통화에 참여하고, 실시간 자막을 스크립트로 작성하고, 실시간으로 말하고, 이후 후속 조치를 취하세요. v1 전사 전용이 기본값입니다. OpenAI Realtime + BlackHole/PulseAudio를 통한 v2 실시간 이중 오디오는 mode='realtime'으로 제공됩니다. v3 원격 노드 호스트를 사용하면 게이트웨이(Linux의 게이트웨이, 사용자 Mac의 Chrome+로그인 프로필)가 아닌 다른 시스템에서 봇을 실행할 수 있습니다. 명시적 설계: 전달된 Meet.google.com URL만 조인합니다. 캘린더 검색이나 자동 전화 걸기가 없습니다."}],"huggingface-provider":[{"hash":"a834ea6f0db230c4","text":"HuggingFace 추론 제공자"}],"irc-platform":[{"hash":"fc5da6631a0da8ad","text":"Hermes 에이전트용 IRC 게이트웨이 어댑터. IRC 서버에 연결하고 IRC 채널(또는 DM)과 Hermes 에이전트 간에 메시지를 중계합니다.  외부 종속성 없음 — IRC 프로토콜에 Python의 stdlib asyncio를 사용합니다."},{"hash":"e0ca6165453593c5","text":"Hermes 에이전트용 IRC 게이트웨이 어댑터. IRC 서버에 연결하고 IRC 채널(또는 DM)과 Hermes 에이전트 간에 메시지를 중계합니다.  외부 종속성 없음 — IRC 프로토콜에 Python의 stdlib asyncio를 사용합니다."}],"kilocode-provider":[{"hash":"54c6ce576be2bb75","text":"킬로 코드"}],"kimi-coding-provider":[{"hash":"62f3a12c4e1491c8","text":"문샷 키미코딩 (글로벌+중국)"}],"krea":[{"hash":"910c8559e0e9f1a9","text":"Krea 이미지 생성 백엔드: Krea 3(생성 및 편집) 및 Krea 2 Medium, Large 및 Medium Turbo. 직접 KREA_API_KEY 또는 관리형 Nous 구독 게이트웨이."}],"line-platform":[{"hash":"dcc87ef1e8cb6199","text":"Hermes 에이전트용 LINE 메시징 API 게이트웨이 어댑터입니다. LINE 웹훅 이벤트(HMAC-SHA256 서명 확인 포함)를 수신하고 LINE 채팅(1:1, 그룹, 방)과 Hermes 에이전트 간에 메시지를 중계하는 aiohttp 웹훅 서버를 실행합니다. 아웃바운드 응답은 무료 응답 토큰을 선호하며 토큰이 만료되거나 없을 경우 측정된 푸시 API로 대체됩니다. 느린 LLM 응답은 템플릿 버튼 포스트백 버블을 표시하므로 사용자는 준비가 되면 새로운 응답 토큰(무료)으로 답변을 가져올 수 있습니다."},{"hash":"f411480e9196ccc9","text":"Hermes 에이전트용 LINE 메시징 API 게이트웨이 어댑터. LINE 웹훅 이벤트(HMAC-SHA256 서명 확인 포함)를 수신하고 LINE 채팅(1:1, 그룹, 방)과 Hermes 에이전트 간에 메시지를 중계하는 aiohttp 웹훅 서버를 실행합니다. 아웃바운드 응답은 무료 응답 토큰을 선호하며 토큰이 만료되거나 없을 경우 측정된 푸시 API로 대체됩니다. 느린 LLM 응답은 템플릿 버튼 포스트백 버블을 표시하므로 사용자는 준비가 되면 새로운 응답 토큰(무료)으로 답변을 가져올 수 있습니다."}],"lmstudio-provider":[{"hash":"7d1fbbe331e1e704","text":"LM스튜디오"}],"matrix-platform":[{"hash":"9a1fe681c6654086","text":"Hermes Agent용 매트릭스 게이트웨이 어댑터. mautrix(E2EE 옵션 사용)를 통해 Matrix 홈서버에 연결하고 Matrix 룸/DM과 Hermes 에이전트 간에 메시지를 중계합니다. 스레드, HTML/markdown 렌더링, 기본 미디어 업로드, 멘션 게이팅, 자유 응답 룸 및 룸별 허용 목록을 지원합니다."},{"hash":"49753a841e0cade4","text":"Hermes Agent용 매트릭스 게이트웨이 어댑터. mautrix(E2EE 옵션 포함)를 통해 Matrix 홈서버에 연결하고 Matrix rooms/DMs와 Hermes 에이전트 간에 메시지를 중계합니다. 스레드, HTML/markdown 렌더링, 기본 미디어 업로드, 멘션 게이팅, 자유 응답 룸 및 룸별 허용 목록을 지원합니다."}],"mattermost-platform":[{"hash":"8384051518cc8481","text":"Hermes Agent용 가장 중요한 게이트웨이 어댑터입니다. v4 REST API + WebSocket 이벤트 스트림을 통해 자체 호스팅 또는 클라우드 Mattermost 인스턴스에 연결하고 Mattermost 채널/DM과 Hermes 에이전트 간에 메시지를 중계합니다. 스레드 모드 응답, 기본 파일 업로드, 채널 범위 허용 목록 및 홈 채널 크론 전달을 지원합니다."},{"hash":"45d92dd923853831","text":"Hermes Agent용 가장 중요한 게이트웨이 어댑터입니다. v4 REST API + WebSocket 이벤트 스트림을 통해 자체 호스팅 또는 클라우드 Mattermost 인스턴스에 연결하고 Mattermost channels/DMs와 Hermes 에이전트 간에 메시지를 중계합니다. 스레드 모드 응답, 기본 파일 업로드, 채널 범위 허용 목록 및 홈 채널 크론 전달을 지원합니다."}],"meta-ai-image-gen":[{"hash":"a0a919b38f766609","text":"메타 모델 API 이미지 생성 백엔드(muse-image). OpenAI 호환 /v1/images/세대. 이미지를 $HERMES_HOME/cache/generated/images/에 저장합니다."}],"meta-ai-provider":[{"hash":"ce8cc66d9a708b12","text":"메타 모델 API — Muse Spark 제품군(Meta Superintelligence Labs)"}],"minimax-provider":[{"hash":"db0e981c7d3c8bb7","text":"MiniMax M 시리즈(글로벌 + 중국 + OAuth)"}],"nebius-token-factory-provider":[{"hash":"57b68e8fedf49fc6","text":"Nebius Token Factory OpenAI 호환 추론"}],"nous":[{"hash":"028a85e7334bfb18","text":"대시보드 인증 공급자 — Nous Portal에 대한 OAuth 2.0(인증 코드 + PKCE). config.yaml(표준 표면) 또는 HERMES_DASHBOARD_OAUTH_CLIENT_ID env var(운영자 재정의, 포털이 Fly.io 프로비저닝에 이를 삽입)의 Dashboard.oauth.client_id를 통해 client_id가 구성되면 자동 활성화됩니다. Dashboard.oauth.portal_url / HERMES_DASHBOARD_PORTAL_URL는 선택사항이며 기본값은 https://portal.nousresearch.com.입니다."}],"nous-provider":[{"hash":"ab8f7d93fca3fddf","text":"Nous 연구 포털"}],"novita-provider":[{"hash":"979134924e324dc3","text":"빌더와 에이전트를 위한 NovitaAI AI 기반 클라우드"}],"ntfy-platform":[{"hash":"539d5cfd70375a20","text":"Hermes 에이전트용 ntfy 푸시 알림 게이트웨이 어댑터입니다. HTTP 스트리밍을 통해 ntfy.sh 또는 자체 호스팅 ntfy 서버의 주제를 구독하고 HTTP POST를 통해 응답을 게시합니다. 경량 — 외부 SDK는 없고 httpx만 있습니다(이미 Hermes 종속성).\nntfy에는 기본 사용자 ID 기본 요소가 없습니다. 어댑터는 각 주제를 신뢰할 수 있는 단일 채널로 처리하며 게시자가 제어하는 ​​필드에서 사용자 ID를 파생하지 않습니다. 실제 신뢰 경계에는 개인 주제 + 읽기 토큰을 사용하십시오."},{"hash":"4bbf2ca5ae0e355e","text":"Hermes 에이전트용 ntfy 푸시 알림 게이트웨이 어댑터입니다. HTTP 스트리밍을 통해 ntfy.sh 또는 자체 호스팅 ntfy 서버의 주제를 구독하고 HTTP POST를 통해 응답을 게시합니다. 경량 — 외부 SDK가 없고 httpx만 있습니다(이미 Hermes 종속성).\nntfy에는 기본 사용자 ID 기본 요소가 없습니다. 어댑터는 각 주제를 신뢰할 수 있는 단일 채널로 처리하며 게시자가 제어하는 ​​필드에서 사용자 ID를 파생하지 않습니다. 실제 신뢰 경계에는 개인 주제 + 읽기 토큰을 사용하십시오."}],"nvidia-provider":[{"hash":"e1cc7fe27a128086","text":"NVIDIA NIM"}],"ollama-cloud-provider":[{"hash":"702910229a8ae95a","text":"올라마 클라우드"}],"openai":[{"hash":"daf5ee0eb261a27d","text":"OpenAI 이미지 생성 백엔드(GPT 이미지 2 및 GPT 이미지 2.5 플레어/선버스트). 생성된 이미지를 $HERMES_HOME/cache/generated/images/에 저장합니다."}],"openai-codex":[{"hash":"087131f14e2e6f8b","text":"ChatGPT/Codex OAuth(네이티브 Codex 이미지/생성 및 이미지/편집 엔드포인트를 통한 gpt-image-2)가 지원하는 OpenAI 이미지 생성. 생성된 이미지를 $HERMES_HOME/cache/generated/images/에 저장합니다."}],"openai-codex-provider":[{"hash":"75df248cab922eb7","text":"OpenAI Codex(응답 API)"}],"opencode-zen-provider":[{"hash":"3b8228d54c19cc51","text":"오픈코드(Zen + Go)"}],"openrouter":[{"hash":"bd255fc6a78a0b3b","text":"OpenRouter + Nous Portal 이미지 생성. 채팅 완료 이미지 출력(참조 접지)과 gpt-image-2, Krea 2, Qwen Image 3 Pro, MAI-Image-2.5 및 Grok Imagine을 위한 OpenRouter의 전용 이미지 API(/images/세대) — 정확한 모델별 종횡비, 해상도/품질/배경/시드/n, 최대 16개의 참조 이미지. 텍스트를 이미지로, 이미지를 이미지로."},{"hash":"3138645975181057","text":"OpenRouter 비디오 생성 백엔드. /api/v1/videos API(Veo, Sora, Kling, Seedance, Wan, Hailuo, Grok Imagine, FLUX Video, …)의 모든 생성 모델 — 텍스트-비디오, 이미지-비디오 및 참조-비디오; 카탈로그 및 모델별 제한이 실시간으로 발견되었습니다."}],"openrouter-provider":[{"hash":"6eeb76ff20a6eb81","text":"OpenRouter 수집기"}],"photon-platform":[{"hash":"a9bdc05aa303afca","text":"Hermes Agent용 Photon Spectrum 게이트웨이 어댑터. Photon의 관리형 Spectrum 플랫폼을 통해 iMessage(및 기타 Spectrum 인터페이스)에 연결합니다. 양방향은 소형 감독 노드 사이드카를 통해 `spectrum-ts` SDK의 장기 gRPC 스트림을 통해 실행됩니다. 인바운드 메시지는 SDK의 `app.messages` 스트림에 도착하고(웹후크 없음, 공개 URL 없음, 서명 비밀 없음) 아웃바운드 메시지는 동일한 사이드카를 통해 전송됩니다.\n플러그인은 일회성 장치 로그인 + 프로젝트 + 사용자 설정을 위한 `hermes photon` CLI와 함께 제공됩니다. 런타임 자격 증명은 다른 모든 채널과 마찬가지로 관리 메타데이터(장치 토큰, 대시보드 프로젝트 ID)를 ``~/.hermes/auth.json``에 저장합니다. Photon의 무료 공유 회선 모델을 사용하면 사용자는 유료 요금제 없이 시작할 수 있습니다."},{"hash":"711d9a02ff43a340","text":"Hermes Agent용 Photon Spectrum 게이트웨이 어댑터. Photon의 관리형 Spectrum 플랫폼을 통해 iMessage(및 기타 Spectrum 인터페이스)에 연결합니다. 양방향은 소형 감독 노드 사이드카를 통해 `spectrum-ts` SDK의 장기 gRPC 스트림을 통해 실행됩니다. 인바운드 메시지는 SDK의 `app.messages` 스트림에 도착하고(웹후크 없음, 공개 URL 없음, 서명 비밀 없음) 아웃바운드 메시지는 동일한 스트림을 통해 전송됩니다. 사이드카.\n플러그인은 일회성 장치 로그인 + 프로젝트 + 사용자 설정을 위한 `hermes photon` CLI와 함께 제공됩니다. 런타임 자격 증명은 ``~/.hermes/.env`` (``PHOTON_PROJECT_ID`` = the Spectrum project id, ``PHOTON_PROJECT_SECRET``) like every other channel, with management metadata (device token, dashboard project id) in ``~/.hermes/auth.json``에 기록됩니다. Photon의 무료 공유 회선 모델을 사용하면 사용자는 유료 요금제 없이 시작할 수 있습니다."}],"qqbot-platform":[{"hash":"116105add65d1913","text":"QQ Bot 게이트웨이 어댑터(공식 QQ Bot API v2). 인바운드 이벤트용 WebSocket 게이트웨이, 아웃바운드 텍스트 및 미디어용 REST."},{"hash":"e4f5bf634031a57b","text":"QQ Bot 게이트웨이 어댑터(공식 QQ Bot API v2). 인바운드 이벤트용 WebSocket 게이트웨이, 아웃바운드 텍스트 및 미디어용 REST."}],"qwen-oauth-provider":[{"hash":"afa217e2a7f91fba","text":"Qwen 포털(OAuth)"}],"raft-platform":[{"hash":"fda163471e78a57d","text":"Hermes Agent용 Raft 게이트웨이 어댑터. 로컬 웨이크 채널 브리지를 통해 외부 에이전트로 Raft 작업공간에 연결합니다. 어댑터는 브리지에서 콘텐츠가 없는 깨우기 힌트를 수신한 다음 이를 Hermes 게이트웨이 세션 파이프라인에 삽입하는 루프백 HTTP 엔드포인트를 시작합니다. 에이전트는 Raft CLI를 통해 메시지를 읽고 보냅니다. 어댑터는 메시지 본문이나 전달 커서를 건드리지 않습니다."},{"hash":"71e128d8c7012935","text":"Hermes Agent용 Raft 게이트웨이 어댑터. 로컬 웨이크 채널 브리지를 통해 외부 에이전트로 Raft 작업공간에 연결합니다. 어댑터는 브리지에서 콘텐츠가 없는 깨우기 힌트를 수신한 다음 이를 Hermes 게이트웨이 세션 파이프라인에 삽입하는 루프백 HTTP 엔드포인트를 시작합니다. 에이전트는 Raft CLI를 통해 메시지를 읽고 보냅니다. 어댑터는 메시지 본문이나 전달 커서를 건드리지 않습니다."}],"retaindb":[{"hash":"0030141351b289c4","text":"RetainDB — 하이브리드 검색 및 7가지 메모리 유형을 갖춘 클라우드 메모리 API."}],"router-provider":[{"hash":"26fa231ac3b5bd3d","text":"램프 라우터(router.com) - OpenAI 응답 호환 LLM 게이트웨이"}],"security-guidance":[{"hash":"7f7600677475ea81","text":"새 콘텐츠에 알려진 위험한 패턴(pickle.load, yaml.load, eval(, os.system, 위험하게SetInnerHTML, verify=False, ECB, XXE, GitHub Actions 주입 등)이 포함된 경우 파일 쓰기 도구 결과에 보안 경고를 추가합니다. Apache-2.0. 비차단 — 파일이 기록되고 다음 차례에 경고가 모델에 다시 전달되어 자체 수정이 가능합니다."}],"self-hosted":[{"hash":"c89ac662cdb0b3c0","text":"대시보드 인증 공급자 — 일반 자체 호스팅 OpenID Connect(인증 코드 + PKCE, 공개 클라이언트). OIDC 검색을 통해 모든 준수 OIDC ID 공급자(Authentik, Keycloak, Zitadel, Authelia, Auth0, Okta, Google, …)에 대해 작동합니다. 발행자 + client_id가 config.yaml(정식 표면)의 Dashboard.oauth.self_hosted.{issuer,client_id} 아래 또는 HERMES_DASHBOARD_OIDC_ISSUER + HERMES_DASHBOARD_OIDC_CLIENT_ID 환경 변수(연산자 재정의/비밀 주입)를 통해 구성되면 자동 활성화됩니다. 범위는 기본적으로 'openid 프로필 이메일'로 설정됩니다. 검색된 jwks_uri에 대해 OIDC ID 토큰(RS256/ES256)을 확인합니다."}],"signal-platform":[{"hash":"85544bf332172180","text":"HTTP 모드(SSE 인바운드, JSON-RPC 2.0 아웃바운드)에서 signal-cli 데몬을 통해 Hermes Agent용 신호 게이트웨이 어댑터. DM, 허용 목록에 있는 그룹, 첨부 파일, 반응 및 홈 채널 크론 전달을 지원합니다. 전화번호는 로그에서 PII로 처리됩니다."},{"hash":"a55e983e1d4dfd7e","text":"HTTP 모드(SSE 인바운드, JSON-RPC 2.0 아웃바운드)에서 signal-cli 데몬을 통해 Hermes 에이전트용 신호 게이트웨이 어댑터. DM, 허용 목록에 있는 그룹, 첨부 파일, 반응 및 홈 채널 크론 전달을 지원합니다. 전화번호는 로그에서 PII로 처리됩니다."}],"simplex-platform":[{"hash":"464114ee75f6c844","text":"Hermes 에이전트용 SimpleX Chat 게이트웨이 어댑터. WebSocket을 통해 로컬 단순 채팅 데몬에 연결하고 SimpleX 연락처/그룹과 Hermes 에이전트 간에 메시지를 중계합니다. SimpleX는 분산되어 있으며 영구 사용자 ID를 할당하지 않습니다. 모든 연락처는 연결 시 생성된 불투명한 내부 ID이므로 사용 가능한 가장 비공개적인 메신저 중 하나입니다."},{"hash":"575edf3272565c8a","text":"Hermes 에이전트용 SimpleX Chat 게이트웨이 어댑터. WebSocket을 통해 로컬 단순 채팅 데몬에 연결하고 SimpleX contacts/groups와 Hermes 에이전트 간에 메시지를 중계합니다. SimpleX는 분산되어 있으며 영구 사용자 ID를 할당하지 않습니다. 모든 연락처는 연결 시 생성된 불투명한 내부 ID이므로 사용 가능한 가장 비공개적인 메신저 중 하나입니다."}],"slack-platform":[{"hash":"22ac4981f7754909","text":"Hermes 에이전트용 Slack 게이트웨이 어댑터. 소켓 모드에서 slack-bolt를 통해 Slack에 연결하고 Slack 채널/DM과 Hermes 에이전트 간에 메시지를 중계합니다. 슬래시 명령, 스레드, mrkdwn 렌더링, 승인 블록, 자유 응답 채널, 멘션 게이팅 및 채널 기술 바인딩을 지원합니다."},{"hash":"6009ead77c4b1019","text":"Hermes 에이전트용 Slack 게이트웨이 어댑터. 소켓 모드에서 slack-bolt를 통해 Slack에 연결하고 Slack channels/DMs와 Hermes 에이전트 간에 메시지를 중계합니다. 슬래시 명령, 스레드, mrkdwn 렌더링, 승인 블록, 자유 응답 채널, 멘션 게이팅 및 채널 기술 바인딩을 지원합니다."}],"sms-platform":[{"hash":"f4eed07db59af43b","text":"Twilio를 통한 Hermes 에이전트용 SMS 게이트웨이 어댑터. Twilio REST API + 인바운드 웹후크를 통해 SMS를 보내고 받으며 전화번호와 Hermes 에이전트 간에 문자를 중계합니다. Markdown은 일반 텍스트로 제거됩니다."},{"hash":"ccc0769b964cef43","text":"Twilio를 통한 Hermes 에이전트용 SMS 게이트웨이 어댑터. Twilio REST API + 인바운드 웹훅을 통해 SMS를 보내고 받으며, 전화번호와 Hermes 에이전트 간에 문자를 중계합니다. Markdown은 일반 텍스트로 제거됩니다."}],"solstice-provider":[{"hash":"9ea229f83f169396","text":"Solstice(사용자별 할당량 OAuth, 시험판)"}],"stepfun-provider":[{"hash":"f10dc624b75cd559","text":"StepFun 단계 계획"}],"teams-platform":[{"hash":"1b5350ccd76681a6","text":"Hermes 에이전트용 Microsoft Teams 게이트웨이 어댑터. Bot Framework를 통해 Microsoft Teams에 연결하고 Teams 채팅(개인 DM, 그룹 채팅, 채널 게시물)과 Hermes 에이전트 간에 메시지를 전달합니다. 적응형 카드 승인 메시지를 지원합니다."},{"hash":"d513f812032e5744","text":"Hermes 에이전트용 Microsoft Teams 게이트웨이 어댑터. Bot Framework를 통해 Microsoft Teams에 연결하고 Teams 채팅(개인 DM, 그룹 채팅, 채널 게시물)과 Hermes 에이전트 간에 메시지를 전달합니다. 적응형 카드 승인 메시지를 지원합니다."}],"teams_pipeline":[{"hash":"8baf995e827e2b9b","text":"그래프 지원 대본 우선 회의 요약을 위한 내구성 있는 런타임 상태 및 연산자 CLI 흐름을 갖춘 Microsoft Teams 회의 파이프라인 플러그인."}],"telegram-platform":[{"hash":"c14d6b5901873a03","text":"Hermes Agent용 텔레그램 게이트웨이 어댑터. python-telegram-bot을 통해 Telegram에 연결하고 Telegram 채팅/그룹/주제와 Hermes 에이전트 간에 메시지를 중계합니다. 스레드/주제, 스트리밍 편집, 기본 미디어, 인라인 키보드, 슬래시 명령, 대체 네트워크 전송(직접 IP 장애 조치), 알림 모드, 멘션 게이팅 및 사용자별/채팅 허용 목록을 지원합니다."},{"hash":"fdc7713d98c79d4b","text":"Hermes Agent용 텔레그램 게이트웨이 어댑터. python-telegram-bot을 통해 Telegram에 연결하고 Telegram chats/groups/topics와 Hermes 에이전트 간에 메시지를 중계합니다. threads/topics, 스트리밍 편집, 기본 미디어, 인라인 키보드, 슬래시 명령, 대체 네트워크 전송(직접 IP 장애 조치), 알림 모드, 멘션 게이팅 및 per-user/chat 허용 목록을 지원합니다."}],"tencent-tokenhub-provider":[{"hash":"4b32cfd4469fa6f2","text":"텐센트 토큰허브"}],"upstage-provider":[{"hash":"ee3106e2d6bbda4a","text":"업스테이지(Solar API)"}],"vertex-provider":[{"hash":"d1c0388317727f0b","text":"Google Vertex AI(OpenAI 호환 엔드포인트, OAuth2를 통한 Gemini)"}],"web-brave-free":[{"hash":"4f56fc47819d411c","text":"Brave Search(무료 계층) — Brave의 Data-for-Search API를 통한 웹 검색입니다. BRAVE_SEARCH_API_KEY가 필요합니다(https://brave.com/search/api/, 2,000개 쿼리/월에 무료 가입)."}],"web-ddgs":[{"hash":"3188386ffe3443e0","text":"ddgs Python 패키지를 통한 DuckDuckGo 웹 검색 — API 키가 필요하지 않습니다. `pip install ddgs`로 설치합니다."}],"web-exa":[{"hash":"3fcce4389fcb6af7","text":"Exa 웹 검색 및 콘텐츠 추출. EXA_API_KEY 필요 — https://exa.ai.에 가입하세요"}],"web-firecrawl":[{"hash":"79a8751c9237275a","text":"Firecrawl 웹 검색 + 콘텐츠 추출. 가입자를 위한 키리스 클라우드, 직접 API 및 Nous 호스팅 도구 게이트웨이 라우팅을 지원합니다."}],"web-keenable":[{"hash":"3999ce0e7594da3d","text":"활성화 가능한 웹 검색 + 페이지 가져오기(AI 앱용 독립 웹 인덱스). 기본 순환의 일부로 Keenable의 무료 계층에서 키 없이 작동합니다. 더 높은 한계를 위해 KEENABLE_API_KEY를 설정하십시오 — https://keenable.ai."}],"web-openai-native":[{"hash":"3fbc3a981a178f58","text":"OpenAI 기본 웹 검색 — 클라이언트 측 검색을 실행하는 대신 응답 API 서버 측 ``web_search`` 내장을 선언합니다. Codex 응답 전송과 openai-codex OAuth(``hermes auth add openai-codex``)가 필요합니다."}],"web-parallel":[{"hash":"fdf15311904d6245","text":"Parallel.ai 웹 검색 + 콘텐츠 추출. 검색은 객관적으로 조정된 결과를 반환합니다. 추출은 병렬 페이지 가져오기를 위해 비동기 SDK를 사용합니다. PARALLEL_API_KEY 필요 — https://parallel.ai.에 가입하세요"}],"web-perplexity":[{"hash":"8dcb63083870dd32","text":"Perplexity Search API 웹 검색 및 쿼리 관련 페이지 스니펫. PERPLEXITY_API_KEY 필요 — https://www.perplexity.ai/account/api.에서 구매하세요"}],"web-searxng":[{"hash":"77739e1cf4df858c","text":"SearXNG 웹 검색 — 무료, 자체 호스팅, 개인 정보 보호 메타 검색 엔진입니다. 인스턴스를 가리키는 SEARXNG_URL가 필요합니다."}],"web-tavily":[{"hash":"90eb464776fd3df9","text":"Tavily 웹 검색 + 추출. 헤르메스 도구를 통해 키리스 옵션을 선택하세요. 더 높은 한계를 위해 TAVILY_API_KEY를 설정하십시오 — https://app.tavily.com/home."}],"web-xai":[{"hash":"3f4d53ea2ba20d97","text":"xAI 웹 검색 — Grok의 에이전트 web_search 도구를 통해 웹을 검색합니다(응답 API). xAI Grok OAuth(`hermes auth`를 통해) 또는 XAI_API_KEY(https://x.ai)가 필요합니다."}],"wecom-platform":[{"hash":"42b008ab864a2122","text":"Hermes Agent용 WeCom/Enterprise WeChat 게이트웨이 어댑터. ``wecom``(WebSocket을 통한 스마트 로봇) 및 ``wecom_callback``(AES 메시지 암호화를 사용하는 HTTP 콜백 엔드포인트를 통해 자체 구축된 앱)의 두 가지 플랫폼을 등록합니다. WeCom 채팅과 Hermes 에이전트 간에 메시지를 중계합니다."},{"hash":"9b3fe3752ff656f8","text":"Hermes Agent용 WeCom/Enterprise WeChat 게이트웨이 어댑터. 두 개의 플랫폼인 '`wecom`` (Smart Robot over WebSocket) and ``wecom_callback`'(AES 메시지 암호화를 사용하는 HTTP 콜백 엔드포인트를 통해 자체 구축된 앱)를 등록합니다. WeCom 채팅과 Hermes 에이전트 간에 메시지를 중계합니다."}],"weixin-platform":[{"hash":"fb31e65fdf798d36","text":"Tencent의 iLink Bot API를 통한 Hermes Agent용 Weixin(개인 WeChat) 게이트웨이 어댑터입니다. 인바운드 메시지에 대해 getupdate를 롱 폴링하고, 응답 시 각 피어의 context_token을 에코하고, AES-128-ECB 암호화된 CDN를 통해 미디어를 이동합니다. `hermes gateway setup`는 iLink QR 로그인을 수행합니다."},{"hash":"4f57b0e8bb8afcf4","text":"Tencent의 iLink Bot API를 통한 Hermes Agent용 Weixin(개인 WeChat) 게이트웨이 어댑터입니다. 인바운드 메시지에 대해 getupdate를 롱 폴링하고, 응답 시 각 피어의 context_token를 에코하고, AES-128-ECB 암호화된 CDN를 통해 미디어를 이동합니다. `hermes gateway setup`는 iLink QR 로그인을 수행합니다."}],"whatsapp-platform":[{"hash":"6905ddf70fc018ec","text":"Hermes 에이전트용 WhatsApp 게이트웨이 어댑터. HTTP API를 통해 로컬 Node.js 브리지(WhatsApp 웹 클라이언트)를 통해 WhatsApp에 연결하고 WhatsApp 채팅과 Hermes 에이전트 간에 메시지를 중계합니다. DM/그룹 정책, 멘션 게이팅, 자유 응답 채팅 및 사용자별 허용 목록을 지원합니다."},{"hash":"351110cfc36a4ed2","text":"Hermes 에이전트용 WhatsApp 게이트웨이 어댑터. HTTP API를 통해 로컬 Node.js 브리지(WhatsApp 웹 클라이언트)를 통해 WhatsApp에 연결하고 WhatsApp 채팅과 Hermes 에이전트 간에 메시지를 중계합니다. DM/group 정책, 멘션 게이팅, 자유 응답 채팅 및 사용자별 허용 목록을 지원합니다."}],"whatsapp_cloud-platform":[{"hash":"222f698f81d178e6","text":"Hermes 에이전트용 WhatsApp Business Cloud API 어댑터. Meta의 공식 클라우드 API를 통해 WhatsApp에 연결합니다(비즈니스 계정 및 공용 웹훅 URL 필요, 토큰 기반 인증): 아웃바운드용 그래프 API, 인바운드용 X-Hub-Signature-256 확인 기능이 있는 aiohttp 웹훅 수신기. 텍스트, 미디어(이미지/비디오/오디오/문서), 음성 메모, 대화형 버튼 및 DM 허용 목록을 지원합니다. Baileys 브리지(whatsapp) 플러그인을 보완합니다. 둘 다 WhatsAppBehaviorMixin을 공유합니다."},{"hash":"e8094ad996f07904","text":"Hermes 에이전트용 WhatsApp Business Cloud API 어댑터. Meta의 공식 클라우드 API를 통해 WhatsApp에 연결합니다(비즈니스 계정 및 공용 웹훅 URL 필요, 토큰 기반 인증): 아웃바운드용 그래프 API, 인바운드용 X-Hub-Signature-256 확인 기능이 있는 aiohttp 웹훅 수신기. 텍스트, 미디어(image/video/audio/document), 음성 메모, 대화형 버튼 및 DM 허용 목록을 지원합니다. Baileys 브리지(whatsapp) 플러그인을 보완합니다. 둘 다 WhatsAppBehaviorMixin을 공유합니다."}],"xai":[{"hash":"16d28e4fcd6a5f9a","text":"xAI 이미지 생성 백엔드(grok-imagine-image). 텍스트를 이미지로."},{"hash":"459f5b1c0b047185","text":"xAI Grok Imagine 비디오 생성 백엔드. xAI 비동기 비디오 API를 통해 텍스트-비디오, 이미지-비디오, 비디오 참조, 비디오 편집, 비디오 확장 및 저장된 공개 URL을 지원합니다."}],"xai-provider":[{"hash":"65286ae5a2e95afb","text":"xAI Grok(응답 API)"}],"xiaomi-provider":[{"hash":"9ee5087fa928e6b2","text":"샤오미 미모"}],"yuanbao-platform":[{"hash":"3161e76cec459140","text":"Hermes 에이전트용 Tencent Yuanbao 게이트웨이 어댑터. 영구 WebSocket(HMAC 서명 토큰)을 통해 Yuanbao IM Bot에 연결하고 Yuanbao와 Hermes 에이전트 간에 DM 및 그룹 메시지를 중계합니다. 기본 미디어/스티커, DM/그룹 액세스 정책 및 홈 채널 크론 전달을 지원합니다."},{"hash":"2eed88157a35e0be","text":"Hermes 에이전트용 Tencent Yuanbao 게이트웨이 어댑터. 영구 WebSocket(HMAC 서명 토큰)을 통해 Yuanbao IM Bot에 연결하고 Yuanbao와 Hermes 에이전트 간에 DM 및 그룹 메시지를 중계합니다. 기본 media/stickers, DM/group 액세스 정책 및 홈 채널 크론 전달을 지원합니다."}],"zai-provider":[{"hash":"7c7a7b75079107f0","text":"Z.AI / GLM"}]}
+diff --git a/web/src/i18n/pt.ts b/web/src/i18n/pt.ts
+index c8e02037fe..674cafe545 100644
+--- a/web/src/i18n/pt.ts
++++ b/web/src/i18n/pt.ts
+@@ -397,6 +397,7 @@ export const pt: Translations = {
+     resetDefaults: "Repor predefinições",
+     resetScopeTooltip: "Repor {scope} para predefinições",
+     confirmResetScope: "Repor todas as definições de {scope} para os valores predefinidos? Isto apenas atualiza o formulário — as alterações só são escritas em config.yaml quando premir Guardar.",
++    resetFieldsDescription: "{count} configuração(ões) serão restauradas para os valores predefinidos.",
+     resetScopeToast: "{scope} reposto para predefinições — reveja e Guarde para persistir",
+     rawYaml: "Configuração YAML em bruto",
+     searchResults: "Resultados da pesquisa",
+diff --git a/web/src/i18n/ru.ts b/web/src/i18n/ru.ts
+index 2df6a64b57..e770926b12 100644
+--- a/web/src/i18n/ru.ts
++++ b/web/src/i18n/ru.ts
+@@ -396,6 +396,7 @@ export const ru: Translations = {
+     resetDefaults: "Сбросить к значениям по умолчанию",
+     resetScopeTooltip: "Сбросить {scope} к значениям по умолчанию",
+     confirmResetScope: "Сбросить все настройки {scope} к значениям по умолчанию? Это обновит только форму — изменения не будут записаны в config.yaml, пока вы не нажмёте «Сохранить».",
++    resetFieldsDescription: "Параметров к значению по умолчанию: {count}.",
+     resetScopeToast: "{scope} сброшено к значениям по умолчанию — проверьте и сохраните",
+     rawYaml: "Исходная YAML-конфигурация",
+     searchResults: "Результаты поиска",
 diff --git a/web/src/i18n/skills.ko.json b/web/src/i18n/skills.ko.json
 new file mode 100644
 index 0000000000..b0fed2a69c
@@ -3244,8 +3396,20 @@ index 0000000000..b0fed2a69c
 +    "text": "YouTube 영상을 요약하고 내용을 스레드나 블로그 글로 재구성합니다."
 +  }
 +}
+diff --git a/web/src/i18n/tr.ts b/web/src/i18n/tr.ts
+index e6034c59c6..f936f37a40 100644
+--- a/web/src/i18n/tr.ts
++++ b/web/src/i18n/tr.ts
+@@ -396,6 +396,7 @@ export const tr: Translations = {
+     resetDefaults: "Varsayılanlara sıfırla",
+     resetScopeTooltip: "{scope} varsayılanlara sıfırla",
+     confirmResetScope: "{scope} ayarlarının tümü varsayılanlara sıfırlansın mı? Bu yalnızca formu günceller — değişiklikler Kaydet'e basılana kadar config.yaml'a yazılmaz.",
++    resetFieldsDescription: "{count} ayar varsayılan değerlerine sıfırlanacak.",
+     resetScopeToast: "{scope} varsayılanlara sıfırlandı — gözden geçirip kalıcı kılmak için Kaydet'e basın",
+     rawYaml: "Ham YAML Yapılandırması",
+     searchResults: "Arama Sonuçları",
 diff --git a/web/src/i18n/types.ts b/web/src/i18n/types.ts
-index cac661b053..2b256d9670 100644
+index cac661b053..7896b58159 100644
 --- a/web/src/i18n/types.ts
 +++ b/web/src/i18n/types.ts
 @@ -94,17 +94,23 @@ export interface Translations {
@@ -3272,6 +3436,50 @@ index cac661b053..2b256d9670 100644
      };
      modelToolsSheetSubtitle: string;
      modelToolsSheetTitle: string;
+@@ -521,6 +527,7 @@ export interface Translations {
+     resetDefaults: string;
+     resetScopeTooltip: string;
+     confirmResetScope: string;
++    resetFieldsDescription: string;
+     resetScopeToast: string;
+     rawYaml: string;
+     searchResults: string;
+diff --git a/web/src/i18n/uk.ts b/web/src/i18n/uk.ts
+index 1c21a45b2d..e507dcd767 100644
+--- a/web/src/i18n/uk.ts
++++ b/web/src/i18n/uk.ts
+@@ -397,6 +397,7 @@ export const uk: Translations = {
+     resetDefaults: "Скинути до значень за замовчуванням",
+     resetScopeTooltip: "Скинути {scope} до значень за замовчуванням",
+     confirmResetScope: "Скинути всі налаштування {scope} до значень за замовчуванням? Це лише оновлює форму — зміни не записуються до config.yaml, доки ви не натиснете «Зберегти».",
++    resetFieldsDescription: "Налаштувань буде повернуто до значень за замовчуванням: {count}.",
+     resetScopeToast: "{scope} скинуто до значень за замовчуванням — перегляньте та збережіть, щоб застосувати",
+     rawYaml: "Сирий YAML-конфіг",
+     searchResults: "Результати пошуку",
+diff --git a/web/src/i18n/zh-hant.ts b/web/src/i18n/zh-hant.ts
+index 8fb2709a9d..a57db91465 100644
+--- a/web/src/i18n/zh-hant.ts
++++ b/web/src/i18n/zh-hant.ts
+@@ -395,6 +395,7 @@ export const zhHant: Translations = {
+     resetDefaults: "重設為預設值",
+     resetScopeTooltip: "將{scope}重設為預設值",
+     confirmResetScope: "要將{scope}的所有設定重設為預設值嗎？此操作只更新表單，在按下「儲存」前不會寫入 config.yaml。",
++    resetFieldsDescription: "{count} 個設定將還原為預設值。",
+     resetScopeToast: "{scope}已重設為預設值 — 請檢視並儲存以套用",
+     rawYaml: "原始 YAML 設定",
+     searchResults: "搜尋結果",
+diff --git a/web/src/i18n/zh.ts b/web/src/i18n/zh.ts
+index d75e785464..e628330018 100644
+--- a/web/src/i18n/zh.ts
++++ b/web/src/i18n/zh.ts
+@@ -391,6 +391,7 @@ export const zh: Translations = {
+     resetDefaults: "恢复默认值",
+     resetScopeTooltip: "将{scope}恢复为默认值",
+     confirmResetScope: "确定要将{scope}的所有设置恢复为默认值吗？此操作仅更新表单，在按下「保存」按钮前不会写入 config.yaml。",
++    resetFieldsDescription: "{count} 个设置将恢复为默认值。",
+     resetScopeToast: "{scope}已恢复为默认值 — 请检查并保存以生效",
+     rawYaml: "原始 YAML 配置",
+     searchResults: "搜索结果",
 diff --git a/web/src/lib/aux-tasks.ts b/web/src/lib/aux-tasks.ts
 index e2df12d78c..e02653b8dd 100644
 --- a/web/src/lib/aux-tasks.ts
@@ -4519,7 +4727,7 @@ index 9baf930498..90d7033e2a 100644
                  className="text-text-secondary hover:text-midground"
                >
 diff --git a/web/src/pages/ConfigPage.tsx b/web/src/pages/ConfigPage.tsx
-index 1de8fcf6ad..9cc704ad3a 100644
+index 1de8fcf6ad..0f8ea7170e 100644
 --- a/web/src/pages/ConfigPage.tsx
 +++ b/web/src/pages/ConfigPage.tsx
 @@ -57,6 +57,45 @@ import { errorMessage } from "@/lib/api-error";
@@ -4588,6 +4796,27 @@ index 1de8fcf6ad..9cc704ad3a 100644
                </span>
                <div className="flex-1 border-t border-border" />
              </div>
+@@ -663,15 +703,17 @@ export default function ConfigPage() {
+         open={confirmReset}
+         onCancel={() => setConfirmReset(false)}
+         onConfirm={executeReset}
++        cancelLabel={t.common.cancel}
+         title={t.config.confirmResetScope.replace(
+           "{scope}",
+           isSearching
+             ? t.config.searchResults
+             : prettyCategoryName(activeCategory),
+         )}
+-        description={`This will reset ${
+-          (isSearching ? searchMatchedFields : activeFields).length
+-        } field(s) to their default values.`}
++        description={t.config.resetFieldsDescription.replace(
++          "{count}",
++          String((isSearching ? searchMatchedFields : activeFields).length),
++        )}
+         destructive
+         confirmLabel={t.config.resetDefaults}
+       />
 diff --git a/web/src/pages/CronPage.tsx b/web/src/pages/CronPage.tsx
 index 0d099ca244..e32a61a53f 100644
 --- a/web/src/pages/CronPage.tsx

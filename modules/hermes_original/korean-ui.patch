@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..6f46a60ee9 100644
+index 18475fe8f4..1abea8b74d 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1970 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1976 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -666,6 +666,12 @@ index 18475fe8f4..6f46a60ee9 100644
 +  "discord.require_mention": "답변에 필요한 봇 멘션",
 +  "discord.free_response_channels": "봇을 멘션하지 않아도 답할 채널",
 +  "discord.allowed_channels": "봇 응답을 허용할 채널",
++  "mattermost.require_mention": "Require mention (봇을 불러야 답하는지)",
++  "mattermost.free_response_channels": "Free response channels (멘션 없이 답할 채널 목록)",
++  "mattermost.allowed_channels": "Allowed channels (봇이 답할 채널 목록)",
++  "matrix.require_mention": "Require mention (봇을 불러야 답하는지)",
++  "matrix.free_response_rooms": "Free response rooms (멘션 없이 답할 방 목록)",
++  "matrix.allowed_rooms": "Allowed rooms (봇이 답할 방 목록)",
 +  "discord.auto_thread": "멘션을 받으면 대화 스레드 자동 생성",
 +  "discord.free_response_auto_thread": "멘션 없는 응답마다 스레드 생성",
 +  "discord.thread_require_mention": "대화 스레드에서도 봇 멘션 요구",
@@ -1679,12 +1685,12 @@ index 18475fe8f4..6f46a60ee9 100644
 +  "loops.self_paced_floor_seconds": "반복 실행이 스스로 다음 실행 시간을 정할 때 사용할 시작 간격(초)입니다.",
 +  "loops.self_paced_ceiling_seconds": "반복 실행이 점차 간격을 늘릴 때 허용할 가장 긴 간격(초)입니다.",
 +  timezone: "예약 작업을 실행할 현지 시각과 대화에 표시할 시간대입니다. IANA timezone(전 세계에서 쓰는 표준 시간대 이름) 형식으로 적습니다. 예: Asia/Seoul(한국 표준시), America/New_York(미국 뉴욕 시간). 비워 두면 Hermes가 실행되는 컴퓨터의 시간대를 사용합니다.",
-+  "mattermost.require_mention": "Mattermost 채널에서 봇을 멘션한 메시지에만 답합니다.",
-+  "mattermost.free_response_channels": "봇을 멘션하지 않아도 답할 Mattermost 채널 ID 목록입니다.",
-+  "mattermost.allowed_channels": "봇이 응답할 수 있는 Mattermost 채널 ID 허용 목록입니다. 비우면 목록으로 제한하지 않습니다.",
-+  "matrix.require_mention": "Matrix 방에서 봇을 멘션한 메시지에만 답합니다.",
-+  "matrix.free_response_rooms": "봇을 멘션하지 않아도 답할 Matrix 방 ID 목록입니다.",
-+  "matrix.allowed_rooms": "봇이 응답할 수 있는 Matrix 방 ID 허용 목록입니다. 비우면 목록으로 제한하지 않습니다.",
++  "mattermost.require_mention": "켜면 Mattermost 채널에서 봇 이름을 `@멘션`한 메시지에만 답합니다. 끄면 멘션이 없어도 답합니다. 켠 상태에서 `free_response_channels`에 채널 ID를 넣으면 그 채널은 예외로 둡니다.",
++  "mattermost.free_response_channels": "`require_mention`을 켠 경우 멘션 없이 답할 Mattermost 채널의 고유 ID를 쉼표로 구분해 적습니다. 목록의 채널에서는 멘션을 생략하고, 다른 채널에서는 봇을 불러야 답합니다. `require_mention`을 끄면 모든 채널에서 멘션 없이 답합니다.",
++  "mattermost.allowed_channels": "봇이 답할 수 있는 Mattermost 채널의 고유 ID 목록입니다. 지정하면 목록에 있는 채널에서만 응답하고, 비워 두면 채널을 제한하지 않습니다. 봇을 멘션해야 하는지는 `require_mention`이 별도로 정합니다.",
++  "matrix.require_mention": "켜면 Matrix 방에서 봇 계정을 `@멘션`한 메시지에만 답합니다. 끄면 멘션이 없어도 답합니다. 켠 상태에서 `free_response_rooms`에 방 ID를 넣으면 그 방은 예외로 둡니다.",
++  "matrix.free_response_rooms": "`require_mention`을 켠 경우 멘션 없이 답할 Matrix 방의 고유 ID를 쉼표로 구분해 적습니다. 목록의 방에서는 멘션을 생략하고, 다른 방에서는 봇을 불러야 답합니다. `require_mention`을 끄면 모든 방에서 멘션 없이 답합니다.",
++  "matrix.allowed_rooms": "봇이 답할 수 있는 Matrix 방의 고유 ID 목록입니다. 지정하면 목록에 있는 방에서만 응답하고, 비워 두면 방을 제한하지 않습니다. 봇을 멘션해야 하는지는 `require_mention`이 별도로 정합니다.",
 +  command_allowlist: "위험 명령으로 판정되더라도 별도 승인 없이 실행할 명령 목록입니다. 항목과 일치하는 명령은 다음부터 자동으로 허용됩니다. 실제로 무엇을 실행하는지 확인한 뒤 신뢰하는 명령만 등록하세요.",
 +  hooks_auto_accept: "설정 파일에 적힌 셸 훅(도구 실행 전후에 자동으로 실행되는 명령)을 확인창 없이 자동 승인합니다. 새 훅도 바로 실행될 수 있으므로 실행 내용을 확인하고 신뢰하는 경우에만 켜세요.",
 +  "auth.codex_login_flow": "Codex에 로그인할 방법입니다. device_code(웹사이트에 코드를 입력)는 기본 방식이고, browser(브라우저 로그인)는 로그인 결과를 이 컴퓨터로 돌려받습니다. 조직에서 기기 코드 로그인을 막았을 때 브라우저 방식을 쓸 수 있습니다.",
@@ -2059,7 +2065,7 @@ index 18475fe8f4..6f46a60ee9 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1997,7 @@ function NestedValueEditor({
+@@ -42,7 +2003,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -2068,7 +2074,7 @@ index 18475fe8f4..6f46a60ee9 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +2014,7 @@ function NestedValueEditor({
+@@ -59,7 +2020,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -2077,7 +2083,7 @@ index 18475fe8f4..6f46a60ee9 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +2043,7 @@ export function AutoField({
+@@ -88,8 +2049,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -2087,7 +2093,7 @@ index 18475fe8f4..6f46a60ee9 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +2076,7 @@ export function AutoField({
+@@ -122,7 +2082,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -2096,7 +2102,7 @@ index 18475fe8f4..6f46a60ee9 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +2137,7 @@ export function AutoField({
+@@ -183,7 +2143,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

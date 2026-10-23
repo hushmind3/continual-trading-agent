@@ -82,6 +82,108 @@ index 49b23a4037..9ac5974881 100644
    );
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
+diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
+index 18475fe8f4..1a987533c7 100644
+--- a/web/src/components/AutoField.tsx
++++ b/web/src/components/AutoField.tsx
+@@ -3,9 +3,87 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+ import { Input } from "@nous-research/ui/ui/components/input";
+ import { Label } from "@nous-research/ui/ui/components/label";
+ 
++const CONFIG_LABELS_KO: Record<string, string> = {
++  model: "주 대화 모델",
++  "plugins.hook_callback_timeout": "플러그인 훅 실행 제한 시간",
++  "plugins.load_timeout_seconds": "플러그인 불러오기 제한 시간",
++  "auth.adopt_external_logins": "외부 로그인 가져오기",
++  "browser.headed": "브라우저 창 표시",
++  "proxy.enabled": "외부 통신 방화벽",
++  "terminal.vercel_runtime": "Vercel Sandbox 실행 환경",
++  "terminal.vercel_image": "Vercel Sandbox 이미지",
++  model_context_length: "모델 문맥 길이",
++  fallback_providers: "대체 제공자 목록",
++  toolsets: "사용할 도구 모음",
++  max_concurrent_sessions: "동시 대화 수 제한",
++  max_live_sessions: "최대 실행 대화 수",
++  "session.terminal_continue": "터미널 세션 이어가기",
++  context_file_max_chars: "문맥 파일 최대 글자 수",
++  context_file_read_timeout: "문맥 파일 읽기 제한 시간",
++  file_read_max_chars: "파일 읽기 최대 글자 수",
++  mcp_discovery_timeout: "MCP 검색 제한 시간",
++  mcp_single_query_discovery_timeout: "MCP 단일 조회 검색 제한 시간",
++  prefill_messages_file: "사전 입력 메시지 파일",
++  timezone: "시간대",
++  command_allowlist: "허용 명령 목록",
++  hooks_auto_accept: "훅 자동 승인",
++  "doctor.live_probe_timeout": "상태 점검 실시간 확인 제한 시간",
++  "updates.check": "업데이트 확인",
++  "updates.pre_update_backup": "업데이트 전 백업 방식",
++  "updates.backup_keep": "보관할 백업 개수",
++  "updates.non_interactive_local_changes": "확인창 없는 업데이트 때 변경사항 처리",
++  "updates.auto_switch_parked_branch": "보류된 브랜치로 자동 전환",
++  "updates.parked_branch_strategy": "보류 브랜치 처리 방식",
++  "updates.refresh_cua_driver": "CUA 드라이버 새로고침",
++  paste_collapse_threshold: "붙여넣기 접기 기준",
++  paste_collapse_threshold_fallback: "붙여넣기 접기 대체 기준",
++  paste_collapse_char_threshold: "붙여넣기 접기 글자 수 기준",
++};
++
++const CONFIG_DESCRIPTIONS_KO: Record<string, string> = {
++  model: "새 대화에서 기본으로 사용할 모델입니다. 제공자 이름과 모델 ID를 함께 지정할 수 있습니다.",
++  model_context_length: "모델의 문맥 길이를 직접 지정합니다. 0으로 두면 모델 정보에서 지원 길이를 자동으로 가져옵니다.",
++  fallback_providers: "대체 제공자 목록입니다. 주 제공자를 사용할 수 없을 때 대신 요청할 제공자를 지정합니다.",
++  toolsets: "에이전트가 사용할 도구 모음의 이름을 지정합니다.",
++  max_concurrent_sessions: "동시에 처리할 수 있는 대화의 최대 개수입니다.",
++  max_live_sessions: "실행 중 상태로 유지할 대화의 최대 개수입니다.",
++  timezone: "예약 작업과 시간 표시 등에 사용할 IANA 시간대입니다(예: Asia/Seoul). 비워 두면 시스템 시간대를 사용합니다.",
++  "updates.non_interactive_local_changes": "채팅 앱이나 게이트웨이가 확인창 없이 Hermes를 업데이트할 때, 아직 커밋하지 않은 소스 변경을 어떻게 처리할지 정합니다. stash는 변경을 임시 보관했다가 업데이트 후 다시 적용하고, discard는 변경을 버립니다. 터미널에서 실행하는 업데이트는 이 설정과 관계없이 항상 확인을 요청합니다.",
++  "updates.refresh_cua_driver": "Hermes 업데이트 중 이미 설치된 cua-driver도 새로 고칩니다. macOS 관리자 권한이 없고 /Applications 폴더에 쓸 수 없는 계정이라면 이 옵션을 끄세요.",
++  "plugins.hook_callback_timeout": "플러그인 훅(빠른 경로 감시 및 pre_tool_call)이 프로세스 안에서 실행될 수 있는 최대 시간(초)입니다. 시간이 초과된 pre_tool_call은 안전을 위해 거부됩니다. 0은 시간 제한 없음이며, 600을 넘기면 600으로 제한됩니다. subagent_stop처럼 호출한 스레드에서 실행되는 훅은 별도의 제한 시간 작업으로 옮기지 않습니다.",
++  "plugins.load_timeout_seconds": "플러그인 하나를 가져와 등록하는 데 허용되는 최대 시간(초)입니다. 시간을 넘긴 플러그인은 '불러오기 시간 초과' 사유와 함께 건너뛰며, 나머지 플러그인은 계속 불러옵니다. 0은 시간 제한 없음이며, 600을 넘기면 600으로 제한됩니다.",
++  "auth.adopt_external_logins": "Hermes에 사용할 수 있는 로그인이 없을 때 Codex CLI 또는 Claude Code의 로그인을 가져와 갱신합니다. 끄면 hermes auth add <provider> 명령으로 Hermes에 직접 등록한 로그인만 사용합니다.",
++  "browser.headed": "로컬 브라우저를 실제 창이 보이는 상태로 실행합니다. 대화 차례가 끝나도 창을 열어 두지만, 사용하지 않는 세션은 browser.inactivity_timeout 설정에 따라 정리됩니다.",
++  "proxy.enabled": "Docker에서만 사용하는 외부 통신 자격 증명 방화벽입니다. hermes egress setup과 hermes egress start 명령을 먼저 실행해야 합니다. 현재 Modal·SSH·Daytona 실행 환경에는 연결되어 있지 않습니다.",
++  "terminal.vercel_runtime": "지원이 종료된 기존 Vercel Sandbox 실행 환경 설정입니다. 실행 환경을 고정하면 이미지 설정보다 이 값이 우선합니다. 이미지 설정을 사용하려면 이 값을 비우세요.",
++  "terminal.vercel_image": "Vercel Sandbox에서 사용할 이미지입니다. Vercel 제공 이미지(예: vercel/sandbox/universal:latest) 또는 VCR 저장소[:태그]를 지정합니다.",
++  "session.terminal_continue": "터미널에서 실행한 작업이 아직 끝나지 않았다면 다음 대화 차례에서 이어서 확인하도록 합니다.",
++  context_file_max_chars: "대화 문맥에 포함할 파일 내용의 최대 글자 수입니다.",
++  context_file_read_timeout: "문맥 파일 읽기를 기다리는 최대 시간(초)입니다.",
++  file_read_max_chars: "파일 읽기 한 번에 반환할 최대 글자 수입니다.",
++  mcp_discovery_timeout: "MCP 서버가 도구 목록을 반환할 때까지 기다리는 최대 시간(초)입니다.",
++  mcp_single_query_discovery_timeout: "MCP 도구를 한 건씩 확인할 때 기다리는 최대 시간(초)입니다.",
++  prefill_messages_file: "대화 시작 시 미리 불러올 메시지 파일 경로입니다.",
++  command_allowlist: "실행을 허용할 명령 목록입니다.",
++  hooks_auto_accept: "훅의 승인 요청을 자동으로 수락합니다.",
++  "doctor.live_probe_timeout": "상태 점검에서 서비스 응답을 기다리는 최대 시간(초)입니다.",
++  "updates.check": "새 Hermes 버전을 자동으로 확인합니다.",
++  "updates.pre_update_backup": "업데이트를 시작하기 전에 현재 설치 상태를 백업하는 방식입니다.",
++  "updates.backup_keep": "업데이트 전 백업을 최신 순으로 보관할 개수입니다.",
++  "updates.auto_switch_parked_branch": "업데이트 뒤 보류된 작업 브랜치로 자동 전환합니다.",
++  "updates.parked_branch_strategy": "보류된 브랜치를 업데이트 전후에 처리하는 방식입니다.",
++  paste_collapse_threshold: "붙여넣은 내용이 이 기준을 넘으면 화면에서 접어 표시합니다.",
++  paste_collapse_threshold_fallback: "기본 접기 기준을 정하지 못했을 때 대신 사용할 값입니다.",
++  paste_collapse_char_threshold: "글자 수를 기준으로 붙여넣기 내용을 접어 표시합니다.",
++};
++
+ function FieldHint({ schema, schemaKey }: { schema: Record<string, unknown>; schemaKey: string }) {
+   const keyPath = schemaKey.includes(".") ? schemaKey : "";
+-  const description = schema.description ? String(schema.description) : "";
++  const rawDescription = schema.description ? String(schema.description) : "";
++  const generatedLabel = (schemaKey.split(".").pop() ?? schemaKey).replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
++  const description = CONFIG_DESCRIPTIONS_KO[schemaKey] ?? (
++    rawDescription.split(" → ").pop() === generatedLabel ? "" : rawDescription
++  );
+ 
+   if (!keyPath && !description) return null;
+ 
+@@ -89,7 +167,7 @@ export function AutoField({
+   onChange,
+ }: AutoFieldProps) {
+   const rawLabel = schemaKey.split(".").pop() ?? schemaKey;
+-  const label = rawLabel.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
++  const label = CONFIG_LABELS_KO[schemaKey] ?? rawLabel.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+ 
+   if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
+     return (
 diff --git a/web/src/components/ChatSidebar.tsx b/web/src/components/ChatSidebar.tsx
 index 94071b4e78..9ad9a9f8ce 100644
 --- a/web/src/components/ChatSidebar.tsx
@@ -1226,6 +1328,76 @@ index 9baf930498..90d7033e2a 100644
                  title="Collapse side panel"
                  className="text-text-secondary hover:text-midground"
                >
+diff --git a/web/src/pages/ConfigPage.tsx b/web/src/pages/ConfigPage.tsx
+index 1de8fcf6ad..9cc704ad3a 100644
+--- a/web/src/pages/ConfigPage.tsx
++++ b/web/src/pages/ConfigPage.tsx
+@@ -57,6 +57,45 @@ import { errorMessage } from "@/lib/api-error";
+ /*  Helpers                                                            */
+ /* ------------------------------------------------------------------ */
+ 
++const CONFIG_CATEGORY_LABELS_KO: Record<string, string> = {
++  attachments: "첨부 파일",
++  bedrock: "Amazon Bedrock",
++  bot_desktop: "봇 데스크톱",
++  curator: "스킬 관리",
++  database: "데이터베이스",
++  desktop: "데스크톱",
++  gateway: "게이트웨이",
++  local_runtime: "로컬 실행 환경",
++  loops: "반복 실행",
++  lsp: "언어 서버(LSP)",
++  matrix: "Matrix",
++  mattermost: "Mattermost",
++  moa: "여러 모델 협업",
++  model_catalog: "모델 목록",
++  monitoring: "모니터링",
++  openrouter: "OpenRouter",
++  proxy: "프록시",
++  secrets: "비밀 정보",
++  session: "세션",
++  sessions: "세션",
++  updates: "업데이트",
++  doctor: "상태 점검",
++  fallback: "대체 제공자",
++  context: "문맥",
++  slack: "Slack",
++  streaming: "스트리밍",
++  tool_loop_guardrails: "도구 반복 방지",
++  tool_output: "도구 출력",
++  tools: "도구",
++  vault: "자격 증명 보관소",
++  vertex: "Vertex AI",
++  vision: "이미지 이해",
++  wake_word: "호출어",
++  web: "웹",
++  worktrees: "작업 디렉터리",
++  x_search: "X 검색",
++};
++
+ const CATEGORY_ICONS: Record<
+   string,
+   React.ComponentType<{ className?: string }>
+@@ -158,8 +197,9 @@ export default function ConfigPage() {
+ 
+   function prettyCategoryName(cat: string): string {
+     const key = cat as keyof typeof t.config.categories;
++    if (CONFIG_CATEGORY_LABELS_KO[cat.toLowerCase()]) return CONFIG_CATEGORY_LABELS_KO[cat.toLowerCase()];
+     if (t.config.categories[key]) return t.config.categories[key];
+-    return cat.charAt(0).toUpperCase() + cat.slice(1);
++    return cat.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+   }
+ 
+   useEffect(() => {
+@@ -413,7 +453,7 @@ export default function ConfigPage() {
+           {showSection && (
+             <div className="flex items-center gap-2 pt-4 pb-2 first:pt-0">
+               <span className="font-mondwest text-display text-xs font-semibold tracking-wider text-muted-foreground">
+-                {section.replace(/_/g, " ")}
++                {prettyCategoryName(section)}
+               </span>
+               <div className="flex-1 border-t border-border" />
+             </div>
 diff --git a/web/src/pages/CronPage.tsx b/web/src/pages/CronPage.tsx
 index 0d099ca244..b3044c5902 100644
 --- a/web/src/pages/CronPage.tsx

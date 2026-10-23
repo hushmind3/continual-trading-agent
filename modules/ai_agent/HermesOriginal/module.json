@@ -6,8 +6,8 @@
     "title": "AI 에이전트"
   },
   "backend": {
-    "namespace": "platform_plugins.hermes_original",
-    "entry": "manager"
+    "namespace": "ai_agent.HermesOriginal",
+    "entry": "register"
   },
   "frontend": {
     "entry": "frontend/register.ts"

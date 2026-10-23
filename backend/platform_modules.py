@@ -21,7 +21,9 @@ def discover(directory=None):
     records = []
     seen = set()
     namespaces = set()
-    for path in sorted(Path(directory or MODULES).glob('*/module.json')):
+    base = Path(directory or MODULES)
+    manifests = [*base.glob('*/module.json'), *base.glob('*/*/module.json')]
+    for path in sorted(manifests):
         data = json.loads(path.read_text(encoding='utf-8'))
         if isinstance(data.get('resources'), dict):
             data['resources'] = {key:native_runtime_path(value) if isinstance(value,str) else value

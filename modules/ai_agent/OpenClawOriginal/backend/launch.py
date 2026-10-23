@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]
 BASE = ROOT / 'runtime/ai_agent/OpenClawOriginal'
 SOURCE = BASE / 'source'
 HOME = BASE / 'home'

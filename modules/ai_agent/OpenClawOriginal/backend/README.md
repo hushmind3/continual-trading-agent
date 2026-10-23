@@ -5,11 +5,11 @@
 ## 구현과 경로
 
 - `original/manager.py`: `ai_agent/OpenClawOriginal/{status,start,stop}` 소메뉴 API.
-- `manager.py` → `../manager.py` → `modules/openclaw_original/backend/manager.py`의 자동 등록 → 전체 메뉴 총괄 → 단일 `/api`.
+- `original/manager.py` → `manager.py` → 공통 `backend/ai_agent/manager.py` → `register.py`의 자동 등록 → 전체 메뉴 총괄 → 단일 `/api`.
 - `launch.py`: 원본 Node CLI를 실행하고 담당 메뉴의 `home/`만 사용합니다.
 - `runtime.py`: 원본 Gateway의 PID·명령·상태를 관리합니다. Gateway는 기존 19021 루프백 주소를 사용합니다.
 - `frame_policy.mjs`: 원본 파일을 패치하지 않고 내장 화면의 프레임·원격 접근 정책만 연결합니다.
-- React 화면·원격 접근·기존 확인 결과: [모듈 안내](../../../modules/openclaw_original/README.md).
+- React 화면·원격 접근·기존 확인 결과: [중메뉴 소유 폴더](../README.md).
 
 공식 원본 설치·업데이트 위치는 `runtime/ai_agent/OpenClawOriginal/source/`로 유지합니다. 설정·대화는 `home/`, 전용 Node는 `tools/node/bin/node`, 실행 상태·로그는 담당 메뉴 runtime에 둡니다. 원본 소스만 `.gitmodules`의 고정 버전으로 등록하고 패키지·홈·키·실행 기록은 제외합니다.
 

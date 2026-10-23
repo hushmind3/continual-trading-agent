@@ -5,10 +5,11 @@ from pathlib import Path
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]
 BASE = ROOT / 'runtime/ai_agent/HermesOriginal'
 SOURCE = BASE / 'source'
 HOME = BASE / 'home'
+KOREAN_PATCH_BASE = '484de065a821b4245697351d08327b465ffd41ba'
 
 
 def environment():
@@ -21,13 +22,19 @@ def environment():
 
 def launch(arguments):
     if arguments and arguments[0] == 'dashboard':
-        patch = Path(__file__).resolve().with_name('korean-ui.patch')
+        patch = Path(__file__).resolve().parents[1] / 'korean-ui.patch'
         # Reuse the already-applied patch; never overwrite upstream/local conflicts.
         applied = subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)],
                                  cwd=SOURCE, capture_output=True)
         if applied.returncode:
-            subprocess.run(['git', 'apply', '--check', str(patch)], cwd=SOURCE, check=True)
-            subprocess.run(['git', 'apply', str(patch)], cwd=SOURCE, check=True)
+            revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=SOURCE,
+                                               text=True).strip()
+            if revision == KOREAN_PATCH_BASE:
+                subprocess.run(['git', 'apply', '--check', str(patch)], cwd=SOURCE, check=True)
+                subprocess.run(['git', 'apply', str(patch)], cwd=SOURCE, check=True)
+            else:
+                print('현재 원본은 보관된 한국어 패치의 기준 버전과 다릅니다. '
+                      '패치를 적용하지 않고 공식 원본을 실행합니다.', file=sys.stderr, flush=True)
     env = environment()
     result = subprocess.run([sys.executable, '-m', 'pm.cli', 'env'], cwd=SOURCE,
                             env=env, capture_output=True, text=True, check=True)

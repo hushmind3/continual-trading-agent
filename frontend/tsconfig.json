@@ -23,7 +23,7 @@
   },
   "include": [
     "src",
-    "../modules/*/frontend/**/*.ts",
-    "../modules/*/frontend/**/*.tsx"
+    "../modules/**/frontend/**/*.ts",
+    "../modules/**/frontend/**/*.tsx"
   ]
 }

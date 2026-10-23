@@ -7,8 +7,8 @@
     "title": "AI 에이전트"
   },
   "backend": {
-    "namespace": "platform_plugins.openclaw_original",
-    "entry": "manager"
+    "namespace": "ai_agent.OpenClawOriginal",
+    "entry": "register"
   },
   "frontend": {
     "entry": "frontend/register.ts"

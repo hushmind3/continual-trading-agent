@@ -3,8 +3,8 @@ import type {BackendAction} from '../data/menu_types';
 import {installedNavigation,type InstalledManifest} from './installed_navigation';
 interface Manifest extends InstalledManifest {schema:number;enabled?:boolean;order?:number;frontend:{entry:string}}
 interface Registration {menus:MenuItem[];registeredMenus?:(actions:BackendAction[])=>MenuItem[]}
-const manifests=import.meta.glob<Manifest>('../../../modules/*/module.json',{eager:true,import:'default'});
-const entries=import.meta.glob<Registration>('../../../modules/*/frontend/register.ts',{eager:true});
+const manifests=import.meta.glob<Manifest>(['../../../modules/*/module.json','../../../modules/*/*/module.json'],{eager:true,import:'default'});
+const entries=import.meta.glob<Registration>(['../../../modules/*/frontend/register.ts','../../../modules/*/*/frontend/register.ts'],{eager:true});
 const enabled=Object.entries(manifests).filter(([,manifest])=>manifest.enabled!==false)
  .sort(([,a],[,b])=>(a.order??100)-(b.order??100)||a.id.localeCompare(b.id))
  .map(([path,manifest])=>{

@@ -2,7 +2,7 @@
 
 용도: 모듈 등록·소스/패키지/데이터 소유·탈착과 독립 배포의 현재 완료 범위를 안내합니다.
 
-`modules/<id>/module.json`과 그 안의 backend/frontend를 하나의 프로그램 단위로 취급합니다. 중앙 등록 파일에 기능별 import나 메뉴를 추가하지 않습니다.
+`modules/<id>/module.json` 또는 `modules/<대메뉴>/<중메뉴>/module.json`과 그 안의 backend/frontend를 하나의 프로그램 단위로 취급합니다. 중앙 등록 파일에 기능별 import나 메뉴를 추가하지 않습니다.
 
 - `schema: 1`, 고유 `id`, `group: {id,title}`, 선택 `order`를 선언합니다.
 - `backend: {namespace, entry, path?}`: 기본 path는 backend. entry가 MENU+router 또는 GROUP+ROUTERS를 제공합니다. 선택 hooks는 busy_reason/reserve_restart/cancel_restart/close입니다. register_host(app)은 프로젝트 정적 화면 제공처럼 공통 호스트 연결이 필요할 때만 사용하며 기능 API는 기존 단일 /api로 등록합니다.
@@ -18,7 +18,7 @@ Hermes 코드는 hermes/backend와 hermes/frontend에 들어 있습니다. 원�
 
 오버로드 → 나자릭은 [등록·화면](nazarick/README.md)과 [실제 백엔드](../backend/overlord/nazarick/README.md)를 연결합니다. 백엔드 중메뉴·소메뉴 소스는 `backend/overlord/nazarick/`, 데이터는 `runtime/overlord/nazarick/`이며 자동 등록 폴더에는 등록 연결과 화면만 둡니다.
 
-AI 에이전트의 공식 원본 등록·화면은 [Hermes 원본](hermes_original/README.md)과 [OpenClaw 원본](openclaw_original/README.md), 실제 중메뉴 구현은 `backend/ai_agent/`가 소유합니다. 원본 체크아웃은 `.gitmodules`의 고정 커밋, 한국어 변경은 추적되는 패치로 보존하며 사용자 상태·도구와 구분합니다.
+AI 에이전트의 공식 원본 등록·화면은 [Hermes 원본](ai_agent/HermesOriginal/README.md)과 [OpenClaw 원본](ai_agent/OpenClawOriginal/README.md), 실제 중메뉴 구현·React 화면·패치·등록은 각각 `modules/ai_agent/<중메뉴>/` 한 폴더가 소유합니다. `backend/ai_agent/manager.py`는 대메뉴 공통 취합만 합니다. 원본 체크아웃은 `.gitmodules`의 고정 커밋, 한국어 변경은 추적되는 패치로 보존하며 사용자 상태·도구와 구분합니다.
 
 ## 최종 목표와 현재 경계
 

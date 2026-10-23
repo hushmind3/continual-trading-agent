@@ -3935,6 +3935,262 @@ index 0d099ca244..b3044c5902 100644
          ]}
        />
  
+diff --git a/web/src/pages/FilesPage.tsx b/web/src/pages/FilesPage.tsx
+index 15b13a5bf9..5105675f18 100644
+--- a/web/src/pages/FilesPage.tsx
++++ b/web/src/pages/FilesPage.tsx
+@@ -70,7 +70,7 @@ function downloadDataUrl(dataUrl: string, name: string) {
+ }
+ 
+ function displayPath(path: string | null | undefined): string {
+-  return path?.trim() || "Files";
++  return path?.trim() || "파일";
+ }
+ 
+ function transferHasFiles(event: ReactDragEvent<HTMLElement>): boolean {
+@@ -139,7 +139,7 @@ export default function FilesPage() {
+           type="button"
+           onClick={() => void load()}
+           disabled={loading}
+-          aria-label="Refresh files"
++          aria-label="파일 목록 새로고침"
+         >
+           {loading ? <Spinner /> : <RefreshCw />}
+         </Button>
+@@ -160,7 +160,7 @@ export default function FilesPage() {
+   const goToPath = async () => {
+     const nextPath = pathInput.trim();
+     if (!nextPath) {
+-      showToast("Path required", "error");
++      showToast("이동할 경로를 입력하세요.", "error");
+       return;
+     }
+     await load(nextPath);
+@@ -169,11 +169,11 @@ export default function FilesPage() {
+   const createDirectory = async () => {
+     const name = folderName.trim();
+     if (!activePath) {
+-      showToast("Directory unavailable", "error");
++      showToast("현재 위치를 확인할 수 없습니다.", "error");
+       return;
+     }
+     if (!name) {
+-      showToast("Folder name required", "error");
++      showToast("새 폴더 이름을 입력하세요.", "error");
+       return;
+     }
+     setCreating(true);
+@@ -181,10 +181,10 @@ export default function FilesPage() {
+       await api.createDirectory(joinPath(activePath, name));
+       setFolderName("");
+       setCreateDialogOpen(false);
+-      showToast("Folder created", "success");
++      showToast("폴더를 만들었습니다.", "success");
+       await load();
+     } catch (e) {
+-      showToast(`Create failed: ${errorMessage(e)}`, "error");
++      showToast(`폴더를 만들지 못했습니다: ${errorMessage(e)}`, "error");
+     } finally {
+       setCreating(false);
+     }
+@@ -197,10 +197,10 @@ export default function FilesPage() {
+       for (const file of Array.from(files)) {
+         await api.uploadFile(joinPath(activePath, file.name), file, true);
+       }
+-      showToast(`${files.length} file${files.length === 1 ? "" : "s"} uploaded`, "success");
++      showToast(`파일 ${files.length}개를 올렸습니다.`, "success");
+       await load();
+     } catch (e) {
+-      showToast(`Upload failed: ${errorMessage(e)}`, "error");
++      showToast(`파일을 올리지 못했습니다: ${errorMessage(e)}`, "error");
+     } finally {
+       setUploading(false);
+       if (fileInputRef.current) fileInputRef.current.value = "";
+@@ -243,7 +243,7 @@ export default function FilesPage() {
+       const file = await api.readFile(entry.path);
+       downloadDataUrl(file.data_url, file.name);
+     } catch (e) {
+-      showToast(`Download failed: ${errorMessage(e)}`, "error");
++      showToast(`파일을 내려받지 못했습니다: ${errorMessage(e)}`, "error");
+     }
+   };
+ 
+@@ -252,11 +252,11 @@ export default function FilesPage() {
+     setDeleting(true);
+     try {
+       await api.deleteFile(pendingDelete.path, pendingDelete.is_directory);
+-      showToast("Deleted", "success");
++      showToast("삭제했습니다.", "success");
+       setPendingDelete(null);
+       await load();
+     } catch (e) {
+-      showToast(`Delete failed: ${errorMessage(e)}`, "error");
++      showToast(`삭제하지 못했습니다: ${errorMessage(e)}`, "error");
+     } finally {
+       setDeleting(false);
+     }
+@@ -286,12 +286,12 @@ export default function FilesPage() {
+             <Input
+               value={pathInput}
+               onChange={(event) => setPathInput(event.target.value)}
+-              aria-label="Path"
+-              placeholder="Path"
++              aria-label="폴더 경로"
++              placeholder="이동할 폴더 경로"
+               className="h-9 min-w-0 flex-1 font-mono"
+             />
+             <Button type="submit" size="sm" outlined className="uppercase">
+-              Go
++              이동
+             </Button>
+           </form>
+         ) : (
+@@ -309,7 +309,7 @@ export default function FilesPage() {
+             className="uppercase"
+             prefix={uploading ? <Spinner /> : <Upload />}
+           >
+-            Upload
++            파일 올리기
+           </Button>
+           <Button
+             type="button"
+@@ -320,7 +320,7 @@ export default function FilesPage() {
+             className="uppercase"
+             prefix={<FolderPlus />}
+           >
+-            Create
++            새 폴더
+           </Button>
+         </div>
+       </div>
+@@ -333,7 +333,7 @@ export default function FilesPage() {
+         onDragLeave={handleDragLeave}
+         onDrop={handleDrop}
+         disabled={!canUpload}
+-        aria-label="Upload files"
++        aria-label="파일 올리기"
+         className={`flex min-h-20 w-full min-w-0 items-center justify-between gap-4 border border-dashed px-4 py-3 text-left transition ${
+           draggingFiles
+             ? "border-primary bg-primary/10 text-foreground"
+@@ -346,15 +346,15 @@ export default function FilesPage() {
+           </span>
+           <span className="min-w-0">
+             <span className="block text-sm font-semibold uppercase tracking-[0.08em] text-foreground">
+-              {uploading ? "Uploading" : draggingFiles ? "Release to upload" : "Drop files here"}
++              {uploading ? "파일 올리는 중" : draggingFiles ? "여기에 놓으면 파일을 올립니다" : "파일을 여기에 끌어다 놓으세요"}
+             </span>
+             <span className="block truncate font-mono text-xs text-text-secondary" title={activePath}>
+-              {activePath || "Loading"}
++              {activePath || "불러오는 중"}
+             </span>
+           </span>
+         </span>
+         <span className="hidden shrink-0 text-xs font-semibold uppercase tracking-[0.08em] text-text-tertiary sm:block">
+-          Choose files
++          파일 선택
+         </span>
+       </button>
+ 
+@@ -367,10 +367,10 @@ export default function FilesPage() {
+           )}
+ 
+           <div className="grid min-w-[42rem] grid-cols-[minmax(12rem,1fr)_7rem_10rem_5.5rem] items-center gap-3 border-b border-border px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-tertiary">
+-            <span>Name</span>
+-            <span>Size</span>
+-            <span>Modified</span>
+-            <span className="text-right">Actions</span>
++            <span>이름</span>
++            <span>크기</span>
++            <span>수정한 날짜</span>
++            <span className="text-right">작업</span>
+           </div>
+ 
+           {listing?.parent && (
+@@ -392,10 +392,10 @@ export default function FilesPage() {
+           {loading && !listing ? (
+             <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+               <Spinner />
+-              Loading files...
++              파일 목록을 불러오는 중…
+             </div>
+           ) : listing && listing.entries.length === 0 ? (
+-            <div className="py-12 text-center text-sm text-muted-foreground">No files</div>
++            <div className="py-12 text-center text-sm text-muted-foreground">이 폴더에는 파일이 없습니다.</div>
+           ) : (
+             listing?.entries.map((entry) => (
+               <div
+@@ -406,7 +406,7 @@ export default function FilesPage() {
+                   type="button"
+                   onClick={() => (entry.is_directory ? openDirectory(entry) : void downloadFile(entry))}
+                   disabled={entry.broken_link}
+-                  title={entry.broken_link ? "Broken symbolic link" : undefined}
++                  title={entry.broken_link ? "대상이 없는 바로가기입니다." : undefined}
+                   className="flex min-w-0 items-center gap-2 text-left font-mono text-foreground disabled:cursor-not-allowed disabled:text-text-tertiary"
+                 >
+                   {entry.is_directory ? (
+@@ -419,7 +419,7 @@ export default function FilesPage() {
+                   <span className="truncate">{entry.name}</span>
+                   {entry.broken_link && (
+                     <Badge tone="destructive" className="shrink-0 text-xs">
+-                      Broken link
++                      연결 끊긴 바로가기
+                     </Badge>
+                   )}
+                 </button>
+@@ -481,9 +481,9 @@ export default function FilesPage() {
+       >
+         <DialogContent className="max-w-sm">
+           <DialogHeader>
+-            <DialogTitle>Create folder</DialogTitle>
++            <DialogTitle>새 폴더 만들기</DialogTitle>
+             <DialogDescription>
+-              Target: {activePath || "Loading"}
++              만들 위치: {activePath || "불러오는 중"}
+             </DialogDescription>
+           </DialogHeader>
+           <div className="p-4">
+@@ -494,7 +494,7 @@ export default function FilesPage() {
+               onKeyDown={(event) => {
+                 if (event.key === "Enter") void createDirectory();
+               }}
+-              placeholder="Folder name"
++              placeholder="새 폴더 이름"
+               disabled={creating}
+             />
+           </div>
+@@ -508,7 +508,7 @@ export default function FilesPage() {
+               }}
+               disabled={creating}
+             >
+-              Cancel
++              취소
+             </Button>
+             <Button
+               type="button"
+@@ -516,7 +516,7 @@ export default function FilesPage() {
+               disabled={creating}
+               prefix={creating ? <Spinner /> : <FolderPlus />}
+             >
+-              Create
++              폴더 만들기
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+@@ -527,11 +527,11 @@ export default function FilesPage() {
+         loading={deleting}
+         onCancel={() => setPendingDelete(null)}
+         onConfirm={() => void confirmDelete()}
+-        title={pendingDelete ? `Delete ${pendingDelete.name}?` : "Delete item?"}
++        title={pendingDelete ? `${pendingDelete.name} 항목을 삭제할까요?` : "항목을 삭제할까요?"}
+         description={
+           pendingDelete?.is_directory
+-            ? "This removes the folder and everything inside it."
+-            : "This removes the file."
++            ? "폴더와 그 안에 들어 있는 모든 파일·폴더가 함께 삭제됩니다."
++            : "이 파일을 삭제합니다."
+         }
+       />
+     </div>
 diff --git a/web/src/pages/McpPage.tsx b/web/src/pages/McpPage.tsx
 index 773479abbb..47ca034157 100644
 --- a/web/src/pages/McpPage.tsx

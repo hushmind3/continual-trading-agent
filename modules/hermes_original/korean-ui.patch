@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..8df0799d00 100644
+index 18475fe8f4..ff6f137fa1 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1949 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -325,7 +325,7 @@ index 18475fe8f4..8df0799d00 100644
 +  "memory.provider": "Memory provider (기억 저장·검색 서비스)",
 +  "terminal.backend": "명령·코드 실행 위치",
 +  "terminal.modal_mode": "Modal 원격 실행 방식",
-+  "terminal.degraded_mode": "원격 실행 연결 실패 시 처리",
++  "terminal.degraded_mode": "명령 실행 환경 연결 실패 처리 방식",
 +  "terminal.cwd": "CWD (명령·코드가 시작할 폴더)",
 +  "terminal.temp_dir": "Temp dir (실행 중 임시 파일 저장 위치)",
 +  "terminal.font_family": "터미널 글꼴 종류",
@@ -355,7 +355,7 @@ index 18475fe8f4..8df0799d00 100644
 +  "terminal.docker_run_as_host_user": "내 사용자 권한으로 실행",
 +  "terminal.docker_snap_compat": "Snap 설치 Docker 호환 처리",
 +  "terminal.docker_shared_container_key": "프로필 간 격리 환경 공유 키",
-+  "terminal.persistent_shell": "명령 사이에 셸 상태 유지",
++  "terminal.persistent_shell": "SSH 명령 사이의 환경 변수 유지",
 +  "display.resume_display": "이전 대화를 다시 열 때 표시 방식",
 +  "display.busy_input_mode": "작업 중 새 입력 처리 방식",
 +  "display.skin": "터미널 화면 테마",
@@ -1308,7 +1308,7 @@ index 18475fe8f4..8df0799d00 100644
 +  "tts.piper.voice": "Piper 음성 이름 또는 사용할 .onnx 음성 파일의 전체 경로입니다. 이름을 지정하면 첫 사용 시 내려받을 수 있습니다.",
 +  "tts.deepinfra.model": "DeepInfra 음성 합성에 사용할 모델 ID입니다. 비우면 현재 모델 목록에서 음성 합성용 첫 모델을 선택합니다.",
 +  "tts.deepinfra.voice": "DeepInfra 음성 합성에서 사용할 목소리 이름입니다.",
-+  "terminal.degraded_mode": "원격 명령 실행 환경에 연결할 수 없을 때 경고 결과로 알릴지, 작업을 오류로 중단할지 정합니다.",
++  "terminal.degraded_mode": "SSH 서버나 Docker 실행 환경에 연결하지 못해 명령을 시작할 수 없을 때의 처리입니다. warn(경고 결과)은 연결 실패 이유와 다시 시도할 안내를 돌려주고, fail(오류)은 요청을 중단합니다. 명령을 실행한 뒤 종료 코드가 실패한 경우에는 적용되지 않습니다.",
 +  "terminal.cwd": "터미널 명령과 코드 실행을 시작할 기본 폴더입니다. 기본값 `.`은 Hermes를 실행한 현재 폴더를 뜻합니다. 사용자가 작업할 프로젝트의 위치이며, 내부 임시 파일 저장 위치(terminal.temp_dir)와는 다릅니다.",
 +  "terminal.temp_dir": "터미널 세션의 백그라운드 로그·PID·종료 상태 파일과 코드 실행 임시 환경을 둘 폴더입니다. 비워 두면 TMPDIR·TMP·TEMP 환경 변수를 먼저 쓰고, 모두 없으면 Hermes 캐시 폴더를 사용하며 기본 캐시 자료는 72시간 뒤 정리됩니다. 직접 지정하는 폴더는 이미 존재하는 절대 경로여야 하며 자동 삭제하지 않습니다. 작업 파일을 둘 폴더(terminal.cwd)와는 다른 위치입니다.",
 +  "terminal.font_family": "데스크톱 터미널 화면에 사용할 글꼴 이름 목록입니다. 비우면 기본 글꼴을 사용합니다.",
@@ -1338,7 +1338,7 @@ index 18475fe8f4..8df0799d00 100644
 +  "terminal.docker_run_as_host_user": "격리 환경 안의 명령을 현재 로그인한 사용자 권한으로 실행합니다. 연결한 폴더에 만든 파일이 관리자(root) 소유가 되는 일을 막지만, 일부 환경은 이 방식으로 시작할 수 없습니다.",
 +  "terminal.docker_snap_compat": "Ubuntu의 Snap 방식으로 설치한 Docker에서 특정 보안 옵션이 거부될 때 호환 처리를 적용합니다. 이를 켜도 다른 보안 제한은 유지됩니다.",
 +  "terminal.docker_shared_container_key": "같은 키를 입력한 Hermes 프로필끼리 Docker 실행 환경을 공유합니다. 신뢰하는 프로필에만 같은 키를 쓰고, 비우면 프로필마다 따로 만듭니다.",
-+  "terminal.persistent_shell": "SSH에서는 명령 사이에 내보낸 환경 변수 값을 유지하고, 로컬에서는 설정된 지속 셸 동작을 사용합니다.",
++  "terminal.persistent_shell": "SSH(원격 컴퓨터)에서 실행한 명령이 export(다음 프로그램에도 전달할 값 설정)로 만든 환경 변수를 다음 명령에도 남겨 둘지 정합니다. 끄면 각 명령은 SSH 로그인 직후의 환경에서 시작합니다. 현재 작업 폴더는 설정과 관계없이 명령 사이에 유지됩니다. 로컬 실행 환경은 별도 설정을 사용합니다.",
 +  "stt.enabled": "메신저로 받은 음성 메시지를 글자로 바꾸는 STT(음성 인식)를 사용합니다.",
 +  "stt.echo_transcripts": "메신저로 받은 음성을 글자로 바꾼 뒤, 인식 결과를 🎙️ 표시가 붙은 별도 메시지로 보내 확인할 수 있게 합니다. 끄면 확인용 메시지만 보내지 않으며 음성 인식 자체는 계속됩니다.",
 +  "stt.language": "모든 음성 인식에서 기본으로 참고할 언어 코드입니다. 현재 기본값은 `en`(영어)입니다. 비우면 서비스가 언어를 자동으로 찾고, Groq·OpenAI처럼 제공자별 언어를 따로 지정하면 그 값이 우선합니다. 화면 메뉴 언어와는 별개입니다.",

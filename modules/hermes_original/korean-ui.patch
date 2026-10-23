@@ -83,10 +83,10 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..b6e8118bf2 100644
+index 18475fe8f4..0e7b6d071f 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1671 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1705 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
@@ -379,7 +379,7 @@ index 18475fe8f4..b6e8118bf2 100644
 +  "curator.prune_builtins": "기본 제공 항목 정리",
 +  "discord.allow_any_attachment": "이전 버전 호환용 첨부 파일 옵션",
 +  "discord.voice_fx.duck_gain": "음성 재생 중 배경음 음량",
-+  "gateway.auto_multiplex_migration": "여러 프로필 구성 자동 이전",
++  "gateway.auto_multiplex_migration": "여러 프로필 구성 자동 통합",
 +  "lsp.broken_retry_seconds": "LSP 오류 후 재시도 대기 시간(초)",
 +  "proxy.tunnel_port": "인증 정보 중계 터널 포트",
 +  "desktop.electron_flags": "데스크톱 앱 실행 옵션",
@@ -477,6 +477,40 @@ index 18475fe8f4..b6e8118bf2 100644
 +  "telegram.extra.rich_drafts": "생성 중 답변 미리보기에 새 서식 사용",
 +  "telegram.extra.allow_cjk_rich_messages": "한국어·중국어·일본어 새 서식 지원",
 +  "telegram.extra.dm_topic_auto_transfer": "개인 대화 메시지를 새 주제로 옮기기",
++  "gateway.unmanaged_idle_exit_seconds": "관리자에 등록되지 않은 게이트웨이 유휴 종료 시간(초)",
++  "gateway.signal_interrupt_grace_timeout": "종료 신호 후 작업 정리 대기 시간(초)",
++  "gateway.service_install_choice": "게이트웨이 서비스 설치 안내 선택 결과",
++  "gateway.delivery_ledger": "메신저 답변 재전송 기록",
++  "gateway.platform_connect_timeout": "메신저 연결 대기 제한 시간(초)",
++  "gateway.loop_watchdog": "게이트웨이 작업 멈춤 감시",
++  "gateway.loop_watchdog_probe_interval_s": "게이트웨이 응답 점검 간격(초)",
++  "gateway.loop_watchdog_probe_timeout_s": "응답 점검 대기 제한 시간(초)",
++  "gateway.loop_watchdog_max_strikes": "멈춤 판정 전 연속 점검 실패 횟수",
++  "gateway.allow_all_users": "허용 목록 없이 모든 사용자 허용",
++  "gateway.bot_loop_guard.enabled": "봇끼리 반복 대화 차단",
++  "gateway.bot_loop_guard.max_events": "반복 판정 시간 안에 허용할 봇 메시지 수",
++  "gateway.bot_loop_guard.window_seconds": "반복 메시지 확인 시간 범위(초)",
++  "gateway.bot_loop_guard.cooldown_seconds": "반복 감지 후 응답 중지 시간(초)",
++  "gateway.startup_watchdog": "게이트웨이 시작 상태 감시",
++  "gateway.startup_watchdog_timeout_seconds": "정상 작동 확인 대기 시간(초)",
++  "gateway.write_sessions_json": "기존 sessions.json 파일도 함께 저장",
++  "gateway.multiplex_profiles": "한 게이트웨이에서 여러 프로필 봇 연결",
++  "gateway.profile_routes": "대화 전달 프로필 규칙",
++  "gateway.scale_to_zero.idle_timeout_minutes": "유휴 후 중계 연결을 쉴 시간(분)",
++  "gateway.restart_loop_guard.max_restarts": "자동 복구 전 허용할 연속 재시작 수",
++  "gateway.restart_loop_guard.window_seconds": "연속 재시작 횟수 계산 시간 범위(초)",
++  "gateway.restart_loop_guard.max_gap_seconds": "재시작을 같은 연속 장애로 볼 최대 간격(초)",
++  "gateway.respawn_storm.max_starts": "시간 범위 안에 허용할 게이트웨이 시작 횟수",
++  "gateway.respawn_storm.window_seconds": "게이트웨이 시작 횟수 계산 시간 범위(초)",
++  "gateway.message_timestamps.enabled": "메신저 메시지 시각을 모델 입력에 포함",
++  "gateway.max_inbound_media_bytes": "받은 사진·음성·영상 최대 크기(바이트)",
++  "gateway.trust_env": "컴퓨터의 프록시·인증서 설정 사용",
++  "gateway.strict": "전송 파일을 허용 경로로 제한",
++  "gateway.media_delivery_allow_dirs": "추가로 허용할 파일 전송 폴더",
++  "gateway.trust_recent_files": "최근 만든 파일 전송 허용",
++  "gateway.trust_recent_files_seconds": "최근 파일로 인정할 시간(초)",
++  "gateway.api_server.max_concurrent_runs": "API 서버 동시 에이전트 작업 수",
++  "gateway.api_server.history_tool_output_max_chars": "대화 기록에 저장할 도구 결과 최대 글자 수",
 +};
 +
 +const CONFIG_LABEL_WORDS_KO: Record<string, string> = {
@@ -1760,7 +1794,7 @@ index 18475fe8f4..b6e8118bf2 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1698,7 @@ function NestedValueEditor({
+@@ -42,7 +1732,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1769,7 +1803,7 @@ index 18475fe8f4..b6e8118bf2 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1715,7 @@ function NestedValueEditor({
+@@ -59,7 +1749,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1778,7 +1812,7 @@ index 18475fe8f4..b6e8118bf2 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1744,7 @@ export function AutoField({
+@@ -88,8 +1778,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1788,7 +1822,7 @@ index 18475fe8f4..b6e8118bf2 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1777,7 @@ export function AutoField({
+@@ -122,7 +1811,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1797,7 +1831,7 @@ index 18475fe8f4..b6e8118bf2 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1838,7 @@ export function AutoField({
+@@ -183,7 +1872,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

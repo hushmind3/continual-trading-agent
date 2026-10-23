@@ -83,15 +83,23 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..a37618a1f7 100644
+index 18475fe8f4..e51397d0cc 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
-@@ -3,15 +3,1724 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
+@@ -3,15 +3,1732 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
  import { Input } from "@nous-research/ui/ui/components/input";
  import { Label } from "@nous-research/ui/ui/components/label";
  
 +const CONFIG_LABELS_KO: Record<string, string> = {
 +  model: "주 대화 모델",
++  "bedrock.region": "Bedrock region (AWS 요청 지역)",
++  "bedrock.discovery.enabled": "Model discovery (사용 가능한 모델 자동 검색)",
++  "bedrock.discovery.provider_filter": "Provider filter (검색할 모델 제공 업체)",
++  "bedrock.discovery.refresh_interval": "Refresh interval (모델 목록 갱신 간격)",
++  "bedrock.guardrail.guardrail_identifier": "Guardrail ID (안전 규칙 식별자)",
++  "bedrock.guardrail.guardrail_version": "Guardrail version (안전 규칙 버전)",
++  "bedrock.guardrail.stream_processing_mode": "Stream processing mode (실시간 검사 방식)",
++  "bedrock.guardrail.trace": "Guardrail trace (안전 검사 기록)",
 +  "fallback.min_switch_reset_seconds": "대체 제공자 전환 기준 초기화 시간(초)",
 +  "runtime.nofile_soft_limit": "프로세스가 열 수 있는 파일 수의 완화된 상한",
 +  "checkpoints.enabled": "복구 지점 저장 사용 여부",
@@ -1353,14 +1361,14 @@ index 18475fe8f4..a37618a1f7 100644
 +  "approvals.deny": "명령 이름이 이 패턴 중 하나와 일치하면 자동 실행 모드여도 실행을 거부합니다.",
 +  "approvals.mcp_reload_confirm": "MCP 도구 목록을 다시 불러오기 전에 사용자 확인을 받습니다. 다음 요청에 전체 문맥을 다시 보내야 할 수 있습니다.",
 +  "approvals.destructive_slash_confirm": "데이터를 지우거나 되돌리기 어려운 슬래시 명령을 실행하기 전에 사용자 확인을 받습니다.",
-+  "bedrock.region": "AWS Bedrock 모델 요청에 사용할 AWS 지역입니다. 비우면 AWS_REGION 환경 변수, 없으면 기본 지역을 사용합니다.",
-+  "bedrock.discovery.enabled": "AWS Bedrock 계정에서 사용할 수 있는 기초 모델을 자동으로 검색합니다.",
-+  "bedrock.discovery.provider_filter": "자동 검색 결과에 포함할 모델 제공자 목록입니다. 비우면 제공자를 제한하지 않습니다.",
-+  "bedrock.discovery.refresh_interval": "Bedrock에서 검색한 모델 목록을 새로 확인할 간격(초)입니다.",
-+  "bedrock.guardrail.guardrail_identifier": "AWS Bedrock에서 만든 안전 규칙(Guardrail)의 식별자입니다.",
-+  "bedrock.guardrail.guardrail_version": "적용할 Bedrock 안전 규칙의 버전입니다. 예: 1 또는 DRAFT.",
-+  "bedrock.guardrail.stream_processing_mode": "응답을 생성하는 동안 안전 규칙을 동기 또는 비동기 방식으로 확인합니다.",
-+  "bedrock.guardrail.trace": "Bedrock 안전 규칙의 작동 내역을 응답에 포함할 수준입니다.",
++  "bedrock.region": "Bedrock 모델 요청을 처리할 AWS 데이터 센터 지역입니다. 비워 두면 AWS_REGION 환경 변수 값을 쓰고, 그 값도 없으면 us-east-1을 사용합니다. 모델 제공 여부와 데이터 처리 지역에 영향을 줍니다.",
++  "bedrock.discovery.enabled": "AWS 계정과 지역에서 사용할 수 있는 Bedrock 모델 목록을 자동으로 가져옵니다. 끄면 이 목록을 자동으로 찾지 않습니다.",
++  "bedrock.discovery.provider_filter": "자동 검색 결과를 모델 제공 업체로 좁힙니다. 예: anthropic, amazon. 비워 두면 업체를 가리지 않고 검색합니다.",
++  "bedrock.discovery.refresh_interval": "자동 검색한 모델 목록을 다시 확인하는 간격입니다. 초 단위이며 기본값 3600은 1시간입니다.",
++  "bedrock.guardrail.guardrail_identifier": "AWS Bedrock 콘솔에서 미리 만든 안전 규칙(Guardrail)의 ID입니다. 아래 버전도 함께 입력해야 요청에 적용됩니다. 둘 중 하나라도 비어 있으면 안전 규칙을 보내지 않습니다.",
++  "bedrock.guardrail.guardrail_version": "적용할 안전 규칙(Guardrail)의 버전입니다. 예: 게시된 버전 번호 또는 DRAFT(초안). ID와 버전을 모두 입력해야 적용됩니다.",
++  "bedrock.guardrail.stream_processing_mode": "답변을 내보내면서 안전 규칙을 확인하는 방식입니다. sync(동기)는 검사 결과를 기다린 뒤 내용을 보내 더 안전하지만 늦을 수 있고, async(비동기)는 먼저 보내 빠르지만 부적절한 내용이 검사 전에 전달될 수 있습니다.",
++  "bedrock.guardrail.trace": "안전 규칙의 검사 기록을 요청 결과에 포함할지 정합니다. disabled는 기록 없음, enabled는 검사 기록, enabled_full은 전체 상세 기록입니다. 기록에는 요청 내용과 관련 정보가 포함될 수 있습니다.",
 +  "tools.tool_search.enabled": "도구가 많을 때 모델이 필요한 도구만 검색해서 불러오는 기능을 사용합니다. auto는 검색할 도구가 있을 때 적용합니다.",
 +  "tools.tool_search.threshold_pct": "모델 문맥 한도 중 도구 목록 설명이 차지할 수 있는 최대 비율입니다.",
 +  "tools.tool_search.search_default_limit": "모델이 검색 개수를 지정하지 않았을 때 도구 검색 한 번에 보여줄 기본 개수입니다.",
@@ -1813,7 +1821,7 @@ index 18475fe8f4..a37618a1f7 100644
        {description && <span className="text-xs text-text-secondary">{description}</span>}
      </div>
    );
-@@ -42,7 +1751,7 @@ function NestedValueEditor({
+@@ -42,7 +1759,7 @@ function NestedValueEditor({
        <div className="grid gap-2 border border-border p-2">
          {Object.entries(value).map(([subKey, subVal]) => (
            <div key={subKey} className="grid gap-1">
@@ -1822,7 +1830,7 @@ index 18475fe8f4..a37618a1f7 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${subKey}`}
                value={subVal}
-@@ -59,7 +1768,7 @@ function NestedValueEditor({
+@@ -59,7 +1776,7 @@ function NestedValueEditor({
        <div className="grid gap-2">
          {value.map((item, index) => (
            <div key={`${fieldKey}.${index}`} className="grid gap-1">
@@ -1831,7 +1839,7 @@ index 18475fe8f4..a37618a1f7 100644
              <NestedValueEditor
                fieldKey={`${fieldKey}.${index}`}
                value={item}
-@@ -88,8 +1797,7 @@ export function AutoField({
+@@ -88,8 +1805,7 @@ export function AutoField({
    value,
    onChange,
  }: AutoFieldProps) {
@@ -1841,7 +1849,7 @@ index 18475fe8f4..a37618a1f7 100644
  
    if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
      return (
-@@ -122,7 +1830,7 @@ export function AutoField({
+@@ -122,7 +1838,7 @@ export function AutoField({
          <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
            {options.map((opt) => (
              <SelectOption key={opt} value={opt}>
@@ -1850,7 +1858,7 @@ index 18475fe8f4..a37618a1f7 100644
              </SelectOption>
            ))}
          </Select>
-@@ -183,7 +1891,7 @@ export function AutoField({
+@@ -183,7 +1899,7 @@ export function AutoField({
                  .filter(Boolean),
              )
            }

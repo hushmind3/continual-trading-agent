@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..2572ab0600 100644
+index 18475fe8f4..916061fe2e 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1984 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -2010,7 +2010,7 @@ index 18475fe8f4..2572ab0600 100644
 +      }
 +      break;
 +    case "reasoning_effort":
-+      explanation = "모델에게 얼마나 깊이 생각할지 요청하는 정도입니다. none(추론 최소화)은 서비스가 지원하는 가장 낮은 단계이고, 비우면 서비스 기본값을 씁니다. 강도를 높이면 답변이 늦어지거나 비용이 늘 수 있습니다.";
++      explanation = "모델에 답을 만들 때 얼마나 깊이 검토할지 요청하는 값입니다. `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` 순으로 더 깊은 검토를 요청합니다. `none`도 서비스가 허용하는 가장 낮은 단계이며, 모든 서비스가 모든 단계를 지원하는 것은 아닙니다. 비워 두면 서비스 기본값을 쓰고, 높은 단계를 고르면 답변이 늦어지거나 사용량 요금이 늘 수 있습니다.";
 +      break;
 +    case "api_mode":
 +      explanation = "보조 모델에 요청을 보낼 때 사용할 통신 형식입니다. chat_completions(일반 채팅 형식), anthropic_messages(Anthropic 메시지 형식), codex_responses(Codex Responses 형식) 중 서비스가 요구하는 방식을 고릅니다. 비우면 선택한 서비스 설정을 따릅니다.";

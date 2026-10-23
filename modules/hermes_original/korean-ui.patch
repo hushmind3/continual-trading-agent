@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..db991dae37 100644
+index 18475fe8f4..b8024548ac 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1982 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -1393,22 +1393,22 @@ index 18475fe8f4..db991dae37 100644
 +  "stt.elevenlabs.tag_audio_events": "ElevenLabs가 웃음·박수 같은 비언어적 소리도 인식 결과에 표시하도록 합니다.",
 +  "stt.elevenlabs.diarize": "한 녹음에 여러 사람이 있으면 화자를 구분해 인식 결과에 표시합니다.",
 +  "stt.deepinfra.model": "DeepInfra에 녹음을 보내 글자로 바꿀 모델의 이름(ID)입니다. 비워 두면 현재 사용 가능한 모델 목록에서 음성 인식용으로 표시된 첫 모델을 자동 선택합니다.",
-+  "browser.backend": "웹 페이지를 조작할 도구를 고릅니다. 비우면 Browser Use(별도 브라우저 조작 프로그램)를 쓸 수 있는지 확인해 자동 선택하고, off(사용 안 함)는 Hermes 기본 브라우저 도구만 사용합니다.",
++  "browser.backend": "웹페이지를 여는 도구를 고릅니다. 비워 두면 Browser Use(별도 브라우저 조작 프로그램)를 쓸 수 있는지 확인해 자동으로 고릅니다. `browser-use`는 Browser Use를 강제로 쓰고, `off`는 Hermes에 기본 포함된 브라우저 도구를 씁니다.",
 +  "browser.inactivity_timeout": "사용하지 않는 브라우저 세션을 자동으로 닫기까지 기다리는 시간(초)입니다.",
 +  "browser.command_timeout": "페이지 열기·화면 읽기 등 브라우저 명령 하나가 끝나기를 기다리는 최대 시간(초)입니다.",
 +  "browser.snapshot_threshold": "브라우저 화면을 읽어 온 글이 이 길이를 넘으면 앞부분만 대화에 보여 주고 나머지는 따로 저장합니다. 긴 화면 내용을 한꺼번에 보내 문맥을 차지하지 않도록 합니다.",
-+  "browser.record_sessions": "브라우저 사용 과정을 WebM 동영상으로 자동 기록합니다.",
++  "browser.record_sessions": "에이전트가 브라우저를 열고 조작하는 과정을 동영상(WebM 형식)으로 기록합니다. 파일은 Hermes 홈의 `browser_recordings` 폴더에 저장되며, 72시간이 지난 기록은 다음 기록을 시작할 때 정리됩니다.",
 +  "browser.allow_private_urls": "브라우저가 내 컴퓨터(localhost), 사내망, 공유기처럼 인터넷에 공개되지 않은 주소에도 접속하도록 허용합니다. 내부 관리 화면이나 파일 서버에 닿을 수 있으므로 필요한 경우에만 켜세요.",
-+  "browser.engine": "내 컴퓨터에서 브라우저를 움직일 프로그램을 고릅니다. auto는 Chrome을 찾고, lightpanda는 화면을 캡처하지 않고 페이지를 빠르게 읽는 경량 브라우저입니다. 클라우드 브라우저나 이미 실행 중인 Chrome을 연결한 경우에는 적용되지 않을 수 있습니다.",
++  "browser.engine": "내 컴퓨터에서 사용할 브라우저를 고릅니다. `auto`는 Chrome을 찾고, `chrome`은 Chrome을 지정합니다. `lightpanda`는 화면을 캡처하지 않고 웹페이지를 빠르게 읽는 가벼운 브라우저입니다. 클라우드 브라우저, Camofox 또는 이미 실행 중인 Chrome을 연결하면 이 설정이 적용되지 않을 수 있습니다.",
 +  "browser.auto_local_for_private_urls": "클라우드 브라우저를 쓰더라도 localhost나 사내망 주소는 이 컴퓨터의 브라우저로 엽니다. 이 컴퓨터에서만 볼 수 있는 주소에 접속할 때 사용합니다.",
 +  "browser.cdp_url": "이미 실행 중인 Chrome·Chromium에 연결할 주소입니다. CDP(Chrome DevTools Protocol, 크롬 브라우저를 프로그램으로 제어하는 연결 규격) 연결 주소를 입력합니다.",
 +  "browser.use_real_profile": "사용자 동의를 받은 뒤 실제 Chrome 프로필의 로그인 정보를 별도 복사본에 담아 브라우저 작업에 사용합니다. 에이전트가 로그인된 웹사이트를 열 수 있으므로 신뢰하는 작업에서만 켜세요.",
-+  "browser.real_profile_autoclose": "Windows에서 실제 Chrome·Edge·Brave 프로필이 사용 중이라 복사할 수 없을 때, 브라우저를 닫아도 되는지 먼저 묻습니다. 허락하면 열려 있는 창과 탭이 닫힐 수 있으며, 자동으로 강제 종료하지는 않습니다.",
++  "browser.real_profile_autoclose": "Windows에서 Chrome·Edge·Brave가 프로필을 사용 중이라 로그인 정보를 복사할 수 없을 때, 브라우저를 닫아도 되는지 먼저 묻습니다. 허락하면 창과 탭이 닫히며 저장하지 않은 내용은 사라질 수 있습니다. 허락 없이 강제로 종료하지는 않습니다.",
 +  "browser.real_profile_pin": "로그인 정보를 복사해 사용할 Chrome 프로필 폴더 이름입니다. 예: `Profile 2`. 비우면 Chrome에서 마지막으로 사용한 프로필을 선택합니다. 잘못된 이름을 지정하면 로그인 정보 없이 새 브라우저를 엽니다.",
 +  "browser.allow_unsafe_evaluate": "브라우저 페이지에서 실행하는 JavaScript가 쿠키·저장 정보·클립보드·네트워크 요청 같은 민감한 자료에 접근하지 못하게 하는 제한을 완전히 우회합니다. 신뢰하지 않는 페이지를 다룰 때는 켜지 마세요.",
 +  "browser.restrict_evaluate": "브라우저 페이지에서 실행하는 JavaScript가 쿠키·저장 정보·클립보드·요청 데이터 등 민감한 자료에 접근하지 못하도록 일부 기능을 차단합니다. JavaScript 실행 전체를 끄는 설정은 아닙니다.",
-+  "browser.dialog_policy": "웹페이지에 확인·입력 창이 뜰 때 처리할 방법입니다. must_respond(사람 응답 대기), auto_dismiss(자동 닫기), auto_accept(자동 확인) 중 고릅니다.",
-+  "browser.dialog_timeout_s": "must_respond(사람 응답 대기) 상태에서 브라우저 확인 창에 답이 없을 때 자동으로 닫기까지 기다리는 시간(초)입니다.",
++  "browser.dialog_policy": "웹페이지에서 확인·입력 창이 뜰 때 처리할 방법입니다. `must_respond`는 사람이 답할 때까지 기다리고, `auto_dismiss`는 창을 닫으며, `auto_accept`는 확인을 누릅니다. 자동 확인은 페이지에서 동작을 진행시킬 수 있으니 필요한 경우에만 선택하세요.",
++  "browser.dialog_timeout_s": "`must_respond`(사람 응답 대기)를 선택했을 때, 확인·입력 창에 답이 없으면 몇 초 뒤 닫을지 정합니다. 다른 처리 방식을 선택했을 때는 적용되지 않습니다.",
 +  "browser.camofox.managed_persistence": "Camofox 브라우저에서 같은 사용자 프로필을 계속 써 로그인 상태와 쿠키를 유지합니다. 끄면 매번 빈 임시 프로필로 시작합니다.",
 +  "browser.camofox.user_id": "다른 프로그램이 관리하는 Camofox 브라우저에서 사용할 사용자 이름입니다. 해당 프로그램에 등록된 이름과 같아야 합니다.",
 +  "browser.camofox.session_key": "다른 프로그램이 관리하는 Camofox 브라우저 세션을 찾을 때 쓰는 연결 키입니다.",

@@ -2365,10 +2365,10 @@ index 7883f5886a..a96efe86f8 100644
        <Select
          className="ml-auto min-w-0"
 diff --git a/web/src/components/ToolsetConfigDrawer.tsx b/web/src/components/ToolsetConfigDrawer.tsx
-index 86ee09c26d..20d0ad4e30 100644
+index 86ee09c26d..52bd589cdb 100644
 --- a/web/src/components/ToolsetConfigDrawer.tsx
 +++ b/web/src/components/ToolsetConfigDrawer.tsx
-@@ -28,6 +28,106 @@ interface Props {
+@@ -28,6 +28,107 @@ interface Props {
    onChanged: () => void;
  }
  
@@ -2413,29 +2413,29 @@ index 86ee09c26d..20d0ad4e30 100644
 +};
 +
 +const envLabels: Record<string, string> = {
-+  FIRECRAWL_API_URL: "(Firecrawl 서버 주소)",
-+  FIRECRAWL_API_KEY: "(Firecrawl API 키, 서비스 연결용 비밀 키)",
-+  BRAVE_SEARCH_API_KEY: "(Brave Search API 키, 서비스 연결용 비밀 키)",
-+  TAVILY_API_KEY: "(Tavily API 키, 서비스 연결용 비밀 키)",
-+  SEARXNG_URL: "(SearXNG 검색 서버 주소)",
-+  EXA_API_KEY: "(Exa API 키, 서비스 연결용 비밀 키)",
-+  PARALLEL_API_KEY: "(Parallel API 키, 서비스 연결용 비밀 키)",
-+  KEENABLE_API_KEY: "(Keenable API 키, 서비스 연결용 비밀 키)",
-+  XAI_API_KEY: "(xAI API 키, 서비스 연결용 비밀 키)",
-+  PERPLEXITY_API_KEY: "(Perplexity API 키, 서비스 연결용 비밀 키)",
++  FIRECRAWL_API_URL: "(Firecrawl 웹 검색 서버 주소)",
++  FIRECRAWL_API_KEY: "(Firecrawl 웹 검색 연결 키)",
++  BRAVE_SEARCH_API_KEY: "(Brave Search 웹 검색 연결 키)",
++  TAVILY_API_KEY: "(Tavily 웹 검색 연결 키)",
++  SEARXNG_URL: "(직접 운영하는 SearXNG 검색 서버 주소)",
++  EXA_API_KEY: "(Exa 웹 검색 연결 키)",
++  PARALLEL_API_KEY: "(Parallel 웹 검색 연결 키)",
++  KEENABLE_API_KEY: "(Keenable 웹 검색 연결 키)",
++  XAI_API_KEY: "(xAI 웹 검색 연결 키)",
++  PERPLEXITY_API_KEY: "(Perplexity 웹 검색 연결 키)",
 +};
 +
 +const envPrompts: Record<string, string> = {
 +  FIRECRAWL_API_URL: "Firecrawl 서버 주소 (예: http://localhost:3002)",
-+  FIRECRAWL_API_KEY: "Firecrawl API 키",
-+  BRAVE_SEARCH_API_KEY: "Brave Search API 키 (무료 요금제)",
-+  TAVILY_API_KEY: "Tavily API 키 (선택 사항 — 키 없이도 사용 가능)",
++  FIRECRAWL_API_KEY: "Firecrawl 계정에서 발급한 연결 키",
++  BRAVE_SEARCH_API_KEY: "Brave Search에서 발급한 연결 키 (무료 요금제)",
++  TAVILY_API_KEY: "Tavily 연결 키 (선택 사항 — 키 없이도 사용 가능)",
 +  SEARXNG_URL: "SearXNG 서버 주소 (예: http://localhost:8080)",
-+  EXA_API_KEY: "Exa API 키",
-+  PARALLEL_API_KEY: "Parallel API 키",
-+  KEENABLE_API_KEY: "Keenable API 키",
-+  XAI_API_KEY: "xAI API 키",
-+  PERPLEXITY_API_KEY: "Perplexity API 키",
++  EXA_API_KEY: "Exa 계정에서 발급한 연결 키",
++  PARALLEL_API_KEY: "Parallel 계정에서 발급한 연결 키",
++  KEENABLE_API_KEY: "Keenable 계정에서 발급한 연결 키",
++  XAI_API_KEY: "xAI 계정에서 발급한 연결 키",
++  PERPLEXITY_API_KEY: "Perplexity 계정에서 발급한 연결 키",
 +};
 +
 +function displayProviderName(name: string): string {
@@ -2465,7 +2465,8 @@ index 86ee09c26d..20d0ad4e30 100644
 +}
 +
 +function displayEnvLabel(key: string): string {
-+  return `${key} ${envLabels[key] ?? "(설정값)"}`;
++  const koreanLabel = envLabels[key] ?? "(설정값)";
++  return `${key} ${koreanLabel}`;
 +}
 +
 +function displayEnvPrompt(key: string, prompt?: string): string {
@@ -2475,7 +2476,7 @@ index 86ee09c26d..20d0ad4e30 100644
  /**
   * Full configuration surface for a single toolset's backends — the dashboard
   * equivalent of selecting a toolset in the `hermes tools` curses UI: toggle
-@@ -73,7 +173,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -73,7 +174,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
          }
          setIsSet(seed);
        })
@@ -2484,7 +2485,7 @@ index 86ee09c26d..20d0ad4e30 100644
        .finally(() => setLoading(false));
    }, [toolset.name, profile, showToast]);
  
-@@ -99,7 +199,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -99,7 +200,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
            setPostSetupRunning(false);
            const ok = st.exit_code === 0;
            showToast(
@@ -2493,7 +2494,7 @@ index 86ee09c26d..20d0ad4e30 100644
              ok ? "success" : "error",
            );
            // Refresh — a backend may now report itself configured/available.
-@@ -109,7 +209,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -109,7 +210,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
        } catch {
          if (!cancelled) {
            setPostSetupRunning(false);
@@ -2502,7 +2503,7 @@ index 86ee09c26d..20d0ad4e30 100644
          }
        }
      };
-@@ -127,12 +227,12 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -127,12 +228,12 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
        await api.toggleToolset(toolset.name, next, profile);
        setEnabled(next);
        showToast(
@@ -2517,7 +2518,7 @@ index 86ee09c26d..20d0ad4e30 100644
      } finally {
        setToggling(false);
      }
-@@ -143,11 +243,11 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -143,11 +244,11 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
      try {
        await api.selectToolsetProvider(toolset.name, provider.name, profile);
        setActiveProvider(provider.name);
@@ -2531,7 +2532,7 @@ index 86ee09c26d..20d0ad4e30 100644
          "error",
        );
      } finally {
-@@ -162,7 +262,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -162,7 +263,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
        if (v && v.trim()) env[e.key] = v.trim();
      }
      if (Object.keys(env).length === 0) {
@@ -2540,7 +2541,7 @@ index 86ee09c26d..20d0ad4e30 100644
        return;
      }
      setSavingProvider(provider.name);
-@@ -177,14 +277,14 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -177,14 +278,14 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
        });
        showToast(
          res.saved.length
@@ -2558,7 +2559,7 @@ index 86ee09c26d..20d0ad4e30 100644
          "error",
        );
      } finally {
-@@ -204,14 +304,21 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -204,14 +305,21 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
      } catch (e) {
        setPostSetupRunning(false);
        showToast(
@@ -2583,7 +2584,7 @@ index 86ee09c26d..20d0ad4e30 100644
  
    return createPortal(
      <div
-@@ -231,7 +338,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -231,7 +339,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
            size="xs"
            className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
            onClick={onClose}
@@ -2592,7 +2593,7 @@ index 86ee09c26d..20d0ad4e30 100644
          >
            <X />
          </Button>
-@@ -243,11 +350,11 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -243,11 +351,11 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                {labelText}
              </span>
              <Badge tone={enabled ? "success" : "outline"} className="text-xs">
@@ -2606,7 +2607,7 @@ index 86ee09c26d..20d0ad4e30 100644
            </p>
            <div className="mt-3 flex items-center gap-2">
              <Switch
-@@ -258,8 +365,8 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -258,8 +366,8 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
              />
              <span className="text-xs text-muted-foreground">
                {enabled
@@ -2617,7 +2618,7 @@ index 86ee09c26d..20d0ad4e30 100644
              </span>
            </div>
          </header>
-@@ -272,12 +379,12 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -272,12 +380,12 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
              </div>
            ) : !config?.has_category ? (
              <p className="text-sm text-muted-foreground py-6 text-center">
@@ -2633,7 +2634,7 @@ index 86ee09c26d..20d0ad4e30 100644
              </p>
            ) : (
              config.providers.map((provider) => {
-@@ -293,22 +400,22 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -293,22 +401,22 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                    <div className="flex items-center justify-between gap-2">
                      <div className="flex items-center gap-2 min-w-0">
                        <span className="font-medium text-sm">
@@ -2660,7 +2661,7 @@ index 86ee09c26d..20d0ad4e30 100644
                        </Badge>
                      ) : (
                        <Button
-@@ -320,14 +427,14 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -320,14 +428,14 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                          {selecting === provider.name ? (
                            <Loader2 className="h-3 w-3 animate-spin" />
                          ) : (
@@ -2677,7 +2678,7 @@ index 86ee09c26d..20d0ad4e30 100644
                      </p>
                    )}
  
-@@ -341,11 +448,11 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -341,11 +449,11 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                                htmlFor={`env-${ev.key}`}
                                className="text-xs font-mono"
                              >
@@ -2691,18 +2692,18 @@ index 86ee09c26d..20d0ad4e30 100644
                                </Badge>
                              )}
                            </div>
-@@ -355,8 +462,8 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -355,8 +463,8 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                              className="h-8 rounded-none text-xs font-mono"
                              placeholder={
                                isSet[ev.key]
 -                                ? "•••••••• (saved — leave blank to keep)"
 -                                : ev.prompt || ev.key
-+                                ? "•••••••• (저장됨 — 기존 값을 유지하려면 비워 두세요)"
++                                ? "•••••••• (이미 저장됨 · 유지하려면 비워 두세요)"
 +                                : displayEnvPrompt(ev.key, ev.prompt)
                              }
                              value={drafts[ev.key] ?? ""}
                              onChange={(e) =>
-@@ -373,7 +480,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -373,7 +481,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                                rel="noreferrer"
                                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                              >
@@ -2711,7 +2712,7 @@ index 86ee09c26d..20d0ad4e30 100644
                              </a>
                            )}
                          </div>
-@@ -386,7 +493,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -386,7 +494,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                          {savingProvider === provider.name ? (
                            <Loader2 className="h-3 w-3 animate-spin" />
                          ) : (
@@ -2720,7 +2721,7 @@ index 86ee09c26d..20d0ad4e30 100644
                          )}
                        </Button>
                      </div>
-@@ -396,12 +503,12 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -396,12 +504,12 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                    {provider.post_setup && (
                      <div className="mt-3 border-t border-border pt-3">
                        <p className="text-xs text-muted-foreground mb-1.5">
@@ -2735,7 +2736,7 @@ index 86ee09c26d..20d0ad4e30 100644
                        </p>
                        <Button
                          size="sm"
-@@ -424,8 +531,8 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -424,8 +532,8 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                        >
                          {postSetupRunning &&
                          postSetupKey === provider.post_setup
@@ -2746,7 +2747,7 @@ index 86ee09c26d..20d0ad4e30 100644
                        </Button>
                      </div>
                    )}
-@@ -440,14 +547,14 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
+@@ -440,14 +548,14 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-muted/30">
                  <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
                  <span className="text-xs font-mono text-muted-foreground">

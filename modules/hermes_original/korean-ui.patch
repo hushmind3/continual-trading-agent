@@ -83,7 +83,7 @@ index 49b23a4037..9ac5974881 100644
    const routes = useMemo(
      () => buildRoutes(builtinRoutes, manifests),
 diff --git a/web/src/components/AutoField.tsx b/web/src/components/AutoField.tsx
-index 18475fe8f4..1c75b9de28 100644
+index 18475fe8f4..5e05b8797d 100644
 --- a/web/src/components/AutoField.tsx
 +++ b/web/src/components/AutoField.tsx
 @@ -3,15 +3,1984 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
@@ -296,7 +296,7 @@ index 18475fe8f4..1c75b9de28 100644
 +  "agent.stream_drain_timeout": "응답 스트림 정리 대기 시간(초)",
 +  "agent.empty_response_guard.enabled": "빈 응답 감지 및 재시도",
 +  "agent.empty_response_guard.cost_threshold_usd": "빈 응답 재시도 비용 상한(USD)",
-+  "agent.service_tier": "모델 빠른 처리 등급 선택 방식",
++  "agent.service_tier": "빠른 답변 처리 방식",
 +  "agent.fast_auto_seconds": "자동 빠른 모드 적용 시간(초)",
 +  "agent.text_verbosity": "최종 답변 분량 요청",
 +  "agent.tool_use_enforcement": "모델이 실제 도구를 호출하도록 안내할 대상",
@@ -1889,8 +1889,8 @@ index 18475fe8f4..1c75b9de28 100644
 +  "delegation.reasoning_effort": "하위 에이전트가 문제를 풀 때 사용할 추론 시간과 강도입니다. 비우면 부모 설정을 따릅니다. 값을 높이면 복잡한 작업을 더 오래 생각할 수 있지만 응답 시간과 사용량이 늘 수 있습니다.",
 +  "approvals.mode": "위험할 수 있는 명령을 실행하기 전에 승인을 받는 규칙을 정합니다. 선택지별 허용 범위는 화면에 표시된 값과 안내를 확인하세요.",
 +  "logging.level": "`agent.log`에 남길 최소 심각도입니다. 기본 INFO는 일반 진행 정보와 그보다 심각한 경고·오류를 기록합니다. DEBUG는 세부 진단까지 더 많이 남기고, WARNING이나 ERROR를 고르면 그보다 낮은 단계는 생략해 기록량을 줄입니다. 별도 `errors.log`에는 WARNING 이상이 기록됩니다.",
-+  "agent.service_tier": "모델 서비스의 빠른 처리 등급을 언제 요청할지 정합니다. fast는 매번, auto는 대화 차례마다 처음 fast_auto_seconds초 동안, cold는 대화 세션의 첫 요청에서만 요청합니다. 비어 있거나 normal이면 요청하지 않으며, 지원하지 않는 서비스에서는 무시됩니다.",
-+  "agent.fast_auto_seconds": "위 설정을 auto로 골랐을 때, 사용자 요청을 처리하는 각 대화 차례의 처음 몇 초 동안 빠른 처리 등급을 요청할지 정합니다. 기본값은 60초입니다.",
++  "agent.service_tier": "모델 서비스에 빠른 처리 방식을 언제 요청할지 정합니다. `fast`는 매 요청에, `auto`는 매 요청의 처음 `fast_auto_seconds`초 동안, `cold`는 새 대화의 첫 요청에만 빠른 처리를 요청합니다. 비워 두거나 `normal`을 고르면 요청하지 않습니다. 빠른 처리를 지원하는 모델·서비스에서만 적용되며, 지원 여부와 별도 요금은 서비스마다 다릅니다. 실제 응답 속도가 빨라진다고 보장되지는 않습니다.",
++  "agent.fast_auto_seconds": "`service_tier`를 `auto`로 골랐을 때, 각 사용자 요청을 시작한 뒤 이 시간(초) 동안 빠른 처리를 요청합니다. 시간이 지나면 그 요청의 나머지 부분은 일반 처리로 돌아갑니다. 기본값은 60초이며, 빠른 처리 지원 여부와 별도 요금은 서비스마다 다릅니다.",
 +  "agent.max_turns": "사용자 요청 하나를 처리할 때 모델에 API(모델 서비스 요청)를 보내고 도구를 실행하는 반복 횟수의 상한입니다. 비우면 횟수로 제한하지 않습니다.",
 +  "agent.budget_warning_ratio": "최대 작업 횟수 중 이 비율에 도달하면 모델에 한 번 알립니다. 예를 들어 0.75는 75% 사용 시점입니다. 이 안내가 작업을 강제로 끝내지는 않습니다. 비우면 알리지 않습니다.",
 +  "agent.run_budget_seconds": "사용자 요청 한 건을 처리하는 데 허용할 최대 실제 시간(초)입니다. 설정하면 시간의 80%가 지났을 때 한 번 마무리를 알리고, 남은 시간보다 긴 API 대기는 제한합니다. 비우면 시간 제한이 없습니다.",
@@ -1910,7 +1910,7 @@ index 18475fe8f4..1c75b9de28 100644
 +  "agent.stream_drain_timeout": "Responses API(모델 답변을 받는 통신 방식)에서 답변 완료 신호를 받은 뒤 연결이 정리되기를 더 기다릴 시간(초)입니다. 답변 생성을 기다리는 제한 시간이 아니며, 0이면 추가로 기다리지 않습니다.",
 +  "agent.empty_response_guard.enabled": "모델이 글자나 결과 없이 빈 답변을 보내면 감지해 다시 요청합니다. 빈 답변을 무조건 반복 요청하면 비용이 다시 들 수 있어, 아래 비용 기준에 따라 재시도 횟수를 줄일 수 있습니다.",
 +  "agent.empty_response_guard.cost_threshold_usd": "빈 답변 한 번을 만들 때 예상 입력 비용이 이 금액(미국 달러) 이상이면, 같은 빈 답변을 반복 요청하는 횟수를 기본 3회에서 1회로 줄입니다. 가격을 알 수 없으면 횟수를 바꾸지 않습니다.",
-+  "agent.text_verbosity": "Responses API(모델 서비스와 답을 주고받는 방식)를 지원하는 서비스에 최종 답변의 분량을 요청합니다. low는 간결하게, medium은 보통 수준으로, high는 자세하게 답해 달라는 뜻입니다. 비워 두면 서비스 기본값을 쓰며 다른 통신 방식에는 보내지 않습니다.",
++  "agent.text_verbosity": "최종 답변을 얼마나 길게 쓸지 모델 서비스에 요청합니다. `low`는 짧게, `medium`은 보통 길이로, `high`는 자세하게 답해 달라는 뜻입니다. 이는 분량 요청이므로 실제 답변 길이가 정확히 정해지지는 않습니다. 비워 두면 서비스 기본값을 쓰며, 이 요청을 지원하는 Responses API 방식에서만 전달됩니다.",
 +  "agent.tool_use_enforcement": "모델이 행동을 말로 설명만 하고 도구를 부르지 않을 때 실제 도구를 호출하도록 안내합니다. auto는 GPT·Codex 계열에 적용하고, true/false는 전체 모델에 강제 적용하거나 끕니다. 모델 이름 일부를 목록으로 지정할 수도 있습니다.",
 +  "agent.execution_guidance": "모델에 도구 결과 저장, 외부 변경 뒤 다시 확인, 개수 맞춰 보기, 확인된 결과만 완료로 알리기 같은 실행 규칙을 추가합니다. auto는 지원 모델에 적용하고, true/false로 강제하거나 끌 수 있으며 모델 이름 목록으로 대상을 지정할 수도 있습니다.",
 +  "agent.intent_ack_continuation": "모델이 작업하겠다는 말만 하고 도구를 부르지 않으면 실제 실행을 이어가도록 다시 안내합니다. 한 대화 차례에 최대 두 번이며, auto는 Codex Responses 방식에 적용합니다. true는 전체 방식, false는 사용 안 함이고 모델 이름 목록으로 지정할 수도 있습니다.",

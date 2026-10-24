@@ -36,7 +36,7 @@ macOS 게이트웨이는 모든 프로필을 처리하는 호스트 서비스 �
 ## FreeLLMAPI 공용 연결
 
 기존 프로젝트 설치본의 단일 `/api/projects/freellmapi/<설치 ID>/v1`을 OpenAI Chat 규격으로 사용합니다. 개별 업체를 이 메뉴에 직접 연결하지 않고 `auto`가 FreeLLMAPI의 활성 체인에서 고릅니다. 통합 키는 담당 `home/.env`에만 저장하고 Git에 올리지 않습니다.
-공식 설치본 `cli/dist/index.js setup-hermes --profile shared --model auto`를 각 기존 `HERMES_HOME`에 실행해 `providers.freellmapi-shared`를 등록했습니다. 기본 홈과 다섯 기존 프로필에서 같은 연결을 선택할 수 있습니다. 현재 화면의 lead 프로필에도 등록했고 원본 모델 선택 UI에서 `freellmapi-shared · auto`를 주 모델로 적용했습니다. 다른 역할 프로필의 기존 주 모델은 유지합니다. 키·주소는 `FREELLMAPI_API_KEY`·`--url`로 전달하며 원본 설정 생성기가 병합합니다.
+공식 설치본 `cli/dist/index.js setup-hermes --profile shared --model auto`를 각 기존 `HERMES_HOME`에 실행해 `providers.freellmapi-shared`를 등록했습니다. 기본 홈과 다섯 기존 프로필에서 같은 연결을 선택할 수 있습니다. 현재 화면의 lead 프로필에도 등록했고 원본 모델 선택 UI에서 `freellmapi-shared · auto`를 주 모델로 적용했습니다. 2026-10-25 원본 모델 UI에서 developer·marketer·researcher·strategist의 주 모델도 `freellmapi-shared/auto`로 맞췄습니다. 기본 홈의 칸반 작업 분할 보조 모델 지정도 해제해 모든 보조 작업이 주 모델 `auto`를 공유합니다. 기존 대화 이력의 모델 이름은 과거 기록이며 새 작업 실행에 적용됩니다. 키·주소는 `FREELLMAPI_API_KEY`·`--url`로 전달하며 원본 설정 생성기가 병합합니다.
 2026-10-25 실제 확인: 기본 프로필의 기존 CLI와 lead 프로필의 원본 웹 대화에서 `auto` 응답을 받았습니다. 장시간 작업·모든 도구의 전수 확인과는 구분합니다.
 
 ## 대화에서 공식 칸반 사용

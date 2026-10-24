@@ -38,3 +38,9 @@ macOS 게이트웨이는 모든 프로필을 처리하는 호스트 서비스 �
 기존 프로젝트 설치본의 단일 `/api/projects/freellmapi/<설치 ID>/v1`을 OpenAI Chat 규격으로 사용합니다. 개별 업체를 이 메뉴에 직접 연결하지 않고 `auto`가 FreeLLMAPI의 활성 체인에서 고릅니다. 통합 키는 담당 `home/.env`에만 저장하고 Git에 올리지 않습니다.
 공식 설치본 `cli/dist/index.js setup-hermes --profile shared --model auto`를 각 기존 `HERMES_HOME`에 실행해 `providers.freellmapi-shared`를 등록했습니다. 기본 홈과 다섯 기존 프로필에서 같은 연결을 선택할 수 있습니다. 현재 화면의 lead 프로필에도 등록했고 원본 모델 선택 UI에서 `freellmapi-shared · auto`를 주 모델로 적용했습니다. 다른 역할 프로필의 기존 주 모델은 유지합니다. 키·주소는 `FREELLMAPI_API_KEY`·`--url`로 전달하며 원본 설정 생성기가 병합합니다.
 2026-10-25 실제 확인: 기본 프로필의 기존 CLI와 lead 프로필의 원본 웹 대화에서 `auto` 응답을 받았습니다. 장시간 작업·모든 도구의 전수 확인과는 구분합니다.
+
+## 대화에서 공식 칸반 사용
+
+작업판 화면과 채팅 도구 활성화는 별개입니다. 총괄 lead에는 공식 `launch.py -p lead tools enable kanban`을 적용해 `home/profiles/lead/config.yaml`의 `platform_toolsets.cli`에 칸반을 추가했습니다. 다른 역할의 실제 디스패처 작업자는 원본이 작업 수명주기 도구를 자동 제공합니다. 별도 협업 엔진·가짜 스킬·새 UI는 만들지 않습니다. [공식 도구 활성화 안내](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban#enabling-tools-for-a-chat-profile)를 따르며, 설정 전 대화는 도구 구성이 남으므로 공식 게이트웨이에 설정을 반영하고 기존 이력으로 재접속하거나 새 대화를 사용합니다.
+
+사용 화면은 8766의 `#ai_agent/HermesOriginal` 안입니다. 현재 공용 보드의 식별자는 `service-lab`, 표시 이름은 AI 서비스 연구소입니다. 보드 이름 대신 식별자를 쓰거나 현재 보드를 기본으로 조회합니다. 2026-10-25 기존 원본 화면에서 목록·카드 상세 조회와 `t_ef5d284a` 댓글 등록·재조회·모델의 최종 확인 답변까지 검증했습니다. 카드 상태는 triage로 유지했고 신규 업무·작업자를 확인용으로 실행하지 않았습니다. 전송 오류 수정은 [프로젝트 실행 중계 안내](../../../projects/backend/README.md)를 따릅니다.

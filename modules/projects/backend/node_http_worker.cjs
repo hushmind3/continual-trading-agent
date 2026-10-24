@@ -44,7 +44,9 @@ async function call(message){
  contexts.set(key,{client:message._client?.[0]||'127.0.0.1'});
  try{return await new Promise((resolve,reject)=>{
   let streamStarted=false,streamSettled=false;
-  const request=http.request({socketPath,path:target+(message.query?'?'+message.query:''),method:message.method||'GET',headers},response=>{
+  // IPC requests carry one-use context and Connection: close; never pool the
+  // socket across dashboard calls, tool turns, or a machine sleep/wake.
+  const request=http.request({socketPath,agent:false,path:target+(message.query?'?'+message.query:''),method:message.method||'GET',headers},response=>{
    if(message.stream){
     const resultHeaders={};for(const [name,value]of Object.entries(response.headers))if(!['content-length','transfer-encoding','connection','set-cookie'].includes(name))resultHeaders[name]=Array.isArray(value)?value.join(', '):value;
     streamStarted=true;reply(message,{stream_start:true,status:response.statusCode,headers:resultHeaders});

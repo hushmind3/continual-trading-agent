@@ -1,17 +1,22 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ExternalLink,Play,Square} from 'lucide-react';
 import {request} from '@platform/data/api';
-import {Button,ErrorMessage,Status} from '@platform/ui/Primitives';
+import {Button,Empty,ErrorMessage,Status} from '@platform/ui/Primitives';
 
 type State={state:'ready'|'starting'|'stopped';url:string;revision:string};
 const prefix='ai_agent/HermesOriginal/';
 export function Original(){
+ const initialStart=useRef(true);
  const [header,setHeader]=useState<HTMLElement|null>(null);
  useEffect(()=>setHeader(document.getElementById('workspace-header-slot')),[]);
  const [state,setState]=useState<State>(),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  useEffect(()=>{let cancelled=false;let timer:ReturnType<typeof setTimeout>;
-  const poll=async()=>{try{const next=await request<State>(prefix+'status',{},'GET');
+  const poll=async()=>{try{let next=await request<State>(prefix+'status',{},'GET');
+   if(cancelled)return;
+   if(initialStart.current){initialStart.current=false;if(next.state==='stopped'){
+    setState({...next,state:'starting'});next=await request<State>(prefix+'start');
+   }}
    if(cancelled)return;setState(next);if(next.state==='starting')timer=setTimeout(()=>void poll(),1500);
   }catch(e){if(!cancelled)setError(e instanceof Error?e.message:String(e))}};
   void poll();return()=>{cancelled=true;clearTimeout(timer)};
@@ -22,10 +27,11 @@ export function Original(){
   {header&&createPortal(<div className="hermes-original-controls" aria-label="헤르메스 실행 제어">
    <span className="hidden sm:inline-flex"><Status tone={state?.state==='ready'?'good':'idle'}>{state?.state==='ready'?'실행 중':state?.state==='starting'?'준비 중':'중지됨'}</Status></span>
    {state?.url&&<Button className="workspace-icon-button" aria-label="새 창에서 열기" title="새 창에서 열기" onClick={()=>window.open(state.url,'_blank','noopener')}><ExternalLink size={17}/></Button>}
-   {state?.state==='stopped'?<Button className="workspace-icon-button" aria-label="실행" title="실행" busy={busy} onClick={()=>void act('start')}><Play size={17}/></Button>:
-    <Button className="workspace-icon-button" aria-label="중지" title="중지" busy={busy} onClick={()=>void act('stop')}><Square size={17}/></Button>}
+   {state?.state==='stopped'||error?<Button className="workspace-icon-button" aria-label="실행" title="실행" busy={busy} onClick={()=>void act('start')}><Play size={17}/></Button>:
+    <Button className="workspace-icon-button" aria-label="중지" title="중지" busy={busy} disabled={!state} onClick={()=>void act('stop')}><Square size={17}/></Button>}
   </div>,header)}
   {error&&<ErrorMessage message={error}/>}
-  {state?.url&&<iframe title="Hermes Agent 원본" src={state.url} className="ui-app-workspace-frame" allow="clipboard-read; clipboard-write; microphone; camera; fullscreen"/>}
+  {state?.url?<iframe title="Hermes Agent 원본" src={state.url} className="ui-app-workspace-frame" allow="clipboard-read; clipboard-write; microphone; camera; fullscreen"/>:<Empty title={error?'대시보드를 열지 못했습니다.':state?.state==='stopped'?'헤르메스 대시보드가 중지되었습니다.':state?.state==='starting'?'헤르메스 대시보드를 준비하고 있습니다.':'실행 상태를 확인하고 있습니다.'}
+   action={(state?.state==='stopped'||error)?<Button tone="primary" busy={busy} onClick={()=>void act('start')}><Play size={17}/>{error?'다시 실행':'실행'}</Button>:undefined}/>}
  </section>;
 }

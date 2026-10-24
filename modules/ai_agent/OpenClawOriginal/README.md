@@ -2,6 +2,10 @@
 
 용도: AI 에이전트 → OpenClaw 원본 → 원본 화면의 모듈 등록·React 화면·원격 접근과 확인 범위를 안내합니다.
 
+화면 시작: 메뉴 진입 시 상태를 확인하고 중지된 OpenClaw 대시보드를 기존 `start` API로 한 번 시작합니다. 준비 중·상태 조회 실패·중지 상태를 공통 UI로 표시하며 실패 시 다시 실행할 수 있습니다. 화면 안에서 직접 중지하면 자동으로 다시 시작하지 않습니다. 다른 메뉴로 이동해도 실행 중인 원본을 종료하지 않습니다.
+
+2026-10-24 화면 복구 확인: 기존 설치본의 상태 `ready`·플랫폼 iframe 채팅 화면과 `연결됨` 표시를 확인했습니다. 플랫폼 TypeScript 검사·Vite 빌드·프론트 독립 적용을 완료했습니다. 모델 호출·외부 접속은 이번 확인에 포함하지 않았습니다.
+
 실제 백엔드·설치·업데이트·소메뉴 계층은 [백엔드 안내](backend/README.md)를 따릅니다. `backend/manager.py`는 소메뉴 취합, `backend/register.py`는 대메뉴 공통 매니저를 통한 등록을 담당합니다. backend·frontend·패치·module.json은 이 폴더가 함께 소유합니다. 원본은 루트 `.gitmodules`의 고정 커밋으로 복원합니다.
 
 - 화면: `frontend/Original.tsx`; 메뉴 등록은 `frontend/register.ts`와 `module.json`에서 합니다.

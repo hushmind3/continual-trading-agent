@@ -87,7 +87,7 @@ index 5bdf3c4..45c02fe 100644
  }
 --- /dev/null
 +++ b/client/src/components/usage-overview.tsx
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,34 @@
 +import { useI18n } from '@/i18n'
 +import type { ModelGroupRow, TokenUsageData } from '@/lib/routing'
 +
@@ -98,14 +98,27 @@ index 5bdf3c4..45c02fe 100644
 +}) {
 +  const { locale } = useI18n()
 +  const ko = locale === 'ko'
-+  const active = new Set(groups.flatMap(g => g.members.filter(m => m.enabled && (m.source ?? 'catalog') === 'catalog' && m.platform !== 'custom').map(m => `${m.platform}:${m.modelId}`)))
-+  const known = data?.models.filter(m => active.has(`${m.platform}:${m.modelId}`) && m.budget > 0)
-+  const remaining = known?.reduce((sum, m) => sum + Math.max(0, m.budget - (m.used ?? 0)), 0)
++  const active = groups.flatMap(g => g.members.filter(m => m.enabled && (m.source ?? 'catalog') === 'catalog' && m.platform !== 'custom'))
 +  return (
-+    <section className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center" aria-label={ko ? '남은 무료 총량' : 'Remaining free capacity'}>
-+      <h1 className="text-base font-medium text-muted-foreground">{ko ? '남은 무료 토큰 · 추정' : 'Remaining free tokens · Estimated'}</h1>
-+      <p className="break-all text-4xl font-semibold tabular-nums">{loading || !data ? (ko ? '조회 중' : 'Loading') : known?.length ? remaining!.toLocaleString(locale) : (ko ? '미확인' : 'Unknown')}</p>
-+      <p className="text-xs text-muted-foreground">{ko ? '등록된 활성 모델의 월 카탈로그 한도 기준 · 업체 실제 잔액 미연동' : 'Active models’ monthly catalog limits · Actual balances not connected'}</p>
++    <section className="flex min-h-0 flex-1 flex-col gap-3 p-4" aria-label={ko ? '무료 모델 잔여량' : 'Free model balances'}>
++      <header className="flex shrink-0 items-center justify-between gap-2">
++        <h1 className="text-base font-semibold">{ko ? '무료 모델' : 'Free models'}</h1>
++        <span className="text-xs text-muted-foreground">{ko ? '남은 월 토큰 · 추정' : 'Monthly tokens left · Estimated'}</span>
++      </header>
++      <ul className="min-h-0 flex-1 divide-y overflow-y-auto rounded-2xl border bg-card" aria-label={ko ? '업체·모델별 남은 총량' : 'Balances by provider and model'}>
++        {active.map(m => {
++          const budget = data?.models.find(b => b.platform === m.platform && b.modelId === m.modelId)
++          const remaining = budget && budget.budget > 0 ? Math.max(0, budget.budget - (budget.used ?? 0)) : null
++          return (
++            <li key={m.modelDbId} className="flex items-center justify-between gap-3 px-3 py-3">
++              <div className="min-w-0"><p className="break-words text-sm font-medium">{m.displayName}</p><p className="mt-1 text-xs text-muted-foreground">{m.platform}</p></div>
++              <p className="shrink-0 text-sm font-semibold tabular-nums">{remaining === null ? (ko ? '미확인' : 'Unknown') : remaining.toLocaleString(locale)}</p>
++            </li>
++          )
++        })}
++        {(loading || !active.length) && <li className="p-3 text-sm text-muted-foreground">{loading ? (ko ? '조회 중' : 'Loading') : (ko ? '활성 모델 없음' : 'No active models')}</li>}
++      </ul>
++      <p className="shrink-0 text-xs text-muted-foreground">{ko ? '월 카탈로그 한도 기준 · 업체 실제 잔액 미연동' : 'Monthly catalog estimates · Actual balances not connected'}</p>
 +    </section>
 +  )
 +}

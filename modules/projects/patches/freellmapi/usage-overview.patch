@@ -1,0 +1,111 @@
+diff --git a/client/src/App.tsx b/client/src/App.tsx
+index d2b54d3..280a796 100644
+--- a/client/src/App.tsx
++++ b/client/src/App.tsx
+@@ -42,7 +42,6 @@ import SearchPage from '@/pages/SearchPage'
+ import DecisionPage from '@/pages/DecisionPage'
+ import MediaDetailPage from '@/pages/MediaDetailPage'
+ import EmbeddingDetailPage from '@/pages/EmbeddingDetailPage'
+-import AnalyticsPage from '@/pages/AnalyticsPage'
+ import LogsPage from '@/pages/LogsPage'
+ import PremiumPage from '@/pages/PremiumPage'
+ import NotFoundPage from '@/pages/NotFoundPage'
+@@ -70,12 +69,8 @@ const queryClient = new QueryClient({
+ })
+ 
+ const navItems = [
+-  { to: '/models', labelKey: 'nav.models' },
+-  { to: '/playground', labelKey: 'nav.playground' },
++  { to: '/models/chat', labelKey: 'nav.models' },
+   { to: '/keys', labelKey: 'nav.keys' },
+-  { to: '/agents', labelKey: 'nav.agents' },
+-  { to: '/analytics', labelKey: 'nav.analytics' },
+-  { to: '/premium', labelKey: 'nav.premium' },
+ ]
+ 
+ // The modality pages behind "Models"; surfaced in the nav dropdown and
+@@ -419,7 +414,7 @@ function PageBoundary({ children }: { children: ReactNode }) {
+ // padded column. Only the Playground so far: its three columns run edge to edge
+ // and the transcript scrolls inside its own pane, so the page must be exactly
+ // as tall as what is left under the navbar — not a centred card with margins.
+-const FULL_BLEED_ROUTES = new Set(['/playground'])
++const FULL_BLEED_ROUTES = new Set(['/playground', '/models/chat'])
+ 
+ // The shell's content container. A full-bleed route drops the max-width and the
+ // padding and becomes a flex child that fills the rest of the screen; every
+@@ -497,7 +492,7 @@ function App() {
+                       <Route path="/keys" element={<KeysPage />} />
+                       <Route path="/agents" element={<AgentsPage />} />
+                       <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />
+-                      <Route path="/analytics" element={<AnalyticsPage />} />
++                      <Route path="/analytics" element={<Navigate to="/models/chat" replace />} />
+                       <Route path="/logs" element={<LogsPage />} />
+                       <Route path="/premium" element={<PremiumPage />} />
+                       <Route path="/test" element={<Navigate to="/playground" replace />} />
+diff --git a/client/src/pages/FallbackPage.tsx b/client/src/pages/FallbackPage.tsx
+index 5bdf3c4..45c02fe 100644
+--- a/client/src/pages/FallbackPage.tsx
++++ b/client/src/pages/FallbackPage.tsx
+@@ -52,6 +52,7 @@ import { ReliabilityFloorControl } from '@/components/reliability-floor-control'
+ import { ProviderMomentControl } from '@/components/provider-moment-control'
+ import { DecisionRoutingPopover, DecisionSetupGuide } from '@/components/decision-routing-popover'
+ import { ChainManager } from '@/components/chain-manager'
++import { UsageOverview } from '@/components/usage-overview'
+ 
+ // `tKey` is the i18n suffix under `strategies.*` (label) and `strategies.*Blurb`.
+ // It differs from the routing `key` for Manual, whose strategy id is 'priority'.
+@@ -97,7 +98,7 @@ function readOptionsCollapsed(): boolean {
+ 
+ 
+ export default function FallbackPage() {
+-  const { t } = useI18n()
++  const { t, locale } = useI18n()
+   const navigate = useNavigate()
+   const queryClient = useQueryClient()
+   // Staged edits carry the chain they were made against, so switching chains
+@@ -335,7 +336,11 @@ export default function FallbackPage() {
+   }
+ 
+   return (
+-    <div>
++    <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
++      <UsageOverview groups={orderedGroups} data={tokenUsage} loading={isLoading} />
++      <details className="shrink-0 border-t bg-card px-4 py-3">
++        <summary className="cursor-pointer text-sm font-medium">{locale === 'ko' ? '모델 추가 · 고급 설정' : 'Add models · Advanced settings'}</summary>
++        <div className="max-h-80 overflow-y-auto pt-4">
+       <PageHeader
+         title={t('models.title')}
+         description={t('strategies.description')}
+@@ -697,6 +702,8 @@ export default function FallbackPage() {
+           </>
+         )}
+       </div>
++        </div>
++      </details>
+     </div>
+   )
+ }
+--- /dev/null
++++ b/client/src/components/usage-overview.tsx
+@@ -0,0 +1,21 @@
++import { useI18n } from '@/i18n'
++import type { ModelGroupRow, TokenUsageData } from '@/lib/routing'
++
++export function UsageOverview({ groups, data, loading }: {
++  groups: ModelGroupRow[]
++  data?: TokenUsageData
++  loading: boolean
++}) {
++  const { locale } = useI18n()
++  const ko = locale === 'ko'
++  const active = new Set(groups.flatMap(g => g.members.filter(m => m.enabled && (m.source ?? 'catalog') === 'catalog' && m.platform !== 'custom').map(m => `${m.platform}:${m.modelId}`)))
++  const known = data?.models.filter(m => active.has(`${m.platform}:${m.modelId}`) && m.budget > 0)
++  const remaining = known?.reduce((sum, m) => sum + Math.max(0, m.budget - (m.used ?? 0)), 0)
++  return (
++    <section className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center" aria-label={ko ? '남은 무료 총량' : 'Remaining free capacity'}>
++      <h1 className="text-base font-medium text-muted-foreground">{ko ? '남은 무료 토큰 · 추정' : 'Remaining free tokens · Estimated'}</h1>
++      <p className="break-all text-4xl font-semibold tabular-nums">{loading || !data ? (ko ? '조회 중' : 'Loading') : known?.length ? remaining!.toLocaleString(locale) : (ko ? '미확인' : 'Unknown')}</p>
++      <p className="text-xs text-muted-foreground">{ko ? '등록된 활성 모델의 월 카탈로그 한도 기준 · 업체 실제 잔액 미연동' : 'Active models’ monthly catalog limits · Actual balances not connected'}</p>
++    </section>
++  )
++}

@@ -8,9 +8,11 @@
 
 Node 서버와 Vite 화면을 함께 가진 앱도 원본 서버를 포함해 설치합니다. 화면의 API 요청은 기존 단일 `/api`로 전달하며 앱별 웹 포트를 추가하지 않습니다. 실패 후 **다시 시도**는 내려받은 소스·준비된 Node 의존성과 빌드 결과에서 이어갑니다. 연결 구현과 제한은 [백엔드 안내](backend/README.md)를 따릅니다.
 
-FreeLLMAPI 로컬 설치는 `runtime/projects/manage/projects/freellmapi/`가 소유합니다. 원본은 `versions/version-1/source/`, 사용자 DB는 `data/`에 보존하며 키와 암호화 설정은 비공개 설치 레코드로 관리합니다. 원본이 지원하는 기존 OpenClaw Node 24 실행기와 설치된 Brave를 검증에 재사용합니다. 별도의 Chrome 설치나 업체 계정 자동 가입은 수행하지 않습니다. FreeLLMAPI는 업체별 API 키를 통합 사용하는 앱이며, 설치만으로 업체 계정·키가 생기지는 않습니다.
+FreeLLMAPI 로컬 설치는 `runtime/projects/manage/projects/freellmapi/`가 소유합니다. 원본은 `versions/version-1/source/`, 사용자 DB는 `data/`에 보존하며 키와 암호화 설정은 비공개 설치 레코드로 관리합니다. 설치만으로 업체 계정·키가 생기지는 않습니다. 원본 UI에 [남은 무료 총량 화면 패치](patches/freellmapi/README.md)를 적용해 활성 모델의 월 카탈로그 한도에서 로컬 사용량을 뺀 추정 합계만 표시합니다. 실제 업체 잔액은 미연동이며 기본 화면에 차트·요청 수·사용량 목록을 노출하지 않습니다.
 
-실제 확인(2026-10-24): 원본 서버·화면 검증 통과, 설치 상태 `ready`·메뉴 연결 완료. `#projects/app/p_tashfeenahmed_freellmapi_7e9a60d5`에서 원본의 첫 관리자 계정 생성 화면을 확인했습니다. 관리자 계정 생성·업체별 가입·API 키 입력·모델 호출은 미실행입니다. Node 실행기를 소유한 OpenClaw 도구 폴더를 제거하면 이 설치의 실행 경로도 함께 변경해야 합니다.
+Codex 데스크톱은 로컬 OpenCodex의 `FreeLLMAPI · 자동` 한 항목으로 연결합니다. 플랫폼의 `/api/projects/freellmapi/{project_id}/v1/{models,responses}`는 기존 Node worker로 전달하며 loopback과 통합 Bearer 키를 요구합니다. 현재 응답은 버퍼링되어 SSE가 완료 후 전달됩니다. 자세한 연결 경계는 [백엔드 안내](backend/README.md)를 따릅니다.
+
+실제 확인(2026-10-24): 기존 설치·Codex 자동 경로에서 Google, Groq, OVH, OpenRouter, Kilo의 네 모델 그룹 여섯 경로 응답과 사용 기록을 확인했습니다. 전체 업체 가입·전체 카탈로그 호출·업체 실제 청구액/잔여 한도 확인은 미완료입니다. 이번 화면 수정에서는 모델을 호출하지 않았습니다. 원본 Node 실행기는 기존 OpenClaw 도구를 재사용하므로 해당 도구를 제거하면 실행 경로도 변경해야 합니다.
 
 ## 구현과 연결
 

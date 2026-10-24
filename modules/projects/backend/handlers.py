@@ -141,8 +141,11 @@ async def freellmapi_codex_proxy(project_id: str, path: str, request: Request):
     body = await request.body()
     if len(body) > 25 * 1024 * 1024:
         raise HTTPException(413, 'Codex 요청 본문이 너무 큽니다.')
-    headers = {key: value for key, value in request.headers.items()
-               if key.lower() not in ('host', 'content-length', 'connection', 'transfer-encoding', 'accept-encoding', 'cookie')}
+    # Codex metadata headers can exceed Node's header ceiling and close the
+    # IPC HTTP socket while the body is uploading (write EPIPE). The original
+    # API needs its bearer and content headers, not the desktop session state.
+    allowed_headers = {'authorization', 'content-type', 'accept', 'user-agent', 'x-request-id'}
+    headers = {key: value for key, value in request.headers.items() if key.lower() in allowed_headers}
     payload = {'path': '/' + path, 'query': request.url.query, 'method': request.method,
                'headers': headers, 'body': body.decode('utf-8')}
     result = await run_in_threadpool(call, runtime.invoke, record, payload, request)

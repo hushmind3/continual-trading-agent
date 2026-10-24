@@ -93,3 +93,5 @@ builtin_packages와 detachment는 기존 run.py와 함께 실행 가능한 .comm
 회사 도구 인증은 앱 비밀 토큰과 Hermes의 실제 회사 연결을 함께 검증합니다. conversation.py는 고정 대표 세션 외의 새 총괄 대화도 같은 company_id일 때 허용하고, 업무 기록은 실제 세션별로 소유하게 합니다. 일반 대화를 회사 세션으로 취급하거나 임의 session_id를 신뢰하지 않습니다. 관련 실제 확인은 integrations/README.md를 따릅니다.
 
 Codex 자동 모델의 컨텍스트 등록은 실제 활성 풀의 최소 크기인 131,072 토큰으로 조정했습니다. 생성된 OpenCodex 카탈로그의 자동 압축 기준은 117,964 토큰입니다. 이 값은 연결 본문 크기 제한과 별개이며 실행 중 Codex가 보관한 모델 정보의 갱신 여부·이 긴 대화 전체의 재전송 성공은 별도 확인 대상입니다.
+
+Codex 도구 호환: 원본의 [codex-compatibility.patch](../patches/freellmapi/codex-compatibility.patch)는 Gemini가 거부하는 encrypted 스키마 주석을 제거하고 같은 이름의 실제 인수는 보존합니다. 관련 검사 21개, 원본 서버 TypeScript 빌드, 해당 중첩 주석을 포함한 실제 무료 자동 경로의 함수 호출/결과 반환을 확인했습니다. 큰 Codex 부가 헤더는 원본 Node 서버에 그대로 전달하지 않으며, 같은 EPIPE 재현 요청은 수정 후 HTTP 200을 확인했습니다. 실제 Codex 화면의 전체 기능 확인과 구분합니다.

@@ -1,0 +1,50 @@
+diff --git a/server/src/__tests__/lib/gemini-wire.test.ts b/server/src/__tests__/lib/gemini-wire.test.ts
+index 8d9b999..8c22d96 100644
+--- a/server/src/__tests__/lib/gemini-wire.test.ts
++++ b/server/src/__tests__/lib/gemini-wire.test.ts
+@@ -114,6 +114,31 @@ describe('Gemini wire translation', () => {
+     ]);
+   });
+ 
++  it('removes Codex encrypted annotations without dropping argument names', () => {
++    expect(sanitizeForGemini({
++      type: 'object',
++      properties: {
++        encrypted: { type: 'boolean', encrypted: false },
++        entries: {
++          type: 'array', encrypted: true,
++          items: { type: 'object', properties: {
++            value: { type: ['string', 'null'], encrypted: true },
++          } },
++        },
++      },
++      required: ['encrypted', 'entries'],
++    })).toEqual({
++      type: 'object',
++      properties: {
++        encrypted: { type: 'boolean' },
++        entries: { type: 'array', items: { type: 'object', properties: {
++          value: { type: 'string', nullable: true },
++        } } },
++      },
++      required: ['encrypted', 'entries'],
++    });
++  });
++
+   it('omits tool_choice entirely when the request has no toolConfig', () => {
+     expect(geminiToolChoice(undefined)).toBeUndefined();
+     expect(geminiToolChoice({})).toBeUndefined();
+diff --git a/server/src/lib/gemini-wire.ts b/server/src/lib/gemini-wire.ts
+index dd818d2..9e0fef2 100644
+--- a/server/src/lib/gemini-wire.ts
++++ b/server/src/lib/gemini-wire.ts
+@@ -103,6 +103,9 @@ const UNSUPPORTED_SCHEMA_KEYS = new Set([
+   'propertyNames',
+   'multipleOf',
+   'deprecated',
++  // Codex marks sensitive arguments with this annotation. It is not part of
++  // Google's Schema proto; actual properties named encrypted remain intact.
++  'encrypted',
+ ]);
+ 
+ const VENDOR_EXTENSION_SCHEMA_KEY = /^x-/i;

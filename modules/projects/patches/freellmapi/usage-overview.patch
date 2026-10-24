@@ -87,7 +87,7 @@ index 5bdf3c4..71150fd 100644
  }
 diff --git a/client/src/components/usage-overview.tsx b/client/src/components/usage-overview.tsx
 new file mode 100644
-index 0000000..d882ec3
+index 0000000..ccc4f7f
 --- /dev/null
 +++ b/client/src/components/usage-overview.tsx
 @@ -0,0 +1,151 @@
@@ -196,7 +196,7 @@ index 0000000..d882ec3
 +          {ko ? '실제 잔여값을 보고한 업체만 합산합니다. 카탈로그 월 한도나 사용 기록은 잔액으로 계산하지 않습니다.' : 'Only provider-reported remaining quota is totaled; catalog limits and local usage are not presented as balances.'}
 +        </p>
 +        <p className="mt-1 text-xs font-medium text-muted-foreground">
-+          {configuredKeys ? (ko ? `FreeLLMAPI 저장 현황: 제공업체 ${configuredProviderCount}곳 · 키 ${configuredKeys.length}개` : `Saved in FreeLLMAPI: ${configuredProviderCount} providers · ${configuredKeys.length} keys`) : (ko ? '저장된 업체 현황을 불러오는 중…' : 'Loading saved provider count…')}
++          {configuredKeys ? (ko ? `FreeLLMAPI 저장: 제공업체 ${configuredProviderCount}곳 · 키 항목 ${configuredKeys.length}개 (비활성 포함)` : `Saved in FreeLLMAPI: ${configuredProviderCount} providers · ${configuredKeys.length} key entries (includes disabled)`) : (ko ? '저장된 업체 현황을 불러오는 중…' : 'Loading saved provider count…')}
 +        </p>
 +      </div>
 +

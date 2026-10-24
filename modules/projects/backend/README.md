@@ -2,6 +2,8 @@
 
 용도: 프로젝트 관리 소메뉴의 설치 트랜잭션과 앱 소유 파일·연결 수명주기를 담당합니다.
 
+Node HTTP 앱의 `index.html` 진입은 `runtime.py`가 같은 앱의 루트 URL로 307 이동하며 쿼리를 보존합니다. React Router가 문서 파일명을 업무 경로로 해석해 404를 표시하지 않게 합니다. 2026-10-24 기존 FreeLLMAPI 플랫폼 iframe에서 `/models/chat` 원본 화면 표시를 확인했습니다. Codex는 OpenCodex의 단일 `FreeLLMAPI · 자동` 항목을 사용하며, 로컬 활성 체인은 실제 응답을 확인한 네 모델 그룹(여섯 공급 경로)으로 제한했습니다. 카탈로그 전체의 작동을 검증한 것은 아닙니다. 원본 요청/토큰 기록은 확인했지만 업체 대시보드의 잔여 무료 한도 차이는 확인하지 않았습니다.
+
 Node HTTP + Vite 앱은 `package.json`의 실제 `start`/`server` 진입점을 함께 탐지합니다. `node_http_worker.cjs`는 원본 서버의 HTTP 요청을 전용 named pipe(Windows)/Unix socket IPC로 실행하고 `runtime.py`의 기존 `projects/invoke`·단일 `/api`에 연결합니다. 추가 TCP 포트나 앱별 API 등록은 만들지 않습니다. 원본 인증·로컬 접근 판정에 실제 플랫폼 접속자의 주소를 전달하고, 쿠키 세션은 별도 인증 어댑터가 필요하다고 거부합니다. 화면은 기존 `assets_bridge.js`로 API를 연결합니다. `verify_ui.cjs`는 같은 원본 Node 서버와 빌드 화면을 실행합니다. 재시도는 저장된 소스·node_modules·빌드 결과를 재사용하며 새 설치·업데이트는 의존성과 화면을 새로 준비합니다. 독립 ZIP 실행은 원본 Node 진입점을 실행합니다.
 
 Node 앱 설정의 `PLATFORM_NODE_EXECUTABLE`은 실제 실행과 UI 검증에 사용할 기존 Node 실행 파일을 지정합니다. 비동기 초기화가 있는 원본 서버는 실제 listening 이벤트까지 기다립니다. 이미 `/assets/projects/<설치 ID>/`를 기준으로 빌드한 화면에는 같은 경로를 중복 추가하지 않습니다. `PLATFORM_VERIFY_BROWSER_EXECUTABLE`로 기존 Chromium 계열 브라우저를 검사에 재사용할 수 있으며, 브라우저 시작 실패 때도 원본 실행기를 정리합니다. 이 설정은 공용 로그인 브라우저를 바꾸거나 Chrome을 설치하지 않습니다.

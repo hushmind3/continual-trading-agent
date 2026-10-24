@@ -105,6 +105,16 @@ def _version(port):
         return json.load(result)
 
 
+def _background(data, key):
+    if not _owned(data, key):
+        return False
+    try:
+        return any(arg == '--headless' or arg.startswith('--headless=')
+                   for arg in psutil.Process(data['pid']).cmdline())
+    except psutil.Error:
+        return False
+
+
 def status():
     with LOCK:
         key = selected()
@@ -130,6 +140,7 @@ def status():
                 'profile': str(profile(key)) if spec['engine'] == 'chromium' else '선택한 브라우저의 기존 프로필',
                 'browser': spec['name'], 'browser_id': key, 'providers': providers.catalog(),
                 'supports_automation': spec['engine'] == 'chromium', 'mode': data.get('mode', 'login'),
+                'background': _background(data, key),
                 'accounts': sessions.status(profile(key), spec['engine']), 'persistent': True}
 
 
@@ -147,8 +158,10 @@ def start(mode='login', url='about:blank'):
             return status()
         current = status()
         data = _read(key)
-        if _owned(data, key) and data.get('mode', 'automation') != mode:
-            # Explicit mode change restarts only this exact dedicated profile owner.
+        background = mode == 'automation'
+        if _owned(data, key) and (data.get('mode', 'automation') != mode
+                                  or current['background'] != background):
+            # Reuse the exact profile, including its saved login, when changing execution mode.
             process = psutil.Process(data['pid'])
             process.terminate()
             try:
@@ -170,6 +183,7 @@ def start(mode='login', url='about:blank'):
         if port and mode == 'automation':
             try:
                 with socket.socket() as probe:
+                    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     probe.bind(('127.0.0.1', port))
             except OSError as error:
                 raise ValueError('공용 브라우저 포트를 다른 프로세스가 사용 중입니다. 기존 브라우저 창을 확인하세요.') from error
@@ -178,10 +192,11 @@ def start(mode='login', url='about:blank'):
             active_port.unlink(missing_ok=True)
         with (STATE / 'browser.log').open('ab') as log:
             os.chmod(STATE / 'browser.log', 0o600)
-            flags = ['--remote-debugging-address=127.0.0.1', f'--remote-debugging-port={port}'] if mode == 'automation' else []
+            flags = (['--remote-debugging-address=127.0.0.1', f'--remote-debugging-port={port}',
+                      '--headless=new', '--restore-last-session'] if background else ['--new-window'])
             process = subprocess.Popen([
                 str(executable), f'--user-data-dir={location}', *flags,
-                '--no-first-run', '--no-default-browser-check', '--new-window', url],
+                '--no-first-run', '--no-default-browser-check', url],
                 stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
         created = psutil.Process(process.pid).create_time()
         _save(key, {'pid': process.pid, 'created': created,
@@ -223,9 +238,8 @@ def public_url(value):
 def open_page(url):
     url = public_url(url)
     with LOCK:
-        if 'accounts.google.com' == urlsplit(url).hostname or providers.get(selected())['engine'] != 'chromium' or status()['state'] != 'ready':
-            current = start('login', url)
-            return {'opened': True, 'url': url, 'mode': 'login', 'browser': current['browser']}
+        if providers.get(selected())['engine'] != 'chromium':
+            raise ValueError('자동 계정 작업은 공용 Chromium 브라우저가 필요합니다. 데스크톱 창은 자동으로 열지 않습니다.')
         current = start('automation')
         request = Request(current['endpoint'] + '/json/new?' + quote(url, safe=''), method='PUT')
         with urlopen(request, timeout=5) as result:

@@ -36,7 +36,7 @@ def mcp():
             method = request.get('method')
             if method == 'initialize':
                 result = {'protocolVersion': '2024-11-05', 'capabilities': {'tools': {}}, 'serverInfo': {'name': 'platform-shared-accounts', 'version': '1.0.0'},
-                          'instructions': '공용 브라우저는 platform_browser MCP. 같은 업체 가입을 동시에 실행하지 마세요. 키·비밀번호는 결과에 반환하지 마세요.'}
+                          'instructions': '공용 브라우저는 platform_browser MCP로 백그라운드에서 사용합니다. 이미 승인된 가입·약관 동의·키 발급을 반복 승인받지 마세요. 추가 본인 인증·CAPTCHA는 우회하지 말고 기록 후 다른 업체를 진행하세요. 같은 업체 가입을 동시에 실행하지 마세요. 키·비밀번호는 결과에 반환하지 마세요.'}
             elif method == 'tools/list':
                 result = {'tools': tools}
             elif method == 'ping':

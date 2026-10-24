@@ -9,7 +9,7 @@ import subprocess
 import sys
 import threading
 from fastapi import HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from .store import owned, read
 
 WORKERS = {}
@@ -270,6 +270,10 @@ def register_host(app):
             if not record.get('active_source'): raise ValueError('아직 실행 가능한 설치본이 없습니다.')
             spec = record['adapter']; ui = spec.get('ui') if spec['kind'] in ('fastapi', 'node-http') else spec
             if not ui or ui['kind'] not in ('static', 'vite', 'asgi'): raise ValueError('원본 웹 화면이 없습니다.')
+            if spec['kind'] == 'node-http' and path == 'index.html':
+                target = '/assets/projects/' + identifier + '/'
+                if request.url.query: target += '?' + request.url.query
+                return RedirectResponse(target, status_code=307)
             if path.startswith('_platform-output/'):
                 from .store import project_folder
                 relative=path.removeprefix('_platform-output/')

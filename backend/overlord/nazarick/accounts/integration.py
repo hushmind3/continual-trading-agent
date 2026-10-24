@@ -15,6 +15,10 @@ PYTHON = ROOT / '.venv/platform' / ('Scripts/python.exe' if os.name == 'nt' else
 CODEX = ROOT / '.codex/config.toml'
 HERMES = ROOT / 'runtime/ai_agent/HermesOriginal/home'
 OPENCLAW = ROOT / 'runtime/ai_agent/OpenClawOriginal/home/openclaw.json'
+ACCOUNT_POLICY = ('이미 승인된 가입·약관 동의·키 발급 범위는 반복 승인 없이 진행한다. '
+                  '공용 브라우저는 백그라운드로 사용하고 데스크톱 창을 자동으로 열지 않는다. '
+                  '추가 본인 인증·CAPTCHA는 우회하지 않고 waiting_user로 기록한 뒤 다른 업체를 진행한다. '
+                  '새 비용·승인 범위를 벗어난 동의는 진행하지 않는다. 확인 없이 가입 완료로 표시하지 않는다. ')
 
 
 def _command(mode):
@@ -83,7 +87,7 @@ def connect():
                            f'공용 계정 작업은 `{PYTHON} "{CLI}" list`로 업체 목록을 먼저 확인한다. '
                            '브라우저 도구는 BROWSER_CDP_URL의 공용 전용 브라우저를 사용한다. '
                            '같은 업체를 동시에 가입하지 않는다. 대기 중인 업체를 선택해 working으로 기록하고 실제 결과에 따라 갱신한다. '
-                           '추가 인증·CAPTCHA·필요한 약관 동의는 waiting_user로 기록하고 사용자에게 넘긴다. 확인 없이 가입 완료로 표시하지 않는다. '
+                           + ACCOUNT_POLICY +
                            '비밀번호·쿠키·API 키를 메모·대화·파일에 복사하지 않는다. '
                            f'키 저장은 공용 설정 화면, 키 사용은 `{PYTHON} "{CLI}" run --service ID --env ENV_NAME -- COMMAND`로 환경변수 주입한다. '
                            f'업체 상태 갱신은 `{PYTHON} "{CLI}" update ID STATUS --notes "결과"`를 사용한다.\n')
@@ -102,7 +106,8 @@ def connect():
                    f'---\nname: shared-accounts\ndescription: 공용 로그인 브라우저와 업체 가입 진행표 사용\n---\n'
                    f'브라우저 작업은 platform 프로필을 사용한다. 공용 업체 목록은 `{PYTHON} "{CLI}" list`로 확인한다. '
                    f'실제 진행 결과는 `{PYTHON} "{CLI}" update ID STATUS --notes "결과"`로 기록한다. '
-                   'working은 한 담당자만 사용하고, 추가 인증·CAPTCHA·필요한 약관 동의는 waiting_user로 기록해 사용자에게 넘긴다. '
+                   'working은 한 담당자만 사용한다. '
+                   + ACCOUNT_POLICY +
                    '키·쿠키·비밀번호를 메모나 결과에 남기지 않는다. '
                    f'API 키는 공용 설정에서 보관하고 `{PYTHON} "{CLI}" run --service ID --env API_KEY -- COMMAND`로 실행 시 주입한다.\n')
         result = {'configured': True, 'endpoint': endpoint, 'hermes_profiles': configured,

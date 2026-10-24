@@ -87,35 +87,158 @@ index 5bdf3c4..71150fd 100644
  }
 diff --git a/client/src/components/usage-overview.tsx b/client/src/components/usage-overview.tsx
 new file mode 100644
-index 0000000..e6b3a51
+index 0000000..d882ec3
 --- /dev/null
 +++ b/client/src/components/usage-overview.tsx
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,151 @@
 +import { useQuery } from '@tanstack/react-query'
 +import { apiFetch } from '@/lib/api'
++import type { FallbackEntry } from '@/lib/routing'
 +import { useI18n } from '@/i18n'
++
++type QuotaMetric = 'tokens' | 'credits' | 'neurons' | 'requests' | string
++type FreeTierPool = {
++  poolKey: string
++  platform: string
++  memberModelIds: string[]
++  quota: { remaining: number | null; metric: QuotaMetric } | null
++}
++type FreeTierData = { generatedAt: string; pools: FreeTierPool[] }
++type RecentResponse = { rows: { platform: string; modelId: string }[] }
++type ConfiguredKey = { platform: string; enabled: boolean; status: string }
++
++const metricLabels: Record<string, { ko: string; en: string }> = {
++  tokens: { ko: '토큰', en: 'tokens' },
++  credits: { ko: '크레딧', en: 'credits' },
++  neurons: { ko: '뉴런', en: 'neurons' },
++  requests: { ko: '요청', en: 'requests' },
++}
++const providerNames: Record<string, string> = {
++  google: 'Google AI Studio', groq: 'Groq', ovh: 'OVHcloud', openrouter: 'OpenRouter',
++  kilo: 'Kilo Gateway', llm7: 'LLM7', xkiro: 'xKiro', zhipu: 'Z.ai',
++  cloudflare: 'Cloudflare', sealion: 'SEA-LION',
++}
++
++function amount(value: number, locale: string) {
++  return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value)
++}
 +
 +export function UsageOverview() {
 +  const { locale } = useI18n()
 +  const ko = locale === 'ko'
-+  const { data: recent } = useQuery<{ rows: { platform: string; modelId: string }[] }>({
++  const { data: balance, isPending: balancePending, isError: balanceError } = useQuery<FreeTierData>({
++    queryKey: ['free-tier-balance'],
++    queryFn: () => apiFetch('/api/free-tier'),
++    refetchInterval: 15_000,
++  })
++  const { data: chain, isPending: chainPending, isError: chainError } = useQuery<FallbackEntry[]>({
++    queryKey: ['active-routing-models'],
++    queryFn: () => apiFetch('/api/fallback'),
++    refetchInterval: 15_000,
++  })
++  const { data: configuredKeys } = useQuery<ConfiguredKey[]>({
++    queryKey: ['configured-provider-keys'],
++    queryFn: () => apiFetch('/api/keys'),
++    refetchInterval: 30_000,
++  })
++  const { data: recent, isError: recentError } = useQuery<RecentResponse>({
 +    queryKey: ['current-routed-model'],
 +    queryFn: () => apiFetch('/api/analytics/requests?range=24h&status=success&limit=1'),
 +    refetchInterval: 5000,
 +  })
++
++  const totals = new Map<string, number>()
++  for (const pool of balance?.pools ?? []) {
++    if (pool.quota && typeof pool.quota.remaining === 'number') {
++      totals.set(pool.quota.metric, (totals.get(pool.quota.metric) ?? 0) + pool.quota.remaining)
++    }
++  }
++  const measured = [...totals.entries()].filter(([, remaining]) => Number.isFinite(remaining))
++  const models = (chain ?? []).filter(row => row.enabled && row.keyCount > 0)
++  const configuredProviderCount = new Set((configuredKeys ?? []).map(key => key.platform)).size
++  const routedProviderCount = new Set(models.map(model => model.platform)).size
++  const modelGroups = new Map<string, { platform: string; models: FallbackEntry[]; quota: FreeTierPool['quota'] }>()
++  for (const model of models) {
++    const pool = balance?.pools.find(candidate => candidate.platform === model.platform && candidate.memberModelIds.includes(model.modelId))
++    const groupKey = pool?.poolKey ?? `${model.platform}::unreported`
++    const group = modelGroups.get(groupKey) ?? { platform: model.platform, models: [], quota: pool?.quota ?? null }
++    group.models.push(model)
++    modelGroups.set(groupKey, group)
++  }
 +  const last = recent?.rows[0]
++  const lastModel = last && models.find(model => model.platform === last.platform && model.modelId === last.modelId)
++  const lastProvider = last && (providerNames[last.platform] ?? last.platform.split(/[-_]/).map(part => part ? part[0].toUpperCase() + part.slice(1) : '').join(' '))
++  const noBalance = ko ? '아직 확인된 잔여량 없음' : 'No reported balance yet'
++  const noModels = ko ? '사용 가능한 라우팅 모델이 없습니다' : 'No routable models are available'
++
 +  return (
-+    <section className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col justify-center gap-5 p-5 sm:p-6" aria-label={ko ? '무료 모델 요약' : 'Free model summary'}>
-+      <div className="rounded-2xl border bg-card p-7 text-center sm:p-8">
-+        <h1 className="text-base font-medium text-muted-foreground">{ko ? '실제 남은 무료 잔액' : 'Actual free balance remaining'}</h1>
-+        <p className="mt-3 text-2xl font-bold sm:text-3xl">{ko ? '조회할 수 없음' : 'Unavailable'}</p>
-+        <p className="mt-2 text-sm text-muted-foreground">{ko ? 'FreeLLMAPI에서 업체 실제 잔액을 조회할 수 없습니다.' : 'FreeLLMAPI does not report actual provider balances here.'}</p>
++    <section className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col justify-center gap-3 p-3 sm:gap-4 sm:p-5" aria-label={ko ? 'FreeLLMAPI 사용 현황' : 'FreeLLMAPI usage overview'}>
++      <div className="rounded-2xl border bg-card px-4 py-3 sm:px-5 sm:py-4">
++        <div className="flex items-baseline justify-between gap-3">
++          <h1 className="text-sm font-semibold sm:text-base">{ko ? '확인된 무료 잔여 한도' : 'Reported free quota remaining'}</h1>
++          <span className="text-xs text-muted-foreground">{ko ? '업체 보고값' : 'Provider reported'}</span>
++        </div>
++        {balancePending ? (
++          <p className="mt-2 text-sm text-muted-foreground">{ko ? '불러오는 중…' : 'Loading…'}</p>
++        ) : balanceError ? (
++          <p role="status" className="mt-2 text-sm text-muted-foreground">{ko ? '잔여 한도를 불러오지 못했습니다' : 'Could not load remaining quota'}</p>
++        ) : measured.length ? (
++          <div className="mt-2 flex flex-wrap gap-2">
++            {measured.map(([metric, remaining]) => {
++              const label = metricLabels[metric] ?? { ko: metric, en: metric }
++              return <span key={metric} className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold tabular-nums">{amount(remaining, locale)} {ko ? label.ko : label.en}</span>
++            })}
++          </div>
++        ) : (
++          <p className="mt-2 text-sm font-medium text-muted-foreground">{noBalance}</p>
++        )}
++        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
++          {ko ? '실제 잔여값을 보고한 업체만 합산합니다. 카탈로그 월 한도나 사용 기록은 잔액으로 계산하지 않습니다.' : 'Only provider-reported remaining quota is totaled; catalog limits and local usage are not presented as balances.'}
++        </p>
++        <p className="mt-1 text-xs font-medium text-muted-foreground">
++          {configuredKeys ? (ko ? `FreeLLMAPI 저장 현황: 제공업체 ${configuredProviderCount}곳 · 키 ${configuredKeys.length}개` : `Saved in FreeLLMAPI: ${configuredProviderCount} providers · ${configuredKeys.length} keys`) : (ko ? '저장된 업체 현황을 불러오는 중…' : 'Loading saved provider count…')}
++        </p>
 +      </div>
-+      <div className="rounded-2xl border bg-card px-5 py-4 text-center">
-+        <p className="text-sm text-muted-foreground">{ko ? '최근 응답 모델' : 'Latest responding model'}</p>
-+        <p className="mt-1 truncate text-base font-semibold">{last ? `${last.platform} · ${last.modelId}` : (ko ? '아직 완료된 응답이 없습니다' : 'No completed response yet')}</p>
++
++      <div className="rounded-2xl border bg-card px-4 py-3 sm:px-5 sm:py-4">
++        <div className="flex items-baseline justify-between gap-3">
++          <h2 className="text-sm font-semibold sm:text-base">{ko ? '자동 라우팅 모델' : 'Automatic routing models'}</h2>
++          <span className="text-xs text-muted-foreground">{chainPending ? '…' : (ko ? `${models.length}개 모델 · ${routedProviderCount}개 업체` : `${models.length} models · ${routedProviderCount} providers`)}</span>
++        </div>
++        {chainError ? (
++          <p role="status" className="mt-2 text-sm text-muted-foreground">{ko ? '모델 목록을 불러오지 못했습니다' : 'Could not load model list'}</p>
++        ) : models.length ? (
++          <>
++          <p className="mt-1 text-xs text-muted-foreground">{ko ? '아래 모델 중 자동으로 선택합니다. 잔여량은 업체별 공유 한도입니다.' : 'Auto selects from these models; quota is shared per provider.'}</p>
++          <ul className="mt-1 max-h-64 divide-y overflow-y-auto pr-1" aria-label={ko ? '사용 가능한 모델과 제공자 잔여량' : 'Available models and provider quota'}>
++            {[...modelGroups.entries()].map(([groupKey, group]) => {
++              const provider = providerNames[group.platform] ?? group.platform.split(/[-_]/).map(part => part ? part[0].toUpperCase() + part.slice(1) : '').join(' ')
++              const metric = group.quota?.metric
++              const metricLabel = metric ? metricLabels[metric] ?? { ko: metric, en: metric } : null
++              const quotaLabel = typeof group.quota?.remaining === 'number' && metricLabel
++                ? `${amount(group.quota.remaining, locale)} ${ko ? metricLabel.ko : metricLabel.en}`
++                : (ko ? '잔여량 미보고' : 'Balance not reported')
++              return (
++              <li key={groupKey} className="min-w-0 py-1.5">
++                <div className="flex items-center justify-between gap-2 text-xs">
++                  <span className="truncate font-semibold">{provider}</span>
++                  <span className="shrink-0 tabular-nums text-muted-foreground">{quotaLabel}</span>
++                </div>
++                <p className="mt-0.5 truncate text-sm">{group.models.map(model => model.displayName || model.modelId).join(' · ')}</p>
++              </li>
++              )
++            })}
++          </ul>
++          </>
++        ) : chainPending ? (
++          <p className="mt-2 text-sm text-muted-foreground">{ko ? '불러오는 중…' : 'Loading…'}</p>
++        ) : <p className="mt-2 text-sm text-muted-foreground">{noModels}</p>}
 +      </div>
-+      <p className="text-center text-sm text-muted-foreground">{ko ? '카탈로그 한도나 사용 기록으로 잔액을 계산하지 않습니다.' : 'No balance is inferred from catalog limits or local usage.'}</p>
++
++      <div className="rounded-2xl border bg-card px-4 py-3 sm:px-5 sm:py-4" aria-live="polite">
++        <p className="text-xs text-muted-foreground">{ko ? '가장 최근 실제 응답' : 'Most recent successful response'}</p>
++        <p className="mt-1 truncate text-sm font-semibold">{last ? `${lastProvider} · ${lastModel?.displayName || last.modelId}` : recentError ? (ko ? '응답 기록을 불러오지 못했습니다' : 'Could not load response history') : (ko ? '아직 성공한 응답이 없습니다' : 'No successful response yet')}</p>
++      </div>
 +    </section>
 +  )
 +}

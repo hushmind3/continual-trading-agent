@@ -38,7 +38,7 @@ async function call(message){
  if(headers.origin&&message._host){try{const origin=new URL(headers.origin);if(origin.host===message._host)headers.origin='http://'+logicalHost;}catch{}}
  headers.host=logicalHost;headers.connection='close';headers['x-platform-ipc-request']=key;
  const body=String(message.body||'');
- if(Buffer.byteLength(body)>8*1024*1024)throw Error('앱 요청이 8 MiB를 초과합니다.');
+ if(Buffer.byteLength(body)>25*1024*1024)throw Error('앱 요청이 25 MiB를 초과합니다.');
  if(body)headers['content-length']=Buffer.byteLength(body);
  contexts.set(key,{client:message._client?.[0]||'127.0.0.1'});
  try{return await new Promise((resolve,reject)=>{

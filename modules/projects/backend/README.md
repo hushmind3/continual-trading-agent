@@ -6,7 +6,9 @@ FreeLLMAPI는 기존 원본 화면에 [남은 무료 총량 화면 패치](../pa
 
 Node HTTP 앱의 `index.html` 진입은 `runtime.py`가 같은 앱의 루트 URL로 307 이동하며 쿼리를 보존합니다. React Router가 문서 파일명을 업무 경로로 해석해 404를 표시하지 않게 합니다. 2026-10-24 기존 FreeLLMAPI 플랫폼 iframe에서 `/models/chat` 원본 화면 표시를 확인했습니다. Codex는 OpenCodex의 단일 `FreeLLMAPI · 자동` 항목을 사용하며, 로컬 활성 체인은 실제 응답을 확인한 네 모델 그룹(여섯 공급 경로)으로 제한했습니다. 카탈로그 전체의 작동을 검증한 것은 아닙니다. 원본 요청/토큰 기록은 확인했지만 업체 대시보드의 잔여 무료 한도 차이는 확인하지 않았습니다.
 
-Node HTTP + Vite 앱은 `package.json`의 실제 `start`/`server` 진입점을 함께 탐지합니다. `node_http_worker.cjs`는 원본 서버의 HTTP 요청을 전용 named pipe(Windows)/Unix socket IPC로 실행하고 `runtime.py`의 기존 `projects/invoke`·단일 `/api`에 연결합니다. 추가 TCP 포트나 앱별 API 등록은 만들지 않습니다. 원본 인증·로컬 접근 판정에 실제 플랫폼 접속자의 주소를 전달하고, 쿠키 세션은 별도 인증 어댑터가 필요하다고 거부합니다. 화면은 기존 `assets_bridge.js`로 API를 연결합니다. `verify_ui.cjs`는 같은 원본 Node 서버와 빌드 화면을 실행합니다. 재시도는 저장된 소스·node_modules·빌드 결과를 재사용하며 새 설치·업데이트는 의존성과 화면을 새로 준비합니다. 독립 ZIP 실행은 원본 Node 진입점을 실행합니다.
+Node HTTP + Vite 앱은 `package.json`의 실제 `start`/`server` 진입점을 함께 탐지합니다. `node_http_worker.cjs`는 원본 서버의 HTTP 요청을 전용 named pipe(Windows)/Unix socket IPC로 실행하고 `runtime.py`의 기존 `projects/invoke`·단일 `/api`에 연결합니다. 추가 TCP 포트나 앱별 API 서버는 만들지 않습니다. 원본 인증·로컬 접근 판정에 실제 플랫폼 접속자의 주소를 전달하고, 쿠키 세션은 별도 인증 어댑터가 필요하다고 거부합니다. 화면은 기존 `assets_bridge.js`로 API를 연결합니다. `verify_ui.cjs`는 같은 원본 Node 서버와 빌드 화면을 실행합니다. 재시도는 저장된 소스·node_modules·빌드 결과를 재사용하며 새 설치·업데이트는 의존성과 화면을 새로 준비합니다. 독립 ZIP 실행은 원본 Node 진입점을 실행합니다.
+
+FreeLLMAPI Codex 연결만 기존 API 호스트의 `/api/projects/freellmapi/<설치 ID>/v1/{models,responses}` 경로를 직접 사용합니다. `handlers.py`는 설치 원본이 공식 FreeLLMAPI 저장소인지 확인하고, loopback 클라이언트·통합 Bearer 키만 허용한 뒤 `runtime.invoke`로 같은 Node worker에 전달합니다. `api_transport.py`는 이 고정 경로만 통과시킵니다. 별도 포트·서버·원본 복사본은 없습니다. 현재 IPC worker는 응답을 버퍼링하므로 SSE는 완료 후 전달되고 70초 제한이 적용됩니다. Codex 입력과 Node worker의 입력 상한은 원본 LLM API 기본값과 같은 25 MiB입니다. 과거 2 MiB/8 MiB 상한은 긴 대화·이미지를 원본 이전에 차단했고, OpenCodex가 이를 context_length_exceeded로 표시할 수 있었습니다. 9 MiB 입력이 원본 JSON 파서에 도달함을 확인했으며 이 확인에는 모델 추론을 사용하지 않았습니다.
 
 Node 앱 설정의 `PLATFORM_NODE_EXECUTABLE`은 실제 실행과 UI 검증에 사용할 기존 Node 실행 파일을 지정합니다. 비동기 초기화가 있는 원본 서버는 실제 listening 이벤트까지 기다립니다. 이미 `/assets/projects/<설치 ID>/`를 기준으로 빌드한 화면에는 같은 경로를 중복 추가하지 않습니다. `PLATFORM_VERIFY_BROWSER_EXECUTABLE`로 기존 Chromium 계열 브라우저를 검사에 재사용할 수 있으며, 브라우저 시작 실패 때도 원본 실행기를 정리합니다. 이 설정은 공용 로그인 브라우저를 바꾸거나 Chrome을 설치하지 않습니다.
 
@@ -89,3 +91,5 @@ builtin_packages와 detachment는 기존 run.py와 함께 실행 가능한 .comm
 2026-10-22 공통 npm의 실제 버전 실행·수정 소스 구문을 확인했습니다. 기존 프로젝트를 다시 설치/내려받거나 분리·ZIP 생성하지 않았으므로 외부 앱 설치/배포 완주와 Finder GUI 조작은 미확인입니다. 공통 실행 경로 결과는 ../../../backend/README.md를 따릅니다.
 
 회사 도구 인증은 앱 비밀 토큰과 Hermes의 실제 회사 연결을 함께 검증합니다. conversation.py는 고정 대표 세션 외의 새 총괄 대화도 같은 company_id일 때 허용하고, 업무 기록은 실제 세션별로 소유하게 합니다. 일반 대화를 회사 세션으로 취급하거나 임의 session_id를 신뢰하지 않습니다. 관련 실제 확인은 integrations/README.md를 따릅니다.
+
+Codex 자동 모델의 컨텍스트 등록은 실제 활성 풀의 최소 크기인 131,072 토큰으로 조정했습니다. 생성된 OpenCodex 카탈로그의 자동 압축 기준은 117,964 토큰입니다. 이 값은 연결 본문 크기 제한과 별개이며 실행 중 Codex가 보관한 모델 정보의 갱신 여부·이 긴 대화 전체의 재전송 성공은 별도 확인 대상입니다.

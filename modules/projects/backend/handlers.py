@@ -1,8 +1,12 @@
 """Project installation submenu, behind the existing /api envelope."""
+import base64
+import ipaddress
 from pathlib import Path
 import shlex
 import re
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import Response
 from . import github, installer, runtime, lifecycle, localization
 from .store import LOCK, STATE, identifier, read, save
 
@@ -116,6 +120,35 @@ def harness_control(request: dict):
 def invoke(request: dict, connection: Request):
     if len(str(request.get('body', ''))) > 2 * 1024 * 1024: raise HTTPException(413, '요청 본문이 너무 큽니다.')
     return call(runtime.invoke, call(read, request.get('id', '')), request, connection)
+
+
+@router.api_route('/freellmapi/{project_id}/{path:path}', methods=['GET', 'POST'], include_in_schema=False)
+async def freellmapi_codex_proxy(project_id: str, path: str, request: Request):
+    """Expose FreeLLMAPI's Responses API through the existing local /api host."""
+    client = request.client
+    try:
+        if not client or not ipaddress.ip_address(client.host).is_loopback:
+            raise HTTPException(403, 'Codex용 FreeLLMAPI 연결은 이 컴퓨터에서만 사용할 수 있습니다.')
+    except ValueError as exc:
+        raise HTTPException(403, 'Codex용 FreeLLMAPI 연결은 이 컴퓨터에서만 사용할 수 있습니다.') from exc
+    if not request.headers.get('authorization'):
+        raise HTTPException(401, 'FreeLLMAPI 통합 API 키가 필요합니다.')
+    if path not in ('v1/models', 'v1/responses'):
+        raise HTTPException(404, 'Codex 연결에서 지원하지 않는 FreeLLMAPI 경로입니다.')
+    record = call(read, project_id)
+    if record.get('url', '').rstrip('/').lower() != 'https://github.com/tashfeenahmed/freellmapi' or record.get('adapter', {}).get('kind') != 'node-http':
+        raise HTTPException(404, 'FreeLLMAPI 설치본을 찾을 수 없습니다.')
+    body = await request.body()
+    if len(body) > 25 * 1024 * 1024:
+        raise HTTPException(413, 'Codex 요청 본문이 너무 큽니다.')
+    headers = {key: value for key, value in request.headers.items()
+               if key.lower() not in ('host', 'content-length', 'connection', 'transfer-encoding', 'accept-encoding', 'cookie')}
+    payload = {'path': '/' + path, 'query': request.url.query, 'method': request.method,
+               'headers': headers, 'body': body.decode('utf-8')}
+    result = await run_in_threadpool(call, runtime.invoke, record, payload, request)
+    response_headers = {key: value for key, value in result.get('headers', {}).items()
+                        if key.lower() not in ('content-length', 'connection', 'transfer-encoding', 'set-cookie')}
+    return Response(base64.b64decode(result.get('body', '')), status_code=result['status'], headers=response_headers)
 
 
 @router.post('/run')

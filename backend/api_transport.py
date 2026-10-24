@@ -58,6 +58,13 @@ async def local_writes(request: Request, call_next):
             matched[1]['headers']=[(key,value) for key,value in request.scope['headers'] if key.lower() not in (b'content-length',b'content-type')]+[(b'content-type',b'application/json'),(b'content-length',str(len(body)).encode())]
             request.state.api_dispatch=(*matched,body)
         except (ValueError,TypeError,AttributeError) as exc:return JSONResponse({'detail':str(exc)},status_code=400)
+    elif path.startswith('/api/projects/freellmapi/'):
+        # Codex speaks OpenAI Responses directly; this loopback-only bridge stays
+        # inside the same /api host and is authenticated by FreeLLMAPI itself.
+        from menu_registry import dispatch
+        matched=dispatch(request.scope,{})
+        if not matched:return JSONResponse({'detail':'Codex용 FreeLLMAPI 경로가 등록되지 않았습니다.'},status_code=404)
+        request.state.api_dispatch=(*matched,await request.body())
     elif path.startswith('/api/'):
         return JSONResponse({'detail':'단일 /api 통로를 사용하세요.'},status_code=404)
     origin = request.headers.get("origin")

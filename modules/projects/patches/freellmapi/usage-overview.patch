@@ -87,7 +87,9 @@ index 5bdf3c4..45c02fe 100644
  }
 --- /dev/null
 +++ b/client/src/components/usage-overview.tsx
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,44 @@
++import { useQuery } from '@tanstack/react-query'
++import { apiFetch } from '@/lib/api'
 +import { useI18n } from '@/i18n'
 +import type { ModelGroupRow, TokenUsageData } from '@/lib/routing'
 +
@@ -98,6 +100,13 @@ index 5bdf3c4..45c02fe 100644
 +}) {
 +  const { locale } = useI18n()
 +  const ko = locale === 'ko'
++  const { data: recent } = useQuery<{ rows: { platform: string; modelId: string }[] }>({
++    queryKey: ['current-routed-model'],
++    queryFn: () => apiFetch('/api/analytics/requests?range=24h&status=success&limit=1'),
++    refetchInterval: 5000,
++  })
++  const last = recent?.rows[0]
++  const lastName = last && groups.flatMap(g => g.members).find(m => m.platform === last.platform && m.modelId === last.modelId)?.displayName
 +  const active = groups.flatMap(g => g.members.filter(m => m.enabled && (m.source ?? 'catalog') === 'catalog' && m.platform !== 'custom'))
 +  return (
 +    <section className="flex min-h-0 flex-1 flex-col gap-3 p-4" aria-label={ko ? '무료 모델 잔여량' : 'Free model balances'}>
@@ -105,6 +114,7 @@ index 5bdf3c4..45c02fe 100644
 +        <h1 className="text-base font-semibold">{ko ? '무료 모델' : 'Free models'}</h1>
 +        <span className="text-xs text-muted-foreground">{ko ? '남은 월 토큰 · 추정' : 'Monthly tokens left · Estimated'}</span>
 +      </header>
++      <p className="shrink-0 truncate text-xs text-muted-foreground">{ko ? '최근 실제 응답' : 'Last served'} · {last ? `${last.platform} · ${lastName ?? last.modelId}` : (ko ? '최근 응답 없음' : 'No recent response')}</p>
 +      <ul className="min-h-0 flex-1 divide-y overflow-y-auto rounded-2xl border bg-card" aria-label={ko ? '업체·모델별 남은 총량' : 'Balances by provider and model'}>
 +        {active.map(m => {
 +          const budget = data?.models.find(b => b.platform === m.platform && b.modelId === m.modelId)

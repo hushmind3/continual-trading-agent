@@ -19,6 +19,7 @@ register_controls(private_api)
 from menu_registry import bind
 bind(private_api.routes)
 app.router.routes.append(Route('/api',UnifiedAPI(),methods=['GET','POST']))
+app.router.routes.append(Route('/api/{path:path}',UnifiedAPI(),methods=['GET','POST']))
 app.mount('/assets',StaticFiles(directory=str(FRONTEND_DIST/'assets'),check_dir=False),name='react-assets')
 app.get('/',include_in_schema=False)(react_index)
 app.middleware('http')(local_writes)

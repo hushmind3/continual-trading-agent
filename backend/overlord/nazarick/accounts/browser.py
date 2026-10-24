@@ -1,4 +1,4 @@
-"""Persistent, visible Chrome profile; loopback CDP, no copied user cookies."""
+"""Persistent shared browser profiles; loopback CDP, no copied user cookies."""
 import json
 import os
 from pathlib import Path
@@ -9,28 +9,95 @@ import time
 from urllib.request import Request, urlopen
 from urllib.parse import quote, urlsplit
 import psutil
-from platform_native import browser_executable
 from .state import STATE, private_directory, write_json, exclusive
+from . import providers, sessions
 
 LOCK = threading.RLock()
 PROFILE = STATE / 'browser-profile'
 CONTROL = STATE / 'browser.json'
+PREFERENCES = STATE / 'browser-preferences.json'
 
 
-def _read():
+def selected():
     try:
-        return json.loads(CONTROL.read_text())
+        return json.loads(PREFERENCES.read_text())['browser_id']
+    except (OSError, ValueError, KeyError):
+        return 'chrome'  # Preserve the existing Chrome profile until explicitly changed.
+
+
+def profile(key):
+    return PROFILE if key == 'chrome' else STATE / 'browser-profiles' / key
+
+
+def control(key):
+    return CONTROL if key == 'chrome' else STATE / 'browsers' / (key + '.json')
+
+
+def choose(key):
+    providers.get(key)
+    with LOCK, exclusive('browser-start'):
+        write_json(PREFERENCES, {'browser_id': key})
+    return status()
+
+
+def _read(key=None):
+    try:
+        return json.loads(control(key or selected()).read_text())
     except (OSError, ValueError):
         return {}
 
 
-def _owned(data):
+def _owned(data, key=None):
     try:
         process = psutil.Process(data['pid'])
         return (abs(process.create_time() - data['created']) < .01
-                and f'--user-data-dir={PROFILE}' in process.cmdline())
+                and f'--user-data-dir={profile(key or selected())}' in process.cmdline())
     except (KeyError, psutil.Error, TypeError):
         return False
+
+
+def _save(key, value):
+    control(key).parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    write_json(control(key), value)
+
+
+def _debug_port(process, location):
+    try:
+        return int((location / 'DevToolsActivePort').read_text().splitlines()[0])
+    except (OSError, ValueError, IndexError):
+        # Older launcher attempts may have removed the file while Chrome was still alive.
+        for connection in process.net_connections(kind='tcp'):
+            if connection.status == psutil.CONN_LISTEN and connection.laddr.ip == '127.0.0.1':
+                try:
+                    if _version(connection.laddr.port).get('webSocketDebuggerUrl'):
+                        return connection.laddr.port
+                except (OSError, ValueError):
+                    pass
+    return 0
+
+
+def _adopt(key):
+    """Recover the real profile owner instead of a short-lived Chrome forwarding process."""
+    spec = providers.get(key)
+    data = _read(key)
+    if _owned(data, key):
+        return data
+    expected = str(providers.executable(spec))
+    for process in psutil.process_iter(['pid', 'cmdline', 'create_time']):
+        try:
+            args = process.info['cmdline'] or []
+            if args and args[0] == expected and f'--user-data-dir={profile(key)}' in args:
+                debug = next((arg.split('=', 1)[1] for arg in args if arg.startswith('--remote-debugging-port=')), None)
+                port = int(debug) if debug else 0
+                if debug == '0':
+                    port = _debug_port(process, profile(key))
+                data = {'pid': process.pid, 'created': process.info['create_time'], 'port': port,
+                        'browser': spec['name'], 'mode': 'automation' if debug is not None else 'login'}
+                _save(key, data)
+                return data
+        except (psutil.Error, OSError, ValueError, IndexError):
+            continue
+    return {}
 
 
 def _version(port):
@@ -40,65 +107,97 @@ def _version(port):
 
 def status():
     with LOCK:
-        data = _read()
-        owned = _owned(data)
+        key = selected()
+        spec = providers.get(key, require_installed=False)
+        installed = providers.executable(spec) is not None
+        data = _adopt(key) if installed and spec['engine'] == 'chromium' else {}
+        owned = _owned(data, key)
         if owned and not data.get('port'):
             try:
-                data['port'] = int((PROFILE / 'DevToolsActivePort').read_text().splitlines()[0])
-                write_json(CONTROL, data)
+                data['port'] = int((profile(key) / 'DevToolsActivePort').read_text().splitlines()[0])
+                _save(key, data)
             except (OSError, ValueError, IndexError):
                 pass
         ready = False
-        if owned:
+        if owned and data.get('mode', 'automation') == 'automation':
             try:
                 ready = bool(_version(data['port']).get('webSocketDebuggerUrl'))
             except (OSError, ValueError):
                 pass
-        return {'state': 'ready' if ready else 'starting' if owned else 'stopped',
+        manual = owned and data.get('mode') == 'login'
+        return {'state': 'unavailable' if not installed else 'ready' if ready else 'login' if manual else 'starting' if owned else 'external' if spec['engine'] == 'external' else 'stopped',
                 'endpoint': f"http://127.0.0.1:{data['port']}" if ready else '',
-                'profile': str(PROFILE), 'browser': data.get('browser', ''),
-                'login': '로그인 여부는 브라우저에서 확인', 'persistent': True}
+                'profile': str(profile(key)) if spec['engine'] == 'chromium' else '선택한 브라우저의 기존 프로필',
+                'browser': spec['name'], 'browser_id': key, 'providers': providers.catalog(),
+                'supports_automation': spec['engine'] == 'chromium', 'mode': data.get('mode', 'login'),
+                'accounts': sessions.status(profile(key), spec['engine']), 'persistent': True}
 
 
-def start():
+def start(mode='login', url='about:blank'):
     with LOCK, exclusive('browser-start'):
+        key = selected()
+        spec = providers.get(key)
+        executable = providers.executable(spec)
+        if spec['engine'] != 'chromium':
+            if mode == 'automation':
+                raise ValueError('이 브라우저는 일반 로그인·가입 화면 열기만 지원합니다. 현재 공용 CDP 도구로 연결할 수 없습니다.')
+            import sys
+            command = ['/usr/bin/open', '-a', str(executable.parents[2]), url] if sys.platform == 'darwin' else [str(executable), url]
+            subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            return status()
         current = status()
-        if current['state'] == 'ready':
+        data = _read(key)
+        if _owned(data, key) and data.get('mode', 'automation') != mode:
+            # Explicit mode change restarts only this exact dedicated profile owner.
+            process = psutil.Process(data['pid'])
+            process.terminate()
+            try:
+                process.wait(timeout=8)
+            except psutil.TimeoutExpired as error:
+                raise ValueError('전용 브라우저가 종료를 기다리고 있습니다. 창을 직접 닫은 뒤 다시 누르세요.') from error
+            current = status()
+        if current['state'] in ('ready', 'login'):
+            if mode == 'login':
+                subprocess.Popen([str(executable), f'--user-data-dir={profile(key)}', '--new-window', url],
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             return current
         if current['state'] == 'starting':
             raise ValueError('공용 브라우저가 준비 중입니다. 잠시 뒤 다시 확인하세요.')
-        executable = browser_executable('chrome') or browser_executable('edge')
-        if not executable:
-            raise ValueError('설치된 Chrome 또는 Edge가 필요합니다.')
         private_directory()
-        PROFILE.mkdir(exist_ok=True, mode=0o700)
-        port = _read().get('port', 0)
-        if port:
+        location = profile(key)
+        location.mkdir(parents=True, exist_ok=True, mode=0o700)
+        port = data.get('port', 0) if mode == 'automation' else 0
+        if port and mode == 'automation':
             try:
                 with socket.socket() as probe:
                     probe.bind(('127.0.0.1', port))
             except OSError as error:
                 raise ValueError('공용 브라우저 포트를 다른 프로세스가 사용 중입니다. 기존 브라우저 창을 확인하세요.') from error
-        active_port = PROFILE / 'DevToolsActivePort'
-        active_port.unlink(missing_ok=True)
+        active_port = location / 'DevToolsActivePort'
+        if mode == 'automation':
+            active_port.unlink(missing_ok=True)
         with (STATE / 'browser.log').open('ab') as log:
             os.chmod(STATE / 'browser.log', 0o600)
+            flags = ['--remote-debugging-address=127.0.0.1', f'--remote-debugging-port={port}'] if mode == 'automation' else []
             process = subprocess.Popen([
-                str(executable), f'--user-data-dir={PROFILE}',
-                '--remote-debugging-address=127.0.0.1', f'--remote-debugging-port={port}',
-                '--no-first-run', '--no-default-browser-check', '--new-window', 'about:blank'],
+                str(executable), f'--user-data-dir={location}', *flags,
+                '--no-first-run', '--no-default-browser-check', '--new-window', url],
                 stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
         created = psutil.Process(process.pid).create_time()
-        write_json(CONTROL, {'pid': process.pid, 'created': created,
-                             'port': port, 'browser': executable.name})
+        _save(key, {'pid': process.pid, 'created': created,
+                   'port': port, 'browser': spec['name'], 'mode': mode})
+        if mode == 'login':
+            return status()
         for _ in range(80):
             if process.poll() is not None:
                 raise ValueError('공용 브라우저가 종료됐습니다. 기존 전용 프로필 창 또는 browser.log를 확인하세요.')
             try:
                 actual_port = port or int(active_port.read_text().splitlines()[0])
                 if _version(actual_port).get('webSocketDebuggerUrl'):
-                    write_json(CONTROL, {'pid': process.pid, 'created': created,
-                                        'port': actual_port, 'browser': executable.name})
+                    actual = _adopt(key)
+                    if not actual:
+                        raise ValueError('전용 브라우저 소유 프로세스를 확인하지 못했습니다.')
+                    _save(key, {**actual, 'port': actual_port, 'mode': mode})
                     return status()
             except (OSError, ValueError, IndexError):
                 pass
@@ -124,7 +223,10 @@ def public_url(value):
 def open_page(url):
     url = public_url(url)
     with LOCK:
-        current = start()
+        if 'accounts.google.com' == urlsplit(url).hostname or providers.get(selected())['engine'] != 'chromium' or status()['state'] != 'ready':
+            current = start('login', url)
+            return {'opened': True, 'url': url, 'mode': 'login', 'browser': current['browser']}
+        current = start('automation')
         request = Request(current['endpoint'] + '/json/new?' + quote(url, safe=''), method='PUT')
         with urlopen(request, timeout=5) as result:
             target = json.load(result)

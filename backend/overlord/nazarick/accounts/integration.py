@@ -40,7 +40,7 @@ def _write(path, text):
 
 def connect():
     with LOCK, state.exclusive('agent-settings'):
-        current = browser.start()
+        current = browser.start('automation')
         endpoint = current['endpoint']
         # Parse everything before changing existing installation settings.
         original = CODEX.read_text() if CODEX.exists() else ''

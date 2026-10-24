@@ -74,7 +74,7 @@ def main():
     if args.action == 'mcp-accounts':
         return mcp()
     if args.action == 'mcp-browser':
-        endpoint = browser.start()['endpoint']
+        endpoint = browser.start('automation')['endpoint']
         entry = ROOT / 'runtime/ai_agent/OpenClawOriginal/source/node_modules/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js'
         node = shutil.which('node')
         if not node or not entry.is_file():

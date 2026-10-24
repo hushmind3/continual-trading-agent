@@ -41,6 +41,14 @@ class Credential(Strict):
     secret: SecretStr
 
 
+class BrowserChoice(Strict):
+    browser_id: str = Field(min_length=1, max_length=40)
+
+
+class BrowserStart(Strict):
+    mode: Literal['login', 'automation'] = 'login'
+
+
 def guarded(action):
     try:
         return action()
@@ -57,14 +65,27 @@ def status():
 
 
 @router.post('/browser/start')
-def start():
-    return guarded(browser.start)
+def start(value: BrowserStart):
+    return guarded(lambda: browser.start(value.mode))
+
+
+@router.post('/browser/select')
+def choose_browser(value: BrowserChoice):
+    return guarded(lambda: browser.choose(value.browser_id))
 
 
 @router.post('/browser/open')
 def open_target(value: Open):
-    urls = {'google': 'https://accounts.google.com/', 'github': 'https://github.com/login'}
-    return guarded(lambda: browser.open_page(urls[value.target] if value.target in urls else state.find(value.target)['url']))
+    def open_account():
+        from . import providers
+        account = next((item for item in providers.accounts() if item['id'] == value.target), None)
+        if account:
+            saved = next(item for item in browser.status()['accounts'] if item['id'] == value.target)['state'] == 'saved'
+            url = account['account_url'] if saved else account['login_url']
+        else:
+            url = state.find(value.target)['url']
+        return browser.open_page(url)
+    return guarded(open_account)
 
 
 @router.post('/services/save')

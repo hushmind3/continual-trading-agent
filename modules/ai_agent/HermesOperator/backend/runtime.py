@@ -15,6 +15,7 @@ BASE = ROOT / "runtime/ai_agent/HermesOperator"
 VENV = BASE / ".venv"
 PROFILE = BASE / "browser-profile"
 STATE_FILE = BASE / "state.json"
+INSTALL_MARKER = BASE / "install-complete.json"
 LOG_FILE = BASE / "operator.log"
 WORKER = Path(__file__).with_name("worker.py")
 REQUIREMENTS = Path(__file__).parents[1] / "requirements.txt"
@@ -59,7 +60,7 @@ _load_state()
 
 def _installed() -> bool:
     python = _python()
-    if not python.is_file():
+    if not python.is_file() or not INSTALL_MARKER.is_file():
         return False
     try:
         result = subprocess.run(
@@ -104,6 +105,7 @@ def _install_job():
             _installing = False
         return
     try:
+        INSTALL_MARKER.unlink(missing_ok=True)
         with LOG_FILE.open("a", encoding="utf8") as log:
             commands = [
                 [uv, "venv", "--python", "3.12", str(VENV)],
@@ -114,6 +116,7 @@ def _install_job():
                 log.write("\n$ " + " ".join(command) + "\n")
                 log.flush()
                 subprocess.run(command, cwd=ROOT, stdout=log, stderr=log, check=True)
+        INSTALL_MARKER.write_text(json.dumps({"completed_at": int(time.time())}), encoding="utf8")
         if not _installed():
             raise RuntimeError("Browser Use 설치 확인에 실패했습니다.")
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:

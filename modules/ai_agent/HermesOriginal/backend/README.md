@@ -32,3 +32,9 @@ HERMES_HOME="$platform_root/runtime/ai_agent/HermesOriginal/home" HERMES_RUNTIME
 macOS 게이트웨이는 모든 프로필을 처리하는 호스트 서비스 하나를 사용합니다. 이 설치본의 LaunchAgent는 `HERMES_HOME=runtime/ai_agent/HermesOriginal/home`, `HERMES_RUNTIME_DIR=runtime/ai_agent/HermesOriginal/tools`의 절대 경로를 사용하며 실행 인수는 `-p default gateway run --external-supervisor`입니다. 프로필 전용 게이트웨이를 시작해 오류 78이 난 경우 별도 프로필 서비스를 추가하지 않고 이 호스트 서비스의 경로와 상태를 확인합니다. 현재 경로를 맞춘 뒤 웹 화면에서 게이트웨이 실행 중을 확인했습니다. 설치·업데이트로 서비스 정의를 다시 생성하면 이 사용자 지정 도구 경로도 확인해야 합니다.
 
 확인: 단일 API의 `ai_agent/HermesOriginal/status`, `#ai_agent/HermesOriginal`의 실제 원본 화면, 원본 `git rev-parse HEAD`, 패치의 `git apply --reverse --check`를 사용합니다. 현재 정리의 실제 실행 확인은 모듈 README의 최신 항목을 따릅니다. 원본 업데이트·모델 추론·외부 메신저 전체를 이번 정리에서 실행하지 않습니다.
+
+## FreeLLMAPI 공용 연결
+
+기존 프로젝트 설치본의 단일 `/api/projects/freellmapi/<설치 ID>/v1`을 OpenAI Chat 규격으로 사용합니다. 개별 업체를 이 메뉴에 직접 연결하지 않고 `auto`가 FreeLLMAPI의 활성 체인에서 고릅니다. 통합 키는 담당 `home/.env`에만 저장하고 Git에 올리지 않습니다.
+공식 설치본 `cli/dist/index.js setup-hermes --profile shared --model auto`를 각 기존 `HERMES_HOME`에 실행해 `providers.freellmapi-shared`를 등록했습니다. 기본 홈과 다섯 기존 프로필에서 같은 연결을 선택할 수 있습니다. 현재 화면의 lead 프로필에도 등록했고 원본 모델 선택 UI에서 `freellmapi-shared · auto`를 주 모델로 적용했습니다. 다른 역할 프로필의 기존 주 모델은 유지합니다. 키·주소는 `FREELLMAPI_API_KEY`·`--url`로 전달하며 원본 설정 생성기가 병합합니다.
+2026-10-25 실제 확인: 기본 프로필의 기존 CLI와 lead 프로필의 원본 웹 대화에서 `auto` 응답을 받았습니다. 장시간 작업·모든 도구의 전수 확인과는 구분합니다.

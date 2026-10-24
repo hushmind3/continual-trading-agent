@@ -3,6 +3,7 @@ const http=require('node:http'),path=require('node:path'),os=require('node:os');
 const {pathToFileURL}=require('node:url'),{syncBuiltinESMExports}=require('node:module');
 const readline=require('node:readline'),crypto=require('node:crypto');
 const write=process.stdout.write.bind(process.stdout);
+const reply=(message,result)=>write(JSON.stringify({...result,_ipc_id:message._ipc_id})+'\n');
 process.stdout.write=process.stderr.write.bind(process.stderr);
 let server,logicalHost;
 const contexts=new Map(),listen=http.Server.prototype.listen;
@@ -46,10 +47,10 @@ async function call(message){
   const request=http.request({socketPath,path:target+(message.query?'?'+message.query:''),method:message.method||'GET',headers},response=>{
    if(message.stream){
     const resultHeaders={};for(const [name,value]of Object.entries(response.headers))if(!['content-length','transfer-encoding','connection','set-cookie'].includes(name))resultHeaders[name]=Array.isArray(value)?value.join(', '):value;
-    streamStarted=true;write(JSON.stringify({stream_start:true,status:response.statusCode,headers:resultHeaders})+'\n');
-    response.on('data',chunk=>write(JSON.stringify({stream_chunk:chunk.toString('base64')})+'\n'));
-    response.on('error',error=>{if(!streamSettled){streamSettled=true;write(JSON.stringify({stream_error:error.message})+'\n');resolve({stream_complete:true})}});
-    response.on('end',()=>{if(!streamSettled){streamSettled=true;write(JSON.stringify({stream_end:true})+'\n');resolve({stream_complete:true})}});
+    streamStarted=true;reply(message,{stream_start:true,status:response.statusCode,headers:resultHeaders});
+    response.on('data',chunk=>reply(message,{stream_chunk:chunk.toString('base64')}));
+    response.on('error',error=>{if(!streamSettled){streamSettled=true;reply(message,{stream_error:error.message});resolve({stream_complete:true})}});
+    response.on('end',()=>{if(!streamSettled){streamSettled=true;reply(message,{stream_end:true});resolve({stream_complete:true})}});
     return;
    }
    const parts=[];let size=0;
@@ -61,7 +62,7 @@ async function call(message){
     resolve({status:response.statusCode,headers:resultHeaders,body:Buffer.concat(parts).toString('base64')});
    });
   });
-  request.setTimeout(message.stream?600000:900000,()=>request.destroy(Error('Node 앱 응답 시간이 초과됐습니다.')));request.on('error',error=>{if(message.stream&&streamStarted){if(!streamSettled){streamSettled=true;write(JSON.stringify({stream_error:error.message})+'\n');resolve({stream_complete:true})}}else reject(error)});request.end(body);
+  request.setTimeout(message.stream?600000:900000,()=>request.destroy(Error('Node 앱 응답 시간이 초과됐습니다.')));request.on('error',error=>{if(message.stream&&streamStarted){if(!streamSettled){streamSettled=true;reply(message,{stream_error:error.message});resolve({stream_complete:true})}}else reject(error)});request.end(body);
  });}finally{contexts.delete(key)}
 }
 async function main(){
@@ -71,7 +72,7 @@ async function main(){
  // Async entry points may finish DB preparation after their module import resolves.
  // call() already waits for the real listening event with a bounded timeout.
  const input=readline.createInterface({input:process.stdin});
- for await(const line of input){try{const message=JSON.parse(line),result=await call(message);if(!message.stream)write(JSON.stringify(result)+'\n')}catch(error){write(JSON.stringify({error:error.message})+'\n')}}
+ for await(const line of input){let message;try{message=JSON.parse(line);const result=await call(message);if(!message.stream)reply(message,result)}catch(error){reply(message||{},{error:error.message})}}
  server.close();process.exit(0);
 }
 main().catch(error=>{write(JSON.stringify({error:error.message})+'\n');process.exit(1)});

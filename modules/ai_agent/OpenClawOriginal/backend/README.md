@@ -24,3 +24,9 @@
 공식 업데이트는 기존 `source/` 작업 트리에서 수행합니다. 원본 Git 원격과 설치 경로를 바꾸지 않으며, 상위 플랫폼은 검증한 버전을 Git 의존성 커밋으로 기록합니다. 새 버전의 실제 실행을 확인한 뒤 그 커밋을 상위 `main`에 함께 반영합니다. 실행 중인 원본에 강제 checkout이나 `git submodule update --remote`를 임의로 실행하지 않습니다.
 
 확인: `ai_agent/OpenClawOriginal/status`와 `#ai_agent/OpenClawOriginal`에서 실제 Gateway·Control UI를 확인합니다. 공식 `gateway call status --json`은 실행 중 업무 확인에 사용하며 모델 호출을 대신하지 않습니다. 이번에는 업데이트·재다운로드·재설치·모델 추론을 확인 목적으로 실행하지 않습니다.
+
+## FreeLLMAPI 공용 연결
+
+기존 프로젝트 설치본의 단일 `/api/projects/freellmapi/<설치 ID>/v1`을 OpenAI Chat 규격으로 사용합니다. 개별 업체를 이 메뉴에 직접 연결하지 않고 `auto`가 FreeLLMAPI의 활성 체인에서 고릅니다. 통합 키는 담당 `home/.env`에만 저장하고 Git에 올리지 않습니다.
+공식 설정의 `models.providers.freellmapi`와 `agents.defaults.model`을 사용합니다. 이 설치의 기본 에이전트 ID는 `dev`입니다. 실제 확인 명령은 `launch.py agent --agent dev --message <메시지> --json`이며, `--deliver` 없이 기존 Gateway를 사용합니다.
+2026-10-25 실제 확인: 기존 설치에서 `auto` 대화가 `OK`를 반환했습니다. 장시간 작업·모든 도구의 전수 확인과는 구분합니다.

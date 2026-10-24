@@ -2,13 +2,13 @@
 
 용도: 프로젝트 관리 소메뉴의 설치 트랜잭션과 앱 소유 파일·연결 수명주기를 담당합니다.
 
-FreeLLMAPI는 기존 원본 화면에 [남은 무료 총량 화면 패치](../patches/freellmapi/README.md)를 적용합니다. 활성 무료 모델의 월 카탈로그 한도에서 로컬 사용량을 뺀 추정 잔여 토큰 합계와 최근 실제 라우팅 모델만 작은 화면에 표시합니다. 실제 업체 잔액과 구분하며, 기본 화면의 차트·모델별 사용 목록·페이지 스크롤을 제외합니다.
+FreeLLMAPI는 기존 원본 화면에 [남은 무료 총량 화면 패치](../patches/freellmapi/README.md)를 적용합니다. 공통 Card·Tailwind로 업체 보고 잔여량, 저장된 연결 수, 자동 라우팅 후보, 최근 요청 결과를 표시합니다. 카탈로그 한도나 로컬 사용량으로 잔액을 추정하지 않습니다.
 
 Node HTTP 앱의 `index.html` 진입은 `runtime.py`가 같은 앱의 루트 URL로 307 이동하며 쿼리를 보존합니다. React Router가 문서 파일명을 업무 경로로 해석해 404를 표시하지 않게 합니다. 2026-10-24 기존 FreeLLMAPI 플랫폼 iframe에서 `/models/chat` 원본 화면 표시를 확인했습니다. Codex는 OpenCodex의 단일 `FreeLLMAPI · 자동` 항목을 사용하며, 로컬 활성 체인은 실제 응답을 확인한 네 모델 그룹(여섯 공급 경로)으로 제한했습니다. 카탈로그 전체의 작동을 검증한 것은 아닙니다. 원본 요청/토큰 기록은 확인했지만 업체 대시보드의 잔여 무료 한도 차이는 확인하지 않았습니다.
 
-Node HTTP + Vite 앱은 `package.json`의 실제 `start`/`server` 진입점을 함께 탐지합니다. `node_http_worker.cjs`는 원본 서버의 HTTP 요청을 전용 named pipe(Windows)/Unix socket IPC로 실행하고 `runtime.py`의 기존 `projects/invoke`·단일 `/api`에 연결합니다. 추가 TCP 포트나 앱별 API 서버는 만들지 않습니다. 원본 인증·로컬 접근 판정에 실제 플랫폼 접속자의 주소를 전달하고, 쿠키 세션은 별도 인증 어댑터가 필요하다고 거부합니다. 화면은 기존 `assets_bridge.js`로 API를 연결합니다. `verify_ui.cjs`는 같은 원본 Node 서버와 빌드 화면을 실행합니다. 재시도는 저장된 소스·node_modules·빌드 결과를 재사용하며 새 설치·업데이트는 의존성과 화면을 새로 준비합니다. 독립 ZIP 실행은 원본 Node 진입점을 실행합니다.
+Node HTTP + Vite 앱은 `package.json`의 실제 `start`/`server` 진입점을 함께 탐지합니다. `node_http_worker.cjs`는 원본 서버의 HTTP 요청을 전용 named pipe(Windows)/Unix socket IPC로 실행하고 `runtime.py`의 기존 `projects/invoke`·단일 `/api`에 연결합니다. 추가 TCP 포트나 앱별 API 서버는 만들지 않습니다. 원본 인증·로컬 접근 판정에 실제 플랫폼 접속자의 주소를 전달하고, 쿠키 세션은 별도 인증 어댑터가 필요하다고 거부합니다. 화면은 기존 `assets_bridge.js`로 API를 연결합니다. Node IPC의 모든 응답·스트림 이벤트에는 요청 ID를 붙이고 `runtime.py`가 요청별 큐로 받습니다. 취소된 스트림의 남은 응답이 다음 인증·대화 요청에 섞이지 않도록 큐를 해제합니다. `verify_ui.cjs`는 같은 원본 Node 서버와 빌드 화면을 실행합니다. 재시도는 저장된 소스·node_modules·빌드 결과를 재사용하며 새 설치·업데이트는 의존성과 화면을 새로 준비합니다. 독립 ZIP 실행은 원본 Node 진입점을 실행합니다.
 
-FreeLLMAPI는 기존 API 호스트의 `/api/projects/freellmapi/<설치 ID>/v1/{models,responses,chat/completions}` 경로를 직접 사용합니다. `handlers.py`는 공식 FreeLLMAPI 설치 원본인지 확인하고 loopback 클라이언트·통합 Bearer 키만 허용한 뒤 `runtime.invoke`로 같은 Node worker에 전달합니다. 허용 경로는 모델 목록·Responses·Chat Completions 세 가지이며, `api_transport.py`도 이 경로만 통과시킵니다. 별도 포트·서버·원본 복사본은 없습니다. 현재 IPC worker는 응답을 버퍼링하므로 SSE는 완료 후 전달되고 70초 제한이 적용됩니다. Codex 입력과 Node worker의 입력 상한은 원본 LLM API 기본값과 같은 25 MiB입니다. 과거 2 MiB/8 MiB 상한은 긴 대화·이미지를 원본 이전에 차단했고, OpenCodex가 이를 context_length_exceeded로 표시할 수 있었습니다. 9 MiB 입력이 원본 JSON 파서에 도달함을 확인했으며 이 확인에는 모델 추론을 사용하지 않았습니다.
+FreeLLMAPI는 기존 API 호스트의 `/api/projects/freellmapi/<설치 ID>/v1/{models,responses,chat/completions}` 경로를 직접 사용합니다. `handlers.py`는 공식 FreeLLMAPI 설치 원본인지 확인하고 loopback 클라이언트·통합 Bearer 키만 허용한 뒤 `runtime.invoke`로 같은 Node worker에 전달합니다. 허용 경로는 모델 목록·Responses·Chat Completions 세 가지이며, `api_transport.py`도 이 경로만 통과시킵니다. 별도 포트·서버·원본 복사본은 없습니다. IPC worker는 SSE 청크를 즉시 전달합니다. 스트리밍은 10분 무응답 제한, 일반 응답은 15분 제한·64 MiB 상한입니다. Codex 입력과 Node worker의 입력 상한은 원본 LLM API 기본값과 같은 25 MiB입니다. 과거 2 MiB/8 MiB 상한은 긴 대화·이미지를 원본 이전에 차단했고, OpenCodex가 이를 context_length_exceeded로 표시할 수 있었습니다. 9 MiB 입력이 원본 JSON 파서에 도달함을 확인했으며 이 확인에는 모델 추론을 사용하지 않았습니다.
 
 2026-10-24 실제 확인: FreeLLMAPI Chat Completions에서 `gemini-2.5-flash`가 응답했습니다. 같은 API 호스트의 Responses `auto`에서 일반 응답과 Codex식 `encrypted` 필드를 포함한 도구 함수 호출이 완료됐습니다. OpenClaw와 Hermes 공식 CLI도 각각 `auto`에서 `OK`를 반환했습니다. OpenClaw 사용량 기록은 비용 `$0.00`였습니다. 플랫폼 기본 URL `/`은 HTTP 200입니다.
 
@@ -97,3 +97,5 @@ builtin_packages와 detachment는 기존 run.py와 함께 실행 가능한 .comm
 Codex 자동 모델의 컨텍스트 등록은 실제 활성 풀의 최소 크기인 131,072 토큰으로 조정했습니다. 생성된 OpenCodex 카탈로그의 자동 압축 기준은 117,964 토큰입니다. 이 값은 연결 본문 크기 제한과 별개이며 실행 중 Codex가 보관한 모델 정보의 갱신 여부·이 긴 대화 전체의 재전송 성공은 별도 확인 대상입니다.
 
 Codex 도구 호환: 원본의 [codex-compatibility.patch](../patches/freellmapi/codex-compatibility.patch)는 Gemini가 거부하는 encrypted 스키마 주석을 제거하고 같은 이름의 실제 인수는 보존합니다. 관련 검사 21개, 원본 서버 TypeScript 빌드, 해당 중첩 주석을 포함한 실제 무료 자동 경로의 함수 호출/결과 반환을 확인했습니다. 큰 Codex 부가 헤더는 원본 Node 서버에 그대로 전달하지 않으며, 같은 EPIPE 재현 요청은 수정 후 HTTP 200을 확인했습니다. 실제 Codex 화면의 전체 기능 확인과 구분합니다.
+
+2026-10-25 공용 연결 복구: 요청별 IPC 큐를 적용해 이전 응답이 다음 모델·인증 요청에 섞이던 문제를 수정했습니다. 실제 자동 세션 발급·인증 완료·대시보드 표시와 Hermes/OpenClaw의 `auto` 대화를 확인했습니다. 설정 소유·프로필별 적용은 각 원본 모듈의 backend/README.md, 화면/한도 설명은 [FreeLLMAPI 패치 안내](../patches/freellmapi/README.md)를 따릅니다.

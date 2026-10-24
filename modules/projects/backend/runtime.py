@@ -8,6 +8,7 @@ import queue
 import subprocess
 import sys
 import threading
+import uuid
 from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from .store import owned, read
@@ -22,6 +23,8 @@ RESTARTING = False
 class AppWorker:
     def __init__(self, source, spec, environment, harness=None, project_id=None, integration=None, app_data=None):
         self.lock = threading.Lock(); self.responses = queue.Queue(); self.source = str(source)
+        self.correlated = spec['kind'] == 'node-http'
+        self.requests = {}
         self.input_lock = threading.Lock(); self.harness_pending = {}; self.project_id = project_id; self.application_active=0
         folder = owned(source, spec.get('directory', '.'))
         log = source.parent / 'application.log'
@@ -60,9 +63,15 @@ class AppWorker:
                         threading.Thread(target=self._harness, args=(payload, cancelled), daemon=True).start()
                     elif 'harness_cancel' in value:
                         if event := self.harness_pending.get(value['harness_cancel']): event.set()
+                    elif self.correlated:
+                        response_queue = self.requests.get(value.get('_ipc_id'))
+                        if response_queue is not None: response_queue.put(value)
                     else: self.responses.put(value)
                 except ValueError: pass
-        finally: self.responses.put({'error': '프로젝트 실행기가 종료됐습니다. 실행 로그를 확인하세요.'})
+        finally:
+            error = {'error': '프로젝트 실행기가 종료됐습니다. 실행 로그를 확인하세요.'}
+            self.responses.put(error)
+            for response_queue in list(self.requests.values()): response_queue.put(error)
 
     def _harness(self, payload, cancelled):
         response = {'harness_result': True, 'id': payload['id']}
@@ -83,30 +92,41 @@ class AppWorker:
     def call(self, payload):
         with self.lock:
             if self.process.poll() is not None: raise ValueError('프로젝트 실행기가 종료됐습니다.')
-            self.send(payload)
-            try: result = self.responses.get(timeout=910)
-            except queue.Empty:
-                self.close(); raise ValueError('프로젝트 응답 시간이 초과됐습니다.')
-            if result.get('error'): raise ValueError(result['error'])
-            return result
+            request_id = uuid.uuid4().hex if self.correlated else None
+            responses = queue.Queue() if self.correlated else self.responses
+            if request_id: self.requests[request_id] = responses
+            try:
+                self.send({**payload, '_ipc_id': request_id} if request_id else payload)
+                try: result = responses.get(timeout=910)
+                except queue.Empty:
+                    self.close(); raise ValueError('프로젝트 응답 시간이 초과됐습니다.')
+                if result.get('error'): raise ValueError(result['error'])
+                result.pop('_ipc_id', None)
+                return result
+            finally:
+                if request_id: self.requests.pop(request_id, None)
 
     def begin_stream(self, payload):
         self.lock.acquire()
+        request_id = uuid.uuid4().hex
+        responses = queue.Queue()
+        self.requests[request_id] = responses
         try:
             if self.process.poll() is not None: raise ValueError('프로젝트 실행기가 종료됐습니다.')
-            self.send({**payload, 'stream': True})
-            try: started = self.responses.get(timeout=910)
+            self.send({**payload, 'stream': True, '_ipc_id': request_id})
+            try: started = responses.get(timeout=910)
             except queue.Empty: raise ValueError('프로젝트 스트리밍 시작 시간이 초과됐습니다.')
             if started.get('error'): raise ValueError(started['error'])
             if not started.get('stream_start'): raise ValueError('프로젝트가 스트리밍 응답을 시작하지 않았습니다.')
         except BaseException:
+            self.requests.pop(request_id, None)
             self.lock.release()
             raise
 
         def chunks():
             try:
                 while True:
-                    try: event = self.responses.get(timeout=610)
+                    try: event = responses.get(timeout=610)
                     except queue.Empty: raise ValueError('프로젝트 스트리밍 응답이 10분 동안 도착하지 않았습니다.')
                     if event.get('stream_chunk') is not None:
                         yield base64.b64decode(event['stream_chunk'])
@@ -117,6 +137,9 @@ class AppWorker:
                     elif event.get('error'):
                         raise ValueError(event['error'])
             finally:
+                # A disconnected SSE consumer must not leave its unread events
+                # in the next dashboard/client request's response queue.
+                self.requests.pop(request_id, None)
                 self.lock.release()
         return started, chunks()
 

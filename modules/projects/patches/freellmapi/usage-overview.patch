@@ -87,10 +87,10 @@ index 5bdf3c4..71150fd 100644
  }
 diff --git a/client/src/components/usage-overview.tsx b/client/src/components/usage-overview.tsx
 new file mode 100644
-index 0000000..ccc4f7f
+index 0000000..537db6d
 --- /dev/null
 +++ b/client/src/components/usage-overview.tsx
-@@ -0,0 +1,151 @@
+@@ -0,0 +1,160 @@
 +import { useQuery } from '@tanstack/react-query'
 +import { apiFetch } from '@/lib/api'
 +import type { FallbackEntry } from '@/lib/routing'
@@ -104,7 +104,7 @@ index 0000000..ccc4f7f
 +  quota: { remaining: number | null; metric: QuotaMetric } | null
 +}
 +type FreeTierData = { generatedAt: string; pools: FreeTierPool[] }
-+type RecentResponse = { rows: { platform: string; modelId: string }[] }
++type RecentResponse = { rows: { platform: string; modelId: string; status: string; createdAt: string; attemptCount: number }[] }
 +type ConfiguredKey = { platform: string; enabled: boolean; status: string }
 +
 +const metricLabels: Record<string, { ko: string; en: string }> = {
@@ -143,7 +143,7 @@ index 0000000..ccc4f7f
 +  })
 +  const { data: recent, isError: recentError } = useQuery<RecentResponse>({
 +    queryKey: ['current-routed-model'],
-+    queryFn: () => apiFetch('/api/analytics/requests?range=24h&status=success&limit=1'),
++    queryFn: () => apiFetch('/api/analytics/requests?range=24h&limit=1'),
 +    refetchInterval: 5000,
 +  })
 +
@@ -168,6 +168,7 @@ index 0000000..ccc4f7f
 +  const last = recent?.rows[0]
 +  const lastModel = last && models.find(model => model.platform === last.platform && model.modelId === last.modelId)
 +  const lastProvider = last && (providerNames[last.platform] ?? last.platform.split(/[-_]/).map(part => part ? part[0].toUpperCase() + part.slice(1) : '').join(' '))
++  const lastStatus = last?.status === 'success' ? (ko ? '성공' : 'Succeeded') : last?.status === 'canceled' ? (ko ? '취소' : 'Canceled') : (ko ? '실패' : 'Failed')
 +  const noBalance = ko ? '아직 확인된 잔여량 없음' : 'No reported balance yet'
 +  const noModels = ko ? '사용 가능한 라우팅 모델이 없습니다' : 'No routable models are available'
 +
@@ -236,8 +237,16 @@ index 0000000..ccc4f7f
 +      </div>
 +
 +      <div className="rounded-2xl border bg-card px-4 py-3 sm:px-5 sm:py-4" aria-live="polite">
-+        <p className="text-xs text-muted-foreground">{ko ? '가장 최근 실제 응답' : 'Most recent successful response'}</p>
-+        <p className="mt-1 truncate text-sm font-semibold">{last ? `${lastProvider} · ${lastModel?.displayName || last.modelId}` : recentError ? (ko ? '응답 기록을 불러오지 못했습니다' : 'Could not load response history') : (ko ? '아직 성공한 응답이 없습니다' : 'No successful response yet')}</p>
++        <p className="text-xs text-muted-foreground">{ko ? '가장 최근 요청 결과' : 'Most recent request result'}</p>
++        {last ? (
++          <>
++            <p className="mt-1 truncate text-sm font-semibold">{lastProvider} · {lastModel?.displayName || last.modelId}</p>
++            <p className="mt-1 text-xs text-muted-foreground">
++              {lastStatus} · {new Date(last.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
++              {last.attemptCount > 1 ? ` · ${last.attemptCount} ${ko ? '회 시도' : 'attempts'}` : ''}
++            </p>
++          </>
++        ) : <p className="mt-1 truncate text-sm font-semibold">{recentError ? (ko ? '요청 기록을 불러오지 못했습니다' : 'Could not load request history') : (ko ? '최근 24시간 요청 기록이 없습니다' : 'No requests in the last 24 hours')}</p>}
 +      </div>
 +    </section>
 +  )

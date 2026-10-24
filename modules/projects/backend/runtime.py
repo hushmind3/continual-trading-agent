@@ -84,11 +84,41 @@ class AppWorker:
         with self.lock:
             if self.process.poll() is not None: raise ValueError('프로젝트 실행기가 종료됐습니다.')
             self.send(payload)
-            try: result = self.responses.get(timeout=70)
+            try: result = self.responses.get(timeout=910)
             except queue.Empty:
                 self.close(); raise ValueError('프로젝트 응답 시간이 초과됐습니다.')
             if result.get('error'): raise ValueError(result['error'])
             return result
+
+    def begin_stream(self, payload):
+        self.lock.acquire()
+        try:
+            if self.process.poll() is not None: raise ValueError('프로젝트 실행기가 종료됐습니다.')
+            self.send({**payload, 'stream': True})
+            try: started = self.responses.get(timeout=910)
+            except queue.Empty: raise ValueError('프로젝트 스트리밍 시작 시간이 초과됐습니다.')
+            if started.get('error'): raise ValueError(started['error'])
+            if not started.get('stream_start'): raise ValueError('프로젝트가 스트리밍 응답을 시작하지 않았습니다.')
+        except BaseException:
+            self.lock.release()
+            raise
+
+        def chunks():
+            try:
+                while True:
+                    try: event = self.responses.get(timeout=610)
+                    except queue.Empty: raise ValueError('프로젝트 스트리밍 응답이 10분 동안 도착하지 않았습니다.')
+                    if event.get('stream_chunk') is not None:
+                        yield base64.b64decode(event['stream_chunk'])
+                    elif event.get('stream_end'):
+                        return
+                    elif event.get('stream_error'):
+                        raise ValueError(event['stream_error'])
+                    elif event.get('error'):
+                        raise ValueError(event['error'])
+            finally:
+                self.lock.release()
+        return started, chunks()
 
     def close(self):
         for cancelled in list(self.harness_pending.values()): cancelled.set()
@@ -142,6 +172,40 @@ def invoke(record, payload, origin=None):
         return result
     finally:
         with LOCK: ACTIVE -= 1
+
+
+def invoke_stream(record, payload, origin=None):
+    global ACTIVE
+    source = Path(record['active_source']); spec = record['adapter']
+    if spec['kind'] != 'node-http': raise ValueError('스트리밍은 Node HTTP 앱에서만 지원합니다.')
+    with LOCK:
+        if RESTARTING: raise ValueError('서버 적용 중입니다. 잠시 뒤 다시 실행하세요.')
+        from .installer import JOBS
+        if record['id'] in JOBS: raise ValueError('이 앱을 업데이트 중입니다. 완료한 뒤 다시 실행하세요.')
+        ACTIVE += 1
+    try:
+        key = record['id']
+        with LOCK:
+            worker = WORKERS.get(key)
+            if worker and (worker.source != str(source) or worker.process.poll() is not None): worker.close(); worker = None
+            if worker is None:
+                from .workspaces import adapter
+                from .store import project_folder
+                worker = AppWorker(source, spec, record.get('environment', {}), record.get('harness'), key, adapter(record), project_folder(record)); WORKERS[key] = worker
+        forwarded = {**payload, '_host': origin.headers.get('host', '') if origin else '',
+            '_client': [origin.client.host, origin.client.port] if origin and origin.client else ['platform-internal', 0],
+            '_server': [origin.url.hostname, origin.url.port or 80] if origin else ['127.0.0.1', 8766]}
+        started, chunks = worker.begin_stream(forwarded)
+        def body():
+            global ACTIVE
+            try:
+                yield from chunks
+            finally:
+                with LOCK: ACTIVE -= 1
+        return started, body()
+    except BaseException:
+        with LOCK: ACTIVE -= 1
+        raise
 
 
 def verify(source, spec, environment=None):

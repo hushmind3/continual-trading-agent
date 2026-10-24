@@ -42,9 +42,18 @@ async function call(message){
  if(body)headers['content-length']=Buffer.byteLength(body);
  contexts.set(key,{client:message._client?.[0]||'127.0.0.1'});
  try{return await new Promise((resolve,reject)=>{
+  let streamStarted=false,streamSettled=false;
   const request=http.request({socketPath,path:target+(message.query?'?'+message.query:''),method:message.method||'GET',headers},response=>{
+   if(message.stream){
+    const resultHeaders={};for(const [name,value]of Object.entries(response.headers))if(!['content-length','transfer-encoding','connection','set-cookie'].includes(name))resultHeaders[name]=Array.isArray(value)?value.join(', '):value;
+    streamStarted=true;write(JSON.stringify({stream_start:true,status:response.statusCode,headers:resultHeaders})+'\n');
+    response.on('data',chunk=>write(JSON.stringify({stream_chunk:chunk.toString('base64')})+'\n'));
+    response.on('error',error=>{if(!streamSettled){streamSettled=true;write(JSON.stringify({stream_error:error.message})+'\n');resolve({stream_complete:true})}});
+    response.on('end',()=>{if(!streamSettled){streamSettled=true;write(JSON.stringify({stream_end:true})+'\n');resolve({stream_complete:true})}});
+    return;
+   }
    const parts=[];let size=0;
-   response.on('data',chunk=>{size+=chunk.length;if(size>8*1024*1024)response.destroy(Error('앱 응답이 8 MiB를 초과합니다.'));else parts.push(chunk)});
+   response.on('data',chunk=>{size+=chunk.length;if(size>64*1024*1024)response.destroy(Error('앱 응답이 64 MiB를 초과합니다.'));else parts.push(chunk)});
    response.on('error',reject);response.on('end',()=>{
     // Cookie authentication cannot be represented faithfully by the JSON fetch bridge.
     if(response.headers['set-cookie'])return reject(Error('쿠키 세션 앱은 인증 어댑터가 필요합니다.'));
@@ -52,7 +61,7 @@ async function call(message){
     resolve({status:response.statusCode,headers:resultHeaders,body:Buffer.concat(parts).toString('base64')});
    });
   });
-  request.setTimeout(60000,()=>request.destroy(Error('Node 앱 응답 시간이 초과됐습니다.')));request.on('error',reject);request.end(body);
+  request.setTimeout(message.stream?600000:900000,()=>request.destroy(Error('Node 앱 응답 시간이 초과됐습니다.')));request.on('error',error=>{if(message.stream&&streamStarted){if(!streamSettled){streamSettled=true;write(JSON.stringify({stream_error:error.message})+'\n');resolve({stream_complete:true})}}else reject(error)});request.end(body);
  });}finally{contexts.delete(key)}
 }
 async function main(){
@@ -62,7 +71,7 @@ async function main(){
  // Async entry points may finish DB preparation after their module import resolves.
  // call() already waits for the real listening event with a bounded timeout.
  const input=readline.createInterface({input:process.stdin});
- for await(const line of input){try{write(JSON.stringify(await call(JSON.parse(line)))+'\n')}catch(error){write(JSON.stringify({error:error.message})+'\n')}}
+ for await(const line of input){try{const message=JSON.parse(line),result=await call(message);if(!message.stream)write(JSON.stringify(result)+'\n')}catch(error){write(JSON.stringify({error:error.message})+'\n')}}
  server.close();process.exit(0);
 }
 main().catch(error=>{write(JSON.stringify({error:error.message})+'\n');process.exit(1)});

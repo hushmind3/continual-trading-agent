@@ -1,12 +1,13 @@
 """Project installation submenu, behind the existing /api envelope."""
 import base64
 import ipaddress
+import json
 from pathlib import Path
 import shlex
 import re
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from . import github, installer, runtime, lifecycle, localization
 from .store import LOCK, STATE, identifier, read, save
 
@@ -148,6 +149,16 @@ async def freellmapi_codex_proxy(project_id: str, path: str, request: Request):
     headers = {key: value for key, value in request.headers.items() if key.lower() in allowed_headers}
     payload = {'path': '/' + path, 'query': request.url.query, 'method': request.method,
                'headers': headers, 'body': body.decode('utf-8')}
+    body_json = {}
+    if request.method == 'POST' and path in ('v1/responses', 'v1/chat/completions'):
+        try: body_json = json.loads(body) if body else {}
+        except (ValueError, UnicodeDecodeError): body_json = {}
+    wants_stream = bool(body_json.get('stream')) or 'text/event-stream' in request.headers.get('accept', '').lower()
+    if wants_stream and request.method == 'POST' and path in ('v1/responses', 'v1/chat/completions'):
+        started, chunks = await run_in_threadpool(call, runtime.invoke_stream, record, payload, request)
+        response_headers = {key: value for key, value in started.get('headers', {}).items()
+                            if key.lower() not in ('content-length', 'connection', 'transfer-encoding', 'set-cookie')}
+        return StreamingResponse(chunks, status_code=started['status'], headers=response_headers)
     result = await run_in_threadpool(call, runtime.invoke, record, payload, request)
     response_headers = {key: value for key, value in result.get('headers', {}).items()
                         if key.lower() not in ('content-length', 'connection', 'transfer-encoding', 'set-cookie')}

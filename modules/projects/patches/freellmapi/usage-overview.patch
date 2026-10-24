@@ -87,7 +87,7 @@ index 5bdf3c4..45c02fe 100644
  }
 --- /dev/null
 +++ b/client/src/components/usage-overview.tsx
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,40 @@
 +import { useQuery } from '@tanstack/react-query'
 +import { apiFetch } from '@/lib/api'
 +import { useI18n } from '@/i18n'
@@ -108,27 +108,23 @@ index 5bdf3c4..45c02fe 100644
 +  const last = recent?.rows[0]
 +  const lastName = last && groups.flatMap(g => g.members).find(m => m.platform === last.platform && m.modelId === last.modelId)?.displayName
 +  const active = groups.flatMap(g => g.members.filter(m => m.enabled && (m.source ?? 'catalog') === 'catalog' && m.platform !== 'custom'))
++  const remaining = active.flatMap(m => {
++    const budget = data?.models.find(b => b.platform === m.platform && b.modelId === m.modelId)
++    return budget && budget.budget > 0 ? [Math.max(0, budget.budget - (budget.used ?? 0))] : []
++  })
++  const totalRemaining = remaining.reduce((sum, value) => sum + value, 0)
 +  return (
-+    <section className="flex min-h-0 flex-1 flex-col gap-3 p-4" aria-label={ko ? '무료 모델 잔여량' : 'Free model balances'}>
-+      <header className="flex shrink-0 items-center justify-between gap-2">
-+        <h1 className="text-base font-semibold">{ko ? '무료 모델' : 'Free models'}</h1>
-+        <span className="text-xs text-muted-foreground">{ko ? '남은 월 토큰 · 추정' : 'Monthly tokens left · Estimated'}</span>
-+      </header>
-+      <p className="shrink-0 truncate text-xs text-muted-foreground">{ko ? '최근 실제 응답' : 'Last served'} · {last ? `${last.platform} · ${lastName ?? last.modelId}` : (ko ? '최근 응답 없음' : 'No recent response')}</p>
-+      <ul className="min-h-0 flex-1 divide-y overflow-y-auto rounded-2xl border bg-card" aria-label={ko ? '업체·모델별 남은 총량' : 'Balances by provider and model'}>
-+        {active.map(m => {
-+          const budget = data?.models.find(b => b.platform === m.platform && b.modelId === m.modelId)
-+          const remaining = budget && budget.budget > 0 ? Math.max(0, budget.budget - (budget.used ?? 0)) : null
-+          return (
-+            <li key={m.modelDbId} className="flex items-center justify-between gap-3 px-3 py-3">
-+              <div className="min-w-0"><p className="break-words text-sm font-medium">{m.displayName}</p><p className="mt-1 text-xs text-muted-foreground">{m.platform}</p></div>
-+              <p className="shrink-0 text-sm font-semibold tabular-nums">{remaining === null ? (ko ? '미확인' : 'Unknown') : remaining.toLocaleString(locale)}</p>
-+            </li>
-+          )
-+        })}
-+        {(loading || !active.length) && <li className="p-3 text-sm text-muted-foreground">{loading ? (ko ? '조회 중' : 'Loading') : (ko ? '활성 모델 없음' : 'No active models')}</li>}
-+      </ul>
-+      <p className="shrink-0 text-xs text-muted-foreground">{ko ? '월 카탈로그 한도 기준 · 업체 실제 잔액 미연동' : 'Monthly catalog estimates · Actual balances not connected'}</p>
++    <section className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col justify-center gap-5 p-5 sm:p-6" aria-label={ko ? '무료 모델 요약' : 'Free model summary'}>
++      <div className="rounded-2xl border bg-card p-7 text-center sm:p-8">
++        <h1 className="text-base font-medium text-muted-foreground">{ko ? '무료 한도 총량' : 'Free quota remaining'}</h1>
++        <p className="mt-3 text-4xl font-bold tabular-nums sm:text-5xl">{loading ? (ko ? '조회 중' : 'Loading') : remaining.length ? totalRemaining.toLocaleString(locale) : (ko ? '미확인' : 'Unknown')}</p>
++        <p className="mt-2 text-sm text-muted-foreground">{ko ? '토큰 · 등록된 무료 모델의 월 한도 추정 합계' : 'Tokens · estimated monthly total across listed free models'}</p>
++      </div>
++      <div className="rounded-2xl border bg-card px-5 py-4 text-center">
++        <p className="text-sm text-muted-foreground">{ko ? '최근 응답 모델' : 'Latest responding model'}</p>
++        <p className="mt-1 truncate text-base font-semibold">{last ? `${last.platform} · ${lastName ?? last.modelId}` : (ko ? '아직 완료된 응답이 없습니다' : 'No completed response yet')}</p>
++      </div>
++      <p className="text-center text-sm text-muted-foreground">{ko ? '업체 잔액이 아닌 FreeLLMAPI 카탈로그 기준 추정치입니다.' : 'Catalog estimate, not the providers’ actual balances.'}</p>
 +    </section>
 +  )
 +}

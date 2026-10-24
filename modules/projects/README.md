@@ -8,9 +8,9 @@
 
 Node 서버와 Vite 화면을 함께 가진 앱도 원본 서버를 포함해 설치합니다. 화면의 API 요청은 기존 단일 `/api`로 전달하며 앱별 웹 포트를 추가하지 않습니다. 실패 후 **다시 시도**는 내려받은 소스·준비된 Node 의존성과 빌드 결과에서 이어갑니다. 연결 구현과 제한은 [백엔드 안내](backend/README.md)를 따릅니다.
 
-FreeLLMAPI 로컬 설치는 `runtime/projects/manage/projects/freellmapi/`가 소유합니다. 원본은 `versions/version-1/source/`, 사용자 DB는 `data/`에 보존하며 키와 암호화 설정은 비공개 설치 레코드로 관리합니다. 설치만으로 업체 계정·키가 생기지는 않습니다. 원본 UI에 [남은 무료 총량 화면 패치](patches/freellmapi/README.md)를 적용해 활성 모델의 월 카탈로그 한도에서 로컬 사용량을 뺀 업체·모델별 추정 잔여량만 표시합니다. 실제 업체 잔액은 미연동이며 기본 화면에 차트·요청 수·사용량 목록을 노출하지 않습니다.
+FreeLLMAPI 로컬 설치는 `runtime/projects/manage/projects/freellmapi/`가 소유합니다. 원본은 `versions/version-1/source/`, 사용자 DB는 `data/`에 보존하며 키와 암호화 설정은 비공개 설치 레코드로 관리합니다. 설치만으로 업체 계정·키가 생기지는 않습니다. 원본 UI에 [남은 무료 총량 화면 패치](patches/freellmapi/README.md)를 적용해 활성 무료 모델의 월 카탈로그 한도에서 로컬 사용량을 뺀 추정 잔여 토큰 합계와 최근 실제 라우팅 모델만 작은 화면에 표시합니다. 실제 업체 잔액은 미연동이며 기본 화면에 차트·요청 수·사용량 목록을 노출하지 않습니다.
 
-Codex 데스크톱은 로컬 OpenCodex의 `FreeLLMAPI · 자동` 한 항목으로 연결합니다. 플랫폼의 `/api/projects/freellmapi/{project_id}/v1/{models,responses}`는 기존 Node worker로 전달하며 loopback과 통합 Bearer 키를 요구합니다. 현재 응답은 버퍼링되어 SSE가 완료 후 전달됩니다. 자세한 연결 경계는 [백엔드 안내](backend/README.md)를 따릅니다.
+Codex 데스크톱은 로컬 OpenCodex의 `FreeLLMAPI · 자동` 한 항목으로 연결합니다. 플랫폼의 `/api/projects/freellmapi/{project_id}/v1/{models,responses}` 경로는 Codex Responses API를 처리합니다. OpenClaw·Hermes 같은 OpenAI Chat 호환 클라이언트는 같은 loopback·Bearer 인증 경로의 `/v1/chat/completions`를 사용합니다. 두 원본의 공식 FreeLLMAPI 설정 생성기를 사용하고 통합 키는 각 런타임 `.env`(권한 0600)에 저장합니다. 실제 확인: Responses API `auto`의 일반 응답과 `encrypted` 도구 스키마 함수 호출, Chat API `auto`, OpenClaw·Hermes에서 각각 짧은 응답을 받았습니다. OpenClaw 실행 기록은 비용 `$0.00`였습니다. 자세한 연결 경계는 [백엔드 안내](backend/README.md)를 따릅니다.
 
 실제 확인(2026-10-24): 기존 설치·Codex 자동 경로에서 Google, Groq, OVH, OpenRouter, Kilo의 네 모델 그룹 여섯 경로 응답과 사용 기록을 확인했습니다. 전체 업체 가입·전체 카탈로그 호출·업체 실제 청구액/잔여 한도 확인은 미완료입니다. 이번 화면 수정에서는 모델을 호출하지 않았습니다. 원본 Node 실행기는 기존 OpenClaw 도구를 재사용하므로 해당 도구를 제거하면 실행 경로도 변경해야 합니다.
 

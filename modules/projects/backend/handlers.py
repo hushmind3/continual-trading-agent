@@ -133,8 +133,8 @@ async def freellmapi_codex_proxy(project_id: str, path: str, request: Request):
         raise HTTPException(403, 'Codex용 FreeLLMAPI 연결은 이 컴퓨터에서만 사용할 수 있습니다.') from exc
     if not request.headers.get('authorization'):
         raise HTTPException(401, 'FreeLLMAPI 통합 API 키가 필요합니다.')
-    if path not in ('v1/models', 'v1/responses'):
-        raise HTTPException(404, 'Codex 연결에서 지원하지 않는 FreeLLMAPI 경로입니다.')
+    if path not in ('v1/models', 'v1/responses', 'v1/chat/completions'):
+        raise HTTPException(404, 'FreeLLMAPI 연결에서 지원하지 않는 API 경로입니다.')
     record = call(read, project_id)
     if record.get('url', '').rstrip('/').lower() != 'https://github.com/tashfeenahmed/freellmapi' or record.get('adapter', {}).get('kind') != 'node-http':
         raise HTTPException(404, 'FreeLLMAPI 설치본을 찾을 수 없습니다.')

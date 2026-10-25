@@ -21,6 +21,10 @@ jobs:
           node-version-file: modules/hermes/backend/engine/upstream/package.json
       - run: pip install numpy==2.2.6 pandas==2.2.3 gymnasium==1.3.0 psutil==7.0.0 requests websockets==10.4 fastapi==0.115.14 -r development/scripts/requirements/verification.txt
       - run: pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
+      - name: Install the declared FinRL source and import dependencies
+        run: |
+          pip install --no-deps "$(sed -n 's/^finrl @ /finrl @ /p' modules/finance/dependencies/operations.txt)" alpaca-trade-api==3.2.0
+          pip install stable-baselines3==2.9.0 sb3-contrib==2.9.0 stockstats==0.5.4 scikit-learn pandas_market_calendars==5.3.1 alpaca-py==0.37.0 wrds yfinance==0.2.43 selenium==4.27.1 beautifulsoup4 aiohttp deprecation msgpack PyYAML websocket-client
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: npm ci

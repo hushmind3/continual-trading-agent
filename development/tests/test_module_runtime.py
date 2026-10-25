@@ -208,7 +208,7 @@ def download():return FileResponse(Path(__file__).resolve().parents[1]/'large.bi
         app=FastAPI();app.include_router(proxy_router(bridge,description))
         with TestClient(app) as client:
             response=client.get('/api/file',headers={'Range':'bytes=4096-4159'})
-        self.assertEqual(response.status_code,206)
+        self.assertEqual(response.status_code,206,{'body':response.text[:500],'paths':[route.path for route in app.routes]})
         self.assertEqual(response.content,b'\0'*64)
 
 if __name__=='__main__':unittest.main()

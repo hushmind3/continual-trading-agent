@@ -57,3 +57,5 @@ Mac 설치 분기는 CUDA·키움 전용 설치를 건너뛰고, environment(gpu
 Mac 설치·내보내기 정리(2026-10-22): install_windows.py는 이름과 무관하게 기존 OS 분기를 사용하며 npm은 공통 npm_command의 Node+실제 npm-cli.js 인수로 실행합니다. module_sources의 같은 .pth hook이 모듈 소스와 공유 native 도구를 연결합니다. 기존 환경에는 hook만 갱신했고 패키지 재설치·추가 다운로드는 수행하지 않았습니다. CUDA·키움은 Mac 설치 대상에서 제외합니다. 독립 기본 모듈의 Mac 설치도 같은 설치기를 재사용하며 Metal 실행기는 설치된 Homebrew llama-server에 연결합니다.
 
 GitHub Actions는 공식 Hermes package.json의 engines.node에서 Node 버전을 읽습니다. backend-integrity는 실제 사용 SDK·Torch CPU·REA Node 실행기·기존 Playwright 환경을 준비하며 Windows 설치기 실행은 windows-installer 작업으로 분리합니다. 테스트 fixture는 현재 직원 고유 ID·모듈 소유 경로·공식 제공자 resolver 계약을 따릅니다. 로컬 검사는 GitHub 통과 판정으로 대신하지 않습니다.
+
+금융 API 회귀검사는 기존 operations.txt가 고정한 FinRL 소스와 실제 SB3·제공자 SDK import 의존성을 준비합니다. 운영 호스트에 금융 패키지를 섞지 않으며 CI의 개발 검사 환경에서만 사용합니다. Linux 파일 범위 응답 검사는 상태 불일치 시 실제 응답 사유와 등록 경로를 함께 보고합니다.

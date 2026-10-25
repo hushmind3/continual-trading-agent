@@ -160,16 +160,16 @@ def apply_source_patches(record, source, run):
     for name in ('usage-overview.patch', 'codex-compatibility.patch'):
         patch = ROOT / 'modules/projects/patches/freellmapi' / name
         receipts[name] = hashlib.sha256(patch.read_bytes()).hexdigest()
-        reverse = subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)],
+        reverse = subprocess.run(['git', 'apply', '--ignore-space-change', '--reverse', '--check', str(patch)],
                                  cwd=source, capture_output=True)
         if reverse.returncode == 0:
             continue
-        check = subprocess.run(['git', 'apply', '--check', str(patch)], cwd=source, capture_output=True)
+        check = subprocess.run(['git', 'apply', '--ignore-space-change', '--check', str(patch)], cwd=source, capture_output=True)
         if check.returncode:
             raise ValueError(f'FreeLLMAPI 원본과 {name} 패치가 맞지 않습니다. 기존 설치본을 유지합니다. 충돌 내용을 확인한 뒤 업데이트하세요.')
         pending.append(patch)
     for patch in pending:
-        run(['git', 'apply', str(patch)], source)
+        run(['git', 'apply', '--ignore-space-change', str(patch)], source)
     record['platform_patches'] = receipts
     return bool(pending)
 

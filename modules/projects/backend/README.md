@@ -106,6 +106,6 @@ Codex 도구 호환: 원본의 [codex-compatibility.patch](../patches/freellmapi
 
 `builtin_packages.py`는 Git 서브모듈을 디렉터리 파일로 읽지 않고 해당 모듈의 공개 추적 소스를 포함합니다. 사용자 상태·환경 비밀·연결 파일은 포함하지 않습니다. Hermes 독립 실행은 공식 PM을 사용하며 구형 llama.cpp 실행기를 추가 설치하지 않습니다. 독립 실행기의 실제 포트를 공식 내부 연결에 전달합니다.
 
-`installer.apply_source_patches`는 공식 FreeLLMAPI 저장소의 설치·업데이트·실패 재개에서 기존 두 버전 관리 패치를 빌드 전에 적용합니다. 이미 적용된 패치는 중복 적용하지 않으며 충돌하면 기존 활성 버전을 유지하고 오류를 표시합니다. 패치 해시를 설치 기록에 남기고 변경된 클라이언트·서버를 다시 빌드합니다. 현재 PC의 기존 설치 목록에는 FreeLLMAPI가 없어 해당 앱의 실제 UI 적용은 아직 미확인입니다.
+`installer.apply_source_patches`는 공식 FreeLLMAPI 저장소의 설치·업데이트·실패 재개에서 기존 두 버전 관리 패치를 빌드 전에 적용합니다. 이미 적용된 패치는 중복 적용하지 않으며 충돌하면 기존 활성 버전을 유지하고 오류를 표시합니다. 패치 해시를 설치 기록에 남기고 변경된 클라이언트·서버를 다시 빌드합니다. 현재 PC에서는 맥의 기존 FreeLLMAPI 설치·DB·키 설정을 같은 설치 ID로 복구했습니다. 실제 화면과 단일 API의 자동 라우팅 응답을 확인했으며, 자세한 범위는 FreeLLMAPI 패치 README를 따릅니다.
 
 실제 확인: 기존 서버의 projects/export(id=hermes)가 104,348,992바이트 ZIP을 생성했습니다. 공식 소스 21,200개 파일과 run_agent.py·gateway/run.py를 포함했고 runtime·.git·.env는 포함하지 않았습니다. ZIP을 새 PC에 설치·실행한 검사는 수행하지 않았습니다.

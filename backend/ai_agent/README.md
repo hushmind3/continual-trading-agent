@@ -9,3 +9,5 @@
 - 공식 원본 체크아웃은 각 `runtime/ai_agent/<중메뉴>/source/`, 사용자 설정은 `home/`, 도구는 `tools/`입니다. 기존 공식 설치·업데이트 경로를 유지하며 원본 Git 의존성과 플랫폼 연결 코드를 구분합니다.
 
 실제 실행과 미확인 범위는 각 중메뉴 README를 따릅니다. 다른 PC 설치·원본 업데이트·모델 응답을 이번 디렉터리 정리의 성공으로 표시하지 않습니다.
+
+[토큰 최적화](../../modules/ai_agent/TokenOptimizer/README.md)는 실제 Token Optimizer·RTK 집계를 제공하는 독립 중메뉴입니다. manager.py는 각 중메뉴를 요청할 때 import하므로 다른 중메뉴가 분리되어도 불필요한 import 의존성을 만들지 않습니다.

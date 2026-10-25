@@ -1,0 +1,1 @@
+export {menus} from './manager';

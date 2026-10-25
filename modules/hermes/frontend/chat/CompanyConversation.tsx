@@ -12,10 +12,10 @@ type State={session_id?:string;ventures:Venture[];progress?:CompanyProgress};
 export function useCompanyConversation(selected:string,sessions:Session[]){
  const sources=useContext(CompanyConversations),source=sources.find(v=>v.session_id===selected||v.id===sessions.find(row=>row.id===selected)?.company_id),id=source?.id??sources[0]?.id;
  const [state,setState]=useState<State>({ventures:[]}),[error,setError]=useState(''),[pending,setPending]=useState(false);
- useEffect(()=>{setState({ventures:[]});setError('');if(!id)return;let live=true,reading=false;
+ useEffect(()=>{setState({ventures:[]});setError('');if(!id||!source)return;let live=true,reading=false;
   const refresh=async()=>{if(reading)return;reading=true;try{const next=await request<State>('projects/conversation',{id},'GET');if(live)setState(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next)}catch(e){if(live)setError(failure(e))}finally{reading=false}};
   void refresh();const timer=setInterval(()=>{if(!document.hidden)void refresh()},2500);return()=>{live=false;clearInterval(timer)};
- },[id]);
+ },[id,!!source]);
  const decide=async(venture_id:string,approve:boolean)=>{if(!id)return;setPending(true);setError('');try{const result=await request<{session_id:string;name:string;workspace:string}>('projects/conversation',{id,action:'decision',venture_id,approve});setState(await request<State>('projects/conversation',{id},'GET'));return result}catch(e){setError(failure(e));throw e}finally{setPending(false)}};
  return {sources,choices:sources.map(item=>item.id===source?.id?{...item,session_id:selected}:{...item,session_id:(()=>{const remembered=sessionStorage.getItem('hermes.company-session.'+item.id);return sessions.some(row=>row.id===remembered&&row.company_id===item.id)?remembered!:item.session_id})()}),root:source?.session_id===selected,enabled:!!source,id,ventures:state.ventures.filter(v=>v.status==='pending'),progress:state.progress,error,pending,decide};
 }

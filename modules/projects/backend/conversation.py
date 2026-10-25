@@ -64,9 +64,19 @@ def call(key, payload, origin=None):
     if action == 'send':
         raise ValueError('AI 총괄은 Hermes 영구 세션의 chat/goal/loop를 사용합니다.')
     if action == 'meetings':
+        from ai_agent.Hermes.engine.bridge import bridge
         meetings = invoke('/api/admin/meetings', token=token)
         records = invoke('/api/admin/hermes/records', 'POST', {'action': 'overview'}, token)
         team = invoke('/api/admin/team', token=token)
+        job = bridge.call('status').get('job', {})
+        live = job.get('meeting') or {}
+        active = job.get('state') in ('starting', 'running', 'stopping')
+        for meeting in meetings.get('meetings', []):
+            if meeting.get('status') == 'running':
+                # A saved agenda survives restart; it does not prove execution.
+                meeting['execution_state'] = ('running' if active and live.get('id') == meeting['id']
+                    else 'pending' if active and not live.get('id') and (live.get('company_id') == key or job.get('session_id') == native_id)
+                    else 'interrupted')
         return {**meetings, **team, 'session_id': native_id, 'jobs': records.get('jobs', []), 'ventures': records.get('ventures', [])}
     if action == 'decision':
         venture = str(payload.get('venture_id', ''))

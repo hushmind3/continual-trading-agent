@@ -1,2 +1,12 @@
 # HTTP gateway integration tests; UI checks use frontend's locked Playwright dependency.
 httpx==0.28.1
+openai
+rich
+ruamel.yaml
+python-dotenv
+tiktoken
+PyJWT[crypto]
+prompt_toolkit
+croniter
+pathspec
+snowballstemmer

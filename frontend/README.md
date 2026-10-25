@@ -30,3 +30,5 @@
 - API·브라우저 검사: `npm run test:api --workspace frontend`, `npm run test:browser --workspace frontend`.
 
 검사는 사용자 지시에 따라 실행하며 빌드·서버 적용·화면 표시·실제 업무 실행을 구분합니다. `dist/`는 빌드 산출물입니다. 현재 모듈 분리 확인은 [모듈 안내](../modules/README.md), Hermes UI의 최근 확인은 [대화 안내](../modules/hermes/frontend/chat/README.md), 모델 추론 실측은 [모델 안내](../modules/hermes/backend/models/README.md)를 따릅니다. 특정 UI 검사의 통과를 전체 금융·REA 업무 실행 완료로 확대하지 않습니다. 기본 모듈 독립 소스 내보내기는 공통 UI 소스 복사본을 포함하며 다른 플랫폼 폴더를 참조하지 않습니다. 현재 단독 실행 확인 범위는 프로젝트 관리 README를 따릅니다.
+
+Hermes 공식 UI 플러그인은 해당 모듈이 존재할 때만 불러옵니다. 공식 디자인 시스템의 Tailwind import·source는 플러그인이 공통 tailwind.css에 주입합니다. 금융·REA 독립 내보내기처럼 Hermes가 없는 배포본은 Hermes 빌드 파일을 강제 참조하지 않습니다.

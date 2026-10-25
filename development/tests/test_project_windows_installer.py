@@ -1,5 +1,7 @@
 """Original Windows installer discovery, typed controls and real execution."""
 import json
+import os
+from unittest import skipUnless
 import sys
 import tempfile
 import time
@@ -11,6 +13,7 @@ from platform_modules import mount_namespaces
 mount_namespaces()
 from platform_plugins.projects import adapters,powershell_app,runtime,installer,requirements,store
 
+@skipUnless(os.name=='nt','Windows 설치기 실제 실행은 Windows 작업에서 검증합니다.')
 class WindowsInstallerTests(TestCase):
  def setUp(self):
   base=ROOT/'runtime/projects/manage/verification';base.mkdir(parents=True,exist_ok=True)

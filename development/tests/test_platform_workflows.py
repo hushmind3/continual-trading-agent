@@ -39,7 +39,7 @@ class REAWorkflowTests(unittest.TestCase):
  def test_native_metadata_separates_recovered_and_unavailable_functions(self):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);source=root/'fixture.exe';source.write_bytes(b'MZ-test-fixture')
-   recovered={'source':'/* inferred pseudocode */','sha256':'fixture','total':2,'succeeded':1,'failed':1,'limitations':['fixture only'],
+   recovered={'source':'/* inferred pseudocode */','sha256':'fixture','total':2,'succeeded':1,'failed':1,'discovered':2,'external_references':0,'limitations':['fixture only'],
               'items':[{'address':'0x1000','status':'ok','pseudocode':'int main() { return 0; }'},{'address':'0x2000','status':'failed','error':'unavailable'}]}
    with patch.object(extract,'OUTPUT',root/'saved'),patch.object(extract,'native_recover',return_value=recovered):
     result=extract.analyze('file',str(source))

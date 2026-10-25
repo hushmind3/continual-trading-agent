@@ -36,7 +36,7 @@ export function hermesOfficialUI():Plugin{
   resolveId(source){if(source==='hermes-platform-transport')return here('./settings/official/transport.ts')},
   transform(code,id){
    const path=id.replaceAll('\\','/').split('?')[0];
-   if(path.endsWith('/frontend/src/tailwind.css'))return {code:code.replace('hermes-official-design.css',nativeUiCss).replace('hermes-official-design-source',nativeUiDist),map:null};
+   if(path.endsWith('/frontend/src/tailwind.css'))return {code:code.replace('@import "tailwindcss";',`@import "tailwindcss";\n@import "${nativeUiCss}";\n@source "${nativeUiDist}";`),map:null};
    if(!path.startsWith(native)||!/[cm]?[jt]sx?$/.test(path))return;
    const imports:string[]=[];
    if(path.endsWith('/plugins/usePlugins.ts')){

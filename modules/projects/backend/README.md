@@ -101,3 +101,11 @@ Codex 도구 호환: 원본의 [codex-compatibility.patch](../patches/freellmapi
 2026-10-25 공용 연결 복구: 요청별 IPC 큐를 적용해 이전 응답이 다음 모델·인증 요청에 섞이던 문제를 수정했습니다. 실제 자동 세션 발급·인증 완료·대시보드 표시와 Hermes/OpenClaw의 `auto` 대화를 확인했습니다. 설정 소유·프로필별 적용은 각 원본 모듈의 backend/README.md, 화면/한도 설명은 [FreeLLMAPI 패치 안내](../patches/freellmapi/README.md)를 따릅니다.
 
 2026-10-25 칸반 후속 호출 확인: 기존 Hermes 대화에서 도구 결과 뒤 `write EPIPE`가 발생했습니다. 임시 확인에서 HTTP 파서의 `HPE_CLOSED_CONNECTION`을 포착했고, IPC의 전역 Agent 재사용을 끈 뒤 같은 대화의 `kanban_comment → kanban_show → 최종 답변`이 완료됐습니다. 댓글은 기존 service-lab 보드 DB에서도 확인했습니다. 1.2/2.4 MiB 한글 본문의 실제 models 경로도 HTTP 200입니다. 임시 로그 코드는 제거했습니다. 장시간 업무·절전 복귀 자체를 전수 확인한 결과는 아닙니다.
+
+## 공식 소스 내보내기·패치 적용 (2026-10-26)
+
+`builtin_packages.py`는 Git 서브모듈을 디렉터리 파일로 읽지 않고 해당 모듈의 공개 추적 소스를 포함합니다. 사용자 상태·환경 비밀·연결 파일은 포함하지 않습니다. Hermes 독립 실행은 공식 PM을 사용하며 구형 llama.cpp 실행기를 추가 설치하지 않습니다. 독립 실행기의 실제 포트를 공식 내부 연결에 전달합니다.
+
+`installer.apply_source_patches`는 공식 FreeLLMAPI 저장소의 설치·업데이트·실패 재개에서 기존 두 버전 관리 패치를 빌드 전에 적용합니다. 이미 적용된 패치는 중복 적용하지 않으며 충돌하면 기존 활성 버전을 유지하고 오류를 표시합니다. 패치 해시를 설치 기록에 남기고 변경된 클라이언트·서버를 다시 빌드합니다. 현재 PC의 기존 설치 목록에는 FreeLLMAPI가 없어 해당 앱의 실제 UI 적용은 아직 미확인입니다.
+
+실제 확인: 기존 서버의 projects/export(id=hermes)가 104,348,992바이트 ZIP을 생성했습니다. 공식 소스 21,200개 파일과 run_agent.py·gateway/run.py를 포함했고 runtime·.git·.env는 포함하지 않았습니다. ZIP을 새 PC에 설치·실행한 검사는 수행하지 않았습니다.

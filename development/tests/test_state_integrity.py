@@ -201,7 +201,7 @@ class IntegrityTests(unittest.TestCase):
   from menu_registry import GROUPS
   from stockrl.platform.framework_operations import ACTIONS
   self.assertEqual(set(ACTIONS),{'native_call'})
-  self.assertEqual([group['id'] for group in GROUPS],['finance','rea','ai_agent'])
+  self.assertEqual([group['id'] for group in GROUPS],['finance','rea','ai_agent','overlord','projects'])
  def test_rea_refuses_project_trash_inputs(self):
   from rea.program_analysis.operations import validate_arguments
   with self.assertRaisesRegex(ValueError,'휴지통'):
@@ -365,7 +365,7 @@ class BrokerLifecycleTests(unittest.TestCase):
     process.wait.side_effect=(lambda: (stop.set(),0)[1]) if index else lambda:0
     processes.append(process)
    streams=kiwoom_data.BrokerStreams(collector)
-   with patch.object(kiwoom_data,'ROOT',root),patch.object(kiwoom_data.subprocess,'Popen',side_effect=processes) as launch,patch.object(stop,'wait',return_value=False) as retry:
+   with patch.object(kiwoom_data,'ROOT',root),patch.object(kiwoom_data,'MODULE_ROOT',root),patch.object(kiwoom_data.subprocess,'Popen',side_effect=processes) as launch,patch.object(stop,'wait',return_value=False) as retry:
     streams.start();streams.thread.join(timeout=5)
     self.assertFalse(streams.thread.is_alive())
     self.assertEqual(launch.call_count,2);retry.assert_called_once_with(2)

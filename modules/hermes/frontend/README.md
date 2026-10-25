@@ -31,3 +31,5 @@ Markdown API: https://github.com/remarkjs/react-markdown / https://github.com/re
 현재 대화·Thinking 제어와 최신 UI 검사 범위는 [대화 안내](chat/README.md)를 따릅니다. 모델 추론 속도·도구 실측은 [백엔드 모델 안내](../backend/models/README.md)에 별도 기록합니다. 과거 UI 검사 개수를 현재 전체 기능 확인으로 취급하지 않습니다.
 
 개별 프롬프트는 기존 공통 시스템 지침·조직·직원 원문 기본값과 사용자 설정을 구분해 표시합니다. 이름 행을 바꿔 저장하면 settings 이벤트를 통해 기존 회사 iframe도 이름을 갱신하며 회의는 같은 서버 이름 투영을 사용합니다. 상세 적용 범위는 settings/agent-prompts/README.md에 정리합니다.
+
+공식 디자인 시스템의 공통 Tailwind 연결은 `official-vite.ts`가 담당합니다. 호스트는 Hermes 모듈이 있을 때만 이 플러그인을 로드하며, 모듈이 없는 독립 배포본의 빌드를 방해하지 않습니다. 기존 UI 구성과 테마 값은 유지합니다.

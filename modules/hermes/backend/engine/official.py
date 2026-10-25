@@ -9,6 +9,7 @@ import asyncio
 import base64
 import json
 import queue
+import os
 import threading
 import uuid
 from urllib.parse import urlsplit, parse_qsl, urlencode
@@ -32,7 +33,7 @@ class OfficialApplication:
         # Official child processes must attach to this same platform endpoint,
         # not bootstrap an unrelated dashboard/gateway on an unbound address.
         app.state.bound_host = '127.0.0.1'
-        app.state.bound_port = 8766
+        app.state.bound_port = int(os.environ.get('PLATFORM_HTTP_PORT','8766'))
         app.state.platform_transport_prefix = '/api/ai_agent/Hermes/native'
         self.lifespan = app.router.lifespan_context(app)
         await self.lifespan.__aenter__()
@@ -95,6 +96,8 @@ class OfficialApplication:
             if isinstance(value.get('body'),bytes):value['body']=base64.b64encode(value['body']).decode('ascii')
             await asyncio.to_thread(outgoing.put,value)
         headers = self._headers(payload.get('headers'))
+        server = payload.get('server')
+        if server and server[1]:self.app.state.bound_port=int(server[1])
         public_host = (payload.get('headers') or {}).get('host','127.0.0.1:8766')
         headers['host'] = public_host
         headers['origin'] = str(payload.get('scheme','http'))+'://'+public_host

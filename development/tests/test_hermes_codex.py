@@ -17,6 +17,12 @@ from types import SimpleNamespace
 
 
 class CodexTests(unittest.TestCase):
+    def setUp(self):
+        # Provider tests must never inherit a developer's live model or credential pool.
+        for target,value in [('hermes_cli.config.load_config', {'model': {'default':'contract-model','provider':'custom'}}),
+                             ('hermes_cli.runtime_provider._resolve_from_pool', None)]:
+            item=patch(target,return_value=value);item.start();self.addCleanup(item.stop)
+
     def test_cloud_goal_reasoning_restores_original_local_auxiliary_options(self):
         native={'auxiliary':{'goal_judge':{'extra_body':{'other':True,'reasoning':{'effort':'low'}}}}}
         worker=SimpleNamespace(codex=SimpleNamespace(reasoning=lambda *args:{'enabled':True,'effort':'high'}))
@@ -54,15 +60,15 @@ class CodexTests(unittest.TestCase):
 
     def test_custom_route_is_unchanged_and_does_not_resolve_oauth(self):
         with patch('hermes_cli.auth_codex.resolve_codex_runtime_credentials') as resolve:
-            self.assertEqual(runtime({'base_url': 'http://localhost/v1'}),
+            self.assertEqual({k:v for k,v in runtime({'provider':'custom','base_url': 'http://localhost/v1','api_key':'local'}).items() if k in ('provider','api_mode','base_url','api_key')},
                 {'provider': 'custom', 'api_mode': 'chat_completions', 'base_url': 'http://localhost/v1', 'api_key': 'local'})
             resolve.assert_not_called()
 
     def test_codex_uses_native_responses_and_credential_owned_host(self):
-        with patch('hermes_cli.auth_codex.resolve_codex_runtime_credentials',
+        with patch('hermes_cli.runtime_provider.resolve_codex_runtime_credentials',
                    return_value={'api_key': 'secret', 'base_url': 'https://owned.example/v1'}):
             result = runtime({'provider': 'openai-codex', 'base_url': 'https://untrusted.example', 'api_key': 'old-key'})
-        self.assertEqual(result, {'provider': 'openai-codex', 'api_mode': 'codex_responses',
+        self.assertEqual({k:v for k,v in result.items() if k in ('provider','api_mode','api_key','base_url')}, {'provider': 'openai-codex', 'api_mode': 'codex_responses',
                                  'api_key': 'secret', 'base_url': 'https://owned.example/v1'})
 
     def test_status_never_exposes_credentials(self):

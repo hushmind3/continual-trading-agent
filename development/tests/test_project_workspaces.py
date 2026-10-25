@@ -21,11 +21,14 @@ class WorkspaceTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(dir=verification)
         self.addCleanup(self.temp.cleanup)
         self.state = Path(self.temp.name)
+        root_patch=patch.object(store,'ROOT',self.state);root_patch.start();self.addCleanup(root_patch.stop)
+        module=self.state/'modules/projects/demo';module.mkdir(parents=True)
+        (module/'module.json').write_text(json.dumps({'id':'projects/demo'}),encoding='utf-8')
         self.patch = patch.object(store, 'STATE', self.state)
         self.patch.start(); self.addCleanup(self.patch.stop)
         source = self.state / 'projects/demo/source'; source.mkdir(parents=True)
         (source / 'ai_provider.py').write_text('async def compose(system,user): return "original"', encoding='utf-8')
-        self.record = {'id': 'p_demo', 'folder_name': 'demo', 'repository': 'owner/sample', 'stage': 'ready',
+        self.record = {'module_id':'projects/demo','id': 'p_demo', 'folder_name': 'demo', 'repository': 'owner/sample', 'stage': 'ready',
             'active_source': str(source), 'adapter': {'kind': 'fastapi'}}
         store.save(self.record)
         self.config = {'revision': 'a' * 40, 'path': 'templates/admin.html', 'navigation': 'data-tab',

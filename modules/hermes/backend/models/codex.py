@@ -92,11 +92,26 @@ class CodexConnection:
 
 
 def runtime(settings):
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from hermes_cli.runtime_provider import resolve_runtime_provider, frozen_runtime_config
+    from hermes_cli.config import load_config
     from run_agent import AIAgent
     import inspect
-    values = resolve_runtime_provider(requested=settings.get('provider'), target_model=settings.get('model'),
-        explicit_api_key=settings.get('api_key') or None if settings.get('provider') == 'custom' else None)
+    from copy import deepcopy
+    native = deepcopy(load_config())
+    model = native.get('model')
+    model = dict(model) if isinstance(model, dict) else {'default': model or ''}
+    provider = settings.get('provider') or ('custom' if settings.get('base_url') else model.get('provider'))
+    if provider != model.get('provider'):
+        model['base_url'] = ''  # An old local endpoint must not override a new OAuth route.
+    model['provider'] = provider
+    model['default'] = settings.get('model') or model.get('default', '')
+    if provider in ('custom', 'llamacpp') and settings.get('base_url'):
+        model['base_url'] = settings['base_url']
+    native['model'] = model
+    with frozen_runtime_config(native):
+        values = resolve_runtime_provider(requested=provider, target_model=model['default'],
+            explicit_base_url=settings.get('base_url') if provider == 'custom' else None,
+            explicit_api_key=settings.get('api_key') or None if provider == 'custom' else None)
     parameters = inspect.signature(AIAgent.__init__).parameters
     return {key:value for key,value in values.items() if key in parameters and key not in ('self','model')}
 

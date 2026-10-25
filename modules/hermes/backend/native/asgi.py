@@ -27,7 +27,7 @@ class OfficialASGI:
             if not message.get('more_body'):break
         query=scope.get('query_string',b'').decode()
         payload={'path':path+('?' + query if query else ''),'method':scope['method'],
-                 'scheme':scope.get('scheme','http'),
+                 'scheme':scope.get('scheme','http'),'server':scope.get('server'),
                  'headers':{k.decode('latin1'):v.decode('latin1') for k,v in scope['headers']},
                  'body':base64.b64encode(body).decode()}
         opened=await asyncio.to_thread(bridge.call,'official/stream/open',payload)

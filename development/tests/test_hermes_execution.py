@@ -23,9 +23,9 @@ policy=importlib.util.module_from_spec(policy_spec);policy_spec.loader.exec_modu
 class ExecutionPolicyTests(unittest.TestCase):
     def test_model_profiles_do_not_leak_between_models(self):
         cfg={'model':'ornith','tool_loading':'lazy','model_options':{}}
-        policy.save_options(cfg,{'context_length':65536,'thinking_mode':'off'})
-        self.assertEqual(policy.model_options(cfg,{}),{'context_length':65536,'thinking_mode':'off'})
-        self.assertEqual(policy.model_options({**cfg,'model':'another'},{}),{'context_length':0,'thinking_mode':'auto'})
+        policy.save_options(cfg,{'context_length':65536,'thinking_mode':'off','max_output_tokens':0,'reasoning_effort':'auto'})
+        self.assertEqual(policy.model_options(cfg,{}),{'context_length':65536,'thinking_mode':'off','max_output_tokens':0,'reasoning_effort':'auto'})
+        self.assertEqual(policy.model_options({**cfg,'model':'another'},{}),{'context_length':0,'thinking_mode':'auto','max_output_tokens':0,'reasoning_effort':'auto'})
         for value in (True,-1,0.5,'65536',2097153):
             with self.subTest(value=value),self.assertRaises(ValueError):policy.save_options(cfg,{'context_length':value})
         policy.save_options(cfg,{'context_length':0,'thinking_mode':'auto'})
@@ -47,7 +47,7 @@ class ExecutionPolicyTests(unittest.TestCase):
         defaults={'tools':{'tool_search':{'defer':['computer_use']}}}
         registry=SimpleNamespace(get_tool_to_toolset_map=lambda:{'terminal':'terminal','computer_use':'computer_use'})
         worker=SimpleNamespace(native_config=lambda:native,write_config=lambda value:None)
-        with patch.dict(sys.modules,{'hermes_cli.config_defaults':SimpleNamespace(DEFAULT_CONFIG=defaults),'tools.registry':SimpleNamespace(registry=registry)}):
+        with patch.dict(sys.modules,{'hermes_cli.config_defaults':SimpleNamespace(DEFAULT_CONFIG=defaults),'tools.registry':SimpleNamespace(registry=registry),'tools.tool_search':SimpleNamespace(_DIRECT_SURFACE_TOOLSETS=set())}):
             policy.configure_tools(worker,'lazy')
             self.assertEqual(native['tools']['tool_search']['defer'],['computer_use','terminal'])
             self.assertEqual(native['tools']['tool_search']['listing_max_tokens'],4000)
@@ -80,9 +80,13 @@ class ExecutionPolicyTests(unittest.TestCase):
         tree = ast.parse((ENGINE / 'worker.py').read_text(encoding='utf-8'))
         call = next(n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == 'AIAgent')
         keys = {k.arg for k in call.keywords}
-        self.assertTrue({'reasoning_config', 'max_tokens', 'skip_context_files'}.isdisjoint(keys))
+        self.assertNotIn('max_tokens',keys)
+        self.assertIn('reasoning_config',keys)
+        self.assertIn('skip_context_files',keys)
+        reasoning = next(k.value for k in call.keywords if k.arg == 'reasoning_config')
+        self.assertIsInstance(reasoning, ast.IfExp)  # Provider-specific override only.
         review = next(k.value for k in call.keywords if k.arg == 'skip_background_review')
-        self.assertIsInstance(review, ast.Call)  # Read-only permission, not unconditional True.
+        self.assertIsInstance(review, ast.BoolOp)  # Read-only permission, not unconditional True.
 
     def test_review_keeps_worker_busy_until_native_completion(self):
         done = threading.Event()

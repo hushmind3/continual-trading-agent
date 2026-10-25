@@ -1,7 +1,5 @@
 @source "../../modules";
 @import "tailwindcss";
-@import "hermes-official-design.css";
-@source "hermes-official-design-source";
 @font-face {
   font-family: "Pretendard Variable";
   src: url("./assets/fonts/PretendardVariable.woff2") format("woff2");

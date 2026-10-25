@@ -15,10 +15,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - run: python modules/hermes/backend/engine/prepare.py
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - run: pip install numpy==2.2.6 pandas==2.2.3 gymnasium==1.3.0 psutil==7.0.0 requests websockets==10.4 fastapi==0.115.9 -r development/scripts/requirements/verification.txt
+          node-version-file: modules/hermes/backend/engine/upstream/package.json
+      - run: pip install numpy==2.2.6 pandas==2.2.3 gymnasium==1.3.0 psutil==7.0.0 requests websockets==10.4 fastapi==0.115.14 -r development/scripts/requirements/verification.txt
+      - run: pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm ci
+        working-directory: modules/rea
       - name: Prepare isolated host and transport-test environments
         run: |
           python -m venv .venv/platform
@@ -40,7 +46,7 @@ jobs:
       - run: python modules/hermes/backend/engine/prepare.py
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: modules/hermes/backend/engine/upstream/package.json
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci --ignore-scripts
@@ -52,3 +58,15 @@ jobs:
         working-directory: frontend
       - run: npm run test:api
         working-directory: frontend
+
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install fastapi==0.115.14 httpx psutil requests
+      - run: python -m unittest discover -s development/tests -p test_project_windows_installer.py -v
+        env:
+          PYTHONPATH: backend

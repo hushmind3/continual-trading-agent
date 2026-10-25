@@ -73,7 +73,7 @@ class AutonomousCompletionTests(unittest.TestCase):
             def fire_tick(self):return 'tick'
             def evaluate_after_turn(self,*args):raise AssertionError('Incomplete turn was judged')
             complete_tick=evaluate_after_turn
-        modules={'hermes_cli.goals':SimpleNamespace(GoalManager=Manager,goal_kick_prompt=lambda *args:'goal'),
+        modules={'hermes_cli.goals':SimpleNamespace(GoalManager=Manager,goal_kick_prompt=lambda *args:'goal',last_user_message_content=lambda rows:'goal'),
             'hermes_cli.loops':SimpleNamespace(LoopManager=Manager)}
         for mode in ('goal','loop'):
             for outcome in ({'completed':False},{'failed':True}):

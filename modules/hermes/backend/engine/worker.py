@@ -190,13 +190,12 @@ class HermesWorker:
     def save_settings(self, request):
         self.idle_required()
         cfg = load_settings()
+        native = self.native_config()
         if 'toolsets' in request:
             selected=request['toolsets']
             if not isinstance(selected,list) or any(not isinstance(value,str) for value in selected):
                 raise ValueError('사용할 기능은 도구 식별자 목록이어야 합니다.')
-            native=self.native_config()
             native.setdefault('platform_toolsets',{})['cli']=sorted(set(selected))
-            self.write_config(native)
         for key in DEFAULTS:
             if key in ('model_options', 'agent_prompts'):continue
             if key in request and not (key == 'api_key' and request[key] == ''):
@@ -222,7 +221,6 @@ class HermesWorker:
             raise ValueError('지원하지 않는 도구 묶음입니다.')
         cfg=save_options(cfg,request)
         if 'reasoning_effort' in request or 'thinking_mode' in request:
-            native=self.native_config()
             agent=native.setdefault('agent',{})
             if 'reasoning_effort' in request:agent['reasoning_effort']=request['reasoning_effort']
             mode=request.get('thinking_mode')
@@ -231,7 +229,6 @@ class HermesWorker:
                 from hermes_cli.config import DEFAULT_CONFIG
                 agent['reasoning_effort']=DEFAULT_CONFIG.get('agent',{}).get('reasoning_effort') or 'medium'
             elif mode=='auto' and 'reasoning_effort' not in request:agent.pop('reasoning_effort',None)
-            self.write_config(native)
         if cfg.get('provider') == 'openai-codex':
             if not self.codex.status()['connected']:
                 raise ValueError('모델 설정에서 ChatGPT 로그인을 완료하세요.')
@@ -239,15 +236,40 @@ class HermesWorker:
             from hermes_cli.auth_constants import DEFAULT_CODEX_BASE_URL
             cfg['base_url'] = DEFAULT_CODEX_BASE_URL
             if 'reasoning_effort' in request:
-                self.codex.reasoning(cfg['model'], model_options(cfg, self.native_config())['reasoning_effort'])
+                self.codex.reasoning(cfg['model'], model_options(cfg, native)['reasoning_effort'])
         if any(key in request for key in ('provider', 'model', 'base_url')):
-            native = self.native_config()
             if cfg.get('provider') == 'openai-codex':
                 native.setdefault('auth', {})['adopt_external_logins'] = False
-            self.write_config(bind_model(native, cfg['model'], cfg['base_url'],
-                model_options(cfg, native)['context_length'], cfg.get('provider', 'custom')))
-        atomic_json(SETTINGS, cfg)
-        return self.public_settings()
+            native = bind_model(native, cfg['model'], cfg['base_url'],
+                model_options(cfg, native)['context_length'], cfg.get('provider', 'custom'))
+        return self.commit_settings(cfg, native)
+
+    def commit_settings(self, cfg, native):
+        """Commit only validated settings; restore both files on a failed save/readback."""
+        native_path = HOME / 'config.yaml'
+        with self.lock:
+            originals = {path: path.read_bytes() if path.exists() else None for path in (native_path, SETTINGS)}
+            written = []
+            try:
+                if native != self.native_config():
+                    self.write_config(native)
+                    written.append(native_path)
+                atomic_json(SETTINGS, cfg)
+                written.append(SETTINGS)
+                return self.public_settings()
+            except Exception:
+                for path in reversed(written):
+                    previous = originals[path]
+                    if previous is None:
+                        path.unlink(missing_ok=True)
+                    else:
+                        temporary = path.with_name(path.name + '.rollback-' + uuid.uuid4().hex)
+                        try:
+                            temporary.write_bytes(previous)
+                            temporary.replace(path)
+                        finally:
+                            temporary.unlink(missing_ok=True)
+                raise
 
     def model_client(self, request=None):
         from openai import OpenAI

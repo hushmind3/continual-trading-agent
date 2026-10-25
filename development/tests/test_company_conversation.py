@@ -8,7 +8,7 @@ mount_namespaces()
 from platform_plugins.projects import conversation,workspaces
 class ConversationTests(unittest.TestCase):
  def setUp(self):
-  self.record={'id':'demo','name':'Demo','stage':'ready','workspace_ui':{'recipe':'company-v1','native':{'token':'secret'}},'harness':{'enabled':True}}
+  self.record={'id':'demo','name':'Demo','stage':'ready','workspace_ui':{'recipe':'company-v1','staff_identity_version':3,'native':{'token':'secret'}},'harness':{'enabled':True}}
   self.calls=[];p=patch.object(conversation.store,'read',return_value=self.record);p.start();self.addCleanup(p.stop)
   p=patch.object(conversation.runtime,'invoke',side_effect=self.invoke);p.start();self.addCleanup(p.stop)
  def invoke(self,record,data,origin):

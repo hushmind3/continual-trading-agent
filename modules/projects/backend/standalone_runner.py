@@ -92,7 +92,7 @@ def main():
         if sys.platform=='darwin' and metadata['module']=='finance':raise ValueError('금융 CUDA·키움 전용 환경은 macOS 설치 대상이 아닙니다. 원본 데이터·모델은 보존하세요.')
         execute([sys.executable, 'development/scripts/install_windows.py'])
         execute([*npm_command(), 'run', 'build', '--workspace', 'frontend'])
-        if metadata['module']=='hermes':install_runner(metadata)
+        if metadata.get('llama_cpp'):install_runner(metadata)
         return
     if not python().is_file(): raise ValueError('먼저 python run.py setup으로 전용 환경을 설치하세요.')
     if not (ROOT / 'frontend/dist/index.html').is_file(): raise ValueError('화면 빌드가 없습니다. setup을 실행하세요.')
@@ -118,6 +118,7 @@ finally:lifecycle('close')
 """
         execute([python(), '-I', '-X', 'utf8', '-B', '-c', code])
     else:
+        os.environ['PLATFORM_HTTP_PORT']=str(args.port)
         execute([python(), '-I', '-X', 'utf8', '-B', '-m', 'uvicorn', 'web_api:app',
                  '--app-dir', ROOT / 'backend', '--host', '127.0.0.1', '--port', args.port])
 

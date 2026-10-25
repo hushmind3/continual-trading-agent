@@ -1,5 +1,7 @@
 """Hermes submenu: collect feature routers, do not implement an agent here."""
 from fastapi import APIRouter
+import asyncio
+import logging
 from ai_agent.Hermes.chat.handlers import router as chat
 from ai_agent.Hermes.models.handlers import router as models
 from ai_agent.Hermes.sessions.handlers import router as sessions
@@ -20,6 +22,20 @@ MENU = {'id': 'ai_agent/Hermes', 'title': '헤르메스', 'operations': ['ai_age
 router = APIRouter()
 for feature in (chat, models, sessions, mcp, skills, artifacts, official):
     router.include_router(feature)
+
+_startup_task = None
+
+@router.on_event('startup')
+async def start_hermes():
+    """Boot the official scheduler/gateway independently of the first UI request."""
+    global _startup_task
+    async def start():
+        from ai_agent.Hermes.engine.bridge import bridge
+        try:
+            await asyncio.to_thread(bridge.call,'official/http',{'path':'/api/status'},timeout=180)
+        except Exception:
+            logging.getLogger(__name__).exception('공식 헤르메스 자동 시작 실패; 설치·설정을 확인하세요.')
+    _startup_task = asyncio.create_task(start(),name='hermes-service-start')
 
 
 @router.on_event('shutdown')

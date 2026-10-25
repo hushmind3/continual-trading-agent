@@ -35,7 +35,7 @@ class NativeRuntimeTests(unittest.TestCase):
         with self.assertRaises(ValueError):harness.control('demo',{'action':'answer','allow':True})
 
     def test_company_default_does_not_replace_explicit_native_workspace(self):
-        worker=Mock();cfg={'workspace':'platform-default'}
+        worker=Mock();cfg={'workspace':'platform-default','manager_staff_id':'staff-test','staff_registry':[{'id':'staff-test','name':'총괄','default_prompt':'작업을 조율합니다.'}]}
         with patch.object(company,'links',return_value={self.sid:{'workspace':'company-default'}}):
             company.prepare(worker,cfg,self.sid)
             self.assertEqual(cfg['workspace'],'company-default')
@@ -72,7 +72,7 @@ class NativeRuntimeTests(unittest.TestCase):
 
 class RecallAndGitTests(unittest.TestCase):
     def test_native_recall_only_uses_own_scope_and_bounds_context(self):
-        worker=Mock();worker.job={'session_id':'own'}
+        worker=Mock();worker.job={'session_id':'own'};worker.company_visible_history=None
         worker.db.get_resume_conversations.return_value=([],[
             {'role':'user','content':'venture_a 견적서 가격 29000원','_row_id':1},
             {'role':'user','content':'venture_b 견적서 SECRET-B','_row_id':2},
@@ -82,7 +82,7 @@ class RecallAndGitTests(unittest.TestCase):
         worker.db.get_resume_conversations.assert_called_once_with('own')
         self.assertLessEqual(len(json.dumps(result,ensure_ascii=False)),5000)
     def test_active_native_context_is_not_injected_twice(self):
-        worker=Mock();worker.job={'session_id':'own'}
+        worker=Mock();worker.job={'session_id':'own'};worker.company_visible_history=None
         active={'role':'user','content':'견적서 현재 질문'}
         archived={'role':'user','content':'견적서 과거 결정','_row_id':1}
         worker.db.get_resume_conversations.return_value=([active],[archived,active])

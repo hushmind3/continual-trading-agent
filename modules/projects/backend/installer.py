@@ -151,6 +151,29 @@ def start(url, source_override=None, resume=False, allow_agent=False, cleanup_im
     return public(record)
 
 
+def apply_source_patches(record, source, run):
+    """Apply the versioned FreeLLMAPI fixes before building; never silently lose them."""
+    if record.get('url', '').rstrip('/').lower() != 'https://github.com/tashfeenahmed/freellmapi':
+        return False
+    pending = []
+    receipts = {}
+    for name in ('usage-overview.patch', 'codex-compatibility.patch'):
+        patch = ROOT / 'modules/projects/patches/freellmapi' / name
+        receipts[name] = hashlib.sha256(patch.read_bytes()).hexdigest()
+        reverse = subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)],
+                                 cwd=source, capture_output=True)
+        if reverse.returncode == 0:
+            continue
+        check = subprocess.run(['git', 'apply', '--check', str(patch)], cwd=source, capture_output=True)
+        if check.returncode:
+            raise ValueError(f'FreeLLMAPI 원본과 {name} 패치가 맞지 않습니다. 기존 설치본을 유지합니다. 충돌 내용을 확인한 뒤 업데이트하세요.')
+        pending.append(patch)
+    for patch in pending:
+        run(['git', 'apply', str(patch)], source)
+    record['platform_patches'] = receipts
+    return bool(pending)
+
+
 def install(record, cancelled, source_override=None, resume_source=None, cleanup_import=False):
     key = record['id']; versions = project_folder(record) / 'versions'
     number = 1
@@ -188,6 +211,7 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
                 if file.is_file() and relative.as_posix() not in tracked:
                     target = source / relative; target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(file, target)
+        patches_changed = apply_source_patches(record, source, run)
         spec = adapters.detect(source)
         if record.get('harness', {}).get('enabled'):
             from .harness import discover
@@ -204,6 +228,17 @@ def install(record, cancelled, source_override=None, resume_source=None, cleanup
         progress('dependencies', '설치된 실행 환경을 재사용하고 필요한 의존성과 화면을 준비합니다.', detected=spec['kind'])
         def prepare_and_verify():
             adapters.prepare(source, spec, run, reuse=resume_source is not None)
+            if patches_changed:
+                from platform_native import npm_command
+                node, npm = npm_command()
+                for folder_name in ('server', 'client'):
+                    folder = source / folder_name
+                    package = folder / 'package.json'
+                    if package.is_file() and json.loads(package.read_text(encoding='utf8')).get('scripts', {}).get('build'):
+                        # Existing dependencies are reused; patched sources need fresh output.
+                        if folder_name == 'client' and resume_source is None:
+                            continue  # adapters.prepare already rebuilt the fresh UI.
+                        run([node, str(npm), 'run', 'build'], folder, 900)
             progress('verify', '원본 실행 결과를 확인합니다. 성공한 설치본만 연결합니다.')
             runtime.verify(source, spec, record.get('environment', {}))
             if spec['kind'] == 'python-cli': runtime.run_cli({**record, 'active_source': str(source), 'adapter': spec}, ['--help'])

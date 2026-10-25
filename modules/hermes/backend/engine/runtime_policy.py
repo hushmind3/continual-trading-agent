@@ -46,6 +46,8 @@ def configure_tools(worker, mode, *, direct_surfaces=True, direct_tools=()):
     from copy import deepcopy
     native=worker.native_config()
     before=deepcopy(native)
+    # Native turn finalization checks these names before scheduling its review.
+    direct_tools = set(direct_tools) | {'memory', 'skill_manage'}
     search=native.setdefault('tools',{}).setdefault('tool_search',{})
     search['enabled']='off' if mode=='eager' else 'auto'
     # Explicitly direct surfaces remain callable without discovery round trips.

@@ -34,6 +34,15 @@ class ToolLoadingTests(unittest.TestCase):
     def test_eager_has_no_deferred_tools(self):
         self.assertEqual(self.configure('eager'), {'enabled': 'off', 'defer': []})
 
+    def test_company_lazy_loading_keeps_native_review_triggers(self):
+        config = {}
+        worker = SimpleNamespace(native_config=lambda: config, write_config=lambda value: None)
+        with patch('tools.registry.registry.get_tool_to_toolset_map', return_value={
+            'memory': 'memory', 'skill_manage': 'skills', 'read_file': 'file',
+            'company_records': 'platform_company'}):
+            configure_tools(worker, 'lazy', direct_surfaces=False, direct_tools=('company_records',))
+        self.assertEqual(config['tools']['tool_search']['defer'], ['read_file'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -59,3 +59,5 @@ Mac 설치·내보내기 정리(2026-10-22): install_windows.py는 이름과 무
 GitHub Actions는 공식 Hermes package.json의 engines.node에서 Node 버전을 읽습니다. backend-integrity는 실제 사용 SDK·Torch CPU·REA Node 실행기·기존 Playwright 환경을 준비하며 Windows 설치기 실행은 windows-installer 작업으로 분리합니다. 테스트 fixture는 현재 직원 고유 ID·모듈 소유 경로·공식 제공자 resolver 계약을 따릅니다. 로컬 검사는 GitHub 통과 판정으로 대신하지 않습니다.
 
 금융 API 회귀검사는 기존 operations.txt가 고정한 FinRL 소스와 실제 SB3·제공자 SDK import 의존성을 준비합니다. 운영 호스트에 금융 패키지를 섞지 않으며 CI의 개발 검사 환경에서만 사용합니다. Linux 파일 범위 응답 검사는 상태 불일치 시 실제 응답 사유와 등록 경로를 함께 보고합니다.
+
+REA 전용 환경은 검증한 FastAPI 0.115.14를 사용합니다. Linux CI에서 자동 업그레이드된 0.162.0의 라우터 표현 차이로 빈 describe가 반환되던 문제를 확인했습니다. 금융 import 검사에는 실제 FinRL의 matplotlib·webdriver-manager 의존성도 준비합니다. API envelope 검사 클라이언트는 실제 loopback 주소를 사용하며 원격 접근 인증을 해제하지 않습니다.

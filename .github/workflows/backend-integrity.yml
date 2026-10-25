@@ -24,7 +24,7 @@ jobs:
       - name: Install the declared FinRL source and import dependencies
         run: |
           pip install --no-deps "$(sed -n 's/^finrl @ /finrl @ /p' modules/finance/dependencies/operations.txt)" alpaca-trade-api==3.2.0
-          pip install stable-baselines3==2.9.0 sb3-contrib==2.9.0 stockstats==0.5.4 scikit-learn pandas_market_calendars==5.3.1 alpaca-py==0.37.0 wrds yfinance==0.2.43 selenium==4.27.1 beautifulsoup4 aiohttp deprecation msgpack PyYAML websocket-client
+          pip install stable-baselines3==2.9.0 sb3-contrib==2.9.0 stockstats==0.5.4 scikit-learn pandas_market_calendars==5.3.1 alpaca-py==0.37.0 wrds yfinance==0.2.43 selenium==4.27.1 beautifulsoup4 aiohttp deprecation msgpack PyYAML websocket-client matplotlib webdriver-manager
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: npm ci

@@ -82,7 +82,7 @@ class ProviderSaveTests(unittest.TestCase):
 class GatewayAndMenuContractTests(unittest.TestCase):
  def test_malformed_envelopes_and_internal_paths_are_rejected(self):
   from web_api import app
-  with TestClient(app) as client:
+  with TestClient(app,base_url='http://127.0.0.1',client=('127.0.0.1',50000)) as client:
    for body in ([],None,{'operation':'state','payload':[]},{'operation':7,'payload':{}},{'payload':{}}):
     with self.subTest(body=body):
      response=client.post('/api',content=__import__('json').dumps(body),headers={'Content-Type':'application/json'})

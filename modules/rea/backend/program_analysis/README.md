@@ -16,6 +16,12 @@ operations.py는 설치된 원본 REA CLI/MCP·Ghidra와 연결하며 extract.py
 
 런타임: `runtime/rea/program_analysis/`. 분석 입력·도구 실행·임시 자료를 보관하며 최종 저장 프로젝트는 project_explorer 소메뉴의 런타임을 공유합니다.
 
+## Windows native 경로
+
+Ghidra·JDK는 담당 `runtime/rea/program_analysis/engines/`에 설치하고 `modules/rea/configs/rea.json`의 `GHIDRA_INSTALL_DIR`·`JAVA_HOME`으로 연결합니다. `operations.runtime_environment()`는 REA 자식 프로세스에만 System32 탐색 경로와 Java 표준 출력·오류의 UTF-8 기본값을 전달합니다. 한글 프로젝트 경로가 Ghidra 배치 실행기의 JDK 탐색 과정에서 깨지는 문제를 막으며 기존 명시적 Java 인코딩 옵션은 유지합니다. OS 전역 환경이나 원본 Ghidra 소스는 수정하지 않습니다.
+
+2026-10-25 Windows 확인: 공식 배포의 SHA-256 확인 후 Ghidra 12.1.4·Temurin JDK 21.0.12.1을 준비했습니다. Java 버전 조회와 실제 Headless Analyzer 도움말 시작을 확인했습니다. 입력 없는 도움말 종료 코드는 1이며 바이너리 분석·디컴파일 성공 검증은 아닙니다.
+
 ## macOS native 경로
 용도: 기존 REA 분석기의 실행 환경 호환성입니다. operations.node_runtime은 Mac에서 Windows AppData를 탐색하지 않고, 설치는 공통 platform_native.npm_command로 실제 Homebrew npm JS를 실행합니다. extract._web은 같은 도구의 native Chrome/Edge 실행 파일을 headless CDP로 사용합니다. extract.pick은 Mac에서 기본 osascript 파일/폴더 선택창을 사용하고 취소(-128)·분석 잠금·중지 처리를 유지합니다. 새 서버·분석 엔진·DB는 없습니다.
 

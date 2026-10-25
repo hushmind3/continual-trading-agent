@@ -29,6 +29,9 @@ def _read(path):
 
 
 def _identity(pid):
+    if os.name == 'nt':
+        from platform_process import identity
+        return identity(pid, SOURCE, (Path(__file__).with_name('launch.py'), SOURCE / 'scripts/run-node.mjs'))
     if os.name != 'posix' or not isinstance(pid, int) or pid <= 0:
         return ''
     result = subprocess.run(['/bin/ps', '-p', str(pid), '-o', 'lstart=', '-o', 'args='],
@@ -79,7 +82,8 @@ def start():
             _process = subprocess.Popen(
                 [sys.executable, str(Path(__file__).resolve().with_name('launch.py')),
                  'gateway', 'run', '--bind', 'loopback', '--port', str(PORT)],
-                cwd=SOURCE, stdout=log, stderr=log, start_new_session=True)
+                cwd=SOURCE, stdout=log, stderr=log, start_new_session=True,
+                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         identity = ''
         for _ in range(100):
             identity = _identity(_process.pid)
@@ -100,6 +104,12 @@ def stop():
     with LOCK:
         state = _read(STATE)
         pid = state.get('pid')
+        if os.name == 'nt':
+            from platform_process import stop_tree
+            stop_tree(pid, state.get('identity'), SOURCE,
+                      (Path(__file__).with_name('launch.py'), SOURCE / 'scripts/run-node.mjs'))
+            STATE.unlink(missing_ok=True)
+            return status()
         if state.get('identity') and _identity(pid) == state['identity']:
             # Popen starts a private session; the Gateway is a child of the CLI.
             os.killpg(pid, signal.SIGTERM)

@@ -134,6 +134,17 @@ def engine_environment():
 def runtime_environment():
     value=os.environ.copy();value.update(engine_environment())
     value.update(NO_COLOR='1',PYTHONUTF8='1')
+    if os.name=='nt':
+        # Ghidra's batch launcher reads Java's JDK path through a pipe. Keep
+        # non-ASCII installation paths intact without changing the user's OS.
+        options=value.get('JAVA_TOOL_OPTIONS','')
+        for channel in ('stdout','stderr'):
+            if f'-D{channel}.encoding=' not in options:
+                options+=f' -D{channel}.encoding=UTF-8'
+        value['JAVA_TOOL_OPTIONS']=options.strip()
+        system=Path(os.environ['SystemRoot'])/'System32'
+        if str(system).lower() not in {item.lower() for item in value.get('PATH','').split(os.pathsep)}:
+            value['PATH']=str(system)+os.pathsep+value.get('PATH','')
     return value
 
 def engine_settings():

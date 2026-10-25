@@ -14,6 +14,7 @@
 | [menu_registry.py](menu_registry.py) | 모듈 등록 정보를 취합하는 총괄 |
 | [web_api.py](web_api.py) | 단일 /api 진입점; 총괄만 통해 기능 등록 |
 | [platform_native.py](platform_native.py) | OS별 npm·브라우저 탐색·폴더 열기; 표준 라이브러리만 사용, 설치·모델 호출 없음 |
+| [platform_process.py](platform_process.py) | Windows 원본 앱의 작업 폴더·실행 인수·시작 시각으로 소유 프로세스를 확인하고 해당 하위 프로세스만 종료 |
 | api_context.py, api_transport.py | 공유 HTTP 객체·요청 전달·React 제공 |
 | runtime/rea/project_explorer/projects/ | 저장된 원본·추론 분석 결과; 실행 기능 등록 대상이 아니며 Git 제외 |
 

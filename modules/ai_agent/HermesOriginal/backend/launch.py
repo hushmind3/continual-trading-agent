@@ -24,14 +24,14 @@ def launch(arguments):
     if arguments and arguments[0] == 'dashboard':
         patch = Path(__file__).resolve().parents[1] / 'korean-ui.patch'
         # Reuse the already-applied patch; never overwrite upstream/local conflicts.
-        applied = subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)],
+        applied = subprocess.run(['git', 'apply', '--reverse', '--check', '--ignore-space-change', str(patch)],
                                  cwd=SOURCE, capture_output=True)
         if applied.returncode:
             revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=SOURCE,
                                                text=True).strip()
             if revision == KOREAN_PATCH_BASE:
-                subprocess.run(['git', 'apply', '--check', str(patch)], cwd=SOURCE, check=True)
-                subprocess.run(['git', 'apply', str(patch)], cwd=SOURCE, check=True)
+                subprocess.run(['git', 'apply', '--check', '--ignore-space-change', str(patch)], cwd=SOURCE, check=True)
+                subprocess.run(['git', 'apply', '--ignore-space-change', str(patch)], cwd=SOURCE, check=True)
             else:
                 print('현재 원본은 보관된 한국어 패치의 기준 버전과 다릅니다. '
                       '패치를 적용하지 않고 공식 원본을 실행합니다.', file=sys.stderr, flush=True)
@@ -44,13 +44,15 @@ def launch(arguments):
     env.update(managed)
     # PM owns the interpreter and every dependency; no copied engine or bootstrap patches.
     import shutil
-    python = shutil.which('python3', path=env['PATH'])
+    python = shutil.which('python.exe' if os.name == 'nt' else 'python3', path=env['PATH'])
     if not python:
         raise RuntimeError('원본 PM의 Python 환경이 준비되지 않았습니다.')
     ready = os.environ.get('HERMES_DESKTOP_READY_FILE')
     if ready:
         env['HERMES_DESKTOP_READY_FILE'] = ready
     os.chdir(SOURCE)
+    if os.name == 'nt':
+        raise SystemExit(subprocess.call([python, str(SOURCE / 'hermes'), *arguments], env=env))
     os.execve(python, [python, str(SOURCE / 'hermes'), *arguments], env)
 
 

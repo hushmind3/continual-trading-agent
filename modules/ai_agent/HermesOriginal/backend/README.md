@@ -15,6 +15,10 @@
 
 ## GitHub 복원과 처음 준비
 
+Windows에서도 동일한 메뉴/API를 사용합니다. `launch.py`는 공식 PM이 제공한 `python.exe`를 사용하며, 런처를 유지한 채 공식 CLI를 자식 프로세스로 실행합니다. `runtime.py`는 공통 `backend/platform_process.py`로 소유 프로세스와 하위 프로세스를 확인합니다. 한국어 패치의 정방향·역방향 확인은 줄바꿈 차이를 허용해 Windows 체크아웃에서도 같은 패치를 사용합니다. 최초 설치 명령은 소스 폴더에서 플랫폼의 `.venv/platform/Scripts/python.exe -m pm.cli install`이며 `HERMES_HOME`·`HERMES_RUNTIME_DIR`는 위 담당 경로로 지정합니다. 설치와 실제 화면·모델 응답 확인은 별개입니다.
+
+2026-10-25 Windows 확인: 공식 PM 설치, 한국어 패치·공식 웹 빌드 후 `status=ready`와 8766 안의 실제 한국어 iframe 표시·브라우저 오류 0개를 확인했습니다. 활성 세션 0개에서 기존 `stop/start` API를 실행해 같은 포트로 다시 준비되는 것도 확인했습니다. 모델·외부 계정·메신저 연결과 응답은 이 기동 확인에 포함하지 않았습니다.
+
 프로젝트 루트에서 `git submodule update --init`으로 등록된 공식 소스를 받습니다. 플랫폼 설치 뒤 공식 PM 환경이 없는 새 설치에서만 다음을 실행합니다. 현재 설치본을 정리하는 과정에서 재설치하지 않습니다.
 
 ```sh

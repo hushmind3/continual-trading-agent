@@ -25,6 +25,9 @@ def _read(path):
 
 
 def _identity(pid):
+    if os.name == 'nt':
+        from platform_process import identity
+        return identity(pid, SOURCE, (Path(__file__).with_name('launch.py'), SOURCE / 'hermes'))
     if os.name != 'posix':
         return ''
     result = subprocess.run(['/bin/ps', '-p', str(pid), '-o', 'lstart=', '-o', 'args='],
@@ -108,7 +111,8 @@ def start():
             os.chmod(log.name, 0o600)
             _process = subprocess.Popen([sys.executable, str(Path(__file__).with_name('launch.py')),
                 'dashboard', '--no-open', '--isolated', '--host', '127.0.0.1', '--port', str(port)],
-                cwd=SOURCE, env=env, stdout=log, stderr=log, start_new_session=True)
+                cwd=SOURCE, env=env, stdout=log, stderr=log, start_new_session=True,
+                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         # exec replaces the launcher PID. Store its actual command identity before publishing.
         identity = ''
         for _ in range(100):
@@ -128,6 +132,11 @@ def start():
 def stop():
     with LOCK:
         state = _read(STATE)
+        if os.name == 'nt':
+            from platform_process import stop_tree
+            stop_tree(state.get('pid'), state.get('identity'), SOURCE,
+                      (Path(__file__).with_name('launch.py'), SOURCE / 'hermes'))
+            return status()
         if state.get('identity') and _identity(state.get('pid')) == state['identity']:
             pid = state['pid']
             if os.getpgid(pid) == pid:

@@ -15,6 +15,12 @@
 
 ## GitHub 복원과 처음 준비
 
+Windows 전용 Node 경로는 `runtime/ai_agent/OpenClawOriginal/tools/node/node.exe`입니다. macOS의 `tools/node/bin/node`와 구분합니다. Windows에서는 런처가 공식 Node CLI를 자식 프로세스로 실행하며 공통 `backend/platform_process.py`로 소유 프로세스 확인·종료를 수행합니다. 같은 공식 소스·홈·기본 포트·단일 API를 사용하고 별도 엔진을 복제하지 않습니다. 설치와 실제 화면·모델 응답 확인은 별개입니다.
+
+실행용 설치는 원본의 Node·pnpm 버전 조건과 잠금 파일을 유지하고 `pnpm install --frozen-lockfile`, `pnpm build runtime`을 사용합니다. 공식 runtime 프로필이 실제 프로그램·플러그인·Control UI를 준비합니다. SDK 배포가 목적일 때만 full 빌드를 사용합니다. 프레임 정책의 Node `--import` 경로는 파일 URI로 전달해 한글·공백·Windows 드라이브 경로를 처리합니다.
+
+2026-10-25 Windows 확인: Node 26.12.1·pnpm 12.15.0으로 공식 runtime 빌드를 완료했습니다. 원본 Gateway의 `ready`·`/healthz` 정상 응답, 중지 후 재시작, 8766 안의 실제 한국어 Control UI와 연결됨 표시·브라우저 오류 0개를 확인했습니다. 콜드 기동 중 원본 초기화가 끝나기 전까지 상태는 starting입니다. 제공자 계정·모델 응답·외부 채널 실행은 이 기동 확인에 포함하지 않았습니다.
+
 프로젝트 루트에서 `git submodule update --init`으로 원본 99599dbf83d67b5feb27df2ffcc22ae0f18f00d1을 복원합니다. 새 Mac 설치에는 원본 package.json의 Node 조건 `>=24.22.1 <25 || >=26.12.1`과 `pnpm 12.15.0`이 필요합니다. 현재 설치본의 도구는 다시 설치하지 않습니다.
 
 호환되는 Node를 이미 설치한 새 환경에서는 `runtime/ai_agent/OpenClawOriginal/tools/node/bin/node`에 그 실행 파일을 준비합니다. 기존 경로가 있으면 덮어쓰지 않습니다. 공식 source 폴더에서 `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm ui:build`로 원본 의존성·빌드를 준비합니다. 사용자 계정·모델 연결은 원본 대시보드에서 별도로 설정합니다. 원본 앱의 다른 PC 신규 설치는 이번 정리의 확인 범위에 포함하지 않습니다.

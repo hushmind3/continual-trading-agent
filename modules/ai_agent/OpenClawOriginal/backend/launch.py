@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[4]
 BASE = ROOT / 'runtime/ai_agent/OpenClawOriginal'
 SOURCE = BASE / 'source'
 HOME = BASE / 'home'
-NODE = BASE / 'tools/node/bin/node'
+NODE = BASE / ('tools/node/node.exe' if os.name == 'nt' else 'tools/node/bin/node')
 
 
 def _prepare_embedded_gateway():
@@ -94,8 +94,11 @@ def launch(arguments):
             env['PLATFORM_EMBED_ORIGINS'] = os.environ['PLATFORM_EMBED_ORIGINS']
         policy = Path(__file__).resolve().with_name('frame_policy.mjs')
         existing = env.get('NODE_OPTIONS', '').strip()
-        env['NODE_OPTIONS'] = f'{existing} --import={policy}'.strip()
+        env['NODE_OPTIONS'] = f'{existing} --import={policy.as_uri()}'.strip()
     os.chdir(SOURCE)
+    if os.name == 'nt':
+        raise SystemExit(subprocess.call([str(NODE), str(SOURCE / 'scripts/run-node.mjs'),
+                                         '--dev', *arguments], env=env))
     os.execve(NODE, [str(NODE), str(SOURCE / 'scripts/run-node.mjs'),
                      '--dev', *arguments], env)
 

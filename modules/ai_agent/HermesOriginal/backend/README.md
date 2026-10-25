@@ -17,7 +17,9 @@
 
 Windows에서도 동일한 메뉴/API를 사용합니다. `launch.py`는 공식 PM이 제공한 `python.exe`를 사용하며, 런처를 유지한 채 공식 CLI를 자식 프로세스로 실행합니다. `runtime.py`는 공통 `backend/platform_process.py`로 소유 프로세스와 하위 프로세스를 확인합니다. 한국어 패치의 정방향·역방향 확인은 줄바꿈 차이를 허용해 Windows 체크아웃에서도 같은 패치를 사용합니다. 최초 설치 명령은 소스 폴더에서 플랫폼의 `.venv/platform/Scripts/python.exe -m pm.cli install`이며 `HERMES_HOME`·`HERMES_RUNTIME_DIR`는 위 담당 경로로 지정합니다. 설치와 실제 화면·모델 응답 확인은 별개입니다.
 
-2026-10-25 Windows 확인: 공식 PM 설치, 한국어 패치·공식 웹 빌드 후 `status=ready`와 8766 안의 실제 한국어 iframe 표시·브라우저 오류 0개를 확인했습니다. 활성 세션 0개에서 기존 `stop/start` API를 실행해 같은 포트로 다시 준비되는 것도 확인했습니다. 모델·외부 계정·메신저 연결과 응답은 이 기동 확인에 포함하지 않았습니다.
+2026-10-25 Windows 확인: 공식 PM·CUDA llama.cpp 설치와 웹 빌드 후 `status=ready`, 한국어 iframe 표시·브라우저 오류 0개를 확인했습니다. 기존 9B GGUF를 원본 sideload API로 하드 링크 등록해 같은 파일을 사용합니다. 원본 모델 활성화·Gateway 시작을 거쳐 실제 채팅에서 프로젝트 AGENTS.md를 read_file로 읽고 한국어 답변을 받았습니다. 같은 포트로 중지·재시작한 뒤 원본 대화 기록과 모델 서버 18434·내부 인증키의 연결이 유지되는 것도 확인했습니다. 외부 계정·메신저 실행은 미확인입니다.
+
+`../windows-local-runtime.patch`는 공식 bf0203a 계열의 Windows 파일 경로 전달 보완입니다. `launch.py`가 Windows에서 Git 정방향·역방향 검사 후 적용하며 충돌은 그대로 오류로 표시합니다. 원본 supervisor가 생성한 기준 INI는 유지하고 Windows 실행용 INI의 모델 경로만 실행기 작업 폴더 기준 상대 경로로 전달합니다. 실행 파일은 CreateProcess의 별도 executable 인수로 지정하고, 실제 argv에는 파일 이름을 사용합니다. 재실행·프리셋 갱신에도 같은 변환을 적용하며 문맥·GPU 배치 정책·도구·에이전트 실행 루프는 변경하지 않습니다.
 
 프로젝트 루트에서 `git submodule update --init`으로 등록된 공식 소스를 받습니다. 플랫폼 설치 뒤 공식 PM 환경이 없는 새 설치에서만 다음을 실행합니다. 현재 설치본을 정리하는 과정에서 재설치하지 않습니다.
 
@@ -38,6 +40,8 @@ macOS 게이트웨이는 모든 프로필을 처리하는 호스트 서비스 �
 확인: 단일 API의 `ai_agent/HermesOriginal/status`, `#ai_agent/HermesOriginal`의 실제 원본 화면, 원본 `git rev-parse HEAD`, 패치의 `git apply --reverse --check`를 사용합니다. 현재 정리의 실제 실행 확인은 모듈 README의 최신 항목을 따릅니다. 원본 업데이트·모델 추론·외부 메신저 전체를 이번 정리에서 실행하지 않습니다.
 
 ## FreeLLMAPI 공용 연결
+
+이 절의 프로필·auto 응답 기록은 기존 macOS 설치 기준입니다. 2026-10-25에 준비한 Windows 설치는 기존 선택 모델인 로컬 9B를 원본 모델 관리 기능으로 연결했습니다. 실제 프리셋의 문맥을 원본 설정에도 반영하고 같은 내부 모델 주소·키를 OpenClaw에서 사용합니다. 비밀 설정은 Git에 포함하지 않습니다.
 
 기존 프로젝트 설치본의 단일 `/api/projects/freellmapi/<설치 ID>/v1`을 OpenAI Chat 규격으로 사용합니다. 개별 업체를 이 메뉴에 직접 연결하지 않고 `auto`가 FreeLLMAPI의 활성 체인에서 고릅니다. 통합 키는 담당 `home/.env`에만 저장하고 Git에 올리지 않습니다.
 공식 설치본 `cli/dist/index.js setup-hermes --profile shared --model auto`를 각 기존 `HERMES_HOME`에 실행해 `providers.freellmapi-shared`를 등록했습니다. 기본 홈과 다섯 기존 프로필에서 같은 연결을 선택할 수 있습니다. 현재 화면의 lead 프로필에도 등록했고 원본 모델 선택 UI에서 `freellmapi-shared · auto`를 주 모델로 적용했습니다. 2026-10-25 원본 모델 UI에서 developer·marketer·researcher·strategist의 주 모델도 `freellmapi-shared/auto`로 맞췄습니다. 기본 홈의 칸반 작업 분할 보조 모델 지정도 해제해 모든 보조 작업이 주 모델 `auto`를 공유합니다. 기존 대화 이력의 모델 이름은 과거 기록이며 새 작업 실행에 적용됩니다. 키·주소는 `FREELLMAPI_API_KEY`·`--url`로 전달하며 원본 설정 생성기가 병합합니다.

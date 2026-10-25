@@ -21,6 +21,13 @@ def environment():
 
 
 def launch(arguments):
+    if os.name == 'nt':
+        patch = Path(__file__).resolve().parents[1] / 'windows-local-runtime.patch'
+        applied = subprocess.run(['git', 'apply', '--reverse', '--check', '--ignore-space-change', str(patch)],
+                                 cwd=SOURCE, capture_output=True)
+        if applied.returncode:
+            subprocess.run(['git', 'apply', '--check', '--ignore-space-change', str(patch)], cwd=SOURCE, check=True)
+            subprocess.run(['git', 'apply', '--ignore-space-change', str(patch)], cwd=SOURCE, check=True)
     if arguments and arguments[0] == 'dashboard':
         patch = Path(__file__).resolve().parents[1] / 'korean-ui.patch'
         # Reuse the already-applied patch; never overwrite upstream/local conflicts.

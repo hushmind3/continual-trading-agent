@@ -3,7 +3,24 @@ import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import {createInterface} from 'node:readline';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {readFileSync,writeFileSync,renameSync} from 'node:fs';
 const root=fileURLToPath(new URL('../../',import.meta.url));
+// REA 6.4.0 decodes its direct Java probe as UTF-8. Explicitly match that
+// encoding only for the probe; Ghidra's Windows batch launcher must retain
+// the native code page for its internal `for /f` path handling.
+if(process.platform==='win32'){
+ const pkg=resolve(root,'node_modules/rea-agents');
+ const file=resolve(pkg,'dist/ghidra/GhidraInstallation.js');
+ const before='spawnSync(command, ["-XX:-UsePerfData", "-XshowSettings:properties", "-version"], {';
+ const after='spawnSync(command, ["-XX:-UsePerfData", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8", "-XshowSettings:properties", "-version"], {';
+ const source=readFileSync(file,'utf8');
+ if(!source.includes(after)){
+  if(JSON.parse(readFileSync(resolve(pkg,'package.json'),'utf8')).version!=='6.4.0'||source.split(before).length!==2)
+   throw new Error('REA Java UTF-8 patch does not match the installed package; original files preserved.');
+  const temp=file+'.platform-tmp';
+  writeFileSync(temp,source.replace(before,after),'utf8');renameSync(temp,file);
+ }
+}
 const client=new Client({name:'stockrl-rea',version:'0.1.0'});
 const transport=new StdioClientTransport({command:process.execPath,args:[resolve(root,'node_modules/rea-agents/scripts/rea.mjs'),'--mcp'],cwd:process.cwd(),env:{...process.env,NO_COLOR:'1'},stderr:'inherit'});
 try {

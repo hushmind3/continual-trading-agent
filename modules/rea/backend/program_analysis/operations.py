@@ -211,14 +211,20 @@ def native_recover(path,progress=None):
             procedures=inventory['normalized_result']
             if not isinstance(procedures,list):
                 raise RuntimeError('원본 함수 목록이 배열 형식이 아닙니다.')
-            addresses=[item['address'] for item in procedures]
+            external=[item for item in procedures if str(item.get('address','')).startswith('EXTERNAL:')]
+            addresses=[item['address'] for item in procedures if item not in external]
             if progress:progress('native-decompile',str(len(addresses))+'개 함수의 의사코드를 복원하고 있습니다.')
             batch=observe('batch_decompile',{'addresses':addresses})
             value=batch['normalized_result']
             if not isinstance(value,dict) or not isinstance(value.get('items'),list):
                 raise RuntimeError('원본 일괄 디컴파일 결과를 확인할 수 없습니다.')
+            batch['discovered_procedures']=procedures
+            batch['external_references']=external
             lines=['/* Ghidra decompiled C-like code. Not the original source project.',
                    ' * File: '+target.name,' * SHA256: '+digest.hexdigest(),' */','']
+            if external:
+                lines.append('/* '+str(len(external))+' external library references have no body in this binary. */')
+                lines.append('')
             for item in value['items']:
                 name=(item.get('procedure') or {}).get('name') or item['address']
                 lines.append('/* '+str(name).replace('*/','* /')+' @ '+item['address']+' */')
@@ -236,6 +242,7 @@ def native_recover(path,progress=None):
             atomic_json(batch,output/'evidence.json')
             return {'name':target.name,'path':str(target),'sha256':digest.hexdigest(),
                 'total':value['total'],'succeeded':value['succeeded'],'failed':value['failed'],
+                'discovered':len(procedures),'external_references':len(external),
                 'items':value['items'],'source':source,
                 'output':str(output.relative_to(ROOT)),'limitations':batch.get('limitations',[])}
 

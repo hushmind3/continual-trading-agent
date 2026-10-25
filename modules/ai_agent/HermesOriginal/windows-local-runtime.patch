@@ -1,0 +1,71 @@
+--- a/hermes_cli/local_runtime/supervisor.py
++++ b/hermes_cli/local_runtime/supervisor.py
+@@ -172,6 +172,30 @@
+ 
+     # ── lifecycle ────────────────────────────────────────────
+ 
++    def _windows_preset_argument(self) -> str:
++        """Keep native Windows argv ASCII; canonical presets remain unchanged."""
++        import configparser
++        import io
++        from utils import atomic_write_text
++        parser = configparser.ConfigParser(interpolation=None)
++        parser.optionxform = str
++        parser.read(self.preset_path, encoding="utf-8")
++        for section in parser.sections():
++            for key in ("model", "model-draft", "mmproj"):
++                if not parser.has_option(section, key):
++                    continue
++                value = parser.get(section, key)
++                if Path(value).is_absolute():
++                    try:
++                        parser.set(section, key, os.path.relpath(value, self.binary.parent))
++                    except ValueError:
++                        pass  # Another drive: retain the explicit user path.
++        target = self.preset_path.with_name("presets.windows.ini")
++        text = io.StringIO()
++        parser.write(text)
++        atomic_write_text(target, text.getvalue(), tmp_prefix=".windows-presets_", mode=0o600)
++        return os.path.relpath(target, self.binary.parent)
++
+     def _spawn(self) -> None:
+         exe = self.binary
+         cmd = [
+@@ -192,9 +216,11 @@
+             *_direct_io_args(exe),
+         ]
+         if self.preset_path and self.preset_path.exists():
+-            cmd += ["--models-preset", str(self.preset_path)]
++            cmd += ["--models-preset", self._windows_preset_argument()
++                    if sys.platform == "win32" else str(self.preset_path)]
+         else:
+-            cmd += ["--models-dir", str(self.models_dir)]
++            cmd += ["--models-dir", os.path.relpath(self.models_dir, exe.parent)
++                    if sys.platform == "win32" else str(self.models_dir)]
+         cmd += self.extra_args
+         self.log_path.parent.mkdir(parents=True, exist_ok=True)
+         if self._log_handle is not None:
+@@ -204,8 +230,13 @@
+         self._log_handle.write(f"\n# spawn: {cmd}\n")
+         self._log_handle.flush()
+         # list-args, never a shell: spaced paths (user homes) must survive.
++        launch_options = {}
++        if sys.platform == "win32":
++            launch_options["executable"] = str(exe)
++            cmd[0] = exe.name
+         self.proc, self._job = spawn_server(cmd, stdout=self._log_handle, stderr=subprocess.STDOUT,
+-                                             cwd=str(exe.parent), env=server_child_env(os.environ))
++                                             cwd=str(exe.parent), env=server_child_env(os.environ),
++                                             **launch_options)
+         logger.info("llama-server router spawned pid=%s port=%s", self.proc.pid, self.port)
+         # State goes down at SPAWN, not after health: endpoint resolution treats a
+         # live-pid-but-not-yet-healthy server as "starting" rather than "unconfigured", so a
+@@ -377,6 +408,8 @@
+         """Have the router re-read the preset file (GET /models?reload=1). It applies new launch
+         flags to models that aren't loaded and unloads any loaded model whose flags changed, so
+         callers rewrite the file only while nothing is loaded."""
++        if sys.platform == "win32" and self.preset_path:
++            self._windows_preset_argument()
+         self._request("/models?reload=1", timeout_s=10)
+ 
+     def unload_model(self, model_id: str) -> None:

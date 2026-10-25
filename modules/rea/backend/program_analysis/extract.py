@@ -283,14 +283,18 @@ def analyze(kind,target):
             else:
                 metadata['artifact']='네이티브 바이너리';shutil.copyfile(source,folder/'original'/source.name)
                 recovered=native_recover(str(source),progress=_publish)
-                metadata.update(function_total=recovered['total'],decompiled_functions=recovered['succeeded'],unavailable_functions=recovered['failed'])
+                metadata.update(function_total=recovered['total'],decompiled_functions=recovered['succeeded'],unavailable_functions=recovered['failed'],
+                    discovered_functions=recovered['discovered'],external_references=recovered['external_references'])
                 (folder/'inferred/decompiled.c').write_text(recovered['source'],encoding='utf8')
                 functions=folder/'inferred/functions';functions.mkdir()
                 for item in recovered['items']:
                     if item['status']=='ok':(functions/(re.sub(r'[^a-zA-Z0-9_-]','_',item['address'])+'.c')).write_text(item['pseudocode'],encoding='utf8')
                 atomic_json(recovered['items'],folder/'analysis/functions.json')
-                atomic_json({'sha256':recovered['sha256'],'total':recovered['total'],'decompiled':recovered['succeeded'],'unavailable':recovered['failed']},folder/'analysis/structure.json')
+                atomic_json({'sha256':recovered['sha256'],'total':recovered['total'],'decompiled':recovered['succeeded'],'unavailable':recovered['failed'],
+                    'discovered':recovered['discovered'],'external_references':recovered['external_references']},folder/'analysis/structure.json')
                 limitations=recovered['limitations']+['네이티브 C 의사코드는 추론된 결과입니다. 컴파일 전 원본 소스가 아닙니다.']
+                if recovered['external_references']:
+                    limitations.append(str(recovered['external_references'])+'개 외부 라이브러리 참조는 이 실행파일에 함수 본문이 없어 디컴파일 대상과 별도로 기록했습니다.')
         _publish('save','원본·추론·구조 자료와 출처를 저장하고 있습니다.',metadata)
         _check();atomic_json(unavailable,folder/'analysis/unavailable.json')
         original=[path for path in (folder/'original').rglob('*') if path.is_file()]

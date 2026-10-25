@@ -61,3 +61,5 @@ GitHub Actions는 공식 Hermes package.json의 engines.node에서 Node 버전�
 금융 API 회귀검사는 기존 operations.txt가 고정한 FinRL 소스와 실제 SB3·제공자 SDK import 의존성을 준비합니다. 운영 호스트에 금융 패키지를 섞지 않으며 CI의 개발 검사 환경에서만 사용합니다. Linux 파일 범위 응답 검사는 상태 불일치 시 실제 응답 사유와 등록 경로를 함께 보고합니다.
 
 REA 전용 환경은 검증한 FastAPI 0.115.14를 사용합니다. Linux CI에서 자동 업그레이드된 0.162.0의 라우터 표현 차이로 빈 describe가 반환되던 문제를 확인했습니다. 금융 import 검사에는 실제 FinRL의 matplotlib·webdriver-manager 의존성도 준비합니다. API envelope 검사 클라이언트는 실제 loopback 주소를 사용하며 원격 접근 인증을 해제하지 않습니다.
+
+명령 소속 검사는 모든 업무 명령의 실제 메뉴 소속과 공통 호스트의 정확한 6개 제어 명령을 구분해 검증합니다. system 소속의 임의 명령을 허용하거나 화면 메뉴를 추가하지 않습니다.

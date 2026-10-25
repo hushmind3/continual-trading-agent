@@ -91,9 +91,12 @@ class GatewayAndMenuContractTests(unittest.TestCase):
    self.assertEqual(client.get('/api',params={'operation':'orders','payload':'{}'}).status_code,404)
    self.assertEqual(client.get('/api',params={'operation':'state','payload':'[]'}).status_code,400)
 
- def test_every_command_belongs_to_a_current_menu(self):
+ def test_every_command_has_a_registered_menu_or_host_owner(self):
+  from web_api import app
   from menu_registry import catalog
   from api_context import private_api
   current=catalog(private_api.routes)
   ids={menu['id'] for group in current['groups'] for menu in group['menus']}
-  self.assertEqual([(row['operation'],row['menu']) for row in current['commands'] if row['menu'] not in ids],[])
+  host={'platform/modules','platform/modules/prepare-detach','system/blockers','system/prepare-restart','health','state'}
+  self.assertCountEqual([(row['operation'],row['group'],row['menu']) for row in current['commands'] if row['menu'] not in ids],
+      [(operation,'platform','system') for operation in host])

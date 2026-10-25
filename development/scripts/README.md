@@ -45,7 +45,7 @@ verify_windows_installer.cjs: 기존 pluto-re의 원본 Windows 설치기 자동
 
 verify_automatic_ui.cjs: UI/설명 파일 없는 일반 Python CLI 검사 소스에서 실행 유형을 자동 추출해 앱 파일 설치 경로를 실행하고 2개 명령의 생성 UI·원본 실행/결과 파일·등록 코드만 존재함·모바일 화면을 확인합니다. 별도 앱 UI를 만들거나 사용자 모델/GitHub 다운로드를 사용하지 않습니다. 성공/준비 실패 모두 소유 임시 폴더 경계를 확인해 정리합니다. 결과 runtime/projects/manage/verification/automatic-ui.json입니다.
 
-공식 원본 소스는 루트 `.gitmodules`의 두 고정 버전으로 복원합니다. 플랫폼 설치와 원본 앱의 PM/Node 패키지 준비는 별도이며, 현재 설치본을 정리할 때 다시 설치하지 않습니다. [Hermes 원본](../../modules/ai_agent/HermesOriginal/backend/README.md), [OpenClaw 원본](../../modules/ai_agent/OpenClawOriginal/backend/README.md)의 실제 설치·업데이트 경로를 따릅니다.
+공식 원본 소스는 루트 `.gitmodules`의 고정 버전으로 복원합니다. 주력 헤르메스는 `modules/hermes/backend/engine/upstream` 전체 소스와 `engine/setup.py`의 공식 PM 준비를 사용합니다. 신규 설치기는 소스가 없을 때만 해당 서브모듈을 준비하고 구형 모듈 .venv·browser 설치는 호출하지 않습니다. 원본 앱은 업데이트·참고용 별도 홈을 유지합니다. 플랫폼 설치와 원본 앱의 PM/Node 패키지 준비는 별도이며, 현재 설치본을 정리할 때 다시 설치하지 않습니다. [Hermes 원본](../../modules/ai_agent/HermesOriginal/backend/README.md), [OpenClaw 원본](../../modules/ai_agent/OpenClawOriginal/backend/README.md)의 실제 설치·업데이트 경로를 따릅니다.
 
 ## macOS 실행
 담당: 기존 단일 API·서버 감시기의 macOS 실행. 루트 `설치.command`는 Python 3.14·uv·Node와 공식 Homebrew llama.cpp를 사용하고, `서버켜기.command`는 같은 start_server.py를 --apply-only로 실행해 화면을 엽니다. 금융 운영은 자동 시작하지 않습니다. 설치 로직은 기존 install_windows.py를 운영체제에 따라 재사용합니다. Mac에서는 플랫폼·금융·Hermes·REA 환경을 설치합니다. 금융은 `modules/finance/dependencies/operations-macos.txt`와 Python 3.11을 사용하며 Windows CUDA·키움 패키지는 설치하지 않습니다. 소스 연결 훅은 각 대상 환경의 Python으로 생성합니다.

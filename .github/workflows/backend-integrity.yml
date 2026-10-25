@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - run: git submodule update --init modules/hermes/backend/engine/upstream
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -24,7 +25,7 @@ jobs:
           .venv/platform/bin/python -m pip install -r development/scripts/requirements/platform.txt
           python -m venv modules/rea/.venv
           modules/rea/.venv/bin/python -m pip install -r modules/rea/requirements.txt
-      - run: python -m compileall -q backend modules development/scripts
+      - run: python -m compileall -q -x 'modules/hermes/backend/engine/upstream/' backend modules development/scripts
       - run: python -m unittest discover -s development/tests -v
         env:
           PYTHONPATH: backend
@@ -32,12 +33,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - run: git submodule update --init modules/hermes/backend/engine/upstream
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python modules/hermes/backend/engine/prepare.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci --ignore-scripts
+      - run: npm --prefix modules/hermes/backend/engine/upstream/web install --package-lock=false --no-audit --no-fund
       - run: npm run typecheck
         working-directory: frontend
       - run: npm run build

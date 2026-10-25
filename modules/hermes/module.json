@@ -16,13 +16,7 @@
     "runtime/ai_agent/Hermes"
   ],
   "resources": {
-    "python": "modules/hermes/.venv/Scripts/python.exe",
-    "model_runner": "runtime/shared/engines/llama.cpp/llama-server.exe"
+    "python": ".venv/platform/Scripts/python.exe"
   },
-  "requirements": "backend/engine/requirements.txt",
-  "order": 30,
-  "dependencies": {
-    "python": "backend/engine/requirements.txt",
-    "node": "backend/engine/browser/package.json"
-  }
+  "order": 30
 }

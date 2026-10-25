@@ -16,7 +16,7 @@ def environment():
     env = {k: v for k, v in os.environ.items() if not k.startswith('HERMES_')}
     env.pop('PYTHONPATH', None)
     env.pop('VIRTUAL_ENV', None)
-    env.update(HERMES_HOME=str(HOME), HERMES_RUNTIME_DIR=str(BASE / 'tools'))
+    env.update(HERMES_HOME=str(HOME), HERMES_RUNTIME_DIR=str(ROOT / 'runtime/shared/engines/hermes-pm'))
     return env
 
 

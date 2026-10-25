@@ -92,13 +92,13 @@ class CodexConnection:
 
 
 def runtime(settings):
-    if settings.get('provider') != 'openai-codex':
-        return {'provider': 'custom', 'api_mode': 'chat_completions',
-                'base_url': settings['base_url'], 'api_key': settings.get('api_key') or 'local'}
-    from hermes_cli.auth_codex import resolve_codex_runtime_credentials
-    creds = resolve_codex_runtime_credentials()
-    return {'provider': 'openai-codex', 'api_mode': 'codex_responses',
-            'base_url': creds['base_url'], 'api_key': creds['api_key']}
+    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from run_agent import AIAgent
+    import inspect
+    values = resolve_runtime_provider(requested=settings.get('provider'), target_model=settings.get('model'),
+        explicit_api_key=settings.get('api_key') or None if settings.get('provider') == 'custom' else None)
+    parameters = inspect.signature(AIAgent.__init__).parameters
+    return {key:value for key,value in values.items() if key in parameters and key not in ('self','model')}
 
 
 def goal_reasoning(worker, native, settings, options):

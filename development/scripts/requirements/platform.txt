@@ -1,4 +1,5 @@
 fastapi==0.115.14
 uvicorn[standard]>=0.30
+websockets>=15,<16
 psutil>=5.9
 requests>=2.31

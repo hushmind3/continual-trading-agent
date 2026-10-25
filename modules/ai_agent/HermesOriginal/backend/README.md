@@ -11,7 +11,7 @@
 - `../korean-ui.patch`: 현재 실행용 한국어 변경. 기준 버전·보관 폴더·복원 절차는 [한국어 패치 기준 안내](../README.md#한국어-패치)를 따릅니다.
 - 등록·React 화면: [중메뉴 소유 폴더](../README.md).
 
-공식 원본 설치·업데이트 위치는 `runtime/ai_agent/HermesOriginal/source/`로 유지합니다. 사용자 상태는 같은 담당 메뉴의 `home/`, 공식 PM 설치 도구는 `tools/`입니다. 이식 Hermes의 소스·환경·대화와 공유하거나 복제하지 않습니다. 원본 소스는 `.gitmodules`의 고정 버전 의존성이고, 설치된 패키지·홈·키·기록은 GitHub에 포함하지 않습니다.
+공식 원본 설치·업데이트 위치는 `runtime/ai_agent/HermesOriginal/source/`로 유지합니다. 사용자 상태는 같은 담당 메뉴의 `home/`, 공식 PM 설치 도구는 `runtime/shared/engines/hermes-pm/`를 공유합니다. 이식 Hermes의 소스·환경·대화와 공유하거나 복제하지 않습니다. 원본 소스는 `.gitmodules`의 고정 버전 의존성이고, 설치된 패키지·홈·키·기록은 GitHub에 포함하지 않습니다.
 
 ## GitHub 복원과 처음 준비
 
@@ -26,7 +26,7 @@ Windows에서도 동일한 메뉴/API를 사용합니다. `launch.py`는 공식 
 ```sh
 platform_root="$PWD"
 cd runtime/ai_agent/HermesOriginal/source
-HERMES_HOME="$platform_root/runtime/ai_agent/HermesOriginal/home" HERMES_RUNTIME_DIR="$platform_root/runtime/ai_agent/HermesOriginal/tools" "$platform_root/.venv/platform/bin/python" -m pm.cli install
+HERMES_HOME="$platform_root/runtime/ai_agent/HermesOriginal/home" HERMES_RUNTIME_DIR="$platform_root/runtime/shared/engines/hermes-pm" "$platform_root/.venv/platform/bin/python" -m pm.cli install
 ```
 
 한국어 패치 적용·웹 빌드는 [한국어 패치 기준 안내](../README.md#한국어-패치)를 따릅니다. 계정·모델·메신저 연결은 원본 설정에서 별도로 준비합니다.

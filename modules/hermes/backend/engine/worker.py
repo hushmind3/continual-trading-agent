@@ -18,27 +18,17 @@ import uuid
 
 ENGINE = Path(__file__).resolve().parent
 sys.path.insert(0,str(ENGINE))
-from locations import ROOT, MODULE_ROOT, NODE_BIN, PYTHON
+from locations import ROOT, MODULE_ROOT, PYTHON
+from prepare import prepare
+prepare(ENGINE)
 UPSTREAM = ENGINE / 'upstream'
 HOME = Path(os.environ.get('HERMES_HOME') or ROOT / 'runtime/ai_agent/Hermes').resolve()
 HOME.mkdir(parents=True, exist_ok=True)
 # Set isolation before importing any upstream code; never inherit another Hermes install.
 os.environ['HERMES_HOME'] = str(HOME)
-os.environ['HERMES_RUNTIME_DIR'] = str(HOME / 'runtime')
-os.environ['TERMINAL_ENV'] = 'local'
+os.environ['HERMES_RUNTIME_DIR'] = str(ROOT / 'runtime/shared/engines/hermes-pm')
 os.environ['CUA_DRIVER_RS_TELEMETRY_ENABLED'] = '0'
-os.environ['HERMES_SKIP_UPDATE_CHECK'] = '1'
-os.environ['HERMES_DISABLE_LAZY_INSTALLS'] = '1'
-os.environ['PATH'] = str(NODE_BIN) + os.pathsep + str(PYTHON.parent) + os.pathsep + os.environ.get('PATH', '')
-from platform_native import browser_executable
-_browser = browser_executable()
-if _browser:
-    os.environ['AGENT_BROWSER_EXECUTABLE_PATH'] = str(_browser)
-else:
-    os.environ.pop('AGENT_BROWSER_EXECUTABLE_PATH', None)
-_driver = ROOT / 'runtime/ai_agent/Hermes/tools/cua-driver' / ('cua-driver.exe' if os.name=='nt' else 'cua-driver')
-if _driver.is_file():
-    os.environ['HERMES_CUA_DRIVER_CMD'] = str(_driver)
+sys.path.insert(0, str(ROOT / 'backend'))
 sys.path.insert(0, str(UPSTREAM))
 import types
 for _name in ('ai_agent','ai_agent.Hermes'):
@@ -50,6 +40,7 @@ sys.modules['ai_agent'].Hermes=sys.modules['ai_agent.Hermes']
 OUTPUT = sys.stdout
 sys.stdout = sys.stderr
 
+import hermes_bootstrap  # Official PM activation, dependency overrides and runtime repair.
 from run_agent import AIAgent
 from hermes_state import SessionDB
 from ruamel.yaml import YAML
@@ -71,7 +62,24 @@ def atomic_json(path, value):
 
 
 def load_settings():
-    return {**DEFAULTS, **(json.loads(SETTINGS.read_text(encoding='utf-8')) if SETTINGS.is_file() else {})}
+    stored = json.loads(SETTINGS.read_text(encoding='utf-8')) if SETTINGS.is_file() else {}
+    cfg = {**DEFAULTS, **stored}
+    # The official profile is the authority. Platform JSON owns UI/organization
+    # additions, never a competing provider/model selection.
+    from hermes_cli.config import load_config
+    native = load_config()
+    model = native.get('model') or {}
+    if isinstance(model, str):
+        cfg['model'] = model
+    else:
+        cfg['model'] = model.get('default') or cfg['model']
+        cfg['provider'] = model.get('provider') or cfg['provider']
+        cfg['base_url'] = model.get('base_url') or cfg['base_url']
+    if cfg['provider'] != stored.get('provider') or cfg['base_url'] != stored.get('base_url'):
+        cfg['api_key'] = ''
+    if cfg['provider'] not in ('custom', 'llamacpp'):
+        cfg['local_model'] = ''
+    return cfg
 
 
 def unpack(value):
@@ -107,7 +115,8 @@ class HermesWorker:
         self.model_process = None
         self.model_log = None
         self.model_base = ''
-        self.yaml = YAML(typ='safe')
+        self.yaml = YAML(typ='safe', pure=True)
+        self.yaml.default_flow_style = False
         self.stopping = False
         self.approval_waiter = threading.Event()
         self.approval_result = False
@@ -116,19 +125,19 @@ class HermesWorker:
         self.catalog = Catalog(self)
         from ai_agent.Hermes.models.codex import CodexConnection
         self.codex = CodexConnection()
-        # AX results work with local text/tool models without a separate vision projector.
+        # The official bootstrap owns bundled-skill updates and preserves user edits.
         cfg = self.native_config()
-        cfg.setdefault('computer_use', {}).setdefault('capture_after_mode', 'ax')
-        if not cfg.setdefault('browser', {}).get('backend'):
-            cfg['browser']['backend'] = 'off'  # native agent-browser stack, not browser-use CLI
+        stored = json.loads(SETTINGS.read_text(encoding='utf-8')) if SETTINGS.is_file() else {}
+        if not stored.get('official_engine_migration'):
+            # The old adapter inserted "off" automatically even when browser
+            # tools were selected. Return that legacy default to native policy.
+            if isinstance(cfg.get('browser'),dict) and cfg['browser'].get('backend') == 'off':
+                cfg['browser'].pop('backend')
+            stored['official_engine_migration'] = 1
+            atomic_json(SETTINGS,stored)
         self.write_config(cfg)
-        # Original skills loader uses HERMES_HOME/skills; seed without overwriting user files.
-        for source in (UPSTREAM / 'skills').rglob('*'):
-            if source.is_file():
-                target = HOME / 'skills' / source.relative_to(UPSTREAM / 'skills')
-                if not target.exists():
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(source, target)
+        from tools.skills_sync import sync_skills
+        sync_skills(quiet=True)
 
     def idle_required(self):
         if getattr(self, 'catalog', None) and self.catalog.thread and self.catalog.thread.is_alive():
@@ -202,8 +211,17 @@ class HermesWorker:
         if not isinstance(cfg['toolsets'], list) or any(t not in self.public_settings()['available_toolsets'] for t in cfg['toolsets']):
             raise ValueError('지원하지 않는 도구 묶음입니다.')
         cfg=save_options(cfg,request)
-        if cfg.get('provider') not in ('custom', 'openai-codex'):
-            raise ValueError('지원하지 않는 모델 제공자입니다.')
+        if 'reasoning_effort' in request or 'thinking_mode' in request:
+            native=self.native_config()
+            agent=native.setdefault('agent',{})
+            if 'reasoning_effort' in request:agent['reasoning_effort']=request['reasoning_effort']
+            mode=request.get('thinking_mode')
+            if mode=='off':agent['reasoning_effort']='none'
+            elif mode=='on' and agent.get('reasoning_effort') in (None,'none','off','auto'):
+                from hermes_cli.config import DEFAULT_CONFIG
+                agent['reasoning_effort']=DEFAULT_CONFIG.get('agent',{}).get('reasoning_effort') or 'medium'
+            elif mode=='auto' and 'reasoning_effort' not in request:agent.pop('reasoning_effort',None)
+            self.write_config(native)
         if cfg.get('provider') == 'openai-codex':
             if not self.codex.status()['connected']:
                 raise ValueError('모델 설정에서 ChatGPT 로그인을 완료하세요.')
@@ -337,7 +355,7 @@ class HermesWorker:
             cfg['workspace'] = str(selected)
         if not cfg['model']:
             raise ValueError('모델 설정에서 모델을 선택하고 저장하세요.')
-        if cfg.get('local_model') and self.status()['local_model']['state'] != 'ready':
+        if cfg.get('provider') == 'custom' and cfg.get('local_model') and self.status()['local_model']['state'] != 'ready':
             raise ValueError('모델 탭에서 로컬 모델을 불러온 뒤 대화를 시작하세요.')
         prompt = str(request.get('message') or '').strip()
         if not prompt:
@@ -408,10 +426,6 @@ class HermesWorker:
             from tools import tool_search
             tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'computer_use'}
             toolsets = list(cfg['toolsets']) + ['mcp-' + name for name in get_registered_mcp_server_names()]
-            if 'web' in toolsets or cfg.get('company_instructions'):
-                from ai_agent.Hermes.chat.web_search import register as register_web_search
-                register_web_search()
-                tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'web'}
             if cfg.get('company_instructions'):
                 from ai_agent.Hermes.chat.company import register
                 register()
@@ -542,17 +556,18 @@ class HermesWorker:
             active_request = getattr(self.agent, '_model_request_active', None)
             job['can_steer'] = bool(not self.stopping and self.thread and self.thread.is_alive() and self.agent and
                                     (getattr(self.agent, '_executing_tools', False) or active_request and active_request.is_set()))
-        model = {'running': bool(self.model_process and self.model_process.poll() is None), 'base_url': self.model_base, 'state': 'idle'}
-        if model['running']:
-            from urllib.request import urlopen
-            model['state'] = 'loading'
+        model = {'running': False, 'base_url': '', 'state': 'idle'}
+        if hasattr(self, 'official') or load_settings().get('provider') == 'llamacpp':
             try:
-                with urlopen(self.model_base.removesuffix('/v1') + '/health', timeout=.4) as response:
-                    if response.status == 200: model['state'] = 'ready'
-            except OSError: pass
-        if self.model_process and self.model_process.poll() is not None:
-            model['state'] = 'failed'
-            model['error'] = '로컬 모델 프로세스가 종료됐습니다. local-model.log를 확인하세요.'
+                native = self.official_service().request('/api/local-models/status')
+                active = native.get('active_model_id')
+                loading = bool(native.get('loading'))
+                loaded = active in (native.get('loaded_models') or {}) if active else False
+                model.update(running=bool(native.get('server_running')), base_url=native.get('server_base_url') or '',
+                    state='loading' if loading else 'ready' if loaded else 'idle')
+                self.model_base = model['base_url']
+            except Exception as error:
+                model.update(state='failed',error=str(error))
         installing=getattr(getattr(self,'catalog',None),'thread',None)
         cfg = load_settings()
         connection = ('remote' if self.codex.status()['connected'] else 'login_required') if cfg.get('provider') == 'openai-codex' else ('remote' if cfg.get('model') and not cfg.get('local_model') else model['state'])
@@ -599,60 +614,27 @@ class HermesWorker:
             self.job.pop('approval', None)
         return str(self.approval_result or '사용자가 응답하지 않았습니다.')
 
+    def official_service(self):
+        if not hasattr(self, 'official'):
+            from ai_agent.Hermes.engine.official import OfficialApplication
+            self.official = OfficialApplication()
+        return self.official
+
     def load_model(self, request):
         self.idle_required()
-        path = Path(str(request.get('path') or '')).expanduser().resolve()
+        path = Path(str(request.get('path') or load_settings().get('local_model') or '')).expanduser().resolve()
         if not path.is_file() or path.suffix.lower() != '.gguf':
-            raise ValueError('존재하는 GGUF 모델 파일을 선택하세요. 다른 형식은 해당 모델 실행기의 API 주소를 연결하세요.')
-        executable = ROOT / 'runtime/shared/engines/llama.cpp' / ('llama-server.exe' if os.name=='nt' else 'llama-server')
-        if sys.platform=='darwin' and not executable.is_file():
-            installed=shutil.which('llama-server')
-            if installed:executable=Path(installed)
-        if not executable.is_file():
-            raise ValueError('설치된 llama-server 실행기를 찾을 수 없습니다.')
-        alias = path.parent.name if path.stem.upper() in {'GGUF', 'MODEL'} else path.stem
-        native = self.native_config()
-        context_length = model_options({**load_settings(),'model':alias},native)['context_length']
-        self.unload_model()
-        with socket.socket() as sock:
-            sock.bind(('127.0.0.1', 0))
-            port = sock.getsockname()[1]
-        # Apple Silicon shares RAM with Metal. Bound the extra host prompt cache,
-        # independently of the user's context/KV cache, and let llama.cpp select cores.
-        runtime_args = ['--threads', '2', '--threads-batch', '2']
-        if sys.platform == 'darwin':
-            import psutil
-            memory_mib = psutil.virtual_memory().total // (1024 * 1024)
-            cache_mib = max(256, min(8192, memory_mib // 16))
-            runtime_args = [] if 'LLAMA_ARG_CACHE_RAM' in os.environ else ['--cache-ram', str(cache_mib)]
-        self.model_log = (HOME / 'local-model.log').open('a', encoding='utf-8')
-        self.model_process = subprocess.Popen(
-            [str(executable), '--model', str(path), '--host', '127.0.0.1', '--port', str(port),
-             '--n-gpu-layers', 'auto', '--ctx-size', str(context_length or 0), '--parallel', '1',
-             *runtime_args,
-             '--checkpoint-min-step', os.environ.get('LLAMA_ARG_CHECKPOINT_MIN_SPACING_NT', '1024'),
-             '-fa', 'on', '-ctk', 'q8_0', '-ctv', 'q8_0',
-             '--jinja', '--alias', alias],
-            cwd=path.parent, stdout=self.model_log, stderr=self.model_log,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-        self.model_base = f'http://127.0.0.1:{port}/v1'
-        self._slot_sample=None
-        with self.lock:self.job.pop('metrics',None)
-        self.write_config(bind_model(native, alias, self.model_base, context_length))
-        self.save_settings({'provider': 'custom', 'base_url': self.model_base, 'model': alias, 'local_model': str(path)})
-        return self.status()
+            raise ValueError('기존 GGUF 모델 파일을 선택하세요.')
+        native = self.official_service()
+        model = native.request('/api/local-models/sideload', 'POST', {'path': str(path)})
+        job = native.request('/api/local-models/activate', 'POST', {'model_id': model['model_id']})
+        return {**self.status(), 'model_job': job}
 
     def unload_model(self):
         self.idle_required()
-        if self.model_process and self.model_process.poll() is None:
-            self.model_process.terminate()
-            try: self.model_process.wait(timeout=8)
-            except subprocess.TimeoutExpired: self.model_process.kill()
-        self.model_process = None
-        if self.model_log:
-            self.model_log.close()
-            self.model_log = None
-        return self.status()
+        if hasattr(self, 'official'):
+            self.official.request('/api/local-models/eject', 'POST', {})
+        return {'unloaded': True}
 
     def mcp(self):
         from tools.mcp_tool_discovery import get_mcp_status
@@ -681,6 +663,10 @@ class HermesWorker:
         return self.mcp()
 
     def execute(self, operation, payload):
+        if operation == 'engine/busy':
+            return {'reason': self.official.busy_reason() if hasattr(self,'official') else ''}
+        if operation.startswith('official/'):
+            return self.official_service().execute(operation, payload)
         if operation == 'company/session':
             from ai_agent.Hermes.chat.company import connect
             self.company_links_path = HOME / 'company-links.json'
@@ -699,7 +685,9 @@ class HermesWorker:
             from ai_agent.Hermes.skills.catalog import execute
             return execute(self,operation,payload)
         if operation == 'engine/info':
-            return {'root': str(UPSTREAM), 'modules': {name: str(Path(module.__file__).resolve())
+            return {'root': str(UPSTREAM), 'python': sys.executable, 'sqlite_version': __import__('sqlite3').sqlite_version,
+                'official_commit': subprocess.check_output(['git','-C',str(UPSTREAM),'rev-parse','HEAD'],text=True).strip(),
+                'modules': {name: str(Path(module.__file__).resolve())
                 for name, module in tuple(sys.modules.items()) if getattr(module, '__file__', None)
                 and name.split('.')[0] in {'agent', 'tools', 'hermes_cli', 'run_agent', 'model_tools', 'pm', 'gateway'}}}
         if operation == 'settings': return self.public_settings()
@@ -766,7 +754,8 @@ class HermesWorker:
         self.stop()
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=4)
-        with contextlib.suppress(Exception): self.unload_model()
+        if hasattr(self, 'official'):
+            with contextlib.suppress(Exception): self.official.close()
         from tools.mcp_tool_lifecycle import shutdown_mcp_servers
         with contextlib.suppress(Exception): shutdown_mcp_servers()
         with contextlib.suppress(Exception): self.db.close()

@@ -18,12 +18,82 @@
     "paths": {
       "@platform/*": [
         "src/*"
+      ],
+      "@hermes-official/*": [
+        "../modules/hermes/backend/engine/upstream/web/src/*"
+      ],
+      "@/*": [
+        "../modules/hermes/backend/engine/upstream/web/src/*"
+      ],
+      "@hermes/shared": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/index.ts"
+      ],
+      "@hermes/shared/*": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/src/*"
+      ],
+      "react-router": [
+        "../modules/hermes/backend/engine/upstream/web/node_modules/react-router/dist/production/index.d.ts"
+      ],
+      "@hermes/shared/ansi": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/ansi.ts"
+      ],
+      "@hermes/shared/billing": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/billing-types.ts"
+      ],
+      "@hermes/shared/billing-policy": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/billing-policy.ts"
+      ],
+      "@hermes/shared/charge-settlement": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/charge-settlement.ts"
+      ],
+      "@hermes/shared/color": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/color.ts"
+      ],
+      "@hermes/shared/format": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/format.ts"
+      ],
+      "@hermes/shared/fuzzy": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/fuzzy.ts"
+      ],
+      "@hermes/shared/gateway-events": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/gateway-events.ts"
+      ],
+      "@hermes/shared/i18n": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/i18n.ts"
+      ],
+      "@hermes/shared/json-rpc-channel": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/json-rpc-channel.ts"
+      ],
+      "@hermes/shared/model-search-text": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/model-search-text.ts"
+      ],
+      "@hermes/shared/plan-usage": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/plan-usage.ts"
+      ],
+      "@hermes/shared/reasoning-effort": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/reasoning-effort.ts"
+      ],
+      "@hermes/shared/reconnect-backoff": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/reconnect-backoff.ts"
+      ],
+      "@hermes/shared/skin": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/skin.ts"
+      ],
+      "@hermes/shared/slash": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/slash.ts"
+      ],
+      "@hermes/shared/theme-presets": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/theme-presets.ts"
+      ],
+      "@hermes/shared/usage-tick": [
+        "../modules/hermes/backend/engine/upstream/apps/shared/./src/usage-tick.ts"
       ]
     }
   },
   "include": [
     "src",
     "../modules/**/frontend/**/*.ts",
-    "../modules/**/frontend/**/*.tsx"
+    "../modules/**/frontend/**/*.tsx",
+    "../modules/hermes/backend/engine/upstream/web/src/plugins/sdk.d.ts"
   ]
 }

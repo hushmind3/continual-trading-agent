@@ -2,10 +2,15 @@
 def model_options(settings, native):
     from .execution import context_window
     saved=(settings.get('model_options') or {}).get(settings['model'],{})
+    agent=native.get('agent') or {}
+    effort=agent.get('reasoning_effort') or saved.get('reasoning_effort','auto')
+    thinking=saved.get('thinking_mode','auto')
+    if 'reasoning_effort' in agent:
+        thinking='off' if effort in ('none','off') else 'auto' if effort=='auto' else 'on'
     return {'context_length':saved.get('context_length',context_window(native,settings['model'])),
-            'thinking_mode':saved.get('thinking_mode','auto'),
+            'thinking_mode':thinking,
             'max_output_tokens':saved.get('max_output_tokens',0),
-            'reasoning_effort':saved.get('reasoning_effort','auto')}
+            'reasoning_effort':effort}
 
 def save_options(settings, request):
     saved=dict((settings.get('model_options') or {}).get(settings['model'],{}))

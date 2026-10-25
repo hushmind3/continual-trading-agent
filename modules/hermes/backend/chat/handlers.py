@@ -9,6 +9,20 @@ def autonomy(id: str): return invoke('autonomy', {'id':id})
 @router.get('/status')
 def status(): return invoke('status')
 
+@router.post('/engine/shutdown')
+def shutdown_engine():
+    from ai_agent.Hermes.engine.bridge import bridge
+    from fastapi import HTTPException
+    reason = bridge.busy_reason()
+    if reason:
+        raise HTTPException(409, reason)
+    bridge.reserve_restart()
+    try:
+        bridge.close()
+        return {'stopped': True}
+    finally:
+        bridge.cancel_restart()
+
 @router.post('/chat')
 def chat(request: dict):
     from ai_agent.Hermes.artifacts.handlers import uploaded_paths

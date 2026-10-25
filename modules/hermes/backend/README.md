@@ -1,40 +1,16 @@
-# Hermes 백엔드
+# 헤르메스 백엔드
 
-용도: 이식 엔진·전용 실행 환경·기능 API와 설정 소유를 안내합니다.
+용도: 공식 전체 실행 기능과 기존 플랫폼 대화·조직 기능을 연결합니다.
 
-런타임 소유 경로는 `runtime/ai_agent/Hermes/`입니다. 대화 DB·공통 설정은 원본 엔진이 공유하며, 스킬은 `skills/`, 도구 실행기는 `tools/`, 검사 자료는 `verification/`에 둡니다. 이식 검사 임시 파일은 `verification/port/run-…/`에서만 만들고 정상 종료와 준비 실패 모두 정리합니다. 실행 충돌을 막기 위한 임시 실행 ID 외에 런타임 최상위에 무작위 이름의 폴더를 만들지 않습니다. 대화·세션·MCP마다 별도 DB와 설정 복사본을 만드는 구조는 아닙니다.
+- `manager.py`가 chat·models·sessions·mcp·skills·artifacts·native 소메뉴를 취합하고 AI 에이전트 등록 → 전체 메뉴 → 단일 /api로 연결합니다.
+- `engine/upstream/`는 공식 전체 Git 트리입니다. 원본 대시보드를 별도 서버에서 대신 실행하거나 공식 도구를 모의 API로 바꾸지 않습니다.
+- `engine/launch.py`는 공식 PM의 Python·환경을 선택합니다. `engine/worker.py`는 기존 JSON IPC·대화·조직 연결, `engine/official.py`는 같은 worker 안의 공식 ASGI 수명 주기와 HTTP/WebSocket 전송을 담당합니다.
+- `native/asgi.py`의 `/api/ai_agent/Hermes/native/`는 담당 매니저가 등록한 같은 API 호스트의 공식 프로토콜 통로입니다. PUT·PATCH·DELETE·파일·리다이렉트·스트리밍을 JSON으로 축소하지 않습니다. 인증은 플랫폼 소유자 통로와 worker 내부 공식 토큰을 사용합니다.
+- 기존 플랫폼 명령은 `/api`의 operation/payload 계약을 유지합니다. 실제 설정·인증·모델 실행은 공식 구현을 사용합니다.
+- 저장은 기존 `runtime/ai_agent/Hermes/`이며 주 대화·총괄·직원 도구 이력은 기존 SessionDB를 보존합니다. 사업 초안·승인·회의의 기존 업무 기록도 삭제하지 않습니다.
 
-메뉴 계층: AI 에이전트(대메뉴) → Hermes(중메뉴) → 대화·모델·작업 환경·MCP·스킬·시스템 프롬프트(소메뉴). 대화 주소는 `#ai_agent/Hermes`입니다.
+모델·제공자·추론 설정의 기준은 공식 config.yaml입니다. 플랫폼 JSON은 조직 개별 프롬프트·화면·기존 확장 설정을 보존합니다. 제공자를 custom/Codex 두 종류로 제한하던 실행 분기는 공식 resolve_runtime_provider로 교체했습니다. 수동 llama-server 실행과 선별 패키지 설치도 공식 모델 관리자·PM으로 교체했습니다.
 
-| Folder | Responsibility |
-| --- | --- |
-| engine/ | Imported upstream engine and common dependencies; isolated Python worker and IPC |
-| chat/ | Start, progress, streaming output and stop |
-| models/ | OpenAI-compatible model connection and local model process |
-| sessions/ | Upstream SessionDB history and session management |
-| mcp/ | Upstream MCP server configuration and tool discovery |
-| skills/ | Upstream skill catalog and skill content |
+초기 준비만 `engine/setup.py`를 사용합니다. 실제 설치된 환경에서는 재설치하지 않습니다. 필요한 외부 계정·서비스 권한은 공식 화면에서 연결하며, 연결 전 외부 실행 성공을 보고하지 않습니다.
 
-`module.json`의 backend 항목이 `manager.py`를 자동 등록합니다. manager가 기능별 router를 취합해 전체 메뉴의 단일 `/api`로 연결하고, 실제 AIAgent는 모듈 전용 Python worker에서 실행합니다.
-
-The original checkout is not a runtime dependency. Upstream Python sources are under `engine/upstream/`; source hashes and deliberate bootstrap changes are recorded in `engine/provenance.json`. The original MIT license is retained. CLI/package-update launchers are not executed. Configuration, credentials, sessions and logs live under project `runtime/ai_agent/Hermes/` and are excluded from Git.
-
-Python: use the already installed Python 3.14 through `modules/hermes/.venv/`; do not change the finance Python environment. Install selected dependencies with `uv pip install --python modules/hermes/.venv/Scripts/python.exe -r modules/hermes/backend/engine/requirements.txt`. No model is downloaded or loaded automatically.
-
-Complete dependency/desktop-driver setup: `.venv\Scripts\python.exe -I -X utf8 modules/hermes/backend/engine/setup.py`. This reuses installed Python 3.14, and verifies the desktop driver's archive against the SHA-256 in the copied upstream PM lock. The original source folder is never consulted by setup or execution.
-
-Source selection excludes the standalone CLI, TUI gateway, messaging adapter entrypoints and upstream tests/evaluations. Common config/session/approval/PM metadata helpers still required by selected tools remain. The ACP edit-approval middleware is retained because the engine requires it even outside ACP sessions; no ACP client is launched. The system does not run the upstream package updater. Imported skills may describe optional tools that need separate credentials or software; merely listing or reading them does not execute them.
-
-컴퓨터·브라우저: 작업 환경 소메뉴에서 사용할 도구를 선택한 뒤 대화에서 요청합니다. 클릭·입력 승인 요청은 대화 화면에서 허용/거절합니다. 로컬 텍스트 GGUF는 AX 접근성 텍스트로 작업하며, 화면 이미지 이해가 필요한 앱은 별도 비전 모델/프로젝터가 필요합니다. 브라우저 Node 패키지는 modules/hermes/backend/engine/browser/node_modules에 설치합니다. 루트 node_modules를 참조하지 않습니다. 실제 동작 검사는 development/tests/test_hermes_live_tools.py에 있으며 HERMES_LIVE_TOOLS=1일 때만 모델·검사 창을 실행합니다.
-
-시스템 프롬프트: 프론트 설정 → 시스템 프롬프트에서 저장합니다. `platform-settings.json`의 system_prompt를 원본 AIAgent의 ephemeral_system_prompt 인자에 추가하며, 기본 도구 안내는 유지합니다. 다음 대화 요청부터 적용하고 빈 문자열로 저장하면 사용자 추가 지침을 해제합니다.
-
-프로젝트 설치기의 자동 변환 요청은 실행별 workspace를 전달할 수 있습니다. worker는 실제 존재하는 폴더만 받아 해당 실행의 작업 경로에 적용합니다. 저장된 기본 작업 폴더는 바꾸지 않으며 모델 준비·승인·중지는 기존 엔진 경로를 유지합니다. 이번 설치기 변경에서 실제 모델을 통한 자동 변환까지 확인한 것은 아닙니다.
-
-artifacts/는 대화 결과 문서 미리보기를 단일 API에 등록합니다. Markdown 링크·인라인 문서 경로·성공한 파일 쓰기의 결과 파일을 프론트에서 열 수 있습니다. 읽기 전용 실행 권한은 시스템 프롬프트 문장과 별도 설정이며 대화 입력창의 읽기 모드 스위치로 다음 요청부터 적용됩니다.
-
-2026-10-16 확인: 금융·REA 회귀 110개, Hermes 권한·재시작·문서 검사 11개 통과. TypeScript·Vite 빌드 및 서버 적용 완료. 실제 오류 보고서 문서 API 응답 확인. 실제 GGUF 추론은 이번 검증에서 실행하지 않았습니다.
-
-현재 분리 범위와 검증은 [모듈 안내](../../README.md), 현재 대화 제어는 [대화 README](../frontend/chat/README.md)를 따릅니다.
-
-총괄 전용 키 없는 검색은 chat/web_search.py가 원본 web provider registry에 연결합니다. 해당 의존성은 engine/requirements.txt와 modules/hermes/.venv에 소속됩니다. 일반 대화의 기본 도구/메모리/세션 정책은 이번 총괄 검색 연결로 변경하지 않습니다.
+2026-10-26 현재 확인: 공식 전체 소스·319개 HTTP 경로 등록, 기존 주 대화 14개 조회, PM Python 3.14.9·SQLite 3.53.1, 실제 공식 게이트웨이 실행, 기존 9B 등록·활성화와 기존 총괄 세션의 실제 직원 위임·파일 읽기·결과 반환을 확인했습니다. 이 위임은 약 6분이 걸렸으며 속도 개선 완료로 기록하지 않습니다. 모든 외부 계정·채널·유료 서비스 실행을 확인한 것은 아닙니다. 실제 모델·스킬·업무 보드 화면, WebSocket 연결 승인, 공통 글꼴·배경 및 가로 넘침 없음, 화면 오류 0건을 확인했습니다. 새 보드 사건을 생성하지 않아 사건 수신은 미확인입니다. 재시작 예약 중 내부 상태 확인을 차단하던 오류를 수정하고 실제 서버 적용을 확인했습니다.

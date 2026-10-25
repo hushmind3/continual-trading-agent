@@ -4,3 +4,6 @@
 [submodule "hermes-original"]
 	path = runtime/ai_agent/HermesOriginal/source
 	url = https://github.com/NousResearch/hermes-agent.git
+[submodule "hermes-engine"]
+	path = modules/hermes/backend/engine/upstream
+	url = https://github.com/NousResearch/hermes-agent.git

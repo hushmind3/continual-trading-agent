@@ -1,19 +1,14 @@
-# Hermes 모듈
+# 헤르메스 모듈
 
-용도: 이식 Hermes의 소스·패키지·영속 데이터 소유와 플랫폼 연결 경계를 안내합니다.
+용도: 기존 플랫폼 헤르메스를 주력으로 유지하고 공식 전체 기능·데이터·UI 연결을 관리합니다.
 
-- `module.json`: AI 에이전트 소속 Hermes 화면과 API의 자동 등록 정보입니다. 왼쪽에는 헤르메스 진입점 하나를 표시하며 설정 기능은 대화 오른쪽 톱니바퀴에서 여는 상단 탭으로 이동합니다.
-- `backend/`: 이식된 원본 엔진과 기능별 Python 코드입니다. 상세 실행 안내는 `backend/README.md`를 봅니다.
-- `frontend/`: 대화·모델·작업 환경·MCP·스킬·시스템 프롬프트 화면입니다. React/Vite/Tailwind와 플랫폼 공통 UI를 사용합니다.
-- `runtime/ai_agent/Hermes/`: 프로그램 밖에 보존하는 설정·대화 DB·작업 기록입니다. 모듈 제거 대상이 아닙니다.
-- `modules/hermes/.venv/`: Hermes 전용 Python·패키지 환경. `runtime/shared/engines/llama.cpp/`는 모델 실행기를 재사용합니다.
+- 공식 전체 소스: `backend/engine/upstream/`. 선별 복사본 대신 공식 Git 서브모듈을 사용합니다. 기준 커밋과 가져오기 이력은 `backend/engine/provenance.json`입니다.
+- 플랫폼 연결: `backend/engine/{launch,worker,official}.py`, `backend/native/`. 공식 AIAgent·ASGI 앱·게이트웨이·칸반 배정기를 사용하며 별도 대체 에이전트 루프를 만들지 않습니다.
+- 화면: 기존 `frontend/chat/`와 조직 화면을 유지합니다. 모델·스킬·MCP와 전체 관리 기능은 공식 React 페이지를 플랫폼 공통 글꼴·색상·탭 안에 연결합니다. iframe으로 교체하지 않습니다.
+- 주력 데이터: 기존 `runtime/ai_agent/Hermes/`. 일반·총괄 대화는 같은 state.db를 사용합니다. 공식 기능의 원래 프로필별 저장 구조와 기존 사업 기록은 유지하며 별도 자체 대화 DB를 추가하지 않습니다.
+- 공용 도구: `runtime/shared/engines/hermes-pm/`. PM이 Python·Node·CUDA 실행기·브라우저·드라이버를 관리합니다. 메뉴별 Python 의존 환경은 같은 Hermes 홈의 공식 installs/에 보관합니다.
+- 원본 메뉴는 업데이트·비교용 소스와 기존 데이터를 보존하며 주력 실행의 대화·모델 설정을 대신하지 않습니다.
 
-폴더 등록·제거는 공통 감시기가 감지해 빌드와 서버 적용을 처리합니다. 실행 중인 작업이 있으면 적용을 보류합니다. 원본 Hermes 외부 체크아웃은 필요하지 않습니다.
+처음 준비할 때만 프로젝트 루트에서 `git submodule update --init -- modules/hermes/backend/engine/upstream`, 이어 플랫폼 Python으로 `modules/hermes/backend/engine/setup.py`를 실행합니다. 기존 준비된 설치본을 확인 목적으로 재설치하지 않습니다.
 
-이 모듈은 플랫폼의 공통 UI·HTTP 통로와 공유 모델 실행기를 사용하며 Python/브라우저 패키지는 모듈 전용 환경에 설치합니다. 폴더 탈착과 독립 배포는 별개입니다. 독립 실행 소스 ZIP은 프로젝트 관리에서 공통 API/UI 소스 복사본과 설치/실행 진입점을 함께 내보냅니다. 다른 PC의 신규 의존성 설치·원본 모델 추론 전체와 모든 외부 GitHub 프로젝트의 자동 변환까지 확인한 뜻은 아닙니다.
-
-패키지 소유: Python은 모듈 내부 `.venv`, Node는 `backend/engine/browser/node_modules`, 명세와 잠금은 각 설치 폴더에 있습니다. 연결 상태의 설정·대화 DB·MCP·스킬·작업 기록은 runtime/ai_agent/Hermes에 저장하며 로컬 분리 시 소유 데이터를 함께 옮깁니다. 기본 경로는 engine/locations.py에서 모듈 기준으로 계산합니다. Python/Node 버전 자체를 바꾸지 않았습니다.
-
-로컬 분리: GitHub → 프로젝트 관리 → 설치된 프로젝트에서 **분리**를 누르면 실제 프로그램·전용 환경·소유 데이터/설정을 독립 폴더로 옮깁니다. `실행.cmd`로 실행하고 다시 연결하면 같은 파일을 복원합니다. 원본 모델은 사용자 지정 위치에 유지합니다.
-
-전달용 소스 ZIP: 설치 정보 → 개발자 상세에서 선택적으로 저장합니다. 압축을 푼 뒤 `python run.py setup`, `check`, `run --port 8080`으로 설치·검사·실행합니다. 필요한 공통 API/UI는 ZIP 안의 복사본을 사용합니다. 기존 데이터·비밀 설정·모델은 자동 포함하지 않습니다. 형식·실제 확인 범위는 [프로젝트 관리](../projects/README.md)를 따릅니다.
+연결·실행·실제 확인 범위는 [백엔드](backend/README.md), [엔진](backend/engine/README.md), [설정 화면](frontend/settings/README.md)을 따릅니다. 원본 모델 파일은 사용자 지정 폴더에 유지합니다. 폐기된 선별 소스·중복 설치기·UI는 휴지통에 보존하며 Git 배포에서 제외합니다.

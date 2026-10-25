@@ -1,5 +1,7 @@
 @source "../../modules";
 @import "tailwindcss";
+@import "../../modules/hermes/backend/engine/upstream/web/node_modules/@nous-research/ui/dist/ui/globals.css";
+@source "../../modules/hermes/backend/engine/upstream/web/node_modules/@nous-research/ui/dist";
 @font-face {
   font-family: "Pretendard Variable";
   src: url("./assets/fonts/PretendardVariable.woff2") format("woff2");
@@ -46,8 +48,36 @@
   --leading-text: 1.75;
   --leading-code: 1.8;
   --leading-description: 1.9;
-  --font-sans: "Pretendard Variable", "Segoe UI", "Malgun Gothic", sans-serif;
+  --font-platform: "Pretendard Variable", "Segoe UI", "Malgun Gothic", sans-serif;
+  --font-sans: var(--font-platform);
 }
+:root { --font-sans: var(--font-platform) !important; --font-body: var(--font-platform) !important; }
+.hermes-official {
+  --font-sans: var(--font-platform) !important;
+  --midground: var(--color-ink) !important;
+  --midground-base: var(--color-ink) !important;
+  --color-midground: var(--color-ink) !important;
+  --foreground-base: var(--color-brand-600) !important;
+  --color-foreground: var(--color-brand-600) !important;
+  --background: white !important;
+  --background-base: white !important;
+  --foreground: var(--color-ink) !important;
+  --surface: white !important;
+  --surface-alt: var(--color-canvas) !important;
+  --surface-raised: white !important;
+  --border: var(--color-slate-200) !important;
+  --accent: var(--color-brand-600) !important;
+  --text-primary: var(--color-ink) !important;
+  --text-secondary: var(--color-copy) !important;
+  --text-tertiary: var(--color-slate-500) !important;
+  --text-on-accent: white !important;
+  --font-body: var(--font-platform) !important;
+  --font-heading: var(--font-platform) !important;
+  @apply min-w-0 bg-white font-sans text-ink;
+}
+.hermes-official .font-mondwest,.hermes-official .font-expanded { font-family: var(--font-sans); }
+.ha-official-controls { @apply mb-5 flex min-w-0 flex-col gap-3; }
+.ha-official-tabs { @apply flex flex-wrap gap-2; }
 @layer base {
   body {
     @apply m-0 bg-canvas font-sans text-slate-900 antialiased;

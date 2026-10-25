@@ -10,10 +10,11 @@ import subprocess
 import threading
 import uuid
 
-from .locations import ROOT, PYTHON, NODE_BIN
+from .locations import ROOT, PYTHON
 STATE = ROOT / 'runtime/ai_agent/Hermes'
 
 WORKER = Path(__file__).with_name('worker.py')
+LAUNCH = Path(__file__).with_name('launch.py')
 
 
 class WorkerBridge:
@@ -37,6 +38,8 @@ class WorkerBridge:
                 return '실행 중인 헤르메스 MCP 설치'
             if state.get('local_model',{}).get('state')=='loading':return '헤르메스 로컬 모델 불러오는 중'
             if state.get('codex_login',{}).get('state')=='pending':return 'ChatGPT 로그인 진행 중'
+            native=self.call('engine/busy',timeout=7)
+            if native.get('reason'):return native['reason']
         except (RuntimeError,ValueError):return '헤르메스 실행 상태 확인 실패; 재시작 보류'
         return ''
 
@@ -80,9 +83,9 @@ class WorkerBridge:
         env = {**os.environ, 'PYTHONUTF8': '1', 'PYTHONIOENCODING': 'utf-8',
                'HERMES_HOME': str(self.state_dir), 'HERMES_RUNTIME_DIR': str(self.state_dir / 'runtime')}
         env.pop('PYTHONPATH', None)
-        env['PATH']=os.pathsep.join((str(PYTHON.parent),str(NODE_BIN),env.get('PATH','')))
+        env['PATH']=os.pathsep.join((str(PYTHON.parent),env.get('PATH','')))
         self.process = subprocess.Popen(
-            [str(PYTHON), '-I', '-X', 'utf8', '-B', str(WORKER)], cwd=ROOT, env=env,
+            [str(PYTHON), '-I', '-X', 'utf8', '-B', str(LAUNCH)], cwd=ROOT, env=env,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log,
             encoding='utf-8', errors='replace', bufsize=1,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
@@ -95,13 +98,13 @@ class WorkerBridge:
         request_id = uuid.uuid4().hex
         waiter = queue.Queue()
         with self.lock:
-            if self.restarting and operation not in ('status','stop','answer','shutdown'):
+            if self.restarting and operation not in ('status','engine/busy','stop','answer','shutdown'):
                 raise RuntimeError('서버 변경 적용 준비 중입니다. 적용 후 다시 시도하세요.')
             process = self._start()
             self.pending[request_id] = waiter
         try:
             with self.lock,self.write_lock:
-                if self.restarting and operation not in ('status','stop','answer','shutdown'):
+                if self.restarting and operation not in ('status','engine/busy','stop','answer','shutdown'):
                     raise RuntimeError('서버 변경 적용 준비 중입니다. 적용 후 다시 시도하세요.')
                 process.stdin.write(json.dumps({'id': request_id, 'operation': operation, 'payload': payload or {}}, ensure_ascii=False) + '\n')
                 process.stdin.flush()

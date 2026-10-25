@@ -66,7 +66,12 @@ async def local_writes(request: Request, call_next):
         if not matched:return JSONResponse({'detail':'Codex용 FreeLLMAPI 경로가 등록되지 않았습니다.'},status_code=404)
         request.state.api_dispatch=(*matched,await request.body())
     elif path.startswith('/api/'):
-        return JSONResponse({'detail':'단일 /api 통로를 사용하세요.'},status_code=404)
+        from menu_registry import native_api_prefixes
+        if not any(path.startswith(prefix) for prefix in native_api_prefixes()):
+            return JSONResponse({'detail':'단일 /api 통로를 사용하세요.'},status_code=404)
+        # The registered menu owns this native protocol on the same API host.
+        # Keep methods, streaming bodies, redirects and file responses intact.
+        parameters={}
     origin = request.headers.get("origin")
     if method != "GET" and origin and origin not in {
         "http://127.0.0.1:5173", "http://localhost:5173",

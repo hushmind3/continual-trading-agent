@@ -37,9 +37,9 @@ def main():
    subprocess.run([str(rea),'-I','-c','from rea.program_analysis.operations import install;install()'],check=True)
  subprocess.run([*npm_command(),'ci','--no-audit','--no-fund'],cwd=ROOT,check=True)
  if (ROOT/'modules/hermes/module.json').is_file():
+  if not (ROOT/'modules/hermes/backend/engine/upstream/hermes').is_file():
+   subprocess.run(['git','submodule','update','--init','modules/hermes/backend/engine/upstream'],cwd=ROOT,check=True)
   subprocess.run([str(host),'-I',str(ROOT/'modules/hermes/backend/engine/setup.py')],check=True)
-  install_sources(ROOT/'modules/hermes/.venv')
-  subprocess.run([*npm_command(),'ci','--workspaces=false','--no-audit','--no-fund'],cwd=ROOT/'modules/hermes/backend/engine/browser',check=True)
  if sys.platform=='darwin':
   import shutil
   runner=shutil.which('llama-server')

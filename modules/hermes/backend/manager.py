@@ -6,6 +6,9 @@ from ai_agent.Hermes.sessions.handlers import router as sessions
 from ai_agent.Hermes.mcp.handlers import router as mcp
 from ai_agent.Hermes.skills.handlers import router as skills
 from ai_agent.Hermes.artifacts.handlers import router as artifacts
+from ai_agent.Hermes.native.handlers import router as official
+from ai_agent.Hermes.native.asgi import register_host
+NATIVE_API_PREFIXES=('/api/ai_agent/Hermes/native/',)
 
 # Run before serving any app/engine request; migration preserves and checks every row.
 from ai_agent.Hermes.engine.locations import ROOT
@@ -15,7 +18,7 @@ migrate(ROOT)
 MENU = {'id': 'ai_agent/Hermes', 'title': '헤르메스', 'operations': ['ai_agent/Hermes/'],
         'views': [], 'frontend': 'modules/hermes/frontend/Hermes.tsx', 'manager': 'ai_agent.Hermes.manager'}
 router = APIRouter()
-for feature in (chat, models, sessions, mcp, skills, artifacts):
+for feature in (chat, models, sessions, mcp, skills, artifacts, official):
     router.include_router(feature)
 
 

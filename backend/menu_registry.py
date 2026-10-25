@@ -98,6 +98,11 @@ def catalog(routes):
         'actions':actions,'commands':commands,'module_errors':errors}
 
 
+def native_api_prefixes():
+    """Native protocol surfaces are declared by their owning registered menu."""
+    return tuple(prefix for _,entry in MODULE_ENTRIES for prefix in getattr(entry,'NATIVE_API_PREFIXES',()))
+
+
 def register_api(api,app):
     """Collect small-menu routers through the finance and REA coordinators."""
     for _,entry in MODULE_ENTRIES:

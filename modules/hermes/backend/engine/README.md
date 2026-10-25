@@ -1,68 +1,19 @@
-# Engine
+# 공식 Hermes 실행 엔진
 
-`upstream/` contains copied upstream implementation, not a replacement agent loop. `provenance.json` records origins and bootstrap changes. `worker.py` calls upstream AIAgent, SessionDB, tool registry, MCP and skills in an isolated process. `bridge.py` provides JSON-line IPC to the existing FastAPI process; no additional public gateway is started.
+용도: 선별 복사 없이 공식 코어 전체와 플랫폼 어댑터의 경계를 관리합니다.
 
-settings의 도구 선택지는 원본 registry의 등록된 범주와 toolsets 메타데이터에서 취합하며 클라이언트 전용·세션 제한 도구를 제외합니다. 기존 저장 선택은 일시적으로 플러그인이 빠져도 유지합니다. 프론트에 고정된 기능 목록으로 웹 검색이 누락되던 경계를 제거했습니다.
-runtime_policy.configure_tools의 일반 lazy 설정은 선택한 web·컴퓨터 도구를 직접 노출하고 다른 도구는 지연 로딩합니다. 총괄 lazy는 web_search/web_extract/team_meeting/company_records만 직접 노출합니다. 위임·파일·터미널·project_npm 등은 원본 tool_describe(정확한 이름) 또는 tool_search로 필요할 때 불러옵니다. 실행 권한·도구 등록·스킬·기억은 유지하고 native/eager의 직접 실행 설정은 보존합니다. configure_tools는 원본 설정과 비교해 도구 설정이 달라질 때만 저장합니다.
+- `upstream/`: 공식 전체 Git 서브모듈. 현재 기준은 947e2c90caa18607ff49fc6761534e36d757138c이며 가져온 공식 트리는 21,193개 파일입니다. 실제 기능 수와 파일 수는 구분합니다.
+- `prepare.py`: 버전 관리된 한글·호환 패치를 검사하고 적용합니다. 신규 체크아웃의 타입 검사 전에 실행하며 설치·Vite 빌드·worker 시작도 같은 패치를 사용합니다.
+- `provenance.json`: 공식 출처·기준 커밋·이전 선별 소스 보관 위치입니다.
+- `patches/platform.patch`: 한글 리소스와 플랫폼에 필요한 최소 호환 변경. 공식 기억·플러그인·게이트웨이·스킬·자동 배정 코드를 선별 삭제하지 않습니다.
+- `launch.py`: 플랫폼 표준 Python은 시작만 담당하고 실제 worker는 PM이 관리하는 Python·의존성으로 실행합니다.
+- `worker.py`: 기존 대화·총괄·조직과 공식 AIAgent를 연결합니다. 공식 프로필의 모델·제공자가 실행 기준입니다. 기존 홈·SessionDB를 유지합니다.
+- `official.py`: 공식 hermes_cli.web_server.app의 수명 주기·모든 HTTP 기능·WebSocket을 같은 worker에서 실행합니다. 실제 게이트웨이를 준비해 예약·칸반 배정도 공식 경로를 사용합니다.
+- `bridge.py`: 기존 JSON-line IPC. `native/` → 중메뉴 manager → AI 에이전트 등록 → 전체 메뉴 → /api로 취합합니다.
+- `setup.py`: 공식 pm install과 공식 웹 의존성만 준비합니다. 구형 .venv·requirements 목록·별도 드라이버 설치기를 다시 만들지 않습니다.
 
-platform_instructions는 작업 폴더·결과 링크·실제 근거·필요한 도구 탐색만 간결하게 전달합니다. 호스트 안내는 실제 sys.platform으로 선택하므로 Mac에 Windows/Git Bash/PowerShell 실행 지침을 주입하지 않습니다. 사용자 시스템·조직·직원별 프롬프트와 원본 Hermes 프롬프트 빌더는 그대로 사용합니다.
+공용 실행 도구는 `runtime/shared/engines/hermes-pm/`, 주력 상태·기억·모델 등록·PM 의존 환경은 `runtime/ai_agent/Hermes/`입니다. 모델 원본은 이동·재다운로드하지 않습니다. 원본 메뉴의 별도 홈을 주력 상태로 바꾸지 않습니다.
 
-sync_tool_policy는 도구 노출 정책(OS/mode/search/선택 toolsets)의 지문을 기존 SessionDB 메타데이터에 보관합니다. 정책 변경 때만 원본 update_session_tool_names로 현재 세션·원본 압축 체인의 마지막 세션에 현재 도구 목록을 다시 고정하여, 원본 대화 복원기가 예전 직접 노출 스키마를 되살리지 않게 합니다. 대화·도구 실행 기록은 삭제하지 않으며 같은 정책의 후속 요청은 원본 접두부 캐시를 유지합니다. prompt_footprint 이벤트는 원본/플랫폼 지침·도구 스키마의 문자 수와 직접 도구 이름을 기록하며 실제 토큰 수로 표시하지 않습니다.
+일반·총괄의 현재 native 실행과 외부 앱의 명시적 JSON 계획/읽기 전용 계약은 구분합니다. 조직 프롬프트·승인·회의 기록은 기존 확장 기능이며 공식 기억 관리자를 별도로 재구현하지 않습니다.
 
-Python dependencies belong to `modules/hermes/.venv/`; runtime state belongs to `runtime/ai_agent/Hermes/`. All runtime paths resolve from this project. The original checkout must not appear on PYTHONPATH or be used as a symlink target.
-
-중지 시 원본 agent.interrupt(hard_cancel=True)를 제어 스레드 밖에서 한 번만 호출합니다. 압축 HTTP 스트림 종료가 지연돼도 IPC 상태 조회를 막지 않으며 실제 실행 스레드가 끝나기 전에는 중지 완료로 표시하지 않습니다.
-
-프로젝트 자동 연결은 `mcp/project` 명령을 `../mcp/project_links.py`로 전달합니다. 다른 MCP 설정을 보존하면서 프로젝트 전용 서버만 추가·해제하며, 원본 discovery와 도구 등록 결과를 확인합니다. 로컬 모델 로더는 설치된 llama.cpp의 `--n-gpu-layers auto`를 사용합니다. 기존 999 고정값이 자동 메모리 맞춤을 막아 Vulkan KV 캐시 할당에 실패한 것을 확인했으며, 문맥 크기는 사용자/원본 설정을 유지하고 GPU 계층만 가용 VRAM에 맞춥니다.
-
-브라우저 실행기는 모듈 자체 backend/engine/browser/node_modules의 agent-browser 0.26.0이며 설치된 Chrome/Edge를 재사용합니다. 기본 native 설정에서 browser.backend=off는 browser-use CLI만 끄고 원본 agent-browser 도구를 사용한다는 뜻입니다. 채팅은 원본 interactive approval context를 사용해 프론트 허용/거절에 연결합니다. AX 캡처의 전체 텍스트를 제한 길이로 보존하는 로컬 패치는 provider-provenance.json에 기록합니다.
-
-서버 재시작 전 기존 worker 상태만 확인하며 작업·중지 처리·모델 로딩·MCP 설치 중에는 재시작을 차단합니다. 준비 승인 시 새 요청을 차단한 뒤 상태를 재확인하고 IPC 쓰기와 직렬화해 시작/재시작 경합을 막습니다. 상태 확인 실패도 재시작 허용으로 처리하지 않습니다.
-ChatGPT device-code 로그인이 진행 중인 worker도 재시작에서 보호합니다. 모델 제공자는 [모델 연결](../models/README.md)의 custom/openai-codex 선택을 따릅니다. 인증은 원본 Hermes가 관리하고 worker는 해당 제공자의 원본 전송을 사용합니다. 유지 중인 로컬 실행기의 슬롯/로그 수치를 클라우드 요청의 토큰·속도로 표시하지 않습니다.
-
-실행 안내는 문서 결과를 로컬 Markdown 링크로 보고하도록 설명합니다. 플랫폼 HTML 미리보기는 정적 HTML·인라인 CSS를 지원하고 스크립트·외부 자원은 차단하므로, 단순 문서 열람을 위해 별도 메모장·브라우저를 실행하지 않도록 안내합니다. 이는 모델에 전달하는 지침이며 모든 모델이 이를 따랐다는 실행 검증은 아닙니다.
-
-실행 정책: 프로젝트 지침 자동 주입·출력 한도·reasoning은 원본 AIAgent 기본값을 사용합니다. 일반 작업의 기억·스킬 검토도 원본 조건과 auxiliary.background_review 설정에 맡깁니다. 읽기 전용 작업과 명시된 focused_discussion 요청은 검토 쓰기를 막습니다. 앱의 주제 전용 맥락은 [대화 안내](../chat/README.md)를 따르며 일반 코드 작업은 원본 지침·기억을 유지합니다. execution.py는 모델별 문맥 설정 연결과 검토 종료 대기를 담당하며, 검토 중에는 worker 작업 소유권을 유지해 모델 내리기·서버 재시작이 겹치지 않게 합니다.
-
-2026-10-16: 격리된 가짜 모델 서버를 통해 원본 지침 주입, 강제 출력 제한·reasoning 비활성화 제거, 원본 스킬 검토 종료, 읽기 전용 도구 차단을 확인했습니다. 실제 Ornith의 thinking 출력·문맥 할당·품질 비교는 실행하지 않았습니다. 설치된 llama.cpp 도움말에서도 ctx-size 0이 모델 문맥을 사용하는 값임을 확인했습니다.
-
-2026-10-18: 실제 GPU 적재·Thinking 템플릿·기본 지침/도구 토큰 조사는 [모델 안내](../models/README.md)에 기록했습니다. 실행 설정은 변경하지 않았으며 원본 지연 로딩 목록을 덮어쓰는 defer: []도 조사 대상입니다.
-
-현재 실행 제어: runtime_policy.py가 모델별 문맥/Thinking과 원본 도구 검색 제공 방식을 연결합니다. defer: [] 강제 생성은 제거했습니다. Thinking auto는 원본/모델 기본값을 보존합니다. 설정·실측·남은 제한은 [모델 안내](../models/README.md)의 설정 복구 항목을 봅니다.
-
-앱 하네스의 실행별 시스템 지침·JSON 응답 계약은 [대화 안내](../chat/README.md)를 따릅니다. 사용자 모델 설정은 저장 변경하지 않으며 JSON 제약은 원본 chat_completions 전송의 request_overrides를 사용합니다.
-
-2026-10-19 문맥 격리 보정: skip_context_files/skip_memory만으로는 원본 시스템 프롬프트의 호스트·현재 경로·코딩 맥락·플러그인 구간이 없어지지 않았습니다. focused_discussion은 실행별 프롬프트 빌더를 앱 역할+사용자 지정 지침으로 교체하고 압축 재생성에도 같은 경계를 유지합니다. 일반 native/직원 도구 실행은 변경하지 않습니다. 기존 회의/앱 대화에 저장된 잘못된 추정은 삭제하지 않으며, 과거 기록과 사용자 지정 공유 맥락의 영향은 별개입니다. 회귀는 test_project_harness의 원본 빌더 미호출·캐시 재생성·native 보존 검사로 확인합니다. 수정 후 실제 모델 답변의 주제 혼동 재발 여부는 별도 확인 대상입니다.
-
-앱 실행은 application_request=true와 실행별 시스템 지침을 사용합니다. worker는 사용자 대화를 생성하지 않고 별도 실행 ID/빈 이력을 사용하며 원본 AIAgent의 _persist_disabled를 적용합니다. 앱 DB가 업무/대화 이력을 소유하며 Hermes 모델·API·Thinking은 기존 설정을 공유합니다. 앱 실행은 사용자 Goal/Loop나 기존 세션 ID와 섞을 수 없습니다. 백그라운드 경험 정리는 내부 요청에서 수행하지 않습니다. 일반 Hermes 대화의 저장·재개는 유지합니다.
-
-실행 수치: worker.py는 작업 스레드 시작 직전 chat.telemetry.begin으로 소유 모델 로그의 현재 위치를 잡습니다. telemetry가 이후 decoder timing만 읽어 짧은 응답의 실제 속도를 보완합니다. 원본 agent loop/출력 한도/Thinking 설정은 변경하지 않습니다. 관련 검증은 ../chat/README.md를 따릅니다.
-
-로컬 모델의 기존 llama-server 실행기는 --checkpoint-min-step 기본값을 1,024로 전달합니다. LLAMA_ARG_CHECKPOINT_MIN_SPACING_NT 환경변수가 있으면 그 값을 우선하며 최대 문맥·GPU 적재·Thinking·체크포인트 개수는 바꾸지 않습니다. 중간 문맥 변경 후 공통 접두부가 있어도 전체 입력이 다시 처리되던 기존 설치본에서, 변경 후 후속 대화의 신규 처리 32토큰·입력 처리 0.154초를 관측했습니다. 모델 기동 직후에는 캐시가 없으므로 첫 입력 비용은 남습니다. 옵션은 설치된 실행기 --help와 [공식 체크포인트 안내](https://github.com/ggml-org/llama.cpp/pull/15293)를 기준으로 사용합니다. 실제 응답 수치는 [대화 안내](../chat/README.md)에 모읍니다.
-
-현재 native 실행 중 메시지는 steer_chat→AIAgent.redirect/steer로 전달하며 stop과 구분합니다. 같은 세션·현재 살아 있는 실행만 허용합니다. 원본 lifecycle의 Tool guardrail halted 이벤트를 감지하면 결과를 complete로 표시하지 않고 paused와 한국어 오류로 남깁니다. 원본의 동일 실패 반복 차단 기능은 유지합니다.
-
-반복 생성 중단은 실패 상태를 유지하며 한국어 원인과 미완료 사실을 반환합니다. 원본 영문 오류는 generation_failure 이벤트에 보존하고 성공/회의 완료로 바꾸거나 자동 무한 재시도하지 않습니다.
-
-실시간 team_meeting은 총괄의 직접 노출 도구입니다. 자식은 원본 위임 실행기·같은 모델·기존 SessionDB를 사용하고 일반 대화 목록에서 숨기며 회의의 실제 발언 출처로 연결합니다. meeting_id는 요청별 재검토 지침이며 다른 대화에 전역 주입하지 않습니다. finally에서 미결/실패를 기존 기록에 남깁니다.
-
-개별 프롬프트는 기존 settings GET/POST의 agent_prompts 부분 갱신으로 같은 platform-settings.json에 저장합니다. 등록된 직원 ID·문자열 길이를 검사하고 미지정 직원은 기본 지침을 사용합니다. public_profiles의 서버 메타데이터로 개별 설정 화면을 구성합니다. 총괄·회의 적용은 ../chat/README.md 및 ../../frontend/settings/agent-prompts/README.md에 설명합니다.
-
-시스템 기본 지침은 chat/prompt_profiles.py의 전체 원문을 사용하고 기존 system_prompt는 추가 지침으로 보존합니다. public settings는 default_system_prompt·설정 출처·직원 표시 이름을 반환하며 API 키·모델·권한은 함께 변경하지 않습니다. 직원 위임은 원본 delegate_task의 실제 _dispatch_delegate_task와 동적 schema를 연결해 staff_id에 대응하는 지침을 자식 문맥에 추가합니다. 원본 실행 종류(role)는 직원 직함과 별개인 native worker/orchestrator 계약입니다. ToolEntry는 슬롯 객체이므로 중복 등록 표시는 래퍼 함수에 보관합니다.
-
-조직 대화는 현재 선택한 도구 중 terminal·read_file·delegate_task·company_records를 직접 노출하여 파일/실행 도구 탐색 왕복을 줄입니다. 일반 대화의 도구 노출과 사용자 선택은 유지합니다.
-
-조직 위임의 결과 전달: 플랫폼 worker에는 원본 CLI/gateway의 백그라운드 결과 재주입 소비자가 없으므로, 회사 직원 위임은 원본 delegate_task의 동기 batch를 호출합니다. 원본 자식 병렬 실행·도구·중단·깊이/일시정지 guard는 유지하며 총괄은 실제 반환 결과를 받은 뒤 보고합니다. 일반 대화의 원본 background 위임은 변경하지 않습니다.
-
-진행 이벤트는 긴 인수의 값/목록만 축약하고 유효한 JSON을 유지합니다. 문자열 중간 절단으로 도구 표시를 파싱하지 못하던 경로를 수정했으며 전체 실행 기록은 SessionDB에 보존합니다. 위임의 staff_id는 개별 task 값을 우선하고 공통 식별자는 묶음의 기본값으로 사용합니다. 선행 산출물이 필요한 검증은 결과를 받은 후 별도로 위임합니다.
-
-조직 실행에 기존 project_npm 도구도 직접 노출합니다. 실제 9B가 이를 쉘 명령으로 오인하거나 terminal의 장기 서버 판정에 vite build가 차단돼 확인을 반복한 근거가 있습니다. 기존 전용 도구로 빌드 명령·완료 코드·receipt를 반환하며 모델별 하드코딩은 추가하지 않습니다.
-
-## macOS 런타임
-locations.py는 macOS에서 모듈 .venv/bin/python을 선택합니다. setup.py는 같은 upstream 잠금의 darwin-arm64/x64 드라이버와 SHA-256을 사용하고 tar.gz를 안전하게 해제합니다. worker.py는 기존 공유 위치의 llama-server를 사용합니다. Mac 설치는 Homebrew Metal 실행기를 이 위치에 연결하며 모델·문맥·Thinking 설정은 유지합니다. 로컬 목록은 저장한 실제 GGUF의 폴더를 우선하고 프로젝트 모델 폴더/기존 바탕화면 폴더 순으로 찾습니다. GUI 도구의 macOS 접근성/화면 기록 권한과 실제 조작은 별도 확인 대상입니다.
-
-macOS 자원 설정(2026-10-21): worker.py는 CPU 스레드 2개 고정을 적용하지 않고 llama.cpp의 자동 선택 및 LLAMA_ARG_THREADS/THREADS_BATCH 환경변수를 사용합니다. 별도 호스트 프롬프트 캐시는 물리 RAM의 1/16(최소 256·최대 8,192 MiB)로 제한합니다. 16GB Mac에서는 1,024 MiB이며 LLAMA_ARG_CACHE_RAM 명시값은 우선합니다. 이는 [원본 host-memory prompt cache](https://github.com/ggml-org/llama.cpp/pull/16391)의 별도 RAM 보관 상한으로, 사용자의 모델 문맥·Thinking·Q8 KV·현재 슬롯의 프롬프트 재사용은 바꾸지 않습니다. 서로 다른 긴 대화 사이의 캐시 보존량은 줄 수 있으며 첫 요청의 입력 처리는 생략되지 않습니다. 재시도 루프·모델 품질 문제를 이 설정으로 해결했다고 보지 않습니다.
-
-대화 수치 보존과 새 총괄 대화: worker.session/create는 연결된 company_id가 있으면 회사 도구 연결을 같은 SessionDB의 새 세션으로 이어줍니다. 세션 조회는 저장 metrics를 반환하고 작업 종료 시 같은 DB 메타데이터에 마지막 실행을 기록합니다. 로컬·외부 제공자는 같은 경로를 사용합니다. 상세 집계·미보고 처리는 ../chat/README.md를 봅니다.
-
-Mac native 실행 경로(2026-10-22): worker의 Windows 브라우저 경로 고정을 제거하고 공유 platform_native가 탐지한 실제 Mac Chrome/Edge를 AGENT_BROWSER_EXECUTABLE_PATH로 사용합니다. 해당 도구는 module_sources의 기존 환경 hook으로 연결합니다. desktop_browser는 Mac에서 open -a, Windows에서 분리 프로세스 실행을 사용하며 Windows 플래그를 Mac에 전달하지 않습니다. 원본 terminal/agent loop는 교체하지 않았습니다. 실제 원본 LocalEnvironment에서 /bin/bash·선택 프로젝트 cwd·명령 종료 코드 0을 확인했습니다. GUI 브라우저 창·Finder·선택창을 자동으로 열어 확인하지는 않았습니다. 기존 Metal GPU/자동 CPU 선택/메모리 캐시 상한은 유지했으며 이번 변경에서 모델 호출·신규 9B 추론은 하지 않았습니다.
+확인: 기존 서버의 official/info·official/catalog와 실제 대화·모델 관리 경로를 사용합니다. 가짜 모델·별도 검사 프로젝트를 만들지 않습니다. 공용 코드·빌드·외부 서비스의 실제 실행 여부는 각각 구분합니다. 상세 실제 결과는 상위 backend/README.md에 기록합니다.

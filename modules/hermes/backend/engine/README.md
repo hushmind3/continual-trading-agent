@@ -7,13 +7,16 @@
 - `provenance.json`: 공식 출처·기준 커밋·이전 선별 소스 보관 위치입니다.
 - `patches/platform.patch`: 한글 리소스와 플랫폼에 필요한 최소 호환 변경. 공식 기억·플러그인·게이트웨이·스킬·자동 배정 코드를 선별 삭제하지 않습니다.
 - `launch.py`: 플랫폼 표준 Python은 시작만 담당하고 실제 worker는 PM이 관리하는 Python·의존성으로 실행합니다.
+- 공식 도구 선택은 hermes_cli.tools_config._get_platform_tools(config, cli)로 해석합니다. 작업 환경 저장은 공식 platform_toolsets.cli에 반영하며 기존 자체 축소 목록은 실행 기준에서 제외했습니다.
 - `worker.py`: 기존 대화·총괄·조직과 공식 AIAgent를 연결합니다. 공식 프로필의 모델·제공자가 실행 기준입니다. 기존 홈·SessionDB를 유지합니다.
 - `official.py`: 공식 hermes_cli.web_server.app의 수명 주기·모든 HTTP 기능·WebSocket을 같은 worker에서 실행합니다. 실제 게이트웨이를 준비해 예약·칸반 배정도 공식 경로를 사용합니다.
 - `bridge.py`: 기존 JSON-line IPC. `native/` → 중메뉴 manager → AI 에이전트 등록 → 전체 메뉴 → /api로 취합합니다.
-- `setup.py`: 공식 pm install과 공식 웹 의존성만 준비합니다. 구형 .venv·requirements 목록·별도 드라이버 설치기를 다시 만들지 않습니다.
+- `setup.py`: 공식 pm install과 공식 npm 워크스페이스·TUI 빌드를 준비합니다. 구형 .venv·requirements 목록·별도 드라이버 설치기를 다시 만들지 않습니다.
 
 공용 실행 도구는 `runtime/shared/engines/hermes-pm/`, 주력 상태·기억·모델 등록·PM 의존 환경은 `runtime/ai_agent/Hermes/`입니다. 모델 원본은 이동·재다운로드하지 않습니다. 원본 메뉴의 별도 홈을 주력 상태로 바꾸지 않습니다.
 
 일반·총괄의 현재 native 실행과 외부 앱의 명시적 JSON 계획/읽기 전용 계약은 구분합니다. 조직 프롬프트·승인·회의 기록은 기존 확장 기능이며 공식 기억 관리자를 별도로 재구현하지 않습니다.
+
+공식 CLI 전용 명령은 전체 기능의 명령 실행에서 공식 ChatPage·PTY·CLI를 직접 사용합니다. 기존 기본 프로필의 일반 대화 열기는 플랫폼 대화로 이어지고, 고급 명령 화면도 같은 공식 SessionDB를 사용합니다. 별도 명령 해석기를 복제하지 않습니다.
 
 확인: 기존 서버의 official/info·official/catalog와 실제 대화·모델 관리 경로를 사용합니다. 가짜 모델·별도 검사 프로젝트를 만들지 않습니다. 공용 코드·빌드·외부 서비스의 실제 실행 여부는 각각 구분합니다. 상세 실제 결과는 상위 backend/README.md에 기록합니다.

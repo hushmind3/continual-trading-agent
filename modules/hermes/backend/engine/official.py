@@ -29,6 +29,11 @@ class OfficialApplication:
         import httpx
         from hermes_cli.web_server import app, _SESSION_TOKEN
         self.app, self.token = app, _SESSION_TOKEN
+        # Official child processes must attach to this same platform endpoint,
+        # not bootstrap an unrelated dashboard/gateway on an unbound address.
+        app.state.bound_host = '127.0.0.1'
+        app.state.bound_port = 8766
+        app.state.platform_transport_prefix = '/api/ai_agent/Hermes/native'
         self.lifespan = app.router.lifespan_context(app)
         await self.lifespan.__aenter__()
         self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://127.0.0.1:8766', timeout=None)
@@ -38,7 +43,11 @@ class OfficialApplication:
         state.raise_for_status()
         if not state.json().get('gateway_running'):
             started = await self.client.post('/api/gateway/start',headers=self._headers(),json={})
-            started.raise_for_status()
+            if started.is_error:
+                # Keep the real status/configuration pages available to repair
+                # a failed gateway rather than poisoning all future requests.
+                import logging
+                logging.getLogger(__name__).error('공식 게이트웨이 시작 실패: HTTP %s', started.status_code)
 
     def _submit(self, coroutine, timeout=120):
         with self.lock:

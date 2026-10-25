@@ -71,6 +71,31 @@ index d2ef1b50d7..f8dbc48b86 100644
          self._request("/models?reload=1", timeout_s=10)
  
      def unload_model(self, model_id: str) -> None:
+diff --git a/hermes_cli/web_server_chat.py b/hermes_cli/web_server_chat.py
+index d09b17ea4d..daf74310ef 100644
+--- a/hermes_cli/web_server_chat.py
++++ b/hermes_cli/web_server_chat.py
+@@ -604,13 +604,18 @@ def _server_internal_ws_url(path: str, **extra_qs) -> Optional[str]:
+     if not host or not port:
+         return None
+     netloc = f"[{host}]:{port}" if ":" in host and not host.startswith("[") else f"{host}:{port}"
+-    if getattr(app.state, "auth_required", False):
++    prefix = getattr(app.state, "platform_transport_prefix", "").rstrip("/")
++    if prefix:
++        # The owning authenticated platform injects the private credential.
++        # Never serialize that credential into a child URL or access log.
++        auth = {}
++    elif getattr(app.state, "auth_required", False):
+         from hermes_cli.dashboard_auth.ws_tickets import internal_ws_credential
+ 
+         auth = {"internal": internal_ws_credential()}
+     else:
+         auth = {"token": _SESSION_TOKEN}
+-    return f"ws://{netloc}{path}?{urllib.parse.urlencode({**auth, **extra_qs})}"
++    return f"ws://{netloc}{prefix}{path}?{urllib.parse.urlencode({**auth, **extra_qs})}"
+ 
+ 
+ def _build_gateway_ws_url() -> Optional[str]:
 diff --git a/plugins/kanban/dashboard/README.md b/plugins/kanban/dashboard/README.md
 new file mode 100644
 index 0000000000..aea9b6f4fa
@@ -4351,7 +4376,7 @@ index 3cb96bf9b9..2da05dea12 100644
      rawYaml: "生の YAML 設定",
      searchResults: "検索結果",
 diff --git a/web/src/i18n/ko.ts b/web/src/i18n/ko.ts
-index 5d2e99113e..e6632d3342 100644
+index 5d2e99113e..244b7bd1ff 100644
 --- a/web/src/i18n/ko.ts
 +++ b/web/src/i18n/ko.ts
 @@ -2,6 +2,11 @@ import type { Translations } from "./types";
@@ -4855,7 +4880,7 @@ index 5d2e99113e..e6632d3342 100644
 +      triage: "정리되지 않은 아이디어입니다. 자동 작업 나누기가 켜져 있으면 디스패처가 실행 가능한 작업 카드로 나눕니다. 꺼져 있으면 카드에서 ‘나누기’를 눌러야 합니다.",
 +      todo: "선행 작업이 끝나길 기다리거나 담당자가 정해지지 않아 대기 중입니다.",
 +      scheduled: "정해진 대기 시간이 지나거나 예약된 후속 작업이 시작되기를 기다립니다.",
-+      ready: "Dependencies satisfied; assign a profile to dispatch (선행 작업이 끝난 상태입니다. 담당 프로필이 지정되면 디스패처(작업 배정기)가 가져갈 수 있습니다.)",
++      ready: "선행 작업이 끝났습니다. 담당 프로필을 지정하면 자동 작업 배정기가 실행합니다.",
 +      running: "담당 에이전트가 맡아 실제로 작업하고 있습니다.",
 +      blocked: "담당 에이전트가 멈추고 사용자의 답변이나 조치를 기다리고 있습니다.",
 +      review: "구현은 끝났으며 검토를 기다리는 중입니다.",
@@ -8469,6 +8494,19 @@ index 5b532b5000..8e016da389 100644
 +    message: `${provider}의 API 키가 없어 메시지를 보낼 수 없습니다. 키 화면에서 키를 추가하거나 다른 모델 제공자를 선택하세요.`
    }
  }
+diff --git a/web/src/lib/gatewayClient.ts b/web/src/lib/gatewayClient.ts
+index 29fd891a27..9e56ec3200 100644
+--- a/web/src/lib/gatewayClient.ts
++++ b/web/src/lib/gatewayClient.ts
+@@ -46,7 +46,7 @@ export class GatewayClient extends JsonRpcGatewayClient {
+     // must fetch a single-use ticket. Explicit ``token`` keeps the test-only
+     // override path.
+     const authParam = token ? (["token", token] as const) : await buildWsAuthParam();
+-    if (!authParam[1]) {
++    if (!authParam[1] && !(window as Window & { HermesPlatform?: unknown }).HermesPlatform) {
+       throw new Error(
+         "Session token not available — page must be served by the Hermes dashboard server",
+       );
 diff --git a/web/src/lib/model-picker-current.ts b/web/src/lib/model-picker-current.ts
 index 6e156f3e60..8e42b6c243 100644
 --- a/web/src/lib/model-picker-current.ts
@@ -9563,7 +9601,7 @@ index 02a23fd367..fef14fc7c0 100644
              <div className="flex flex-wrap justify-center gap-2">
                <a
 diff --git a/web/src/pages/ChatPage.tsx b/web/src/pages/ChatPage.tsx
-index 9baf930498..90d7033e2a 100644
+index 9baf930498..25fe4a89de 100644
 --- a/web/src/pages/ChatPage.tsx
 +++ b/web/src/pages/ChatPage.tsx
 @@ -58,7 +58,6 @@ import {
@@ -9582,7 +9620,32 @@ index 9baf930498..90d7033e2a 100644
    PTY_RECONNECTING_BANNER,
    PTY_SESSION_ENDED_MESSAGE,
    PTY_SESSION_ENDED_TERMINAL_LINE,
-@@ -1901,7 +1899,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+@@ -167,7 +165,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+   const tokenMissing =
+     typeof window !== "undefined" &&
+     !window.__HERMES_SESSION_TOKEN__ &&
+-    !window.__HERMES_AUTH_REQUIRED__;
++    !window.__HERMES_AUTH_REQUIRED__ &&
++    !(window as Window & { HermesPlatform?: unknown }).HermesPlatform;
+   const [banner, setBanner] = useState<string | null>(() =>
+     tokenMissing ? PTY_TOKEN_MISSING_BANNER.text : null,
+   );
+@@ -506,11 +505,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+     const termWrap = termWrapRef.current;
+ 
+     const token = window.__HERMES_SESSION_TOKEN__;
+-    const gated = !!window.__HERMES_AUTH_REQUIRED__;
++    const gated = !!window.__HERMES_AUTH_REQUIRED__ &&
++    !(window as Window & { HermesPlatform?: unknown }).HermesPlatform;
+     // Banner already initialised above; just bail before wiring xterm/WS.
+     // In gated mode the token is absent by design — api.buildWsUrl() mints
+     // a WS ticket instead, so don't bail; let the effect reach that path.
+-    if (!token && !gated) {
++    if (!token && !gated && !(window as Window & { HermesPlatform?: unknown }).HermesPlatform) {
+       return;
+     }
+ 
+@@ -1901,7 +1901,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
            <div
              ref={hostRef}
              role="region"
@@ -9591,7 +9654,7 @@ index 9baf930498..90d7033e2a 100644
              className="hermes-chat-xterm-host min-h-0 min-w-0 flex-1"
            />
  
-@@ -1910,10 +1908,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+@@ -1910,10 +1910,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                <div className="flex max-w-[min(28rem,calc(100vw-3rem))] flex-col items-start gap-2 border border-warning/60 bg-black/80 px-3 py-2 text-xs text-warning shadow-lg">
                  <div className="tracking-wide">
                    {ptyState === "reconnecting"
@@ -9605,7 +9668,7 @@ index 9baf930498..90d7033e2a 100644
                  </div>
                  <div className="flex flex-wrap gap-2">
                    <Button
-@@ -1921,18 +1919,18 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+@@ -1921,18 +1921,18 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                      outlined
                      onClick={reconnectPty}
                      prefix={<RotateCcw className="h-4 w-4" />}
@@ -9628,7 +9691,7 @@ index 9baf930498..90d7033e2a 100644
                      </Button>
                    )}
                  </div>
-@@ -1945,10 +1943,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+@@ -1945,10 +1945,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
                role="status"
                aria-live="polite"
@@ -9641,7 +9704,7 @@ index 9baf930498..90d7033e2a 100644
                </div>
              </div>
            )}
-@@ -1995,7 +1993,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+@@ -1995,7 +1995,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                ghost
                onClick={toggleChatPanel}
                title="Show side panel (model + sessions)"
@@ -9650,7 +9713,7 @@ index 9baf930498..90d7033e2a 100644
                className={cn(
                  "absolute z-10",
                  "normal-case tracking-normal font-normal",
-@@ -2029,7 +2027,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+@@ -2029,7 +2029,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                  ghost
                  size="icon"
                  onClick={toggleChatPanel}
@@ -11358,6 +11421,155 @@ index 30fb6c2c47..92e62758e8 100644
                  </p>
                )}
              </CardContent>
+diff --git a/web/src/pages/PairingPage.tsx b/web/src/pages/PairingPage.tsx
+index 1bbbc8e8ee..4134898aab 100644
+--- a/web/src/pages/PairingPage.tsx
++++ b/web/src/pages/PairingPage.tsx
+@@ -44,7 +44,7 @@ export default function PairingPage() {
+         setPending(res.pending);
+         setApproved(res.approved);
+       })
+-      .catch(() => showToast("Failed to load pairing requests", "error"))
++      .catch(() => showToast("연결 승인 요청을 불러오지 못했습니다", "error"))
+       .finally(() => setLoading(false));
+   }, [showToast]);
+ 
+@@ -54,17 +54,17 @@ export default function PairingPage() {
+ 
+   const handleApprove = async (user: PairingUser) => {
+     if (!user.request_id) {
+-      showToast("Missing pairing request", "error");
++      showToast("연결 승인 요청을 찾을 수 없습니다", "error");
+       return;
+     }
+     const key = getUserKey(user);
+     setApproving(key);
+     try {
+       await api.approvePairing(user.platform, user.request_id);
+-      showToast(`Approved: "${getUserLabel(user)}"`, "success");
++      showToast(`승인했습니다: "${getUserLabel(user)}"`, "success");
+       loadPairing();
+     } catch (e) {
+-      showToast(`Could not approve the pairing request: ${errorMessage(e)}`, "error");
++      showToast(`연결을 승인하지 못했습니다: ${errorMessage(e)}`, "error");
+     } finally {
+       setApproving(null);
+     }
+@@ -75,10 +75,10 @@ export default function PairingPage() {
+     setClearing(true);
+     try {
+       const res = await api.clearPendingPairing();
+-      showToast(`Cleared ${res.cleared} pending request(s)`, "success");
++      showToast(`대기 요청 ${res.cleared}개를 지웠습니다`, "success");
+       loadPairing();
+     } catch (e) {
+-      showToast(`Could not clear pending requests: ${errorMessage(e)}`, "error");
++      showToast(`대기 요청을 지우지 못했습니다: ${errorMessage(e)}`, "error");
+     } finally {
+       setClearing(false);
+     }
+@@ -92,12 +92,12 @@ export default function PairingPage() {
+         try {
+           await api.revokePairing(platform, user_id);
+           showToast(
+-            `Revoked: "${user ? getUserLabel(user) : user_id}"`,
++            `연결을 해제했습니다: "${user ? getUserLabel(user) : user_id}"`,
+             "success",
+           );
+           loadPairing();
+         } catch (e) {
+-          showToast(`Could not revoke access: ${errorMessage(e)}`, "error");
++          showToast(`접근 권한을 해제하지 못했습니다: ${errorMessage(e)}`, "error");
+           throw e;
+         }
+       },
+@@ -115,7 +115,7 @@ export default function PairingPage() {
+         disabled={clearing}
+         prefix={clearing ? <Spinner /> : <Trash2 className="h-4 w-4" />}
+       >
+-        Clear pending
++        대기 요청 지우기
+       </Button>,
+     );
+     return () => {
+@@ -144,13 +144,13 @@ export default function PairingPage() {
+         open={userRevoke.isOpen}
+         onCancel={userRevoke.cancel}
+         onConfirm={userRevoke.confirm}
+-        title="Revoke access"
++        title="접근 권한 해제"
+         description={
+           pendingRevokeUser
+             ? `"${getUserLabel(pendingRevokeUser)}" will lose access. This cannot be undone.`
+-            : "This user will lose access. This cannot be undone."
++            : "이 사용자의 접근 권한을 해제합니다. 되돌릴 수 없습니다."
+         }
+-        confirmLabel="Revoke"
++        confirmLabel="권한 해제"
+         loading={userRevoke.isDeleting}
+       />
+ 
+@@ -161,13 +161,13 @@ export default function PairingPage() {
+           className="flex items-center gap-2 text-muted-foreground"
+         >
+           <Users className="h-4 w-4" />
+-          Pending requests ({pending.length})
++          승인 대기 ({pending.length})
+         </H2>
+ 
+         {pending.length === 0 && (
+           <Card>
+             <CardContent className="py-8 text-center text-sm text-muted-foreground">
+-              No pending pairing requests
++              대기 중인 연결 요청이 없습니다
+             </CardContent>
+           </Card>
+         )}
+@@ -187,7 +187,7 @@ export default function PairingPage() {
+                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                     <span className="truncate">{user.user_id}</span>
+                     {typeof user.age_minutes === "number" && (
+-                      <span>{user.age_minutes}m ago</span>
++                      <span>{user.age_minutes}분 전</span>
+                     )}
+                   </div>
+                 </div>
+@@ -206,7 +206,7 @@ export default function PairingPage() {
+                       )
+                     }
+                   >
+-                    Approve
++                    승인
+                   </Button>
+                 </div>
+               </CardContent>
+@@ -222,13 +222,13 @@ export default function PairingPage() {
+           className="flex items-center gap-2 text-muted-foreground"
+         >
+           <ShieldCheck className="h-4 w-4" />
+-          Approved users ({approved.length})
++          승인된 사용자 ({approved.length})
+         </H2>
+ 
+         {approved.length === 0 && (
+           <Card>
+             <CardContent className="py-8 text-center text-sm text-muted-foreground">
+-              No approved users
++              승인된 사용자가 없습니다
+             </CardContent>
+           </Card>
+         )}
+@@ -256,8 +256,8 @@ export default function PairingPage() {
+                   <Button
+                     ghost
+                     size="icon"
+-                    title="Revoke"
+-                    aria-label="Revoke"
++                    title="권한 해제"
++                    aria-label="권한 해제"
+                     className="text-destructive"
+                     onClick={() => userRevoke.requestDelete(key)}
+                   >
 diff --git a/web/src/pages/PluginsPage.tsx b/web/src/pages/PluginsPage.tsx
 index e240dd72db..f335a87f79 100644
 --- a/web/src/pages/PluginsPage.tsx
@@ -14223,3 +14435,11 @@ index 6d1bf4cf48..ad886c6db1 100644
                    onClick={() => webhookDelete.requestDelete(sub.name)}
                  >
                    <Trash2 />
+diff --git a/web/src/platform-router.ts b/web/src/platform-router.ts
+new file mode 100644
+index 0000000000..311af9f6ac
+--- /dev/null
++++ b/web/src/platform-router.ts
+@@ -0,0 +1,2 @@
++// Keep platform adapters on the same resolved router instance as official pages.
++export {MemoryRouter,Routes,Route,useLocation,useNavigate} from "react-router";

@@ -31,9 +31,6 @@
       "@hermes/shared/*": [
         "../modules/hermes/backend/engine/upstream/apps/shared/src/*"
       ],
-      "react-router": [
-        "../modules/hermes/backend/engine/upstream/web/node_modules/react-router/dist/production/index.d.ts"
-      ],
       "@hermes/shared/ansi": [
         "../modules/hermes/backend/engine/upstream/apps/shared/./src/ansi.ts"
       ],

@@ -24,7 +24,10 @@ def main():
     os.environ.update(managed)
     sys.path.insert(0,str(root/'backend'))
     from platform_native import npm_command
-    subprocess.run([*npm_command(), '--prefix',str(engine/'upstream/web'),'install','--package-lock=false','--no-audit','--no-fund'],cwd=root,env=env,check=True)
+    # Install the official workspace once: web and TUI share its locked
+    # dependencies. Do not prepare a second, location-dependent web tree.
+    subprocess.run([*npm_command(),'ci','--include=dev','--no-audit','--no-fund'],cwd=engine/'upstream',env=env,check=True)
+    subprocess.run([*npm_command(),'run','build','--workspace','ui-tui'],cwd=engine/'upstream',env=env,check=True)
 
 
 if __name__=='__main__':main()

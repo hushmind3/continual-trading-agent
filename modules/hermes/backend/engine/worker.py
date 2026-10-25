@@ -51,7 +51,7 @@ from ai_agent.Hermes.engine.runtime_policy import model_options, save_options, c
 SETTINGS = HOME / 'platform-settings.json'
 DEFAULTS = {'provider': 'custom', 'base_url': 'http://127.0.0.1:8080/v1', 'model': '', 'api_key': '',
             'workspace': str(ROOT), 'max_iterations': 100,
-            'toolsets': ['terminal', 'file', 'todo', 'skills'], 'local_model': '', 'system_prompt': '', 'read_only': False,
+            'toolsets': [], 'local_model': '', 'system_prompt': '', 'read_only': False,
             'model_options': {}, 'tool_loading': 'native', 'agent_prompts': {}}
 
 
@@ -68,6 +68,8 @@ def load_settings():
     # additions, never a competing provider/model selection.
     from hermes_cli.config import load_config
     native = load_config()
+    from hermes_cli.tools_config import _get_platform_tools
+    cfg['toolsets'] = sorted(_get_platform_tools(native, 'cli'))
     model = native.get('model') or {}
     if isinstance(model, str):
         cfg['model'] = model
@@ -167,6 +169,7 @@ class HermesWorker:
 
     def public_settings(self):
         cfg = load_settings()
+        from hermes_cli.browser_runtime import chromium_executable
         from toolsets import get_all_toolsets, CLIENT_SURFACE_TOOLSETS, session_disabled_toolsets
         from tools.registry import registry
         hidden = set(session_disabled_toolsets([], 'platform') or []) | set(CLIENT_SURFACE_TOOLSETS) | {'platform_company'}
@@ -181,12 +184,19 @@ class HermesWorker:
         return {**cfg, **model_options(cfg,self.native_config()), 'agent_prompts': effective_prompts(cfg), 'agent_prompt_profiles': public_profiles(cfg), 'system_prompt': system_prompt(cfg), 'default_system_prompt': SYSTEM_PROMPT, 'system_prompt_source': 'custom' if cfg.get('system_prompt') and cfg['system_prompt'] != SYSTEM_PROMPT else 'default', 'api_key': '', 'has_api_key': bool(cfg.get('api_key')),
                 'python': sys.version.split()[0], 'engine': str(UPSTREAM),
                 'available_toolsets': [choice['id'] for choice in choices], 'toolset_options': choices,
-                'computer_driver_installed': _driver.is_file(),
-                'browser_runtime_installed': bool(shutil.which('agent-browser') and os.environ.get('AGENT_BROWSER_EXECUTABLE_PATH'))}
+                'computer_driver_installed': bool(shutil.which('cua-driver')),
+                'browser_runtime_installed': bool(chromium_executable())}
 
     def save_settings(self, request):
         self.idle_required()
         cfg = load_settings()
+        if 'toolsets' in request:
+            selected=request['toolsets']
+            if not isinstance(selected,list) or any(not isinstance(value,str) for value in selected):
+                raise ValueError('사용할 기능은 도구 식별자 목록이어야 합니다.')
+            native=self.native_config()
+            native.setdefault('platform_toolsets',{})['cli']=sorted(set(selected))
+            self.write_config(native)
         for key in DEFAULTS:
             if key in ('model_options', 'agent_prompts'):continue
             if key in request and not (key == 'api_key' and request[key] == ''):

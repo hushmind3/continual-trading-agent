@@ -1,7 +1,7 @@
 @source "../../modules";
 @import "tailwindcss";
-@import "../../modules/hermes/backend/engine/upstream/web/node_modules/@nous-research/ui/dist/ui/globals.css";
-@source "../../modules/hermes/backend/engine/upstream/web/node_modules/@nous-research/ui/dist";
+@import "hermes-official-design.css";
+@source "hermes-official-design-source";
 @font-face {
   font-family: "Pretendard Variable";
   src: url("./assets/fonts/PretendardVariable.woff2") format("woff2");
@@ -76,8 +76,25 @@
   @apply min-w-0 bg-white font-sans text-ink;
 }
 .hermes-official .font-mondwest,.hermes-official .font-expanded { font-family: var(--font-sans); }
+.hermes-official .text-display { @apply text-sm leading-snug; letter-spacing: normal; }
+.hermes-official .text-display.text-xs { @apply text-xs; }
+.hermes-official .text-display.text-sm { @apply text-sm; }
+.hermes-official h1 { @apply text-xl font-semibold leading-tight; }
+.hermes-official h2 { @apply text-lg font-semibold leading-snug; }
+.hermes-official h3 { @apply text-base font-semibold leading-snug; }
+.hermes-official :is(button,input,select,textarea,[role=combobox]) { @apply rounded-lg; }
+.hermes-official :is(.border-border,[class~="border-border/50"]) { @apply rounded-xl border-slate-200; }
 .ha-official-controls { @apply mb-5 flex min-w-0 flex-col gap-3; }
-.ha-official-tabs { @apply flex flex-wrap gap-2; }
+.ha-official-toolbar { @apply flex items-center justify-between gap-3; }
+.ha-official-history { @apply flex shrink-0 gap-1; }
+.ha-official-history .ui-button { @apply p-2; }
+.ha-official-history svg { @apply size-4; }
+.ha-official-toolbar > div:last-child { @apply min-w-0 max-w-72; }
+.ha-official-empty { @apply flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6; }
+.ha-official-command-host { @apply flex min-h-100 flex-col overflow-hidden; height: calc(100dvh - calc(var(--spacing) * 80)); }
+.ha-official-command-host > div { @apply min-h-0 flex-1; }
+.ha-official-tabs { @apply flex flex-nowrap gap-5 overflow-x-auto overscroll-x-contain; scrollbar-width: thin; }
+.ha-official-tabs .ui-button { @apply shrink-0 whitespace-nowrap; }
 @layer base {
   body {
     @apply m-0 bg-canvas font-sans text-slate-900 antialiased;

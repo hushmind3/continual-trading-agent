@@ -2,9 +2,14 @@ import {readFileSync} from 'node:fs';
 import {existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {createRequire} from 'node:module';
+import {dirname} from 'node:path';
 import type {Plugin} from 'vite';
 
 const here=(path:string)=>fileURLToPath(new URL(path,import.meta.url));
+const nativeRequire=createRequire(here('../backend/engine/upstream/web/package.json'));
+const nativeUiCss=nativeRequire.resolve('@nous-research/ui/styles/globals.css').replaceAll('\\','/');
+const nativeUiDist=dirname(dirname(nativeUiCss)).replaceAll('\\','/');
 const sharedPackage=here('../backend/engine/upstream/apps/shared/package.json');
 const sharedExports=JSON.parse(readFileSync(sharedPackage,'utf8')).exports as Record<string,string>;
 const sharedAliases=Object.fromEntries(Object.entries(sharedExports).sort(([a],[b])=>b.length-a.length).map(([key,value])=>['@hermes/shared'+key.slice(1),here('../backend/engine/upstream/apps/shared/'+value)]));
@@ -12,7 +17,6 @@ export const officialAliases={
  '@hermes-official':here('../backend/engine/upstream/web/src'),
  ...sharedAliases,
  '@':here('../backend/engine/upstream/web/src'),
- 'react-router':here('../backend/engine/upstream/web/node_modules/react-router'),
 };
 
 /** Adapt UI transport/import boundaries without forking the official feature code. */
@@ -32,6 +36,7 @@ export function hermesOfficialUI():Plugin{
   resolveId(source){if(source==='hermes-platform-transport')return here('./settings/official/transport.ts')},
   transform(code,id){
    const path=id.replaceAll('\\','/').split('?')[0];
+   if(path.endsWith('/frontend/src/tailwind.css'))return {code:code.replace('hermes-official-design.css',nativeUiCss).replace('hermes-official-design-source',nativeUiDist),map:null};
    if(!path.startsWith(native)||!/[cm]?[jt]sx?$/.test(path))return;
    const imports:string[]=[];
    if(path.endsWith('/plugins/usePlugins.ts')){

@@ -133,3 +133,5 @@ company.create_conversation은 기존 조직의 도구 연결을 새 native UUID
 Mac 실행 도구: project_commands.project_npm은 platform_native.npm_command로 Homebrew npm의 실제 JS 진입점을 Node로 실행합니다. npm.cmd나 node 옆의 Windows 패키지 배치를 Mac에 가정하지 않습니다. desktop_browser도 같은 native 브라우저 탐색을 사용합니다. 설치된 npm 11.19.0의 실제 버전 명령·원본 Hermes 셸 실행을 확인했으며 제품 빌드·회의·위임은 이번 경로 수정에서 실행하지 않았습니다. 상세 결과는 ../engine/README.md를 따릅니다.
 
 새 총괄 세션의 업무 도구 인증은 projects/backend/conversation.py가 동일 회사 연결을 기존 SessionDB로 확인합니다. company-links의 회사 토큰만 복사하고 고정 대표 세션 ID만 허용하던 서버 경계를 수정했으며, 새 대화의 기록 조회·위임·업무 소유를 기존 세션과 같은 회사 안에서 사용합니다. 일반/다른 조직 대화의 도구 권한을 넓히지 않습니다.
+
+회의 회차: meetings.round_speeches는 현재 대표 요청의 round_start 이후 발언만 판정합니다. 동일 직원의 중복 호출은 자식 에이전트를 만들기 전에 거절합니다. 실패한 호출도 자동으로 재반복하지 않으며 다른 직원 검토 뒤 총괄이 결론을 냅니다. 기존 회의 ID·과거 발언·직원 UUID는 보존하며 새 대표 요청의 재검토만 새 회차로 시작합니다. 현재 회차의 실제 완료 리뷰어 둘 이상이라는 원본 종료 조건은 유지합니다.

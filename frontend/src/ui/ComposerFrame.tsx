@@ -16,7 +16,7 @@ interface Props {
 export function ComposerFrame({children, toolbar, attachments, options, dragging, ...events}: Props) {
   return <form {...events} className={'hermes-composer' + (dragging ? ' is-dragging' : '')}>
     {attachments}
-    <div className="ui-composer-editor">{children}</div>
+    <div className="ui-composer-editor relative">{children}</div>
     <div className="ui-composer-toolbar">{toolbar}</div>
     {options}
     {dragging && <div className="ui-composer-drop-hint">여기에 파일을 놓아 첨부하세요</div>}

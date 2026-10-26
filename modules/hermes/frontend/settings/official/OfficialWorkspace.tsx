@@ -1,3 +1,4 @@
+import {officialPageLabels as labels} from '../../agent_navigation';
 import {Suspense,useEffect,useRef,useState} from 'react';
 import {MemoryRouter,Routes,Route,useLocation,useNavigate} from '@hermes-official/platform-router';
 import {Button} from '@platform/ui/Primitives';
@@ -13,7 +14,7 @@ import {PageHeaderProvider} from '@hermes-official/contexts/PageHeaderProvider';
 import {PluginPage,usePlugins,exposePluginSDK} from '@hermes-official/plugins';
 import {NativeCommands,ResumeSession} from './ResumeSession';
 
-const labels:Record<string,string>={'/sessions':'대화 기록','/files':'파일','/analytics':'사용량 분석','/models':'모델','/logs':'실행 로그','/cron':'예약 작업','/skills':'스킬','/plugins':'플러그인','/mcp':'도구 연결','/pairing':'연결 승인','/channels':'메신저 연결','/webhooks':'외부 알림 연결','/system':'시스템 관리','/profiles':'프로필','/profiles/new':'프로필 만들기','/config':'전체 설정','/env':'인증 정보','/docs':'사용 안내'};
+
 exposePluginSDK();
 const locationKey='hermes:official:location';
 function initialLocation(page?:string){if(page)return page;try{const saved=sessionStorage.getItem(locationKey);return saved?.startsWith('/')&&!saved.startsWith('//')?saved:'/config'}catch{return '/config'}}
@@ -27,6 +28,7 @@ function Pages({page}:{page?:string}){
  const [commandVisited,setCommandVisited]=useState(commandActive);
  useEffect(()=>{if(commandActive)setCommandVisited(true)},[commandActive]);
  const requestedPage=useRef(page);
+ useEffect(()=>{const open=(event:Event)=>navigate((event as CustomEvent<string>).detail);window.addEventListener('hermes:official-navigate',open);return()=>window.removeEventListener('hermes:official-navigate',open)},[navigate]);
  useEffect(()=>{setLocale('ko')},[setLocale]);
  useEffect(()=>{if(!page){try{sessionStorage.setItem(locationKey,location.pathname+location.search)}catch{/* Storage is optional. */}}},[page,location.pathname,location.search]);
  useEffect(()=>{if(requestedPage.current!==page){requestedPage.current=page;if(page)navigate(page)}},[page,navigate]);

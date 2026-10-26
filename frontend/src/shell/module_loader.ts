@@ -5,7 +5,7 @@ import {installedNavigation,type InstalledManifest} from './installed_navigation
 export interface SharedSettingsProps {page: string; navigate: (page: string) => void}
 interface SettingDefinition {id: string; label: string; description: string; icon?: string}
 interface Manifest extends InstalledManifest {schema:number;enabled?:boolean;order?:number;frontend:{entry:string};shared_settings?:SettingDefinition[]}
-interface Registration {menus:MenuItem[];registeredMenus?:(actions:BackendAction[])=>MenuItem[];settingsPage?:LazyExoticComponent<ComponentType<SharedSettingsProps>>}
+interface Registration {menus:MenuItem[];headerActions?:ComponentType|LazyExoticComponent<ComponentType>;registeredMenus?:(actions:BackendAction[])=>MenuItem[];settingsPage?:LazyExoticComponent<ComponentType<SharedSettingsProps>>}
 const manifests=import.meta.glob<Manifest>(['../../../modules/*/module.json','../../../modules/*/*/module.json'],{eager:true,import:'default'});
 const entries=import.meta.glob<Registration>(['../../../modules/*/frontend/register.ts','../../../modules/*/*/frontend/register.ts'],{eager:true});
 const enabled=Object.entries(manifests).filter(([,manifest])=>manifest.enabled!==false)
@@ -28,3 +28,5 @@ export function registeredNavigation(actions:BackendAction[]){return enabled.fla
 export const navigation=registeredNavigation([]);
 export const sharedSettings=enabled.flatMap(entry=>entry.settings);
 if(new Set(sharedSettings.map(item=>item.id)).size!==sharedSettings.length)throw new Error('공용 설정 ID가 중복됐습니다.');
+
+export const moduleHeaderActions=enabled.flatMap(entry=>entry.headerActions?[entry.headerActions]:[]);

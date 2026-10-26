@@ -31,3 +31,5 @@ AI 에이전트 → 헤르메스는 왼쪽에 진입점 하나를 표시합니�
 모듈 소유/탈착: 화면 구현은 기존 `modules/<id>/frontend/` 또는 중메뉴 소유형 `modules/<대메뉴>/<중메뉴>/frontend/`에 있고 공통 Shell은 등록 정보만 읽습니다. menu_catalog는 금융 작업기가 아니라 호스트가 제공하므로 금융 폴더가 없어도 남은 메뉴가 연결됩니다. 플랫폼의 React/Vite/Tailwind/UI는 공통 렌더링 계약입니다. 실제 금융·REA·Hermes 폴더 탈착과 남은 GitHub 화면 렌더링은 2026-10-18 확인했습니다.
 
 workspace_host=hermes/chat인 명시적 통합 앱은 별도 사이드바 메뉴를 노출하지 않습니다. 예전 앱 주소로 직접 접속하면 Hermes로 이동합니다. 다른 설치 앱의 GitHub 계층은 유지합니다.
+
+모듈의 register.ts는 선택적으로 headerActions를 등록할 수 있습니다. module_loader가 활성 모듈의 버튼만 취합하고 Shell이 공통 상단에 표시하므로 특정 앱 코드를 Shell·헤르메스에 넣지 않습니다. 프로젝트 관리 모듈의 FreeLLMAPI 연결은 어느 화면에서도 같은 설치본 메뉴를 엽니다.

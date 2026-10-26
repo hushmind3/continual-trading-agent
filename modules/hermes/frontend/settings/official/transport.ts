@@ -2,6 +2,13 @@
 export const nativePrefix='/api/ai_agent/Hermes/native';
 export function officialAssetUrl(path:string){return nativePrefix+path}
 
+/** Keep official dialogs in the platform's font/color scope after portaling. */
+export function officialPortalRoot(){
+ let root=document.getElementById('hermes-official-overlays');
+ if(!root){root=document.createElement('div');root.id='hermes-official-overlays';root.className='hermes-official ha-official-overlay-host';document.body.append(root)}
+ return root;
+}
+
 /** Preserve the official HTTP protocol on the registered menu's API surface. */
 export const officialFetch:typeof fetch=async(input,init)=>{
  const original=input instanceof Request?new Request(input,init):new Request(new URL(input.toString(),location.origin),init);

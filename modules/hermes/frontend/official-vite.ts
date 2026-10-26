@@ -39,6 +39,14 @@ export function hermesOfficialUI():Plugin{
    if(path.endsWith('/frontend/src/tailwind.css'))return {code:code.replace('@import "tailwindcss";',`@import "tailwindcss";\n@import "${nativeUiCss}";\n@source "${nativeUiDist}";`),map:null};
    if(!path.startsWith(native)||!/[cm]?[jt]sx?$/.test(path))return;
    const imports:string[]=[];
+   if(/createPortal\s*\(/.test(code)&&/,\s*document\.body(?=\s*[,)])/.test(code)){
+    code=code.replace(/,\s*document\.body(?=\s*[,)])/g,', officialPortalRoot()');
+    imports.push('officialPortalRoot');
+   }
+   if(path.endsWith('/components/ModelPickerDialog.tsx')){
+    code=code.replace(/current:(\s*\{\s*" "\s*\})/g,'현재:$1');
+    code=code.replace(/(\{[^{}\n]*(?:total_models|models\.length)[^{}\n]*\})\s*models\b/g,'$1개 모델');
+   }
    if(path.endsWith('/plugins/usePlugins.ts')){
     code=code.replace('return `${HERMES_BASE_PATH}/dashboard-plugins/${scope}${name}/${file}`;', 'return officialAssetUrl(`/dashboard-plugins/${scope}${name}/${file}`);');
     imports.push('officialAssetUrl');

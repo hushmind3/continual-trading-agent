@@ -22,3 +22,11 @@ export function agentLocation() {
 export function navigateAgent(view: 'chat'|'settings', section?: string) {
   location.hash = agentHref(view==='chat'?'chat':section||agentLocation().section);
 }
+
+export function openOfficial(path:string){
+ sessionStorage.setItem('hermes:official:location',path);
+ window.dispatchEvent(new CustomEvent('hermes:official-navigate',{detail:path}));
+ navigateAgent('settings','official');
+}
+
+export const officialPageLabels:Record<string,string>={'/sessions':'대화 기록','/files':'파일','/analytics':'사용량 분석','/models':'모델','/logs':'실행 로그','/cron':'예약 작업','/skills':'스킬','/plugins':'플러그인','/mcp':'도구 연결','/pairing':'연결 승인','/channels':'봇·메신저 연결','/webhooks':'외부 알림 연결','/system':'시스템 관리','/profiles':'프로필','/profiles/new':'프로필 만들기','/config':'전체 설정','/env':'인증 정보','/docs':'사용 안내'};

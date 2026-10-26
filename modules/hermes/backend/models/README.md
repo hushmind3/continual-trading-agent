@@ -15,7 +15,7 @@
 
 `codex.py`는 이식된 원본 Hermes의 `openai-codex` 인증·모델 목록·Responses 전송을 연결합니다. 모델 화면의 ChatGPT 로그인은 원본 device-code 흐름을 사용하고 `runtime/ai_agent/Hermes/auth.json`에 독립 인증을 보관합니다. Codex 앱의 인증 파일이나 회전용 refresh token을 복사하지 않습니다. 코드 입력·계정 승인은 사용자가 브라우저에서 완료합니다. 별도 API 키를 요구하지 않으며 계정의 이용 한도와 모델 접근 권한을 따릅니다.
 
-단일 `/api`의 `ai_agent/Hermes/codex/status`(GET), `codex/login`(POST), `codex/models`(POST)를 사용합니다. settings의 provider는 기존 `custom` 또는 `openai-codex`이며 후자는 원본 `codex_responses`를 선택합니다. 조회/로그인만으로 현재 모델은 바뀌지 않고 ‘이 모델과 추론 수준 사용’에서 적용합니다. 로컬 GGUF를 다시 불러오면 custom 연결로 복귀합니다. 대화·회사 기록·기억·도구·승인·Goal/Loop는 기존 Hermes 경로를 사용하고 판정용 보조 호출도 선택 제공자를 따릅니다. 모델 목록 조회 성공과 실제 첫 추론 성공을 구분합니다.
+단일 `/api`의 `ai_agent/Hermes/codex/status`(GET), `codex/login`(POST), `codex/models`(POST)를 사용합니다. settings의 provider는 원본 등록 제공자 ID를 사용하며 사용자 정의 제공자도 같은 원본 providers에 보관합니다. `openai-codex`는 원본 `codex_responses`를 선택합니다. 조회/로그인만으로 현재 모델은 바뀌지 않고 ‘이 모델과 추론 수준 사용’에서 적용합니다. 로컬 GGUF를 다시 불러오면 custom 연결로 복귀합니다. 대화·회사 기록·기억·도구·승인·Goal/Loop는 기존 Hermes 경로를 사용하고 판정용 보조 호출도 선택 제공자를 따릅니다. 모델 목록 조회 성공과 실제 첫 추론 성공을 구분합니다.
 계정 목록은 원본 `fetch_codex_catalog_entries`의 실제 응답에서 숨김 항목만 제외하고 모델명·서버 기본 추론 수준·지원 수준·순서를 보존합니다. 원본 CLI용 합성 모델/문맥 변형과 로컬 캐시를 계정 모델로 추가하지 않습니다. 기존 `-900k` 저장값은 원본 별칭으로 인식합니다. 목록 조회 실패는 오류로 표시합니다.
 추론 수준은 기존 모델별 model_options.reasoning_effort에 저장하고 AIAgent.reasoning_config 및 Goal 판정의 원본 extra_body.reasoning으로 전달합니다. auto는 서버가 광고한 기본 수준을 사용합니다. 서버 옵션 중 현재 원본 전송이 지원하지 않는 값(Ultra의 Codex 자동 위임 등)은 목록에 미지원으로 표시하고 저장/실행 시 명시적으로 거절합니다. max로 몰래 낮추지 않습니다. 이미 로그인한 상태에서는 로그인 버튼을 다시 눌러도 중복 인증 대기를 만들지 않습니다.
 Goal 판정에 적용한 클라우드 추론 옵션은 원래 값을 기존 native config에 보관하며, 로컬/다른 제공자로 복귀할 때 복구합니다. 사용자가 별도로 지정했던 보조 설정을 삭제하지 않습니다.
@@ -104,3 +104,5 @@ macOS: 같은 공유 실행기 폴더의 `llama-server`와 모듈 `.venv/bin/pyt
 Mac 자원 최적화: Metal과 llama.cpp의 CPU 자동 선택을 사용하며 별도 RAM 프롬프트 캐시를 장비 RAM에 비례해 제한합니다. 16GB Mac의 상한은 1GB이고 사용자 지정 LLAMA_ARG_CACHE_RAM은 보존합니다. 문맥 65,536·Thinking on·Q8 KV는 유지합니다. Windows 전용 PE 실행기·DLL 37개(약 161.6 MiB)는 사용 중이지 않음을 확인해 프로젝트 휴지통의 동일 상대경로로 옮겼으며 Mac Metal 실행기·드라이버·모델·DB는 유지했습니다. 이 이동은 RAM이나 응답 속도 개선 수치가 아닙니다. 실제 재적재 후 실행 인수의 cache-ram=1024, 실행기 로그의 n_threads=4, 문맥 65,536을 확인했습니다. 기존 총괄 세션의 실제 응답은 “연결 확인”으로 완료됐고 첫 요청 입력 11,213·출력 32토큰·1회 요청·전체 22.8초·생성 20.0 tok/s였습니다. 변경 전과 같은 입력의 비교 측정은 하지 않아 속도 향상 배수나 즉답 성능은 주장하지 않습니다.
 
 Mac에서 공유 llama-server 링크가 Homebrew 갱신/이동으로 유효하지 않을 때는 이미 설치된 PATH의 llama-server를 사용합니다. 설치기는 새 다운로드 대신 같은 공유 경로의 링크를 갱신합니다. 기존 M5 Metal·자동 CPU 코어 선택·RAM 캐시 상한·모델 원본·문맥/Thinking 설정은 유지합니다. 이번 native 경로 변경에서 추가 모델 적재/추론은 하지 않았습니다.
+
+2026-10-26 FreeLLMAPI: 기존 설치본의 loopback 통합 API·통합 키를 공식 custom-endpoints에 등록했습니다. 원본 model/options에서 인증된 제공자·실제 모델 314개를 조회했습니다. 키는 원래 로컬 설정에만 저장하고 응답·Git에 노출하지 않습니다. 목록 성공은 모든 모델·업체 가입·추론 성공을 뜻하지 않습니다.

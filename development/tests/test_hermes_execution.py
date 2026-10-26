@@ -21,6 +21,21 @@ policy=importlib.util.module_from_spec(policy_spec);policy_spec.loader.exec_modu
 
 
 class ExecutionPolicyTests(unittest.TestCase):
+    def test_meeting_staff_speaks_once_and_new_round_preserves_old_turns(self):
+        from platform_modules import mount_namespaces
+        mount_namespaces()
+        from ai_agent.Hermes.chat import meetings
+        worker = SimpleNamespace(job={'meeting': {'id': 'saved', 'round_start': 1}})
+        old = {'staff_id': 'first', 'source': 'hermes_delegate', 'status': 'completed'}
+        current = {'staff_id': 'second', 'source': 'hermes_delegate', 'status': 'completed'}
+        item = {'meeting_id': 'saved', 'minutes': [old, current]}
+        self.assertEqual(meetings.round_speeches(worker, item), [current])
+        with self.assertRaisesRegex(ValueError, '이미 발언'):
+            meetings.speak(worker, item, {'staff_id': 'second'})
+        worker.job['meeting']['round_start'] = 2
+        self.assertEqual(meetings.round_speeches(worker, item), [])
+        self.assertEqual(item['minutes'], [old, current])
+
     def test_model_profiles_do_not_leak_between_models(self):
         cfg={'model':'ornith','tool_loading':'lazy','model_options':{}}
         policy.save_options(cfg,{'context_length':65536,'thinking_mode':'off','max_output_tokens':0,'reasoning_effort':'auto'})

@@ -85,7 +85,7 @@ def prepare(worker, cfg, session, workspace=None):
     roster = ', '.join(name+' (내부 ID: '+key+')' for key, name in names.items() if key != 'common')
     return ('\n'+staff_prompt(cfg, manager_id(cfg))+'\n[현재 조직과 도구 연결]\n'+roster+'\n'
             '직원 ID는 도구 인수에만 쓰고 보고에는 이름을 쓰세요. 호칭·일상 질문에는 바로 답하고 요청하지 않은 실행·회의·과거 업무를 시작하지 마세요. '
-            '회의 요청은 team_meeting으로 현재 안건을 등록해 직원 토론과 결론·초안을 제출하세요. 기존 meeting_id가 있으면 재개하고 대표에게 진행·참석을 요구하지 마세요. '
+            '회의 요청은 team_meeting으로 현재 안건을 등록해 직원 토론과 결론·초안을 제출하세요. 필요한 직원이 한 번씩만 발언하고 총괄이 바로 결론을 보고하세요. 반복 반론이나 새 회의를 자동으로 이어가지 마세요. 기존 meeting_id가 있으면 재개하고 대표에게 진행·참석을 요구하지 마세요. '
             '독립 업무는 delegate_task의 staff_id로 위임하세요. 직원 지침은 자동 주입되므로 context에는 이번 작업·폴더·관련 파일·완료 조건만 쓰세요. '
             '필요한 과거 근거만 company_records recall/session_search로 조회하고 검증한 교훈은 remember·기억·스킬에 남기세요. '
             '업무 기록은 begin이 반환한 job_id·workspace로 finish/fail에 실제 결과를 남기세요. '

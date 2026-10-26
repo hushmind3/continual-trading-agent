@@ -29,3 +29,7 @@ CliApp.tsx·GeneratedFieldInput.tsx: 원본 메타데이터를 받아 선택/숫
 명시적 원본 화면 연결은 [백엔드 안내](../backend/README.md)의 workspace/connect를 사용합니다. 앱 소유의 고정 HTML을 Hermes 대화 상단 탭에 표시하며 일반 ProjectApp의 원본 UI 선택을 저장소명으로 변경하지 않습니다.
 
 Hermes 상위 탭에 명시적으로 연결한 설치 앱은 별도 GitHub 실행 메뉴를 만들지 않습니다. 설치 목록의 열기는 Hermes로 이동하며 프로그램·사업 기록·결과 파일은 앱 소유 폴더에 유지합니다.
+
+InstalledProjects.tsx의 InstalledServiceActions는 register.ts의 headerActions로 플랫폼 상단에 무료 모델·계정 버튼을 제공합니다. 기존 projects/installed의 원본 저장소와 실제 menu를 사용하며 설치 ID·업체 모델 목록·자격 증명을 프론트에 복제하지 않습니다. 원래 제공업체 계정·키·라우팅 화면을 직접 열며 공용 계정·브라우저 설정을 대체하지 않습니다.
+
+2026-10-26 실제 금융 화면에서도 상단 버튼이 표시되고 기존 FreeLLMAPI 앱으로 이동한 뒤 유지됨을 확인했습니다. 같은 버전의 `/` 목록은 아이콘 8개·왼쪽 정렬이며 390px 가로 넘침과 화면 오류는 없었습니다. 업체별 새 가입·결제는 실행하지 않았습니다.

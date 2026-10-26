@@ -966,6 +966,12 @@
 
 /* Shared writing surface: full-width editor, predictable toolbar, real file chips. */
 .ui-composer-editor{@apply min-w-0 w-full}
+.ui-command-menu{@apply absolute bottom-full inset-x-0 z-50 mb-2 max-h-80 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-lg}
+.ui-command-menu .ui-command-option{@apply flex w-full h-auto items-center justify-start gap-3 rounded-lg px-3 py-2 text-left text-base font-normal text-slate-700}
+.ui-command-menu .ui-command-option span{@apply shrink-0 text-base font-medium text-slate-800}
+.ui-command-menu .ui-command-option small{@apply min-w-0 truncate text-sm font-normal text-slate-500}
+.ui-command-menu .ui-command-option.is-selected{@apply bg-slate-100}
+.ha-official-overlay-host{@apply contents}
 .ui-composer-toolbar{@apply flex w-full min-w-0 flex-wrap items-center gap-2}
 .ui-composer-toolbar>[data-composer-action=send]{@apply ml-auto shrink-0}
 .ui-composer-key-hint{@apply ml-auto truncate text-xs text-slate-400}
@@ -1214,3 +1220,13 @@
 .ha-discussion-proposal{@apply mx-auto max-w-conversation rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm}
 .ha-discussion-proposal p{@apply my-2 text-copy}
 .ha-typing{@apply text-sm text-copy}
+
+.hermes-composer .ui-command-menu .ui-command-option{@apply flex h-auto justify-start rounded-lg px-3 py-2 text-left font-normal}
+.hermes-composer .ui-command-menu .ui-command-option>svg{@apply block size-4.5 shrink-0 text-slate-600}
+.hermes-composer .ui-command-menu .ui-command-option>span{@apply text-base font-normal text-slate-700}
+.hermes-composer .ui-command-menu .ui-command-option>small{@apply truncate text-sm text-slate-400}
+
+.hermes-official [aria-labelledby="model-picker-title"]>div{@apply bg-white text-ink font-sans}
+.hermes-official [aria-labelledby="model-picker-title"] :is(.font-mono,button,input){font-family:var(--font-platform);letter-spacing:normal}
+.hermes-official [aria-labelledby="model-picker-title"]>div>div.grid{@apply grid-cols-1 sm:grid-cols-[200px_minmax(0,1fr)]}
+.hermes-official [aria-labelledby="model-picker-title"]>div>div.grid>div:first-child{@apply max-h-36 sm:max-h-none border-b sm:border-b-0}

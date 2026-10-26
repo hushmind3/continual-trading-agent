@@ -3,7 +3,7 @@ import {Select,ErrorMessage} from '@platform/ui/Primitives';
 
 export interface CodexModel {id:string;name:string;aliases?:string[];default_reasoning_effort?:string;reasoning_efforts:{value:string;description:string;available:boolean}[]}
 export interface ReasoningSelection {model?:CodexModel;value:string;change:(value:string)=>void;error?:string}
-const labels:Record<string,string>={none:'끄기',minimal:'최소',low:'낮음',medium:'보통',high:'높음',xhigh:'매우 높음',max:'최대',ultra:'Ultra'};
+const labels:Record<string,string>={none:'끄기',minimal:'최소',low:'낮음 · 가벼운 추론',medium:'보통',high:'높음',xhigh:'매우 높음',max:'최대',ultra:'최상위'};
 const reasoningDescriptions:Record<string,string>={
  'Greater reasoning depth for complex problems':'복잡한 문제를 해결할 때 더 깊이 추론합니다.',
 };

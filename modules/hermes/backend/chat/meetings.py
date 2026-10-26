@@ -18,7 +18,7 @@ SCHEMA = {'name': 'team_meeting', 'description': 'Run a real, concise review. Ea
 
 def records(worker, command):
     from .company import execute
-    result = json.loads(execute(command))
+    result = json.loads(execute(command,worker=worker))
     if result.get('error'): raise ValueError(result.get('detail') or result['error'])
     return result
 
@@ -26,6 +26,9 @@ def records(worker, command):
 def publish(worker, **values):
     with worker.lock:
         worker.job['meeting'] = {**worker.job.get('meeting', {}), **values}
+        state=dict(worker.job['meeting'])
+    callback=getattr(worker,'publish_meeting',None)
+    if callable(callback):callback(state)
 
 
 def round_speeches(worker, item):

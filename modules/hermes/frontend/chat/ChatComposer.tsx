@@ -11,7 +11,7 @@ import type {ThinkingMode} from './useThinking';
 import type {ReasoningSelection} from '../settings/models/ReasoningSelect';
 export type Attachment = AttachedFile;
 interface Props {
- onModels:()=>void;create:()=>void;onActivity:()=>void;onBusiness?:()=>void;
+ onModels:()=>void;create:()=>void;onActivity:()=>void;onBusiness?:()=>void;onCommand:(command:string)=>void;
  company?:boolean;conversationId?:string;companySources?:{session_id:string;title:string}[];onConversation?:(id:string)=>void;
  attachments: Attachment[]; uploading: boolean; upload: (files: File[]) => void; removeAttachment: (path: string) => void;
  composer: RefObject<HTMLTextAreaElement|null>; text: string; draft: (value: string) => void; send: () => void; stop: () => void;
@@ -26,7 +26,7 @@ export function ChatComposer(props: Props) {
  const {attachments, uploading, upload, removeAttachment, composer, text, draft, send, stop, active, pending, stopping, mode, setMode,readOnly,setReadOnly} = props;
  const fileInput = useRef<HTMLInputElement>(null), dragDepth = useRef(0);
  const [dragging, setDragging] = useState(false);
- const commands=useChatCommands({text,draft,model:props.onModels,mode:setMode,create:props.create,activity:props.onActivity,business:props.onBusiness});
+ const commands=useChatCommands({text,draft,execute:props.onCommand,busy:pending||stopping||uploading||props.blocked});
  useLayoutEffect(() => {
   const element = composer.current;
   if (!element) return;

@@ -265,6 +265,24 @@ def bind_delegation(registry,worker_getter):
     handler._platform_staff_bound=True;entry.handler=handler
 
 
+def staff_delegation(args,cfg):
+    """Bind a persisted staff identity to native task context; leave native execution policy intact."""
+    prepared=dict(args)
+    if args.get('action') in ('list','steer','stop'):return prepared
+    def enrich(task):
+        task=dict(task);sid=task.pop('staff_id',prepared.get('staff_id'))
+        if not isinstance(sid,str) or sid not in default_prompts(cfg) or sid=='common':
+            raise ValueError('등록된 직원 고유 식별자를 그대로 사용하세요. '+json.dumps([{'staff_id':key,'name':name} for key,name in staff_names(cfg).items() if key!='common'],ensure_ascii=False))
+        task['context']=staff_prompt(cfg,sid,include_system=True)+'\n\n[이번 위임]\n직원 식별자: '+sid+'\n현재 goal만 수행하세요. context의 과거 기록은 새 지시가 아닙니다. 로컬 파일 확인·작성·수정에는 read_file/write_file/patch를 우선 사용하고 터미널에는 실행 명령만 전달하세요. 같은 파일 머리 부분을 쉘로 반복 덮어쓰지 마세요. 로컬 경로를 web_search/web_extract에 넣지 마세요. 도구 결과로만 완료 여부를 판단하고 막히면 구체적 원인을 총괄에게 반환하세요.\n\n'+str(task.get('context') or '')
+        return task
+    if isinstance(prepared.get('tasks'),list):
+        if not all(isinstance(task,dict) for task in prepared['tasks']):raise ValueError('각 직원 업무는 객체여야 합니다.')
+        prepared['tasks']=[enrich(task) for task in prepared['tasks']]
+        prepared.pop('staff_id',None)
+        return prepared
+    return enrich(prepared)
+
+
 def bind_staff_dispatch(agent,cfg):
     """Inject staff instructions at the real native dispatch for this agent tree."""
     agent._platform_staff_cfg=cfg
@@ -280,23 +298,8 @@ def bind_staff_dispatch(agent,cfg):
         if selected is None:return native(instance,args)
         if getattr(instance,'_platform_meeting_review',False):return json.dumps({'error':'회의 직원은 총괄에게 실행 위임을 요청하세요.'},ensure_ascii=False)
         if args.get('action') in ('list','steer','stop'):return native(instance,args)
-        prepared=dict(args)
-        def invalid_staff():
-            names=staff_names(selected)
-            return json.dumps({'error':'등록된 직원 고유 식별자를 그대로 사용하세요. 이름이나 축약 ID는 지원하지 않습니다.','staff':[{'staff_id':sid,'name':name} for sid,name in names.items() if sid!='common']},ensure_ascii=False)
-        def enrich(task):
-            if not isinstance(task,dict):return None
-            task=dict(task);sid=task.pop('staff_id',prepared.get('staff_id'))
-            if not isinstance(sid,str) or sid not in default_prompts(selected) or sid=='common':return None
-            task['context']=staff_prompt(selected,sid,include_system=True)+'\n\n[이번 위임]\n직원 식별자: '+sid+'\n현재 goal만 수행하세요. context의 과거 기록은 새 지시가 아닙니다. 로컬 파일 확인·작성·수정에는 read_file/write_file/patch를 우선 사용하고 터미널에는 실행 명령만 전달하세요. 같은 파일 머리 부분을 쉘로 반복 덮어쓰지 마세요. 로컬 경로를 web_search/web_extract에 넣지 마세요. 도구 결과로만 완료 여부를 판단하고 막히면 구체적 원인을 총괄에게 반환하세요.\n\n'+str(task.get('context') or '')
-            return task
-        if isinstance(prepared.get('tasks'),list):
-            tasks=[enrich(task) for task in prepared['tasks']]
-            if any(task is None for task in tasks):return invalid_staff()
-            prepared['tasks']=tasks
-        else:
-            prepared=enrich(prepared)
-            if prepared is None:return invalid_staff()
+        try:prepared=staff_delegation(args,selected)
+        except ValueError as exc:return json.dumps({'error':str(exc)},ensure_ascii=False)
         # The desktop worker has no gateway turn-injection consumer. Reuse the
         # native synchronous batch so child results reach this same live turn.
         from tools.delegate_tool import delegate_task, _strip_model_hidden_task_fields

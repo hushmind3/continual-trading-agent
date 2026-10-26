@@ -17,6 +17,7 @@ export function Hermes(){
  const polling=working(status)||status?.local_model.state==='loading';
  const refreshModel=()=>{void request<Settings>(prefix+'settings',{},'GET').then(s=>setModelName(s.model)).catch(()=>{})};
  useEffect(refreshModel,[tab]);
+ useEffect(()=>{const changed=()=>{refreshModel();setRetry(value=>value+1)};window.addEventListener('hermes:model-changed',changed);return()=>window.removeEventListener('hermes:model-changed',changed)},[]);
  useEffect(()=>{const changed=()=>setTab(agentLocation().view);window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed)},[]);
  useEffect(()=>{let disposed=false,inFlight=false;let timer:ReturnType<typeof setTimeout>;const poll=async()=>{
   clearTimeout(timer);if(inFlight||disposed)return;inFlight=true;

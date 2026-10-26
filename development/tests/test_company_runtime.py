@@ -47,25 +47,25 @@ class NativeRuntimeTests(unittest.TestCase):
         worker=Mock();worker.company_link={'id':'demo','url':'http://127.0.0.1/api','token':'private-capability'}
         worker.job={'session_id':self.sid};worker.agent=None
         error=HTTPError(worker.company_link['url'],400,'Bad Request',{},io.BytesIO(b'{"detail":"Unknown job; private-capability"}'))
-        with patch.object(company,'_worker',worker),patch.object(company,'urlopen',side_effect=error):
-            result=json.loads(company.execute({'action':'finish','job_id':'invented'}))
+        with patch.object(company,'urlopen',side_effect=error):
+            result=json.loads(company.execute({'action':'finish','job_id':'invented'},worker=worker))
         self.assertIn('Unknown job',result['detail'])
         self.assertNotIn('private-capability',json.dumps(result))
 
     def test_success_text_cannot_be_misfiled_as_error(self):
         worker=Mock();worker.company_link={'id':'demo'};worker.agent=None
-        with patch.object(company,'_worker',worker),patch.object(company,'urlopen') as send:
-            result=json.loads(company.execute({'action':'finish','job_id':'real','error':'12 tests passed'}))
+        with patch.object(company,'urlopen') as send:
+            result=json.loads(company.execute({'action':'finish','job_id':'real','error':'12 tests passed'},worker=worker))
         self.assertIn('action=fail',result['error']);send.assert_not_called()
         self.assertNotIn('error',company.SCHEMA['parameters']['properties'])
 
     def test_success_and_failure_are_explicit_record_actions(self):
         worker=Mock();worker.company_link={'id':'demo','url':'http://127.0.0.1/api','token':'internal'}
         worker.agent=None;worker.job={'session_id':self.sid}
-        with patch.object(company,'_worker',worker),patch.object(company,'urlopen',side_effect=lambda *a,**k:io.BytesIO(b'{"ok":true}')) as send:
-            company.execute({'action':'finish','job_id':'real','body':'12 tests passed'})
+        with patch.object(company,'urlopen',side_effect=lambda *a,**k:io.BytesIO(b'{"ok":true}')) as send:
+            company.execute({'action':'finish','job_id':'real','body':'12 tests passed'},worker=worker)
             success=json.loads(send.call_args.args[0].data)['payload']['command']
-            company.execute({'action':'fail','job_id':'real','body':'Compiler exited 1'})
+            company.execute({'action':'fail','job_id':'real','body':'Compiler exited 1'},worker=worker)
             failure=json.loads(send.call_args.args[0].data)['payload']['command']
         self.assertNotIn('error',success)
         self.assertEqual(failure['action'],'finish');self.assertEqual(failure['error'],'Compiler exited 1')

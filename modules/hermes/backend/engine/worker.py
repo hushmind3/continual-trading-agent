@@ -106,9 +106,29 @@ def event_detail(data):
     return json.dumps({'truncated':True,'summary':original[:512]},ensure_ascii=False)
 
 
+def migrate_session_sources(db):
+    """Retain history/IDs while making legacy platform rows resumable by the official owner."""
+    import sqlite3
+    with db._read_ctx() as connection:
+        rows=connection.execute("SELECT id FROM sessions WHERE source='platform' AND COALESCE(session_key,'')='' AND COALESCE(chat_id,'')='' AND COALESCE(origin_json,'')='' AND COALESCE(user_id,'')=''").fetchall()
+        if not rows:return
+        folder=HOME/'migrations';folder.mkdir(parents=True,exist_ok=True)
+        backup=folder/('session-source-'+time.strftime('%Y%m%d-%H%M%S')+'.sqlite')
+        if backup.exists():raise RuntimeError('대화 이관 백업 경로가 이미 존재합니다.')
+        with sqlite3.connect(backup) as target:connection.backup(target)
+    identifiers=[row[0] for row in rows]
+    def apply(connection):
+        connection.executemany("UPDATE sessions SET source='cli' WHERE id=? AND source='platform'",[(key,) for key in identifiers])
+        connection.execute("INSERT OR REPLACE INTO state_meta(key,value) VALUES(?,?)",('platform.session-source.v1',json.dumps({'ids':identifiers,'from':'platform','to':'cli','backup':str(backup)},ensure_ascii=False)))
+    db._execute_write(apply)
+
+
 class HermesWorker:
     def __init__(self):
         self.db = SessionDB(db_path=HOME / 'state.db')
+        migrate_session_sources(self.db)
+        from ai_agent.Hermes.chat.native_plugin import install
+        install(HOME,self.db)
         self.company_links_path = HOME / 'company-links.json'
         self.agent = None
         self.thread = None
@@ -318,7 +338,7 @@ class HermesWorker:
             return create_conversation(self, str(request['company_id']), str(request.get('title') or '새 대화')[:100], load_settings()['model'])
         session_id = uuid.uuid4().hex
         cfg = load_settings()
-        self.db.create_session(session_id, 'platform', model=cfg['model'] or None)
+        self.db.create_session(session_id, 'cli', model=cfg['model'] or None)
         title = str(request.get('title') or '새 대화')[:100]
         self.db.set_session_title(session_id, self.db.get_next_title_in_lineage(title))
         return self.session(session_id)
@@ -460,7 +480,7 @@ class HermesWorker:
             toolsets = list(cfg['toolsets']) + ['mcp-' + name for name in get_registered_mcp_server_names()]
             if cfg.get('company_instructions'):
                 from ai_agent.Hermes.chat.company import register
-                register()
+                register(self)
                 tool_search._DIRECT_SURFACE_TOOLSETS = tool_search._DIRECT_SURFACE_TOOLSETS | {'platform_company','web'}
                 toolsets.extend(['platform_company', 'platform_company_recall', 'delegation', 'web', 'session_search'])
             if cfg.get('read_only'):toolsets=['file']
@@ -498,6 +518,7 @@ class HermesWorker:
                 tool_complete_callback=lambda *args, **kw: self.event('tool_complete', args),
                 clarify_callback=self.clarify,
             )
+            self.agent._platform_worker=self
             sync_tool_policy(self, self.agent, cfg)
             if cfg.get('application_request'): self.agent._persist_disabled = True
             bind_discussion_context(self.agent,cfg)

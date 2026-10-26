@@ -131,6 +131,43 @@ class OfficialApplication:
             await asyncio.gather(state['task'],return_exceptions=True)
         return {'closed':True}
 
+    async def _owner_socket(self, incoming, outgoing):
+        """Carry the official owner's wire unchanged; tickets stay inside this worker."""
+        from pathlib import Path
+        from hermes_constants import get_hermes_home
+        from hermes_cli.gateway_runtime import ensure_gateway_runtime, gateway_profile_home, attachable
+        from hermes_cli.gateway_client import _session_ticket, gateway_ws_target, GATEWAY_WS_PROTOCOL
+        from websockets.asyncio.client import connect
+        home = gateway_profile_home(get_hermes_home())
+        ready = await asyncio.to_thread(ensure_gateway_runtime, home)
+        if not attachable(ready):
+            raise RuntimeError('공식 세션 실행기가 준비되지 않았습니다: ' + str(ready.reason_code))
+        ticket = await asyncio.to_thread(_session_ticket, home, ready.endpoint)
+        url, protocols = gateway_ws_target(ready.endpoint, ticket)
+        async with connect(url, subprotocols=protocols, proxy=None, max_size=8*1024*1024) as owner:
+            if owner.subprotocol != GATEWAY_WS_PROTOCOL:
+                raise RuntimeError('공식 세션 프로토콜이 일치하지 않습니다.')
+            outgoing.put({'type':'websocket.accept'})
+            async def upload():
+                while True:
+                    frame = await incoming.get()
+                    if frame['type'] == 'websocket.disconnect': return
+                    if frame['type'] == 'websocket.receive':
+                        await owner.send(frame.get('text') if 'text' in frame else frame.get('bytes', b''))
+            async def download():
+                async for data in owner:
+                    value = {'type':'websocket.send'}
+                    if isinstance(data,bytes): value['bytes']=base64.b64encode(data).decode('ascii')
+                    else: value['text']=data
+                    outgoing.put(value)
+            tasks=[asyncio.create_task(upload()),asyncio.create_task(download())]
+            try:
+                done,_=await asyncio.wait(tasks,return_when=asyncio.FIRST_COMPLETED)
+                for task in done: task.result()
+            finally:
+                for task in tasks: task.cancel()
+                await asyncio.gather(*tasks,return_exceptions=True)
+
     async def _socket(self, payload, identifier, outgoing):
         parsed = self._path(payload.get('path', ''))
         incoming = asyncio.Queue()
@@ -150,7 +187,10 @@ class OfficialApplication:
                 value['bytes'] = base64.b64encode(value['bytes']).decode('ascii')
             outgoing.put(value)
         try:
-            await self.app(scope, incoming.get, send)
+            if parsed.path == '/api/ws':
+                await self._owner_socket(incoming, outgoing)
+            else:
+                await self.app(scope, incoming.get, send)
         except Exception as exc:
             closed = True
             outgoing.put({'type': 'websocket.close', 'code': 1011, 'reason': str(exc)})

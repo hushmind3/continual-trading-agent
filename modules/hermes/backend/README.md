@@ -34,3 +34,7 @@
 `worker.save_settings`는 입력 전체를 검증한 뒤 공식 설정과 플랫폼 설정을 기록합니다. 저장·결과 조회 오류 시 이전 파일로 복원합니다. 서버 시작 훅이 공식 앱·게이트웨이를 준비하므로 첫 화면 요청에 초기화를 의존하지 않습니다. `models/codex.py`는 요청 당시 모델·제공자 설정을 공식 frozen_runtime_config에 전달해 열린 대화의 연결 정보가 다른 모델과 섞이지 않게 합니다.
 
 실제 확인: 기존 서버 재적용 후 화면 요청 전에 Hermes 실행 프로세스 기동, 잘못된 작업 폴더와 도구 변경을 함께 저장한 요청의 HTTP 400 및 두 설정 파일 원본 유지. 관련 기존 검사 88개 중 실행 68개 통과·조건부 건너뜀 20개. GitHub CI·외부 서비스 실행은 별도 확인 대상입니다.
+
+## canonical owner 연결 상태
+
+실제 공개 `/api/ai_agent/Hermes/native/api/ws`를 원본 owner에 연결했습니다. 기존 독립 ASGI의 레거시 TUI sidecar에는 없던 session.mutate와 runtime.describe를 실제 확인했습니다. 구형 source=platform인 기존 대화 37개는 일관된 DB 복구본을 남기고 원본 cli source로 연결했으며 ID·메시지 전체 해시는 유지했습니다. 기존 일반 대화의 실제 응답과 owner 조회·내보내기·viewer 연결 해제를 확인했습니다. 상세 경계와 미완료 사항은 engine/README.md와 ../frontend/chat/README.md를 따릅니다. 플랫폼 대화 실행 자체와 owner의 일원화·원본 클라이언트 기능 전체 검증은 아직 미완료입니다.

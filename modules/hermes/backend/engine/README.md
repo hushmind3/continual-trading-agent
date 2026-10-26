@@ -9,7 +9,7 @@
 - `launch.py`: 플랫폼 표준 Python은 시작만 담당하고 실제 worker는 PM이 관리하는 Python·의존성으로 실행합니다.
 - 공식 도구 선택은 hermes_cli.tools_config._get_platform_tools(config, cli)로 해석합니다. 작업 환경 저장은 공식 platform_toolsets.cli에 반영하며 기존 자체 축소 목록은 실행 기준에서 제외했습니다.
 - `worker.py`: 기존 대화·총괄·조직과 공식 AIAgent를 연결합니다. 공식 프로필의 모델·제공자가 실행 기준입니다. 기존 홈·SessionDB를 유지합니다.
-- `official.py`: 공식 hermes_cli.web_server.app의 수명 주기·모든 HTTP 기능·WebSocket을 같은 worker에서 실행합니다. 실제 게이트웨이를 준비해 예약·칸반 배정도 공식 경로를 사용합니다.
+- `official.py`: 공식 hermes_cli.web_server.app의 수명 주기·HTTP·관리 WebSocket을 같은 worker에서 실행합니다. `/api/ws`는 원본 gateway_runtime·gateway_client의 접속·티켓 절차로 실제 canonical owner에 전달합니다. 레거시 TUI sidecar에 잘못 연결하지 않으며 티켓은 worker 안에만 유지합니다. 예약·칸반 배정도 같은 공식 게이트웨이를 사용합니다.
 - `bridge.py`: 기존 JSON-line IPC. `native/` → 중메뉴 manager → AI 에이전트 등록 → 전체 메뉴 → /api로 취합합니다.
 - `setup.py`: 공식 pm install과 공식 npm 워크스페이스·TUI 빌드를 준비합니다. 구형 .venv·requirements 목록·별도 드라이버 설치기를 다시 만들지 않습니다.
 
@@ -32,3 +32,11 @@
 ## DSPy 선택 스킬
 
 공식 optional-skills/mlops/research/dspy는 DSPy 사용 지침이며 Hermes의 자동 검토 자체가 DSPy·GEPA를 실행한다는 뜻은 아닙니다. 2026-10-26 기존 기본 프로필에서 공식 skills hub의 official/mlops/research/dspy를 설치해 enabled를 확인했습니다. 공식 PM이 선택한 의존 환경에 기존 패키지 버전을 고정한 채 DSPy 3.4.1·GEPA 0.1.4를 준비하고 hermes_bootstrap 활성화 이후 dspy.GEPA import·호출 가능 여부를 확인했습니다. 자동 검토·스킬 변경 장부와 같은 기존 공식 경로는 유지합니다. 실제 평가 자료로 최적화·성능 향상을 검증한 결과는 없으며 별도 자기개선 엔진·학습 DB·상시 최적화 루프를 만들지 않았습니다.
+
+## 기존 대화의 공식 owner 연결
+
+구형 플랫폼의 source=platform은 원본 local-session 마이그레이션 대상이 아니어서 동일 state.db여도 owner에서 기존 대화를 찾지 못했습니다. worker 초기화에서 메시징 경로·사용자 정보가 없는 이 구형 행만 공식 cli source로 바꿉니다. 변경 전에 기존 DB의 일관된 SQLite backup을 migrations/에 남기고 같은 DB의 state_meta에 변경 ID·복구 위치를 기록합니다. 대화·메시지·조직 연결 ID는 삭제하지 않습니다. 새 일반/총괄 대화도 원본 cli source를 사용합니다.
+
+실제 확인(2026-10-26): 기존 37개 행의 ID 유지·source 변경, 전체 메시지 해시 동일, 기존 저장 ID 그대로 owner resume 성공. canonical runtime.describe·조회 RPC·subscription_id를 사용한 viewer detach 성공. 이 수정이 플랫폼의 모든 AIAgent 실행을 owner로 옮겼다는 의미는 아닙니다. 기존 회사·회의 확장의 원본 플러그인 연결과 실행 주체 일원화는 남아 있습니다.
+
+공식 조직 SDK 연결은 ../chat/native_plugin.py를 사용합니다. core AIAgent·GatewayAgent·SessionDB를 복제하지 않으며, 원본 PluginContext에 조직 도구를 등록합니다. 기존 플랫폼의 직접 AIAgent 호출은 아직 남아 있습니다. 같은 기존 세션의 원본 GatewayAgent 도구 조회는 실제 성공했으나, 플랫폼 요청의 모델·추론·읽기 모드·목표/반복·승인·첨부·스트림 정책을 원본 client에 계승하는 전환은 완료되지 않았습니다. 모델 이름과 제공자가 서로 다른 기존 세션을 발견했으며 현재 선택과 맞추는 원본 GatewayAgent.switch_model의 실제 변경을 확인했습니다. 이를 플랫폼의 모든 전송 경로에 적용한 완료로 보고하지 않습니다.

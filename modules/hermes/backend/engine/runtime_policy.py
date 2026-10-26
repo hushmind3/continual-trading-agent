@@ -46,12 +46,13 @@ def configure_tools(worker, mode, *, direct_surfaces=True, direct_tools=()):
     from copy import deepcopy
     native=worker.native_config()
     before=deepcopy(native)
-    # Native turn finalization checks these names before scheduling its review.
-    direct_tools = set(direct_tools) | {'memory', 'skill_manage'}
+    toolsets = registry.get_tool_to_toolset_map()
+    # Review forks inherit this surface and must read skills before changing them.
+    direct_tools = set(direct_tools) | {name for name, toolset in toolsets.items() if toolset in {'memory', 'skills'}}
     search=native.setdefault('tools',{}).setdefault('tool_search',{})
     search['enabled']='off' if mode=='eager' else 'auto'
     # Explicitly direct surfaces remain callable without discovery round trips.
-    search['defer']=sorted(name for name, toolset in registry.get_tool_to_toolset_map().items()
+    search['defer']=sorted(name for name, toolset in toolsets.items()
                            if name not in direct_tools and (not direct_surfaces or toolset not in _DIRECT_SURFACE_TOOLSETS)) if mode=='lazy' else (
         [name for name in DEFAULT_CONFIG['tools']['tool_search']['defer'] if name not in direct_tools] if mode=='native' else [])
     if native!=before:

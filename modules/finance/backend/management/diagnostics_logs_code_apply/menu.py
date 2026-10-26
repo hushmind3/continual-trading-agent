@@ -1,2 +1,0 @@
-"""진단 · 로그 · 코드 적용의 기존 기능 연결."""
-MENU={'id': 'finance/diagnostics_logs_code_apply', 'title': '진단 · 로그 · 코드 적용', 'operations': ['system/blockers', 'health', 'state', 'job', 'resources', 'logs', 'capabilities', 'imports', 'stop', 'system/apply', 'system/status', 'system/prepare-restart', 'system/check', 'download/'], 'views': ['settings', 'resources', 'job', 'logs'], 'frontend': 'modules/finance/frontend/management/diagnostics_logs_code_apply/DiagnosticsLogsCodeApply.tsx', 'manager': 'stockrl.management.diagnostics_logs_code_apply.menu'}

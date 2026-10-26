@@ -20,7 +20,7 @@ class ConversationTests(unittest.TestCase):
   else:value={'ok':True}
   return {'status':200,'body':base64.b64encode(json.dumps(value).encode()).decode()}
  def test_native_session_created_once_by_original_worker_and_original_history_imported(self):
-  with tempfile.TemporaryDirectory() as d,patch.object(conversation.store,'project_folder',return_value=Path(d)),patch.object(conversation.store,'save'),patch('ai_agent.Hermes.engine.bridge.bridge') as bridge:
+  with tempfile.TemporaryDirectory() as d,patch.object(conversation.store,'project_folder',return_value=Path(d)),patch.object(conversation.store,'save'),patch('ai_agent.choki.engine.bridge.bridge') as bridge:
    bridge.call.return_value={'session_id':'native'}
    self.assertEqual(conversation.call('demo',{'action':'session'})['session_id'],'native')
    operation,payload=bridge.call.call_args.args;self.assertEqual(operation,'company/session');self.assertEqual(payload['messages'][0]['body'],'원본 대화');self.assertEqual(payload['token'],'secret')

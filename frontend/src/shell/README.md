@@ -4,7 +4,7 @@
 
 - 플랫폼 상단 바는 48px 높이이며 화면·사이드바 높이도 함께 맞춥니다. `workspace-header-slot`은 소메뉴가 React portal로 실행 버튼을 올리는 공통 위치입니다. 헤르메스 원본은 이 위치를 사용해 중복 제목·제어 줄을 없앱니다.
 - 서버 연결 옆 공용 설정 톱니바퀴는 `module_loader.ts`가 활성 모듈 명세의 `shared_settings`와 화면 등록의 `settingsPage`를 자동 취합한 항목을 엽니다. `SharedSettings.tsx`는 공통 분류 탐색과 담당 화면을 연결하며 모듈별 항목·업무 코드를 포함하지 않습니다. 현재 [나자릭 공용 계정](../../../modules/nazarick/frontend/accounts/README.md)이 여섯 항목을 제공합니다. 등록된 설정이 없으면 아이콘을 표시하지 않습니다. 공통 Drawer의 settings 변형으로 넓은 중앙 창을 표시하고 사이드바에는 중복 표시하지 않습니다.
-- `Shell.tsx`: 상단 바, 금융·REA·AI 에이전트·GitHub 메뉴, 현재 화면 제목, 갱신 시각, 오류와 알림 창.
+- `Shell.tsx`: 상단 바, 금융·AI 에이전트·GitHub 메뉴, 현재 화면 제목, 갱신 시각, 오류와 알림 창.
 - `menu_groups/menu_registry.ts`: module_loader의 모듈 등록 정보를 취합합니다. 프로젝트 관리 화면과 외부 설치기의 생성 메뉴도 같은 등록 경로를 사용합니다.
 - `installed_navigation.ts`: 설치 기록 `install_revision`이 있는 모듈은 GitHub 대메뉴 → 앱별 중메뉴로 취합합니다. 기존 설치본도 같은 규칙을 적용합니다. 주소·컴포넌트·기능은 유지하며 기본 AI 에이전트/Hermes/MCP 계층은 변경하지 않습니다. 같은 분류를 백엔드 `platform_modules.discover()`에도 적용합니다.
 - 금융·REA의 기본 화면 7개: 운영 제어, 가상계좌·주문, 정책 학습, MoE, 연결·설정, 프로그램 분석, 프로젝트 탐색. 백엔드 등록 작업은 등록표에 따라 추가될 수 있습니다.
@@ -22,13 +22,13 @@
 
 2026-10-16: React·Vite·공통 tailwind.css를 사용하며 버튼·입력·선택 요소는 src/ui/Primitives.tsx를 재사용합니다. 화면의 API·데이터 처리 계약은 유지합니다.
 
-AI 에이전트 → 헤르메스는 왼쪽에 진입점 하나를 표시합니다. 모델·작업 환경·MCP·스킬·시스템 프롬프트는 설정 상단 탭으로 전환하고 기존 여섯 주소는 modules/hermes의 module.json과 frontend/register.ts를 통해 등록합니다. sidebar=false인 주소는 탐색에서만 숨깁니다. 같은 지연 로딩 작업공간을 공유하고 주소로 화면을 구분하므로 이동 중 대화 상태를 중복 생성하지 않습니다.
+AI 에이전트 → 헤르메스는 왼쪽에 진입점 하나를 표시합니다. 모델·작업 환경·MCP·스킬·시스템 프롬프트는 설정 상단 탭으로 전환하고 기존 여섯 주소는 backend/ai_agent/choki의 module.json과 frontend/register.ts를 통해 등록합니다. sidebar=false인 주소는 탐색에서만 숨깁니다. 같은 지연 로딩 작업공간을 공유하고 주소로 화면을 구분하므로 이동 중 대화 상태를 중복 생성하지 않습니다.
 
-메뉴가 mountKey를 지정하면 해당 작업공간 인스턴스를 공유합니다. AI 에이전트 소메뉴는 같은 mountKey를 사용해 주소 이동 때 작성 중인 화면을 새로 만들지 않습니다. 지정하지 않은 금융·REA 메뉴의 기존 전환 방식은 유지합니다.
+메뉴가 mountKey를 지정하면 해당 작업공간 인스턴스를 공유합니다. AI 에이전트 소메뉴는 같은 mountKey를 사용해 주소 이동 때 작성 중인 화면을 새로 만들지 않습니다. 지정하지 않은 금융 메뉴의 기존 전환 방식은 유지합니다.
 
-중메뉴가 있는 기능은 MenuItem.section을 지정합니다. navigation/NavigationTree.tsx가 계층·접힘을, MenuLink.tsx가 링크·현재 위치·축소 표시를 담당합니다. section 없는 금융·REA는 기존 메뉴를 유지합니다.
+중메뉴가 있는 기능은 MenuItem.section을 지정합니다. navigation/NavigationTree.tsx가 계층·접힘을, MenuLink.tsx가 링크·현재 위치·축소 표시를 담당합니다. 금융 메뉴의 기존 2단계 구조를 유지합니다.
 
-모듈 소유/탈착: 화면 구현은 기존 `modules/<id>/frontend/` 또는 중메뉴 소유형 `modules/<대메뉴>/<중메뉴>/frontend/`에 있고 공통 Shell은 등록 정보만 읽습니다. menu_catalog는 금융 작업기가 아니라 호스트가 제공하므로 금융 폴더가 없어도 남은 메뉴가 연결됩니다. 플랫폼의 React/Vite/Tailwind/UI는 공통 렌더링 계약입니다. 실제 금융·REA·Hermes 폴더 탈착과 남은 GitHub 화면 렌더링은 2026-10-18 확인했습니다.
+모듈 소유/탈착: 화면 구현은 기존 `modules/<id>/frontend/` 또는 중메뉴 소유형 `modules/<대메뉴>/<중메뉴>/frontend/`에 있고 공통 Shell은 등록 정보만 읽습니다. menu_catalog는 금융 작업기가 아니라 호스트가 제공하므로 금융 폴더가 없어도 남은 메뉴가 연결됩니다. 플랫폼의 React/Vite/Tailwind/UI는 공통 렌더링 계약입니다. 실제 금융·Hermes 폴더 탈착과 남은 GitHub 화면 렌더링은 2026-10-18 확인했습니다.
 
 workspace_host=hermes/chat인 명시적 통합 앱은 별도 사이드바 메뉴를 노출하지 않습니다. 예전 앱 주소로 직접 접속하면 Hermes로 이동합니다. 다른 설치 앱의 GitHub 계층은 유지합니다.
 

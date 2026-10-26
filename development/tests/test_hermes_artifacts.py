@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'backend'))
-from ai_agent.Hermes.artifacts.handlers import preview,LIMIT
+from ai_agent.choki.artifacts.handlers import preview,LIMIT
 
 
 class ArtifactTests(unittest.TestCase):
@@ -42,7 +42,7 @@ class UploadTests(unittest.TestCase):
     def test_upload_preserves_bytes_and_cannot_escape_owned_folder(self):
         import base64
         from unittest.mock import patch
-        from ai_agent.Hermes.artifacts import handlers
+        from ai_agent.choki.artifacts import handlers
         with tempfile.TemporaryDirectory() as temporary,patch.object(handlers,'UPLOADS',Path(temporary)/'uploads'):
             result=handlers.upload({'name':'../../보고서.md','content':base64.b64encode('내용'.encode()).decode()})
             self.assertEqual(Path(result['path']).read_text(encoding='utf8'),'내용')
@@ -51,7 +51,7 @@ class UploadTests(unittest.TestCase):
             with self.assertRaises(ValueError):handlers.uploaded_paths([str(Path(temporary)/'secret.md')])
     def test_invalid_and_oversized_uploads_fail(self):
         from fastapi import HTTPException
-        from ai_agent.Hermes.artifacts.handlers import upload,UPLOAD_LIMIT
+        from ai_agent.choki.artifacts.handlers import upload,UPLOAD_LIMIT
         for value in ({'name':'test.txt','content':'%%%bad'},{'name':'a:b.txt','content':''},{'name':'large.txt','content':'A'*((UPLOAD_LIMIT+2)//3*4+4)}):
             with self.subTest(name=value['name']),self.assertRaises(HTTPException):upload(value)
 

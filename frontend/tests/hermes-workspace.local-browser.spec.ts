@@ -8,8 +8,8 @@ const rich=[
  '| 항목 | 결과 | 비고 |\n| --- | --- | --- |\n| 대화 | 정상 | 넓은 화면 |\n| 도구 | 확인 | 실제 결과 |',
  '\n\x60\x60\x60typescript\nconst longLine = "'+ 'x'.repeat(260)+'";\nconsole.log(longLine);\n\x60\x60\x60',
  '[공식 문서](https://example.com/docs)',
- '[오류 보고서](runtime/ai_agent/Hermes/artifacts/example-report.md)',
- '[HTML 보고서](runtime/ai_agent/Hermes/artifacts/example-report.html)',
+ '[오류 보고서](runtime/ai_agent/choki/artifacts/example-report.md)',
+ '[HTML 보고서](runtime/ai_agent/choki/artifacts/example-report.html)',
  '<img src="invalid" onerror="window.hermesUnsafe=true">'
 ].join('\n\n');
 const messages:Record<string,unknown>[]=[{role:'user',content:'화면 구성과 확인 결과를 정리해 줘.'},{role:'assistant',content:rich}];
@@ -25,8 +25,8 @@ async function fixture(page:Page,empty=false,history=false){
  await page.route('**/api**',async route=>{
   const r=route.request(),url=new URL(r.url());let op:string,payload:Record<string,unknown>;
   try{if(r.method()==='GET'){op=url.searchParams.get('operation')??'';payload=JSON.parse(url.searchParams.get('payload')??'{}')}else{const body=r.postDataJSON();op=body.operation;payload=body.payload??{}}}catch{return route.continue()}
-  if(!op.startsWith('ai_agent/Hermes/'))return route.continue();
-  op=op.slice('ai_agent/Hermes/'.length);calls.push({op,payload});let response:unknown={};
+  if(!op.startsWith('ai_agent/choki/'))return route.continue();
+  op=op.slice('ai_agent/choki/'.length);calls.push({op,payload});let response:unknown={};
   const status=()=>({job:{...state.job},local_model:{running:true,state:'ready',base_url:settings.base_url}});
   if(history)state.job.events=[];
   if(op==='status')response=status();
@@ -36,7 +36,7 @@ async function fixture(page:Page,empty=false,history=false){
   else if(op==='session/rename'){titles[String(payload.id)]=String(payload.title);response=Object.entries(titles).map(([id,title])=>({id,title,model:settings.model}))}
   else if(op==='session')response={session:{id:payload.id,title:titles[String(payload.id)]||'새 대화 검증',model:settings.model},messages:payload.id===id?messages:[]};
   else if(op==='autonomy')response={goal:null,loop:null};
-  else if(op==='artifact/upload')response={name:payload.name,path:'C:/workspace/runtime/ai_agent/Hermes/artifacts/uploads/test/'+payload.name,bytes:8};
+  else if(op==='artifact/upload')response={name:payload.name,path:'C:/workspace/runtime/ai_agent/choki/artifacts/uploads/test/'+payload.name,bytes:8};
   else if(op==='artifact'&&payload.path==='missing.md'){await route.fulfill({status:404,json:{detail:'문서 파일이 없습니다.'}});return}
   else if(op==='artifact'&&String(payload.path).endsWith('.html'))response={name:'example-report.html',path:payload.path,format:'.html',bytes:200,truncated:false,content:'<h1>HTML 검사 결과</h1><p>완료된 보고서 내용입니다.</p><script>window.top.htmlPreviewUnsafe=true</script><img src="https://example.com/tracker">'};
   else if(op==='artifact')response={name:'example-report.md',path:String(payload.path),format:'.md',bytes:90,content:'# 검사 보고서\n\n- 재시작 보호 확인\n\n[근거 문서](./evidence.md)\n\n<script>window.reportUnsafe=true</script>',truncated:false};
@@ -53,7 +53,7 @@ async function fixture(page:Page,empty=false,history=false){
   else if(op==='mcp')response={servers:{},status:[]};
   await route.fulfill({json:response});
  });
- await page.goto('/#ai_agent/Hermes');
+ await page.goto('/#ai_agent/choki');
  if(!empty)await expect(page.locator('.ha-markdown h2')).toHaveText('작업 결과');
  return {calls,state};
 }
@@ -202,7 +202,7 @@ test('local report links open readable documents inside the chat',async({page})=
  await dialog.getByRole('button',{name:'소스',exact:true}).click();
  await expect(dialog.locator('pre')).toContainText('# 검사 보고서');
  expect(await page.evaluate(()=>Boolean((window as unknown as Record<string,unknown>).reportUnsafe))).toBe(false);
- expect(calls.some(call=>call.op==='artifact'&&call.payload.path==='runtime/ai_agent/Hermes/artifacts/example-report.md')).toBe(true);
+ expect(calls.some(call=>call.op==='artifact'&&call.payload.path==='runtime/ai_agent/choki/artifacts/example-report.md')).toBe(true);
  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
  await expect(page.getByRole('button',{name:'오류 보고서',exact:true})).toBeFocused();
 });
@@ -225,7 +225,7 @@ test('upload attaches a real file reference and next run mode stays editable dur
  await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
  await expect.poll(()=>calls.filter(call=>call.op==='chat').length).toBe(1);
  const sent=calls.find(call=>call.op==='chat')!;
- expect(sent.payload.attachments).toEqual(['C:/workspace/runtime/ai_agent/Hermes/artifacts/uploads/test/요청.md']);
+ expect(sent.payload.attachments).toEqual(['C:/workspace/runtime/ai_agent/choki/artifacts/uploads/test/요청.md']);
  expect(sent.payload.message).toContain('[요청.md]');
  await expect(page.getByLabel('실행 방식',{exact:true})).toBeEnabled();
  await page.getByLabel('실행 방식',{exact:true}).selectOption('goal');
@@ -235,7 +235,7 @@ test('upload attaches a real file reference and next run mode stays editable dur
 
 test('missing document leaves the full conversation usable instead of opening an empty pane',async({page})=>{
  await fixture(page);
- await page.route('**/api**',async(route)=>{const request=route.request();const op=request.method()==='POST'?request.postDataJSON()?.operation:new URL(request.url()).searchParams.get('operation');if(op==='ai_agent/Hermes/artifact')return route.fulfill({status:404,json:{detail:'문서 파일이 없습니다.'}});return route.fallback()});
+ await page.route('**/api**',async(route)=>{const request=route.request();const op=request.method()==='POST'?request.postDataJSON()?.operation:new URL(request.url()).searchParams.get('operation');if(op==='ai_agent/choki/artifact')return route.fulfill({status:404,json:{detail:'문서 파일이 없습니다.'}});return route.fallback()});
  await page.getByRole('button',{name:'오류 보고서',exact:true}).click();
  await expect(page.getByRole('alert')).toContainText('문서 파일이 없습니다.');
  await expect(page.getByRole('complementary',{name:'결과 문서'})).toHaveCount(0);
@@ -316,7 +316,7 @@ test('workspace is a separate submenu and saves only its own fields',async({page
 });
 test('model configuration failure has an actionable retry',async({page})=>{
  await fixture(page);let fail=true;
- await page.route('**/api**',async route=>{const request=route.request();const op=request.method()==='GET'?new URL(request.url()).searchParams.get('operation'):request.postDataJSON()?.operation;if(op==='ai_agent/Hermes/settings'&&fail)return route.fulfill({status:503,json:{detail:'설정 연결 실패'}});return route.fallback()});
+ await page.route('**/api**',async route=>{const request=route.request();const op=request.method()==='GET'?new URL(request.url()).searchParams.get('operation'):request.postDataJSON()?.operation;if(op==='ai_agent/choki/settings'&&fail)return route.fulfill({status:503,json:{detail:'설정 연결 실패'}});return route.fallback()});
  await page.getByRole('button',{name:'설정 열기',exact:true}).click();
  await page.getByLabel('AI 에이전트 화면').selectOption('models');
  await expect(page.getByRole('alert')).toContainText('설정 연결 실패');
@@ -434,7 +434,7 @@ test('document links resolve relative to the open report inside the same panel',
  await page.getByRole('button',{name:'오류 보고서',exact:true}).click();
  const panel=page.getByRole('complementary',{name:'결과 문서'});
  await panel.getByRole('button',{name:'근거 문서',exact:true}).click();
- await expect.poll(()=>calls.some(call=>call.op==='artifact'&&call.payload.path==='runtime/ai_agent/Hermes/artifacts/./evidence.md')).toBe(true);
+ await expect.poll(()=>calls.some(call=>call.op==='artifact'&&call.payload.path==='runtime/ai_agent/choki/artifacts/./evidence.md')).toBe(true);
  await expect(panel).toBeVisible();
  await expect(page.getByLabel('헤르메스에게 보낼 메시지')).toBeEditable();
 });
@@ -462,7 +462,7 @@ test('activity panel can be dragged wider, resized with keys and remembers its w
 
 test('model runtime options are saved and applied through the existing API',async({page})=>{
  const {calls}=await fixture(page);
- await page.goto('/#ai_agent/Hermes/models');
+ await page.goto('/#ai_agent/choki/models');
  await page.getByLabel('문맥 한도',{exact:true}).fill('32768');
  await page.getByLabel('도구 설명 불러오기',{exact:true}).selectOption('lazy');
  await page.getByRole('button',{name:'실행 설정 저장·적용',exact:true}).click();

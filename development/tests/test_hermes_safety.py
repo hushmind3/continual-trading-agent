@@ -9,8 +9,8 @@ import unittest
 from unittest.mock import Mock,patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'backend'))
-from ai_agent.Hermes.chat.read_only import bind
-from ai_agent.Hermes.engine.bridge import WorkerBridge
+from ai_agent.choki.chat.read_only import bind
+from ai_agent.choki.engine.bridge import WorkerBridge
 
 
 class ReadOnlyTests(unittest.TestCase):
@@ -58,7 +58,7 @@ class RestartTests(unittest.TestCase):
 
 class AutonomousCompletionTests(unittest.TestCase):
     def test_incomplete_native_turn_never_reaches_goal_or_loop_judge(self):
-        from ai_agent.Hermes.chat.autonomy import run
+        from ai_agent.choki.chat.autonomy import run
         @dataclass
         class State:
             goal:str='goal'

@@ -22,12 +22,12 @@ class InstallerTests(unittest.TestCase):
 
     def test_search_returns_more_pages_and_passes_sort(self):
         with patch.object(github, 'github', return_value={'total_count': 89, 'items': []}) as fetch:
-            result = github.search('rea', 2, 'stars')
+            result = github.search('sample', 2, 'stars')
         self.assertTrue(result['has_more'])
         self.assertIn('per_page=30', fetch.call_args.args[0])
         self.assertIn('page=2', fetch.call_args.args[0])
         self.assertIn('sort=stars', fetch.call_args.args[0])
-        self.assertEqual(github.repository('https://github.com/morluto/rea.git'), 'morluto/rea')
+        self.assertEqual(github.repository('https://github.com/example/sample-agent.git'), 'example/sample-agent')
 
     def test_agent_model_preparation_waits_for_ready(self):
         from platform_plugins.projects.agent_setup import ensure_ready
@@ -47,10 +47,10 @@ class InstallerTests(unittest.TestCase):
         bridge.call.assert_called_once_with('status')
 
     def test_node_mcp_detects_repository_manifest_before_website(self):
-        (self.source / 'server.json').write_text(json.dumps({'repository': {'url': 'https://github.com/morluto/rea'},
-            'packages': [{'registryType': 'npm', 'identifier': 'rea-agents', 'version': '6.5.0',
+        (self.source / 'server.json').write_text(json.dumps({'repository': {'url': 'https://github.com/example/sample-agent'},
+            'packages': [{'registryType': 'npm', 'identifier': 'sample-agents', 'version': '6.5.0',
                 'transport': {'type': 'stdio'}, 'packageArguments': [{'type': 'positional', 'value': 'mcp'}]}]}))
-        (self.source / 'package.json').write_text(json.dumps({'name': 'rea-agents', 'version': '6.5.0', 'bin': {'rea': 'scripts/rea.mjs'}}))
+        (self.source / 'package.json').write_text(json.dumps({'name': 'sample-agents', 'version': '6.5.0', 'bin': {'sample-agent': 'scripts/agent.mjs'}}))
         website = self.source / 'website'; website.mkdir(); (website / 'index.html').write_text('Marketing website')
         spec = adapters.detect(self.source)
         self.assertEqual(spec['kind'], 'node-mcp')

@@ -11,8 +11,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
 from platform_plugins.projects import harness
-from ai_agent.Hermes.chat import company
-from ai_agent.Hermes.engine.runtime_policy import auxiliary_thinking
+from ai_agent.choki.chat import company
+from ai_agent.choki.engine.runtime_policy import auxiliary_thinking
 
 class NativeRuntimeTests(unittest.TestCase):
     def setUp(self):
@@ -20,7 +20,7 @@ class NativeRuntimeTests(unittest.TestCase):
         self.sid=uuid.uuid5(uuid.NAMESPACE_URL,'platform-company:demo').hex
         self.bridge=Mock();self.bridge.process.poll.return_value=None
         self.bridge.call.return_value={'job':{'session_id':self.sid,'state':'running','company_id':'demo','metrics':{'output_tokens':123}}}
-        p=patch('ai_agent.Hermes.engine.bridge.bridge',self.bridge);p.start();self.addCleanup(p.stop)
+        p=patch('ai_agent.choki.engine.bridge.bridge',self.bridge);p.start();self.addCleanup(p.stop)
         p=patch.object(harness.store,'read',return_value=self.record);p.start();self.addCleanup(p.stop)
     def test_tabs_share_native_measurements_and_owned_stop(self):
         state=harness.status('demo');self.assertTrue(state['native']);self.assertEqual(state['job']['metrics']['output_tokens'],123)

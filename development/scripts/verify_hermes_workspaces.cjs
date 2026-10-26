@@ -1,10 +1,10 @@
 // Verify native CEO transport and retained original UI; every model write is intercepted.
 const {chromium}=require('@playwright/test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const origin='http://127.0.0.1:8766',out=path.resolve('runtime/ai_agent/Hermes/verification/workspace-tabs');
+const origin='http://127.0.0.1:8766',out=path.resolve('runtime/ai_agent/choki/verification/workspace-tabs');
 async function get(operation,payload={}){return (await fetch(origin+'/api?operation='+operation+'&payload='+encodeURIComponent(JSON.stringify(payload)))).json()}
 async function main(){
  const tabs=(await get('projects/workspace-tabs')).items,connected=tabs.find(t=>t.conversation&&t.view==='talk');assert.ok(connected?.session_id);
- const id=connected.id.split(':')[0],sid=connected.session_id,settings=await get('ai_agent/Hermes/settings');
+ const id=connected.id.split(':')[0],sid=connected.session_id,settings=await get('ai_agent/choki/settings');
  const browser=await chromium.launch({headless:true});fs.mkdirSync(out,{recursive:true});let page;
  try{
   page=await browser.newPage({viewport:{width:1440,height:960}});const errors=[],submitted=[],actions=[];let approved=false,confirmAllowed=false;
@@ -16,12 +16,12 @@ async function main(){
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/api*',async route=>{
    const req=route.request(),url=new URL(req.url()),post=req.method()==='POST'?req.postDataJSON():null,op=post?.operation||url.searchParams.get('operation'),payload=post?.payload||JSON.parse(url.searchParams.get('payload')||'{}');
-   if(op==='ai_agent/Hermes/status')return fulfill(route,status);
-   if(op==='ai_agent/Hermes/settings'||op==='ai_agent/Hermes/settings/save')return fulfill(route,settings);
-   if(op==='ai_agent/Hermes/sessions')return fulfill(route,[{id:'ordinary_fixture',title:'기존 일반 대화'},{id:sid,title:'AI 총괄'}]);
-   if(op==='ai_agent/Hermes/session')return fulfill(route,{session:{id:payload.id,title:payload.id===sid?'AI 총괄':'기존 일반 대화'},messages:payload.id===sid?messages:[{role:'user',content:'기존 일반 대화 보존'}]});
-   if(op==='ai_agent/Hermes/autonomy')return fulfill(route,{});
-   if(op==='ai_agent/Hermes/chat'){
+   if(op==='ai_agent/choki/status')return fulfill(route,status);
+   if(op==='ai_agent/choki/settings'||op==='ai_agent/choki/settings/save')return fulfill(route,settings);
+   if(op==='ai_agent/choki/sessions')return fulfill(route,[{id:'ordinary_fixture',title:'기존 일반 대화'},{id:sid,title:'AI 총괄'}]);
+   if(op==='ai_agent/choki/session')return fulfill(route,{session:{id:payload.id,title:payload.id===sid?'AI 총괄':'기존 일반 대화'},messages:payload.id===sid?messages:[{role:'user',content:'기존 일반 대화 보존'}]});
+   if(op==='ai_agent/choki/autonomy')return fulfill(route,{});
+   if(op==='ai_agent/choki/chat'){
     submitted.push(payload);assert.equal(payload.session_id,sid);assert.ok(['chat','goal','loop'].includes(payload.mode));
     messages.push({role:'user',content:payload.message},{role:'assistant',content:'**네이티브 총괄 답변 확인**'});
     status={...status,job:{state:'complete',session_id:sid,events:[],error:'',text:'네이티브 총괄 답변 확인',metrics:metric}};return fulfill(route,status);
@@ -33,7 +33,7 @@ async function main(){
    if(post&&!['projects/invoke','state'].includes(op))throw Error('Unexpected unmocked mutation: '+op);
    return route.continue();
   });
-  await page.goto(origin+'/#ai_agent/Hermes',{waitUntil:'networkidle'});
+  await page.goto(origin+'/#ai_agent/choki',{waitUntil:'networkidle'});
   const nav=page.getByRole('navigation',{name:'대화 작업 화면'});await nav.waitFor();assert.deepEqual(await nav.getByRole('button').allTextContents(),['대화','회사 현황','업무 실행 기록']);
   const mode=page.getByRole('combobox',{name:'실행 방식',exact:true}),composer=page.getByRole('textbox',{name:'헤르메스에게 보낼 메시지'});
   await mode.selectOption('company');await page.locator('.hermes-messages').getByText('이전 회사 대화',{exact:true}).waitFor();assert.equal(await mode.inputValue(),'chat');

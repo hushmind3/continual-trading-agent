@@ -44,13 +44,13 @@ class DetachmentTests(unittest.TestCase):
             'repository':'example/app','active_source':str(source),'adapter':{'kind':'static','directory':'.','output':'.'},'environment':{'APP_TOKEN':'private'}}
         store.save(record);return record,source,module
     def builtin(self):
-        folder=self.root/'modules/rea';folder.mkdir(parents=True)
-        (folder/'module.json').write_text('{"id":"rea"}')
+        folder=self.root/'modules/sample_module';folder.mkdir(parents=True)
+        (folder/'module.json').write_text('{"id":"sample_module"}')
         (folder/'program.py').write_text('original code')
         (folder/'.venv').mkdir();(folder/'.venv/installed.txt').write_text('private environment')
-        data=self.root/'runtime/rea';data.mkdir(parents=True);(data/'result.txt').write_text('user result')
+        data=self.root/'runtime/sample_module';data.mkdir(parents=True);(data/'result.txt').write_text('user result')
         entry=SimpleNamespace(busy_reason=Mock(return_value=''),reserve_restart=Mock(),close=Mock(),cancel_restart=Mock())
-        self.entries.append(({'id':'rea','group':{'id':'rea','title':'REA'},'folder':folder,'data':['runtime/rea']},entry))
+        self.entries.append(({'id':'sample_module','group':{'id':'sample_module','title':'Sample'},'folder':folder,'data':['runtime/sample_module']},entry))
         def prepare(record,target,progress):target.mkdir(parents=True);(target/'modules').mkdir();return target
         return folder,data,entry,prepare
     def test_external_detach_is_runnable_without_download_or_manual_setup(self):
@@ -70,14 +70,14 @@ class DetachmentTests(unittest.TestCase):
     def test_builtin_moves_its_actual_environment_and_data_then_restores_them(self):
         folder,data,entry,prepare=self.builtin()
         with patch.object(detachment,'prepare',side_effect=prepare):
-            detachment.start('rea');record=self.wait('rea')
+            detachment.start('sample_module');record=self.wait('sample_module')
         self.assertEqual(record['stage'],'removed',record.get('error'))
         target=Path(record['standalone_path']);self.assertFalse(folder.exists());self.assertFalse(data.exists())
-        self.assertEqual((target/'modules/rea/.venv/installed.txt').read_text(),'private environment')
-        (target/'modules/rea/program.py').write_text('updated code')
-        (target/'runtime/rea/result.txt').write_text('updated result')
+        self.assertEqual((target/'modules/sample_module/.venv/installed.txt').read_text(),'private environment')
+        (target/'modules/sample_module/program.py').write_text('updated code')
+        (target/'runtime/sample_module/result.txt').write_text('updated result')
         (target/'extra-user-file.txt').write_text('preserve independent edits')
-        lifecycle.reconnect('rea')
+        lifecycle.reconnect('sample_module')
         self.assertEqual((folder/'program.py').read_text(),'updated code')
         self.assertEqual((data/'result.txt').read_text(),'updated result')
         self.assertFalse(target.exists())
@@ -85,7 +85,7 @@ class DetachmentTests(unittest.TestCase):
     def test_preparation_failure_preserves_original_program_and_releases_guard(self):
         folder,data,entry,prepare=self.builtin()
         with patch.object(detachment,'prepare',side_effect=RuntimeError('build failed')):
-            detachment.start('rea');record=self.wait('rea')
+            detachment.start('sample_module');record=self.wait('sample_module')
         self.assertEqual(record['stage'],'ready');self.assertIn('build failed',record['error'])
         self.assertTrue(folder.exists());self.assertTrue(data.exists());entry.cancel_restart.assert_called_once()
     def test_cleanup_moves_only_generated_residue_to_trash(self):

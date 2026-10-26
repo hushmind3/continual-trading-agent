@@ -1,6 +1,6 @@
 export type Currency = "USD" | "KRW";
 export interface AccountEquityPoint {date:string;nav:number}
-export type FrameworkScope = "FinRL" | "stockrl";
+export type FrameworkScope = string;
 export type Control = "learning";
 export interface Worker {alive?:boolean;requested?:boolean;status?:string;error?:string}
 export interface FileState {exists:boolean;bytes:number;modified:string|null}
@@ -34,7 +34,7 @@ export interface PolicyEvaluation {
 }
 export interface Checkpoint {name:string;path:string;file:FileState;num_timesteps:number|null;updates:number|null;identity:Record<string,unknown>;compatible:boolean;evaluation?:PolicyEvaluation|null}
 export interface Snapshot {
-  architecture:"finrl-unified-v3";updated_at:string;frontend_revision?:string|null;commands?:{operation:string;methods:string[];module:string;function:string}[];
+  architecture:"module-platform-v1";updated_at:string;frontend_revision?:string|null;commands?:{operation:string;methods:string[];module:string;function:string}[];
   views?:Record<string,{data:unknown;error:string;updated_at:number|null}>;
   state_revision?:number;module_errors?:Record<string,string>;resident_models?:{path:string;algorithm:string;device:string;loads:number;reuse:number}[];
   module_updated_at?:Record<string,number>;

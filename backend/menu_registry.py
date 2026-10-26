@@ -104,7 +104,7 @@ def native_api_prefixes():
 
 
 def register_api(api,app):
-    """Collect small-menu routers through the finance and REA coordinators."""
+    """Collect small-menu routers through the finance and AI-agent coordinators."""
     for _,entry in MODULE_ENTRIES:
         if mount:=getattr(entry,'register_host',None):mount(app)
         routers=getattr(entry,'ROUTERS',None) or (entry.router,)

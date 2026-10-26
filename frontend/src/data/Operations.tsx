@@ -19,7 +19,7 @@ export function OperationsProvider({children}:{children:ReactNode}) {
     const run=(async()=>{
       try{
         const next=await request<Snapshot>('state',{views:selection,refresh_views:force});
-        if(next.architecture!=='finrl-unified-v3')throw new Error('통합 상태 API가 아닌 서버에 연결되어 있습니다.');
+        if(next.architecture!=='module-platform-v1')throw new Error('통합 상태 API가 아닌 서버에 연결되어 있습니다.');
         if(alive.current){if(next.frontend_revision){if(frontendRevision.current&&frontendRevision.current!==next.frontend_revision){location.reload();return;}frontendRevision.current=next.frontend_revision;}setState(next);setError('');}
       }catch(e){if(alive.current)setError(e instanceof Error?e.message:'연결 실패');}
     })();

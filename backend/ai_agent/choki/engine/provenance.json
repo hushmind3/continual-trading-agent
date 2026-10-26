@@ -1,0 +1,9 @@
+{
+  "source": "https://github.com/NousResearch/hermes-agent",
+  "method": "Complete official Git dependency; platform adapters live outside upstream",
+  "upstream_commit": "947e2c90caa18607ff49fc6761534e36d757138c",
+  "snapshot_at": "2026-10-25T12:20:57.047293+00:00",
+  "omitted_entrypoints": [],
+  "tracked_files": 21193,
+  "retired_source": "휴지통\\20261025T122057024438Z\\modules\\hermes\\backend\\engine\\upstream"
+}

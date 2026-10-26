@@ -70,14 +70,14 @@ def register_controls(router):
     @router.get('/api/health')
     def health():return {'ok':True,'service':'project-platform','project':str(ROOT),'status':'ok',
                         'pid':os.getpid(),'python':sys.executable,'python_prefix':sys.prefix,
-                        'deployment_id':os.environ.get('STOCKRL_APPLY_ID'),'module_signature':loaded_signature}
+                        'deployment_id':os.environ.get('PLATFORM_APPLY_ID'),'module_signature':loaded_signature}
     @router.get('/api/state')
     def state(views:str='[]',refresh_views:bool=False):
         import json
         try:wanted=json.loads(views)
         except (ValueError,TypeError):raise HTTPException(400,'조회할 화면 목록이 올바르지 않습니다.') from None
         if not isinstance(wanted,list) or any(not isinstance(value,str) for value in wanted):raise HTTPException(400,'화면 목록을 전달하세요.')
-        result={'architecture':'finrl-unified-v3','updated_at':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),
+        result={'architecture':'module-platform-v1','updated_at':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),
                 'views':{},'experts':{'items':[]},'job':{'running':False}}
         errors={item['id']:entry.load_error for item,entry in registrations() if getattr(entry,'load_error',None)}
         for metadata,entry in registrations():

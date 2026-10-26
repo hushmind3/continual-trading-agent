@@ -8,12 +8,12 @@ import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
-from ai_agent.Hermes.chat import telemetry
+from ai_agent.choki.chat import telemetry
 
 
 class TelemetryTests(unittest.TestCase):
     def test_decoder_receipt_is_scoped_to_the_current_job(self):
-        root=Path(__file__).resolve().parents[2]/'runtime/ai_agent/Hermes/verification'
+        root=Path(__file__).resolve().parents[2]/'runtime/ai_agent/choki/verification'
         root.mkdir(parents=True,exist_ok=True)
         with tempfile.TemporaryDirectory(dir=root,prefix='timing-') as folder:
             path=Path(folder)/'model.log'
@@ -27,7 +27,7 @@ class TelemetryTests(unittest.TestCase):
             self.assertIsNone(telemetry.local_timing(worker))
 
     def test_partial_and_non_decoder_lines_are_not_a_speed_sample(self):
-        root=Path(__file__).resolve().parents[2]/'runtime/ai_agent/Hermes/verification'
+        root=Path(__file__).resolve().parents[2]/'runtime/ai_agent/choki/verification'
         root.mkdir(parents=True,exist_ok=True)
         with tempfile.TemporaryDirectory(dir=root,prefix='timing-') as folder:
             path=Path(folder)/'model.log';path.touch()

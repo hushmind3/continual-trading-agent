@@ -26,7 +26,7 @@ def main():
         while time.monotonic() < deadline:
             try:
                 ids = {item['id'] for item in api('platform/modules')['items']}
-                assert {'finance', 'hermes', 'rea'} <= ids
+                assert {'finance', 'hermes'} <= ids
                 with urllib.request.urlopen(BASE, timeout=10) as response:
                     html = response.read().decode()
                 asset = re.search(r'src="(/assets/index-[^"]+\.js)"', html)

@@ -128,7 +128,7 @@ class PackageTests(unittest.TestCase):
     def test_translation_does_not_load_a_model(self):
         from unittest.mock import Mock
         bridge = Mock(); bridge.call.return_value = {'local_model': {'state': 'idle'}}
-        with patch.dict(sys.modules, {'ai_agent.Hermes.engine.bridge': SimpleNamespace(bridge=bridge)}):
+        with patch.dict(sys.modules, {'ai_agent.choki.engine.bridge': SimpleNamespace(bridge=bridge)}):
             localization.translate(['English description'], 'test-no-model')
         bridge.call.assert_called_once_with('status')
         self.assertIn('자동으로 불러오지', localization.ERRORS.pop('test-no-model')[1])

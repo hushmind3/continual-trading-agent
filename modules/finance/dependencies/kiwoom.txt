@@ -1,5 +1,0 @@
-# The current Kiwoom SDK requires websockets>=15; legacy Alpaca requires websockets<11.
-# This environment runs only the existing broker transport and emits normalized events.
-kwcli==1.0.2
-keyring==25.7.0
-websockets==15.0.1

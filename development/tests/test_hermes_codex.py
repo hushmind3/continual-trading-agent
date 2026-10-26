@@ -9,10 +9,10 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
-sys.path.insert(0, str(ROOT / 'modules/hermes/backend/engine/upstream'))
-from ai_agent.Hermes.models.codex import CodexConnection, runtime, goal_reasoning
-from ai_agent.Hermes.engine.execution import bind_model
-from ai_agent.Hermes.chat import telemetry
+sys.path.insert(0, str(ROOT / 'backend/ai_agent/choki/engine/upstream'))
+from ai_agent.choki.models.codex import CodexConnection, runtime, goal_reasoning
+from ai_agent.choki.engine.execution import bind_model
+from ai_agent.choki.chat import telemetry
 from types import SimpleNamespace
 
 

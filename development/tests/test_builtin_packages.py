@@ -22,7 +22,7 @@ class BuiltinPackageTests(unittest.TestCase):
     def test_each_export_contains_only_its_module_and_a_self_contained_launcher(self):
         base=ROOT/'runtime/projects/manage/verification';base.mkdir(parents=True,exist_ok=True)
         with tempfile.TemporaryDirectory(dir=base) as temporary,patch.object(store,'STATE',Path(temporary)):
-            for key in ('finance','rea','hermes'):
+            for key in ('finance','hermes'):
                 with self.subTest(module=key):
                     result=builtin_packages.export(key)
                     archive=Path(temporary)/'projects'/key/'exports'/result['filename']

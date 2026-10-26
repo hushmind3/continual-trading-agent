@@ -15,15 +15,15 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
-from ai_agent.Hermes.engine.bridge import WorkerBridge
+from ai_agent.choki.engine.bridge import WorkerBridge
 
 @unittest.skipUnless(os.environ.get('HERMES_LIVE_TOOLS') == '1', 'Explicit live desktop/browser verification only')
 class HermesLiveTools(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        query = urllib.parse.urlencode({'operation':'ai_agent/Hermes/settings','payload':'{}'})
+        query = urllib.parse.urlencode({'operation':'ai_agent/choki/settings','payload':'{}'})
         cfg = json.load(urllib.request.urlopen('http://127.0.0.1:8766/api?' + query))
-        cls.folder = ROOT / 'runtime/ai_agent/Hermes/verification/interaction'
+        cls.folder = ROOT / 'runtime/ai_agent/choki/verification/interaction'
         cls.folder.mkdir(parents=True, exist_ok=True)
         cls.bridge = WorkerBridge(cls.folder / ('state-' + uuid.uuid4().hex[:8]))
         cls.addClassCleanup(cls.bridge.close)
@@ -33,7 +33,7 @@ class HermesLiveTools(unittest.TestCase):
         # this worker on the old ephemeral server port.
         if cfg.get('local_model'):
             req=urllib.request.Request('http://127.0.0.1:8766/api',data=json.dumps({
-                'operation':'ai_agent/Hermes/model/unload','payload':{}}).encode(),headers={'Content-Type':'application/json'})
+                'operation':'ai_agent/choki/model/unload','payload':{}}).encode(),headers={'Content-Type':'application/json'})
             urllib.request.urlopen(req).close()
             cls.bridge.call('model/load', {'path':cfg['local_model']})
             for _ in range(40):

@@ -15,14 +15,15 @@ from platform_native import native_runtime_path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = Path(os.environ.get('PLATFORM_MODULES_DIR') or ROOT / 'modules').resolve()
+AI_AGENT_MODULES = ROOT / 'backend' / 'ai_agent'
 
 
 def discover(directory=None):
     records = []
     seen = set()
     namespaces = set()
-    base = Path(directory or MODULES)
-    manifests = [*base.glob('*/module.json'), *base.glob('*/*/module.json')]
+    bases = [Path(directory)] if directory is not None else [MODULES, AI_AGENT_MODULES]
+    manifests = [path for base in bases for path in (*base.glob('*/module.json'), *base.glob('*/*/module.json'))]
     for path in sorted(manifests):
         data = json.loads(path.read_text(encoding='utf-8'))
         if isinstance(data.get('resources'), dict):
@@ -116,7 +117,8 @@ def lifecycle(method):
 
 def signature(directory=None):
     digest = hashlib.sha256()
-    for path in sorted(Path(directory or MODULES).glob('*/module.json')):
+    bases = [Path(directory)] if directory is not None else [MODULES, AI_AGENT_MODULES]
+    for path in sorted(path for base in bases for path in base.glob('*/module.json')):
         digest.update(path.parent.name.encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()

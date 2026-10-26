@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
-from ai_agent.Hermes.engine.bridge import WorkerBridge
+from ai_agent.choki.engine.bridge import WorkerBridge
 
 
 class ModelFixture(http.server.BaseHTTPRequestHandler):
@@ -109,19 +109,19 @@ class ModelFixture(http.server.BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError): pass
 
 
-@unittest.skipUnless((ROOT / 'modules/hermes/.venv/Scripts/python.exe').exists(), 'Hermes Python environment is not installed')
+@unittest.skipUnless((ROOT / 'runtime/ai_agent/choki/.venv/Scripts/python.exe').exists(), 'Hermes Python environment is not installed')
 class HermesPortTests(unittest.TestCase):
     def test_18_original_auxiliary_wire_receives_shared_thinking_choice(self):
-        from ai_agent.Hermes.engine.runtime_policy import auxiliary_thinking
+        from ai_agent.choki.engine.runtime_policy import auxiliary_thinking
         native={'auxiliary':{task:{'provider':'custom','model':'port-fixture','base_url':self.base,
             'extra_body':{'chat_template_kwargs':{'keep_option':True}}} for task in ('compression','goal_judge')}}
         auxiliary_thinking(native,{'model':'port-fixture','base_url':self.base,'local_model':'fixture.gguf'},{'thinking_mode':'off'})
         home=self.folder/'aux-wire';home.mkdir(exist_ok=True)
         (home/'config.yaml').write_text(json.dumps(native),encoding='utf-8')
-        upstream=ROOT/'modules/hermes/backend/engine/upstream'
+        upstream=ROOT/'backend/ai_agent/choki/engine/upstream'
         script=f"import sys;sys.path.insert(0,{str(upstream)!r});from agent.auxiliary_client import call_llm\nfor task in ('compression','goal_judge'):\n call_llm(task,provider='custom',model='port-fixture',base_url={self.base!r},api_key='fixture',messages=[{{'role':'user','content':'AUX_THINKING_WIRE'}}],timeout=5)"
         before=len(ModelFixture.calls)
-        result=subprocess.run([str(ROOT/'modules/hermes/.venv/Scripts/python.exe'),'-I','-X','utf8','-B','-c',script],
+        result=subprocess.run([str(ROOT/'runtime/ai_agent/choki/.venv/Scripts/python.exe'),'-I','-X','utf8','-B','-c',script],
             env={**os.environ,'HERMES_HOME':str(home)},capture_output=True,text=True,timeout=25)
         self.assertEqual(result.returncode,0,result.stderr[-1800:])
         calls=[c for c in ModelFixture.calls[before:] if any(m.get('content')=='AUX_THINKING_WIRE' for m in c.get('messages',[]))]
@@ -202,7 +202,7 @@ class HermesPortTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        checks = ROOT / 'runtime/ai_agent/Hermes/verification/port'
+        checks = ROOT / 'runtime/ai_agent/choki/verification/port'
         checks.mkdir(parents=True, exist_ok=True)
         cls.temp = tempfile.TemporaryDirectory(prefix='run-', dir=checks)
         cls.addClassCleanup(cls.temp.cleanup)
@@ -342,7 +342,7 @@ for line in sys.stdin:
  result={'protocolVersion':'2025-03-26','capabilities':{'tools':{}},'serverInfo':{'name':'fixture','version':'1'}} if method=='initialize' else {'tools':[{'name':'echo','description':'Echo fixture','inputSchema':{'type':'object','properties':{'text':{'type':'string'}}}}]} if method=='tools/list' else {'content':[{'type':'text','text':r.get('params',{}).get('arguments',{}).get('text','')}]} if method=='tools/call' else {}
  print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}),flush=True)
 ''', encoding='utf-8')
-        settings = {'port_fixture': {'command': str(ROOT / 'modules/hermes/.venv/Scripts/python.exe'), 'args': ['-I', '-X', 'utf8', str(script)]}}
+        settings = {'port_fixture': {'command': str(ROOT / 'runtime/ai_agent/choki/.venv/Scripts/python.exe'), 'args': ['-I', '-X', 'utf8', str(script)]}}
         self.bridge.call('mcp/save', {'servers': settings})
         result = self.bridge.call('mcp/connect')
         self.assertEqual(result['servers'], settings)

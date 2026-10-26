@@ -25,21 +25,11 @@ def environment(directory,requirements,constraints=None,gpu=False,python_version
 def main():
  os.environ['PYTHONUTF8']='1'
  host=environment('.venv/platform','development/scripts/requirements/platform.txt')
- for module in ('finance','rea'):
-  if not (ROOT/'modules'/module/'module.json').is_file():continue
-  if module=='finance' and sys.platform=='darwin':
-   environment('modules/finance/.venv','modules/finance/dependencies/operations-macos.txt',python_version='3.11')
-  elif module=='finance':
-   environment('modules/finance/.venv','modules/finance/dependencies/operations.txt','modules/finance/dependencies/operations.lock.txt',gpu=True)
-   environment('modules/finance/.venv/kiwoom','modules/finance/dependencies/kiwoom.txt','modules/finance/dependencies/kiwoom.lock.txt')
-  else:
-   rea=environment('modules/rea/.venv','modules/rea/requirements.txt','development/scripts/requirements/platform.txt')
-   subprocess.run([str(rea),'-I','-c','from rea.program_analysis.operations import install;install()'],check=True)
  subprocess.run([*npm_command(),'ci','--no-audit','--no-fund'],cwd=ROOT,check=True)
- if (ROOT/'modules/hermes/module.json').is_file():
-  if not (ROOT/'modules/hermes/backend/engine/upstream/hermes').is_file():
-   subprocess.run(['git','submodule','update','--init','modules/hermes/backend/engine/upstream'],cwd=ROOT,check=True)
-  subprocess.run([str(host),'-I',str(ROOT/'modules/hermes/backend/engine/setup.py')],check=True)
+ if (ROOT/'backend/ai_agent/choki/module.json').is_file():
+  if not (ROOT/'backend/ai_agent/choki/engine/upstream/hermes').is_file():
+   subprocess.run(['git','submodule','update','--init','backend/ai_agent/choki/engine/upstream'],cwd=ROOT,check=True)
+  subprocess.run([str(host),'-I',str(ROOT/'backend/ai_agent/choki/engine/setup.py')],check=True)
  if sys.platform=='darwin':
   import shutil
   runner=shutil.which('llama-server')
@@ -48,6 +38,6 @@ def main():
   if not link.exists():
    pending=link.with_name(link.name+'.tmp')
    pending.symlink_to(runner);pending.replace(link)
-  print('플랫폼·금융·Hermes·REA 설치 완료. 서버켜기.command를 실행하세요. 금융은 macOS 전용 환경을 사용하며 Windows CUDA·키움 환경은 설치하지 않았습니다.')
+  print('플랫폼·금융·Hermes 설치 완료. 서버켜기.command를 실행하세요. 금융은 macOS 전용 환경을 사용하며 Windows CUDA·키움 환경은 설치하지 않았습니다.')
  else:print('플랫폼과 각 모듈의 전용 환경 설치 완료. 서버켜기.cmd를 실행하세요.')
 if __name__=='__main__':main()

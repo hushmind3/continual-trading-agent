@@ -20,7 +20,7 @@ from platform_plugins.projects.harness_prompt import message_for
 class HarnessTests(unittest.TestCase):
     def test_focused_prompt_rebuild_never_calls_native_host_or_repository_builder(self):
         from types import SimpleNamespace
-        from ai_agent.Hermes.engine.runtime_policy import bind_discussion_context
+        from ai_agent.choki.engine.runtime_policy import bind_discussion_context
         native=Mock(return_value='Current working directory: C:/금융매매모델')
         agent=SimpleNamespace(_build_system_prompt=native,_cached_system_prompt='old host prompt',
                               _cached_system_prompt_static='old',ephemeral_system_prompt='host rules')
@@ -54,7 +54,7 @@ class HarnessTests(unittest.TestCase):
 
     def test_plain_meeting_disables_execution_without_forcing_json(self):
         from types import SimpleNamespace
-        from ai_agent.Hermes.engine.runtime_policy import apply_response_contract
+        from ai_agent.choki.engine.runtime_policy import apply_response_contract
         agent=SimpleNamespace(api_mode='chat_completions',request_overrides={'temperature':.3})
         apply_response_contract(agent,'',plan_only=True)
         self.assertEqual(agent.request_overrides['tools'],[])
@@ -71,7 +71,7 @@ class HarnessTests(unittest.TestCase):
 
     def test_structured_native_transport_preserves_thinking_and_tools(self):
         from types import SimpleNamespace
-        from ai_agent.Hermes.engine.runtime_policy import apply_response_contract
+        from ai_agent.choki.engine.runtime_policy import apply_response_contract
         agent=SimpleNamespace(api_mode='chat_completions',request_overrides={'extra_body':{'chat_template_kwargs':{'enable_thinking':True}}},tools=['read_file'])
         apply_response_contract(agent,'json_object')
         self.assertEqual(agent.request_overrides['response_format'],{'type':'json_object'})
@@ -84,7 +84,7 @@ class HarnessTests(unittest.TestCase):
 
     def test_application_generation_is_validated_and_run_scoped(self):
         from types import SimpleNamespace
-        from ai_agent.Hermes.engine.runtime_policy import application_generation,apply_application_generation
+        from ai_agent.choki.engine.runtime_policy import application_generation,apply_application_generation
         agent=SimpleNamespace(max_tokens=9000,request_overrides={'extra_body':{'thinking':True}})
         options=application_generation({'max_tokens':2500,'temperature':.3})
         apply_application_generation(agent,options)
@@ -156,11 +156,11 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(data['result'],'BACKGROUND COMPLETE')
 
     def test_coordinator_uses_real_agent_contract_and_rejects_incomplete(self):
-        from ai_agent.Hermes.engine.bridge import bridge
+        from ai_agent.choki.engine.bridge import bridge
         job={'state':'complete','session_id':'owned','text':'{"reply":"verified","tasks":[]}','events':[]}
         fake=Mock();fake.busy_reason.return_value=''
         fake.call.side_effect=lambda operation,payload=None: {'session':{'id':'owned'}} if operation=='session/create' else {'job':job}
-        with patch('ai_agent.Hermes.engine.bridge.bridge',fake):
+        with patch('ai_agent.choki.engine.bridge.bridge',fake):
             result=harness.execute('p_demo',{'system':'JSON only','user':'owner request','max_tokens':1700},threading.Event())
         self.assertIn('verified',result)
         self.assertEqual(fake.call.call_args_list[0].args[1]['workspace'],str(self.source))
@@ -170,14 +170,14 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(store.read('p_demo')['harness']['session_id'],'owned')
         self.assertFalse(harness.ACTIVE)
         job['state']='paused'
-        with patch('ai_agent.Hermes.engine.bridge.bridge',fake),self.assertRaisesRegex(ValueError,'완료'):
+        with patch('ai_agent.choki.engine.bridge.bridge',fake),self.assertRaisesRegex(ValueError,'완료'):
             harness.execute('p_demo',{'system':'JSON only','user':'owner request'},threading.Event())
         titles=[c.args[1]['title'] for c in fake.call.call_args_list if c.args[0]=='session/create']
         self.assertEqual(titles,[])
 
     def test_disabled_harness_status_does_not_contact_hermes_for_a_stale_session(self):
         self.record['harness'].update(session_id='previous',enabled=False,state='idle');store.save(self.record)
-        with patch('ai_agent.Hermes.engine.bridge.bridge') as bridge:
+        with patch('ai_agent.choki.engine.bridge.bridge') as bridge:
             state=harness.status('p_demo')
             self.assertFalse(state['enabled']);bridge.call.assert_not_called()
 
@@ -185,7 +185,7 @@ class HarnessTests(unittest.TestCase):
         metrics={'generation_tps':42.5,'input_tokens':300,'output_tokens':84,'api_calls':1}
         self.record['harness'].update(state='complete',session_id='owned');store.save(self.record)
         fake=Mock();fake.call.return_value={'job':{'session_id':'owned','state':'complete','metrics':metrics,'events':[]}}
-        with patch('ai_agent.Hermes.engine.bridge.bridge',fake):
+        with patch('ai_agent.choki.engine.bridge.bridge',fake):
             self.assertEqual(harness.status('p_demo')['job']['metrics'],metrics)
             fake.call.return_value={'job':{'session_id':'someone-else','state':'running','metrics':{'generation_tps':999},'events':[]}}
             restored=harness.status('p_demo')['job']
@@ -196,7 +196,7 @@ class HarnessTests(unittest.TestCase):
         self.record['harness'].update(state='waiting',session_id=None,last_job={'metrics':{'generation_tps':99}});store.save(self.record)
         harness.ACTIVE['p_demo']+=1
         try:
-            with patch('ai_agent.Hermes.engine.bridge.bridge') as bridge:
+            with patch('ai_agent.choki.engine.bridge.bridge') as bridge:
                 self.assertNotIn('job',harness.status('p_demo'));bridge.call.assert_not_called()
         finally:del harness.ACTIVE['p_demo']
 
@@ -216,7 +216,7 @@ class HarnessTests(unittest.TestCase):
     def test_another_users_active_agent_is_not_started_or_stopped(self):
         fake=Mock();fake.busy_reason.return_value='user task'
         cancelled=threading.Event();cancelled.set()
-        with patch('ai_agent.Hermes.engine.bridge.bridge',fake),self.assertRaisesRegex(ValueError,'중단'):
+        with patch('ai_agent.choki.engine.bridge.bridge',fake),self.assertRaisesRegex(ValueError,'중단'):
             harness.execute('p_demo',{'system':'system','user':'request'},cancelled)
         fake.call.assert_not_called()
         self.assertFalse(harness.ACTIVE)
@@ -224,7 +224,7 @@ class HarnessTests(unittest.TestCase):
     def test_control_cannot_answer_another_sessions_approval(self):
         self.record['harness'].update(session_id='owned',state='complete');store.save(self.record)
         fake=Mock();fake.call.return_value={'job':{'session_id':'other','state':'running','approval':{'kind':'tool','detail':'private'}}}
-        with patch('ai_agent.Hermes.engine.bridge.bridge',fake),self.assertRaisesRegex(ValueError,'실행 중'):
+        with patch('ai_agent.choki.engine.bridge.bridge',fake),self.assertRaisesRegex(ValueError,'실행 중'):
             harness.control('p_demo',{'action':'answer','allow':True})
         self.assertEqual([c.args[0] for c in fake.call.call_args_list],['status'])
 

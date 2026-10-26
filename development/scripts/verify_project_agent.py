@@ -20,7 +20,7 @@ STARTED = time.time()
 def release_target(folder):
     """Close only test-created worker descendants holding the disposable cwd on Windows."""
     import psutil
-    worker = str(ROOT / 'modules/hermes/backend/engine/worker.py').replace('\\', '/').lower()
+    worker = str(ROOT / 'backend/ai_agent/choki/engine/worker.py').replace('\\', '/').lower()
     for process in psutil.process_iter(['cwd', 'create_time']):
         try:
             if process.info['create_time'] < STARTED or not process.info['cwd'] or Path(process.info['cwd']).resolve() != folder.resolve(): continue
@@ -50,12 +50,12 @@ with tempfile.TemporaryDirectory(prefix='agent-target-', dir=OUTPUT) as temporar
     print(json.dumps({'session_id': session, 'connected_tools': result['connection']['tools']}), flush=True)
     try:
         while time.monotonic() < deadline:
-            job = api('ai_agent/Hermes/status')['job']
+            job = api('ai_agent/choki/status')['job']
             if job['session_id'] != session: raise RuntimeError('The verification session was replaced')
             if job['state'] not in ('starting', 'running', 'stopping'): break
             time.sleep(2)
         else:
-            api('ai_agent/Hermes/stop'); raise TimeoutError('Agent verification exceeded 480 seconds')
+            api('ai_agent/choki/stop'); raise TimeoutError('Agent verification exceeded 480 seconds')
         (OUTPUT / 'agent-workflow.json').write_text(json.dumps(job, ensure_ascii=False), encoding='utf8')
         assert job['state'] == 'complete', job.get('error')
         calls = [json.loads(event['detail'])[1] for event in job.get('events', []) if event.get('name') == 'tool_start']
@@ -65,10 +65,10 @@ with tempfile.TemporaryDirectory(prefix='agent-target-', dir=OUTPUT) as temporar
         print(json.dumps({'state': job['state'], 'text': job.get('text', '')[-1400:],
             'tools_executed': calls}, ensure_ascii=False), flush=True)
     finally:
-        status = api('ai_agent/Hermes/status')['job']
+        status = api('ai_agent/choki/status')['job']
         if status.get('session_id') == session and status.get('state') in ('starting', 'running', 'stopping'):
-            api('ai_agent/Hermes/stop')
+            api('ai_agent/choki/stop')
             deadline = time.monotonic() + 30
-            while time.monotonic() < deadline and api('ai_agent/Hermes/status')['job'].get('state') in ('starting', 'running', 'stopping'):
+            while time.monotonic() < deadline and api('ai_agent/choki/status')['job'].get('state') in ('starting', 'running', 'stopping'):
                 time.sleep(1)
         release_target(folder)

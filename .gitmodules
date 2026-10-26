@@ -5,5 +5,5 @@
 	path = runtime/ai_agent/HermesOriginal/source
 	url = https://github.com/NousResearch/hermes-agent.git
 [submodule "hermes-engine"]
-	path = modules/hermes/backend/engine/upstream
+	path = backend/ai_agent/choki/engine/upstream
 	url = https://github.com/NousResearch/hermes-agent.git

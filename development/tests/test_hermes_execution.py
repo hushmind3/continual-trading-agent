@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINE = ROOT / 'modules/hermes/backend/engine'
+ENGINE = ROOT / 'backend/ai_agent/choki/engine'
 spec = importlib.util.spec_from_file_location('hermes_execution', ENGINE / 'execution.py')
 execution = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(execution)
@@ -24,7 +24,7 @@ class ExecutionPolicyTests(unittest.TestCase):
     def test_meeting_staff_speaks_once_and_new_round_preserves_old_turns(self):
         from platform_modules import mount_namespaces
         mount_namespaces()
-        from ai_agent.Hermes.chat import meetings
+        from ai_agent.choki.chat import meetings
         worker = SimpleNamespace(job={'meeting': {'id': 'saved', 'round_start': 1}})
         old = {'staff_id': 'first', 'source': 'hermes_delegate', 'status': 'completed'}
         current = {'staff_id': 'second', 'source': 'hermes_delegate', 'status': 'completed'}

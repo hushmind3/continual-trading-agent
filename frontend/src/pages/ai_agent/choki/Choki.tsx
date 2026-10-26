@@ -1,0 +1,34 @@
+import {agentLocation,navigateAgent} from './agent_navigation';
+import {useEffect,useRef,useState} from 'react';
+import {request} from '@platform/data/api';
+import {Button,ErrorMessage} from '@platform/ui/Primitives';
+import {Chat} from './chat/Chat';
+import {Settings as AgentSettings} from './settings/Settings';
+import {ModelChooser} from './settings/models/ModelSettings';
+import {prefix,failure,working,type AgentStatus,type Settings} from './types';
+
+export function Choki(){
+ const [tab,setTab]=useState(()=>agentLocation().view),[status,setStatus]=useState<AgentStatus>(),[error,setError]=useState('');
+ const [modelName,setModelName]=useState(''),[focused,setFocused]=useState(()=>sessionStorage.getItem('hermes.focused')==='true');
+ const [retry,setRetry]=useState(0),last=useRef('');
+ const [choosingModel,setChoosingModel]=useState(false);
+ const [settingsVisited,setSettingsVisited]=useState(()=>tab==='settings');
+ useEffect(()=>{if(tab==='settings')setSettingsVisited(true)},[tab]);
+ const polling=working(status)||status?.local_model.state==='loading';
+ const refreshModel=()=>{void request<Settings>(prefix+'settings',{},'GET').then(s=>setModelName(s.model)).catch(()=>{})};
+ useEffect(refreshModel,[tab]);
+ useEffect(()=>{const changed=()=>{refreshModel();setRetry(value=>value+1)};window.addEventListener('hermes:model-changed',changed);return()=>window.removeEventListener('hermes:model-changed',changed)},[]);
+ useEffect(()=>{const changed=()=>setTab(agentLocation().view);window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed)},[]);
+ useEffect(()=>{let disposed=false,inFlight=false;let timer:ReturnType<typeof setTimeout>;const poll=async()=>{
+  clearTimeout(timer);if(inFlight||disposed)return;inFlight=true;
+  try{const next=await request<AgentStatus>(prefix+'status',{},'GET');if(!disposed){const key=JSON.stringify(next);if(key!==last.current){last.current=key;setStatus(next)}setError('');if(working(next)||next.local_model.state==='loading')timer=setTimeout(()=>void poll(),document.hidden?10000:1200)}}catch(e){if(!disposed){setError(failure(e));if(polling)timer=setTimeout(()=>void poll(),10000)}}finally{inFlight=false}
+ };const resume=()=>{if(!document.hidden)void poll()};void poll();window.addEventListener('focus',resume);document.addEventListener('visibilitychange',resume);return()=>{disposed=true;clearTimeout(timer);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume)}},[retry,polling]);
+ const focus=()=>setFocused(v=>{sessionStorage.setItem('hermes.focused',String(!v));return !v});
+ const models=()=>setChoosingModel(true);
+ return <div className={'hermes-workspace '+(tab==='chat'?'is-chat':'is-settings')+(focused?' is-focused':'')}>
+ {error&&<div className="ha-connection-error"><ErrorMessage message={error}/><Button onClick={()=>setRetry(v=>v+1)}>다시 연결</Button></div>}
+ <div className="hermes-chat-mount" hidden={tab!=='chat'}><Chat status={status} modelName={modelName} focused={focused} onFocus={focus} onStatus={setStatus} onModels={models} onSettings={()=>navigateAgent('settings')} onRefresh={()=>setRetry(v=>v+1)}/></div>
+ {(settingsVisited||tab==='settings')&&<div className="hermes-settings-mount" hidden={tab!=='settings'}><AgentSettings status={status} onStatus={setStatus} onChat={()=>navigateAgent('chat')}/></div>}
+ {choosingModel&&<ModelChooser onClose={()=>setChoosingModel(false)} onChanged={()=>{refreshModel();setRetry(value=>value+1)}}/>}
+ </div>;
+}

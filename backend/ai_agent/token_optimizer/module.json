@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "token_optimizer",
+  "group": {"id": "ai_agent", "title": "AI 에이전트"},
+  "backend": {"namespace": "ai_agent.token_optimizer", "path": ".", "entry": "register"},
+  "frontend": {"entry": "../pages/ai_agent/token_optimizer/register.ts"},
+  "data": ["runtime/ai_agent/TokenOptimizer"],
+  "legacy_shared_code": true,
+  "order": 34
+}

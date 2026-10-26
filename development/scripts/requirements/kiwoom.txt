@@ -1,2 +1,0 @@
-# Compatibility entry; finance owns the authoritative dependency declaration.
--r ../../../modules/finance/dependencies/kiwoom.txt

@@ -1,9 +1,8 @@
 # Execution and setup
 
-- start_server.py: 기존 소유 서버에 소스를 적용하고 단일 API를 실행합니다.
+- start_server.py: 기존 소유 서버에 변경된 소스를 적용하고 단일 API 응답을 확인합니다. 플랫폼 서버가 메뉴별 런타임을 일괄 시작하는 오래된 `system/start` 호출은 사용하지 않습니다.
 - Git 제외 설치 모듈도 등록 서명으로 변경을 추적해 프론트와 API를 함께 갱신합니다. 감시기가 빌드만 하고 API를 유지해 새 메뉴 활성화가 대기하던 경로를 수정했습니다. 실행 중 작업 보호는 그대로 적용합니다.
 - verify_project_detachment.cjs: 실제 공개 GitHub 정적 앱의 설치·브라우저·자동 분리·단독 실행·재연결·완전 제거와 모바일 화면을 확인합니다. 검사 앱만 제거하고 모델은 사용하지 않습니다.
-- verify_builtin_detachment.py: 유휴 REA의 실제 소스·전용 환경·소유 데이터를 분리해 독립 API/브라우저와 원래 위치 복원을 확인합니다. 실패 시에도 재연결을 시도하며 사용자 작업 중에는 실행하지 않습니다. 결과는 runtime/projects/manage/verification/builtin-detachment.json입니다.
 - server_watchdog.py: 실행 창과 분리된 단일 감시 프로세스. 서버 종료 시 기존 실행기로 API만 복구합니다.
 - verify_module_detach.py: 실제 Hermes 폴더를 잠시 분리·복원하고 자동 등록·프론트 빌드·API 복원·설정 보존·중앙 코드 무변경을 확인합니다. 실행 중 작업은 먼저 확인하며 실패해도 폴더를 복원합니다. 결과는 `runtime/platform/module-verification.json`입니다.
 - verify_module_registration.py: 새로운 대메뉴·API·React 화면을 가진 검사 모듈을 폴더 하나로 추가·분리합니다. 기존 메뉴·API 보존과 중앙 파일 수정 0건을 확인하며 검사 모듈은 runtime/platform에 보관합니다.
@@ -11,11 +10,10 @@
 - install_windows.py: 최소 호스트와 각 모듈의 전용 Python/Node 패키지를 설치합니다. 없는 모듈은 건너뜁니다.
 - requirements/: 호스트 명세와 개발 검사 패키지, 금융 소유 명세를 연결하는 호환 파일입니다.
 
-루트 `서버켜기.cmd`·`설치.cmd`에서 호출합니다. 운영 호스트는 `.venv/platform/`, 금융·SDK·REA·Hermes는 각 모듈의 전용 환경을 사용합니다. FinRL-X 외부 원본과 설치 연결은 제거했습니다. 금융 데이터 코드는 modules/finance/backend/finrl/price_data/와 provider_settings/에 있습니다.
 
 사용자 검사: 루트에서 `.venv\Scripts\python.exe -m unittest discover -s development/tests`, frontend 폴더에서 `npm run typecheck`, `npm run test:api`, `npm run test:browser`. 요청 없는 자동 검사·백그라운드 검사는 실행하지 않습니다.
 
-npm은 루트 workspace 설치를 사용합니다. REA install()은 modules/rea에서 자체 잠금으로 npm ci를 수행합니다. 루트 workspace는 플랫폼 frontend만 포함합니다. 검사 명령은 루트 npm run typecheck/test:api/test:browser로도 실행할 수 있습니다.
+npm은 루트 workspace 설치를 사용합니다. 루트 workspace는 플랫폼 frontend만 포함합니다. 검사 명령은 루트 npm run typecheck/test:api/test:browser로도 실행할 수 있습니다.
 
 모듈 참조 조사: .venv\Scripts\python.exe -B development/scripts\audit_module_usage.py. AST·import 경로만 읽어 운영 참조·검사 전용·참조 없음 후보를 출력합니다. 플랫폼 코드 import·함수 실행·삭제는 수행하지 않습니다.
 
@@ -33,11 +31,9 @@ npm은 루트 workspace 설치를 사용합니다. REA install()은 modules/rea�
 
 모듈의 실행 중 작업은 등록된 busy_reason 훅을 통해 공통 재시작 차단 목록에 포함합니다. 모듈 폴더·등록 정보 변경 시 import 사전 확인, 프론트 빌드, 서버 적용을 자동 처리합니다. 작업 중이거나 차단 상태를 확인할 수 없으면 적용을 보류합니다. 프론트 독립 적용은 기존 작업을 중지하지 않습니다.
 
-모듈 환경 분리: isolate_module_environment.py는 기존 설치본의 선언된 의존성만 모듈 전용 가상환경에 복사하고 console 실행기·상대 소스 훅을 구성합니다. module_sources.py는 폴더 위치에서 모듈 소스를 찾는 전용 환경의 훅입니다. 새 PC 설치는 install_windows.py가 플랫폼·금융·SDK·REA·Hermes 환경과 각 Node 패키지를 별도로 설치합니다. 운영 서버는 .venv/platform을 사용합니다.
+환경 분리: `module_sources.py`는 설치기가 플랫폼 공통 도구를 Python 환경에 연결합니다. `install_windows.py`는 `.venv/platform/`과 Choki 공식 설치기를 준비하고, Choki의 Python·Node 런타임은 공식 Hermes PM이 `runtime/ai_agent/choki/installs/`와 `runtime/shared/engines/hermes-pm/`에서 관리합니다.
 
-실제 탈착 검사: `verify_builtin_module_isolation.py`는 작업 보호 후 금융·REA·Hermes의 소스와 전용 환경 폴더를 잠시 옮기고, 남은 GitHub 화면/호스트와 이동된 각 모듈의 실행을 확인합니다. 성공·실패 모두 원래 폴더를 복원하며 데이터·모델은 이동하지 않습니다. 결과는 `runtime/platform/module-verification/builtin-isolation.json`. 이 검사는 빌드·재시작을 수행하므로 운영 작업이 없는 때 실행합니다. `module_sources.py`는 이동한 전용 환경의 소스 검색과 console 실행기 경로를 복구합니다. 다른 PC의 Python/Node/CUDA까지 포함한 포터블 배포 검사는 아닙니다.
 
-독립 소스 검증: verify_standalone_modules.py는 기본 모듈 ZIP을 각각 추출하고, 설치된 의존성의 전용 경로 복사본에서 타입·화면 빌드·API/카탈로그·브라우저 표시를 확인합니다. 원래 프로젝트 소스 import를 차단하고 사용자 데이터/모델을 복사하거나 추론하지 않습니다. 불변 패키지 파일은 NTFS 하드 링크로 저장 공간을 재사용하며 경로·실행기·쓰기 파일은 독립 사본입니다. 새 PC에서 pip/npm 다운로드 설치를 재현한 검사는 아닙니다. 모든 임시 폴더/검사 서버는 종료·정리하며 결과/화면은 runtime/projects/manage/verification/standalone-modules.json 및 <모듈>-standalone.png입니다.
 
 현재 등록 동기화: health의 module_signature는 실행 서버가 로드한 등록 상태입니다. 감시기는 이 값과 디스크·적용된 프론트/백엔드 등록 서명을 함께 비교합니다. 빠른 분리/재연결/제거로 이전 디스크 상태로 돌아와도 메뉴/API 잔재를 다시 적용합니다. 설치 완료는 두 빌드 등록의 적용까지 기다립니다. 관련 감시 회귀 검사 7개 통과.
 
@@ -45,10 +41,9 @@ verify_windows_installer.cjs: 기존 pluto-re의 원본 Windows 설치기 자동
 
 verify_automatic_ui.cjs: UI/설명 파일 없는 일반 Python CLI 검사 소스에서 실행 유형을 자동 추출해 앱 파일 설치 경로를 실행하고 2개 명령의 생성 UI·원본 실행/결과 파일·등록 코드만 존재함·모바일 화면을 확인합니다. 별도 앱 UI를 만들거나 사용자 모델/GitHub 다운로드를 사용하지 않습니다. 성공/준비 실패 모두 소유 임시 폴더 경계를 확인해 정리합니다. 결과 runtime/projects/manage/verification/automatic-ui.json입니다.
 
-공식 원본 소스는 루트 `.gitmodules`의 고정 버전으로 복원합니다. 주력 헤르메스는 `modules/hermes/backend/engine/upstream` 전체 소스와 `engine/setup.py`의 공식 PM·잠금된 npm 워크스페이스·TUI 빌드를 사용합니다. CI 프론트 의존성도 공식 package-lock의 web 워크스페이스로 준비합니다. 공식 패키지 실제 경로를 해석하므로 web/node_modules 고정 배치에 의존하지 않습니다. 신규 설치기는 소스가 없을 때만 해당 서브모듈을 준비하고 구형 모듈 .venv·browser 설치는 호출하지 않습니다. 원본 앱은 업데이트·참고용 별도 홈을 유지합니다. 플랫폼 설치와 원본 앱의 PM/Node 패키지 준비는 별도이며, 현재 설치본을 정리할 때 다시 설치하지 않습니다. [Hermes 원본](../../modules/ai_agent/HermesOriginal/backend/README.md), [OpenClaw 원본](../../modules/ai_agent/OpenClawOriginal/backend/README.md)의 실제 설치·업데이트 경로를 따릅니다.
+공식 원본 소스는 루트 `.gitmodules`의 고정 버전으로 복원합니다. 주력 헤르메스는 `backend/ai_agent/choki/engine/upstream` 전체 소스와 `engine/setup.py`의 공식 PM·잠금된 npm 워크스페이스·TUI 빌드를 사용합니다. CI 프론트 의존성도 공식 package-lock의 web 워크스페이스로 준비합니다. 공식 패키지 실제 경로를 해석하므로 web/node_modules 고정 배치에 의존하지 않습니다. 신규 설치기는 소스가 없을 때만 해당 서브모듈을 준비하고 구형 모듈 .venv·browser 설치는 호출하지 않습니다. 원본 앱은 업데이트·참고용 별도 홈을 유지합니다. 플랫폼 설치와 원본 앱의 PM/Node 패키지 준비는 별도이며, 현재 설치본을 정리할 때 다시 설치하지 않습니다. [Hermes 원본](../../backend/ai_agent/hermes_original/README.md), [OpenClaw 원본](../../backend/ai_agent/openclaw_original/README.md)의 실제 설치·업데이트 경로를 따릅니다.
 
 ## macOS 실행
-담당: 기존 단일 API·서버 감시기의 macOS 실행. 루트 `설치.command`는 Python 3.14·uv·Node와 공식 Homebrew llama.cpp를 사용하고, `서버켜기.command`는 같은 start_server.py를 --apply-only로 실행해 화면을 엽니다. 금융 운영은 자동 시작하지 않습니다. 설치 로직은 기존 install_windows.py를 운영체제에 따라 재사용합니다. Mac에서는 플랫폼·금융·Hermes·REA 환경을 설치합니다. 금융은 `modules/finance/dependencies/operations-macos.txt`와 Python 3.11을 사용하며 Windows CUDA·키움 패키지는 설치하지 않습니다. 소스 연결 훅은 각 대상 환경의 Python으로 생성합니다.
 
 Python은 bin/python, 서버 잠금은 fcntl, 포트 소유권은 lsof로 확인합니다. 서버/감시기는 터미널과 분리해 유지합니다. 호스트는 APIRoute 직접 등록과 호환되는 FastAPI 0.115.14를 사용합니다. 새 버전의 지연 include_router가 메뉴를 누락시키므로 호스트 요구사항에서 버전을 고정했습니다. 실제 실행 결과와 남은 범위는 루트 README를 봅니다.
 
@@ -56,10 +51,8 @@ Mac 설치 분기는 CUDA·키움 전용 설치를 건너뛰고, environment(gpu
 
 Mac 설치·내보내기 정리(2026-10-22): install_windows.py는 이름과 무관하게 기존 OS 분기를 사용하며 npm은 공통 npm_command의 Node+실제 npm-cli.js 인수로 실행합니다. module_sources의 같은 .pth hook이 모듈 소스와 공유 native 도구를 연결합니다. 기존 환경에는 hook만 갱신했고 패키지 재설치·추가 다운로드는 수행하지 않았습니다. CUDA·키움은 Mac 설치 대상에서 제외합니다. 독립 기본 모듈의 Mac 설치도 같은 설치기를 재사용하며 Metal 실행기는 설치된 Homebrew llama-server에 연결합니다.
 
-GitHub Actions는 공식 Hermes package.json의 engines.node에서 Node 버전을 읽습니다. backend-integrity는 실제 사용 SDK·Torch CPU·REA Node 실행기·기존 Playwright 환경을 준비하며 Windows 설치기 실행은 windows-installer 작업으로 분리합니다. 테스트 fixture는 현재 직원 고유 ID·모듈 소유 경로·공식 제공자 resolver 계약을 따릅니다. 로컬 검사는 GitHub 통과 판정으로 대신하지 않습니다.
+GitHub Actions는 공식 Hermes package.json의 engines.node에서 Node 버전을 읽습니다. backend-integrity는 실제 사용 SDK·Torch CPU·기존 Playwright 환경을 준비하며 Windows 설치기 실행은 windows-installer 작업으로 분리합니다. 테스트 fixture는 현재 직원 고유 ID·모듈 소유 경로·공식 제공자 resolver 계약을 따릅니다. 로컬 검사는 GitHub 통과 판정으로 대신하지 않습니다.
 
-금융 API 회귀검사는 기존 operations.txt가 고정한 FinRL 소스와 실제 SB3·제공자 SDK import 의존성을 준비합니다. 운영 호스트에 금융 패키지를 섞지 않으며 CI의 개발 검사 환경에서만 사용합니다. Linux 파일 범위 응답 검사는 상태 불일치 시 실제 응답 사유와 등록 경로를 함께 보고합니다.
 
-REA 전용 환경은 검증한 FastAPI 0.115.14를 사용합니다. Linux CI에서 자동 업그레이드된 0.162.0의 라우터 표현 차이로 빈 describe가 반환되던 문제를 확인했습니다. 금융 import 검사에는 실제 FinRL의 matplotlib·webdriver-manager 의존성도 준비합니다. API envelope 검사 클라이언트는 실제 loopback 주소를 사용하며 원격 접근 인증을 해제하지 않습니다.
 
 명령 소속 검사는 모든 업무 명령의 실제 메뉴 소속과 공통 호스트의 정확한 6개 제어 명령을 구분해 검증합니다. system 소속의 임의 명령을 허용하거나 화면 메뉴를 추가하지 않습니다.

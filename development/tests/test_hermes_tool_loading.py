@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
-sys.path.insert(0, str(ROOT / 'modules/hermes/backend/engine/upstream'))
-from ai_agent.Hermes.engine.runtime_policy import configure_tools
+sys.path.insert(0, str(ROOT / 'backend/ai_agent/choki/engine/upstream'))
+from ai_agent.choki.engine.runtime_policy import configure_tools
 from hermes_cli.config_defaults import DEFAULT_CONFIG
 
 

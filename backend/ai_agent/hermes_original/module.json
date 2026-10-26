@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "hermes_original",
+  "group": {
+    "id": "ai_agent",
+    "title": "AI 에이전트"
+  },
+  "backend": {
+    "namespace": "ai_agent.hermes_original",
+    "path": ".",
+    "entry": "register"
+  },
+  "frontend": {
+    "entry": "../pages/ai_agent/hermes_original/register.ts"
+  },
+  "data": [
+    "runtime/ai_agent/HermesOriginal"
+  ],
+  "legacy_shared_code": true,
+  "order": 31
+}

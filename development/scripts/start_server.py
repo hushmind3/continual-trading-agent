@@ -124,7 +124,7 @@ def sources():
             for target in ('frontend','backend'):groups[target][name]=hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
             continue
         if name.startswith('frontend/src/') or name in ('frontend/index.html','frontend/package.json','frontend/tsconfig.json','frontend/vite.config.ts'):group='frontend'
-        elif name.startswith('backend/') and name.endswith('.py') and not name.startswith('runtime/rea/project_explorer/projects/') or name.startswith('development/scripts/requirements/'):group='backend'
+        elif (name.startswith('backend/') and name.endswith('.py')) or name.startswith('development/scripts/requirements/'):group='backend'
         elif name.startswith('development/scripts/') and name.endswith('.py') or name=='서버켜기.cmd':group='launcher'
         elif name=='configs/instruments.json':group='configuration'
         else:continue
@@ -261,7 +261,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
                     operation['status']='running';phase(stage,'8766 서버 갱신')
             if restart:
                 for record in current:stop_verified(record)
-                env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',STOCKRL_APPLY_ID=operation['id'],TAILSCALE_SOCKET=str(Path.home()/'.tailscale-projectplatform.sock'))
+                env=os.environ.copy();env.update(PYTHONPATH=str(ROOT/'backend'),PYTHONUTF8='1',PLATFORM_APPLY_ID=operation['id'],TAILSCALE_SOCKET=str(Path.home()/'.tailscale-projectplatform.sock'))
                 with (RUNTIME/'server.stdout.log').open('ab') as output,(RUNTIME/'server.stderr.log').open('ab') as errors:
                     # The platform UI is also used from other devices on the same LAN.
                     # Keep the existing port and API; bind all interfaces so both
@@ -313,8 +313,7 @@ def main(apply_only=False,skip_build=False,skip_checks=False,frontend_only=False
             raise
     if watchdog:ensure_watchdog()
     if not apply_only:
-        result=api('system/start',{})
-        print('전체 시스템 시작 요청: '+result.get('status',''),flush=True)
+        print('플랫폼 서버 적용 완료',flush=True)
 
 
 if __name__=='__main__':

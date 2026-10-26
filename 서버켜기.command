@@ -7,4 +7,4 @@ if [[ ! -x .venv/platform/bin/python ]]; then
   exit 1
 fi
 .venv/platform/bin/python development/scripts/start_server.py --apply-only --skip-checks
-open 'http://127.0.0.1:8766/#ai_agent/Hermes'
+open 'http://127.0.0.1:8766/#ai_agent/choki'

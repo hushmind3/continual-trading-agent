@@ -298,82 +298,6 @@
 .policy-training-actions {@apply flex;@apply items-center;@apply justify-between;@apply gap-5;@apply flex-wrap;@apply mt-5.5 mr-0 mb-4 ml-0;@apply pt-5;@apply border-t border-solid border-gray-200}
 .policy-training-actions>p {max-width:55ch;@apply text-label;@apply leading-text;@apply text-gray-500}
 .policy-workspace>.workspace-disclosure .ui-panel {@apply p-0;@apply border-0;@apply bg-transparent;@apply shadow-none}
-/* REA: a direct input choice, a saved result, and a calm source browser. */
-.workspace-app .rea-analysis-entry {@apply p-7}
-.workspace-app .rea-analysis-entry>header h2 {@apply text-title;letter-spacing:-.calc(var(--spacing) * 1.25)}
-.rea-target-grid {@apply grid;grid-template-columns:repeat(3,minmax(0,1fr));@apply gap-4}
-.workspace-app .ui-button.rea-target-card {@apply relative;@apply flex;@apply flex-col;@apply items-start;@apply justify-start;@apply gap-0;@apply min-h-45.5;@apply p-6;@apply border border-solid border-gray-200;border-radius:calc(var(--spacing) * 3.75);@apply bg-gray-50;@apply shadow-none;@apply text-left;@apply whitespace-normal}
-.workspace-app .ui-button.rea-target-card:hover:not(:disabled) {@apply border-brand-200;@apply bg-slate-50}
-.workspace-app .ui-button.rea-target-selected {@apply border-brand-200;@apply bg-slate-50}
-.rea-target-card>svg:first-child {@apply mb-5;@apply text-gray-500;stroke-width:1.5}
-.rea-target-card>b {@apply text-body;@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 0.5);@apply text-gray-800}
-.rea-target-card>span {@apply mt-1.75;@apply text-label;@apply font-normal;@apply leading-description;@apply text-gray-500}
-.rea-target-arrow {@apply absolute;@apply top-6;@apply right-5.5;@apply text-gray-400}
-.rea-website-form {@apply mt-5.5;@apply pt-5;@apply border-t border-solid border-gray-200}
-.rea-website-form>label {@apply block;@apply mb-2;@apply text-label;@apply font-medium;@apply text-gray-500}
-.rea-website-form>div {@apply flex;@apply gap-2.5}
-.rea-website-form .ui-button {@apply shrink-0}
-.rea-scope {@apply mt-5.5;@apply pt-4;@apply border-t border-solid border-gray-100;@apply text-label;@apply leading-code;@apply text-gray-500}
-.rea-scope>summary {@apply cursor-pointer;@apply font-medium}
-.rea-scope p {@apply mt-2.5;max-width:95ch;@apply leading-description;@apply text-gray-500}
-.rea-analysis-progress {@apply flex;@apply items-center;@apply justify-between;@apply gap-4;@apply mt-5;@apply pt-3.5 pr-4 pb-3.5 pl-4;@apply border border-solid border-brand-100;@apply rounded-xl;@apply bg-slate-50}
-.rea-analysis-progress>span {@apply text-xs;@apply leading-text;@apply text-slate-500}
-.rea-analysis-progress .ui-button {@apply shrink-0}
-.rea-target-path {@apply mt-3.5;@apply text-label;@apply leading-code;@apply text-gray-500;@apply wrap-anywhere}
-.rea-result-heading {@apply flex;@apply items-center;@apply gap-3.25}
-.rea-result-icon {@apply grid;@apply place-items-center;@apply w-11;@apply h-11;@apply rounded-xl;@apply bg-slate-100;@apply text-slate-500}
-.rea-result-heading h3 {@apply text-base;@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 6.25);@apply wrap-anywhere}
-.rea-result-heading p {@apply mt-0.5;@apply text-label;@apply text-gray-500}
-.rea-result-metrics {@apply grid;grid-template-columns:repeat(3,minmax(0,1fr));@apply gap-6;@apply mt-6 mr-0 mb-5 ml-0;@apply pt-5 pr-0 pb-5 pl-0;@apply border-t border-solid border-gray-100;@apply border-b border-solid border-gray-100}
-.rea-result-metrics p {@apply text-label;@apply text-gray-500}
-.rea-result-metrics strong {@apply block;@apply mt-1.5;font-size:calc(var(--spacing) * 7);@apply font-semibold;letter-spacing:-.calc(var(--spacing) * 1.75);@apply text-gray-800;@apply tabular-nums}
-.rea-result-metrics strong>span {@apply ml-1.5;@apply text-label;@apply font-normal;letter-spacing:0;@apply text-gray-500}
-.rea-saved-path {@apply min-w-0;@apply mt-3.5;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;@apply text-label;@apply leading-description;@apply text-gray-500;@apply wrap-anywhere}
-.rea-result-actions {@apply flex;@apply items-center;@apply gap-2.5;@apply flex-wrap;@apply mt-4.5}
-.rea-result-actions>a {@apply inline-flex;@apply items-center;@apply gap-1.75}
-.rea-provenance {@apply flex;@apply items-center;gap:calc(var(--spacing) * 3) calc(var(--spacing) * 5.5);@apply flex-wrap;@apply mt-5;@apply text-caption;@apply text-gray-500}
-.rea-provenance code {@apply mr-1.25;@apply pt-0.75 pr-1.5 pb-0.75 pl-1.5;border-radius:calc(var(--spacing) * 1.25);@apply bg-gray-100;@apply text-caption;@apply text-gray-500}
-.rea-project-toolbar {@apply flex;@apply items-center;@apply gap-2.5;@apply flex-wrap}
-.rea-project-toolbar select {@apply flex-1;@apply min-w-55}
-.rea-project-toolbar .ui-button {@apply shrink-0}
-.rea-project-meta {@apply flex;@apply items-center;@apply justify-between;@apply gap-4;@apply mt-1.5}
-.rea-project-meta .ui-status {@apply shrink-0;@apply mt-3.5}
-.rea-browser-toolbar {@apply flex;@apply items-center;@apply justify-between;@apply gap-4;@apply flex-wrap;@apply mb-4.5}
-.rea-breadcrumbs {@apply flex;@apply items-center;@apply flex-wrap;@apply gap-1.25;@apply text-xs;@apply leading-code;@apply text-gray-500}
-.rea-breadcrumbs>span {@apply flex;@apply items-center;@apply gap-1.25}
-.rea-breadcrumbs button {@apply pt-0.75 pr-0 pb-0.75 pl-0;@apply text-slate-500;@apply wrap-anywhere;@apply cursor-pointer}
-.rea-breadcrumbs button:hover {@apply text-brand-600}
-.rea-browser-actions {@apply flex;@apply items-center;@apply gap-2.5}
-.rea-browser-actions input {@apply w-55}
-.rea-browser-actions .ui-button {@apply text-label;@apply min-h-9;@apply pt-1.75 pr-2.75 pb-1.75 pl-2.75;@apply whitespace-nowrap}
-.rea-browser-grid {@apply grid;grid-template-columns:calc(var(--spacing) * 62.5) minmax(0,1fr);@apply min-h-110;@apply overflow-hidden;@apply border border-solid border-gray-200;border-radius:calc(var(--spacing) * 3.5);@apply bg-white}
-.rea-file-sidebar {@apply min-w-0;@apply border-r border-solid border-gray-200;@apply bg-gray-50}
-.rea-file-sidebar-heading {@apply flex;@apply justify-between;@apply gap-3;@apply pt-3.75 pr-4 pb-3.75 pl-4;@apply border-b border-solid border-gray-200;@apply text-caption;@apply font-semibold;@apply text-gray-500}
-.rea-file-list {@apply max-h-150;@apply overflow-auto;@apply p-1.5}
-.rea-file-entry {@apply flex;@apply items-center;@apply gap-2;@apply w-full;@apply p-2.5;@apply rounded-lg;@apply text-left;@apply text-label;@apply text-gray-500;@apply cursor-pointer;transition:background .15s,color .15s}
-.rea-file-entry>svg {@apply shrink-0;@apply text-gray-500;stroke-width:1.6}
-.rea-file-entry>span {@apply min-w-0;@apply flex-1;@apply overflow-hidden;@apply text-ellipsis;@apply whitespace-nowrap}
-.rea-file-entry>small {@apply shrink-0;@apply text-small;@apply text-gray-400}
-.rea-file-entry:hover {@apply bg-gray-100;@apply text-gray-700}
-.rea-file-entry-selected {@apply bg-brand-50;@apply text-slate-600}
-.rea-file-entry-selected>svg {@apply text-slate-500}
-.rea-file-loading {@apply flex;@apply items-center;@apply gap-2;@apply pt-4 pr-2.5 pb-4 pl-2.5;@apply text-label;@apply text-gray-500}
-.rea-file-empty {@apply pt-5 pr-2.5 pb-5 pl-2.5;@apply text-label;@apply leading-code;@apply text-gray-500}
-.rea-file-pagination {@apply flex;@apply items-center;@apply justify-between;@apply gap-1.5;@apply p-3;@apply border-t border-solid border-gray-200;@apply text-caption;@apply text-gray-500}
-.rea-file-pagination .ui-button {@apply min-h-7.5;@apply pt-1 pr-2 pb-1 pl-2;@apply text-caption}
-.rea-code-pane {@apply min-w-0}
-.rea-code-heading {@apply flex;@apply items-start;@apply justify-between;@apply gap-4;@apply pt-3.75 pr-5 pb-3.75 pl-5;@apply border-b border-solid border-gray-200;@apply bg-white}
-.rea-code-heading p {@apply text-xs;@apply font-medium;@apply leading-copy;@apply text-gray-600;@apply wrap-anywhere}
-.rea-code-heading>div>span {@apply block;@apply mt-0.75;@apply text-caption;@apply text-gray-500}
-.rea-code-provenance {@apply shrink-0;@apply pt-0.75 pr-1.75 pb-0.75 pl-1.75;@apply border border-solid border-slate-200;@apply rounded-md;@apply bg-slate-100;@apply text-caption;@apply whitespace-nowrap;@apply text-slate-500}
-.rea-code {@apply max-h-162.5;@apply min-h-91.25;@apply overflow-auto;@apply m-0;@apply p-5.5;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;@apply text-xs;line-height:1.95;@apply text-gray-700;tab-size:4;@apply bg-white;scrollbar-width:thin;scrollbar-color:var(--color-gray-300) transparent}
-.rea-code-empty,.rea-code-loading {@apply flex;@apply min-h-105;@apply flex-col;@apply items-center;@apply justify-center;@apply gap-3.25;@apply p-7;@apply text-center;@apply text-gray-400}
-.rea-code-empty>svg {stroke-width:1.2;@apply text-gray-400}
-.rea-code-empty h3 {@apply text-compact;@apply font-medium;@apply text-gray-500}
-.rea-code-empty p,.rea-code-loading {@apply text-label;@apply leading-code}
-@media(max-width:75rem) {.policy-model-grid {grid-template-columns:repeat(2,minmax(0,1fr))}.policy-training-grid {grid-template-columns:repeat(2,minmax(0,1fr))}.rea-browser-grid {grid-template-columns:calc(var(--spacing) * 52.5) minmax(0,1fr)}}
-@media(max-width:60rem) {.rea-browser-grid {grid-template-columns:calc(var(--spacing) * 47.5) minmax(0,1fr)}.rea-file-entry>small {@apply hidden}.rea-target-grid {@apply gap-2.5}.workspace-app .ui-button.rea-target-card {@apply p-5}}
-@media(max-width:47.5rem) {.policy-model-grid {@apply gap-2.5}.policy-model-card {@apply p-3.5}.policy-training-summary {@apply p-5;@apply rounded-2xl}.policy-summary-heading {@apply flex-col;@apply gap-4}.policy-result-metrics {@apply gap-3.5}.policy-result-metrics strong {@apply text-title}.policy-result-metrics strong.policy-result-time {@apply text-label}.policy-training-actions {@apply gap-3.5}.policy-training-actions>div {@apply w-full}.policy-training-actions .ui-button {@apply flex-1}.workspace-app .rea-analysis-entry {@apply p-5.5}.rea-target-grid {grid-template-columns:minmax(0,1fr)}.workspace-app .ui-button.rea-target-card {@apply min-h-28;@apply pt-4.5 pr-5 pb-4.5 pl-18}.rea-target-card>svg:first-child {@apply absolute;@apply top-5.25;@apply left-5.5;@apply m-0}.rea-target-card>b {@apply text-sm}.rea-target-card>span {@apply text-caption;@apply mt-1.25}.rea-target-arrow {@apply top-5;@apply right-4.5}.rea-website-form>div {@apply flex-wrap}.rea-website-form .ui-button {@apply w-full}.rea-analysis-progress {@apply items-start;@apply flex-wrap}.rea-result-metrics {@apply gap-3.5}.rea-result-metrics strong {@apply text-2xl}.rea-result-actions .ui-button {@apply flex-1;@apply justify-center}.rea-project-toolbar select {@apply w-full;@apply basis-full}.rea-project-toolbar .ui-button {@apply flex-1}.rea-project-meta {@apply items-start;@apply flex-wrap;@apply gap-0}.rea-project-meta .ui-status {@apply mt-2}.rea-browser-actions {@apply w-full}.rea-browser-actions input {@apply min-w-0;@apply flex-1}.rea-browser-grid {grid-template-columns:minmax(0,1fr);@apply min-h-0}.rea-file-sidebar {@apply border-r-0;@apply border-b border-solid border-gray-200}.rea-file-list {@apply max-h-58.75}.rea-file-entry {@apply text-xs}.rea-code-heading {@apply pt-3.5 pr-4 pb-3.5 pl-4}.rea-code {@apply p-4;@apply min-h-70;@apply text-label}.rea-code-empty,.rea-code-loading {@apply min-h-70}}
 @media(max-width:23.75rem) {.policy-model-grid {grid-template-columns:minmax(0,1fr)}.policy-result-metrics {grid-template-columns:minmax(0,1fr);@apply gap-4}.policy-training-grid {grid-template-columns:minmax(0,1fr)}}
 
 /* Accounts: one balance, a small set of metrics, then holdings and executions. */
@@ -552,15 +476,6 @@
 @media(max-width:47.5rem) {.expert-toolbar {@apply top-19;@apply grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);@apply gap-2.5;@apply p-3.5;box-shadow:0 calc(var(--spacing) * 1.25) calc(var(--spacing) * 4.5) color-mix(in srgb, var(--color-slate-700) 4%, transparent)}.expert-toolbar>label {@apply w-auto;@apply min-w-0;@apply m-0}.expert-toolbar>.ui-button-primary {@apply w-full;@apply pt-2.5 pr-2 pb-2.5 pl-2;@apply gap-1.25;@apply whitespace-nowrap}.expert-toolbar>.ui-button-primary>svg {@apply hidden}.expert-toolbar-tools {grid-column:1 / -1;@apply grid;grid-template-columns:repeat(3,minmax(0,1fr));@apply gap-1.5;@apply w-full;@apply m-0}.expert-toolbar-tools .ui-button {@apply w-full;@apply pt-2 pr-1.25 pb-2 pl-1.25;@apply text-label;@apply whitespace-nowrap;@apply justify-center}.expert-toolbar-tools .ui-button>svg {@apply hidden}.expert-toolbar-tools .ui-button-danger {grid-column:1 / -1}.expert-family-grid :where(button,input,summary) {scroll-margin-top:calc(var(--spacing) * 58.75)}}
 
 /* Source provenance remains visible without changing saved names or paths. */
-.rea-folder-label {@apply block;@apply text-xs;@apply font-medium;@apply text-gray-500}
-.rea-folder-name {@apply block;@apply mt-0.75;@apply text-small;@apply text-gray-400}
-.rea-file-entry[data-provenance] {@apply min-h-14.5}
-.rea-file-entry[data-provenance="original"]>svg {@apply text-brand-500}
-.rea-file-entry[data-provenance="inferred"]>svg {@apply text-amber-600}
-.rea-file-entry[data-provenance="analysis"]>svg {@apply text-slate-400}
-.rea-code-provenance-original {@apply border-brand-100;@apply bg-brand-50;@apply text-slate-500}
-.rea-code-provenance-inferred {@apply border-amber-100;@apply bg-amber-50;@apply text-amber-700}
-.rea-code-provenance-analysis {@apply border-slate-200;@apply bg-slate-100;@apply text-slate-500}
 
 /* Holdings and executions keep their row identity visible during horizontal scrolling. */
 .account-records .data-table-scroll :is(th,td):first-child {position:sticky;@apply left-0;@apply min-w-32.5;@apply max-w-45;@apply whitespace-normal;box-shadow:calc(var(--spacing) * 0.25) 0 var(--color-slate-200)}
@@ -912,7 +827,6 @@
  .ha-mode-select{@apply shrink-0}
  .ha-mode-select>svg{@apply hidden}
  .ha-mode-select select{@apply max-w-22}
- .ha-composer-note{@apply text-small;padding:calc(var(--spacing) * 1.75) 0 max(calc(var(--spacing) * 2),env(safe-area-inset-bottom))}
  .ha-mode-select select{@apply text-label}
  .hermes-run-options label{@apply text-caption}
  .hermes-autonomy-state{@apply text-caption;@apply gap-1.75}

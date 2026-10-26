@@ -148,7 +148,7 @@ for await(const line of createInterface({input:process.stdin})){
         result=subprocess.run([str(launcher)],check=True,capture_output=True,text=True,encoding='utf8',timeout=10)
         self.assertEqual(Path(json.loads(result.stdout.strip())),moved/'.venv')
 
-    def test_minimal_host_boots_without_finance_rea_hermes_or_torch(self):
+    def test_minimal_host_boots_without_business_modules_or_torch(self):
         empty=self.root/'modules';empty.mkdir()
         code="""import sys,json,asyncio,urllib.parse
 from pathlib import Path
@@ -169,7 +169,7 @@ async def run(operation):
  return json.loads(b''.join(e.get('body',b'') for e in events))
 assert asyncio.run(run('health'))['service']=='project-platform'
 assert asyncio.run(run('state'))['module_errors']=={}
-assert not any(n.split('.')[0] in {'torch','stockrl','rea','ai_agent','finrl'} for n in sys.modules)
+assert not any(n.split('.')[0] in {'torch','stockrl','ai_agent','finrl'} for n in sys.modules)
 print('EMPTY_HOST_OK')
 """
         environment={**os.environ,'PLATFORM_MODULES_DIR':str(empty)}
@@ -177,38 +177,5 @@ print('EMPTY_HOST_OK')
             cwd=ROOT,env=environment,capture_output=True,text=True,encoding='utf8',timeout=30)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('EMPTY_HOST_OK',result.stdout)
-
-    def test_large_file_download_keeps_file_streaming_and_range_support(self):
-        from fastapi import FastAPI
-        from fastapi.testclient import TestClient
-        from module_runtime import proxy_router
-        backend=self.root/'backend';backend.mkdir()
-        (backend/'__init__.py').write_text('',encoding='utf8')
-        (backend/'app.py').write_text("""from pathlib import Path
-from fastapi import APIRouter
-from .transport import FileResponse
-router=APIRouter()
-GROUP={'id':'files','title':'Files','menus':[]}
-ROUTERS=[router]
-@router.get('/api/file')
-def download():return FileResponse(Path(__file__).resolve().parents[1]/'large.bin')
-""",encoding='utf8')
-        shutil.copy2(ROOT/'modules/rea/backend/worker.py',backend/'worker.py')
-        shutil.copy2(ROOT/'modules/rea/backend/transport.py',backend/'transport.py')
-        with (self.root/'large.bin').open('wb') as stream:stream.truncate(33*1024*1024)
-        (self.root/'module.json').write_text(json.dumps({'id':'files','runtime':{
-            'language':'python','protocol':'module-jsonl-v1','package':'download_fixture','entry':'app',
-            'command':[str(python_at(ROOT/'modules/rea/.venv')),'-I','-B','{module}/backend/worker.py'],
-            'state':self.root.relative_to(ROOT).as_posix()}}),encoding='utf8')
-        bridge=ModuleRuntime(self.root);self.addCleanup(bridge.close)
-        description=bridge.call('describe',timeout=20)
-        response=bridge.call('request',{'path':'/api/file','method':'GET','body':'','headers':{}})
-        self.assertEqual(Path(response['file']),self.root/'large.bin')
-        self.assertEqual(response['body'],'')
-        app=FastAPI();app.include_router(proxy_router(bridge,description))
-        with TestClient(app) as client:
-            response=client.get('/api/file',headers={'Range':'bytes=4096-4159'})
-        self.assertEqual(response.status_code,206,{'body':response.text[:500],'paths':[route.path for route in app.routes]})
-        self.assertEqual(response.content,b'\0'*64)
 
 if __name__=='__main__':unittest.main()

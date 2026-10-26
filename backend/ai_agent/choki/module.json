@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "choki",
+  "group": {
+    "id": "ai_agent",
+    "title": "AI 에이전트"
+  },
+  "backend": {
+    "namespace": "ai_agent.choki",
+    "path": ".",
+    "entry": "manager"
+  },
+  "frontend": {
+    "entry": "../pages/ai_agent/choki/register.ts"
+  },
+  "data": [
+    "runtime/ai_agent/choki"
+  ],
+  "resources": {
+    "python": ".venv/platform/Scripts/python.exe"
+  },
+  "order": 30
+}

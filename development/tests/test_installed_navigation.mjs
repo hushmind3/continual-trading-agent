@@ -7,13 +7,13 @@ const component=()=>null;
 const menu=(name,hash)=>({name,hash,group:name,icon,component,required:[]});
 
 test('built-in engine menus retain their original ownership and identity',()=>{
- const entries=[{...menu('MCP','ai_agent/Hermes/mcp'),group:'AI 에이전트',section:{id:'Hermes',name:'헤르메스',icon}}];
+ const entries=[{...menu('MCP','ai_agent/choki/mcp'),group:'AI 에이전트',section:{id:'Hermes',name:'헤르메스',icon}}];
  assert.equal(installedNavigation({id:'hermes'},entries),entries);
  assert.equal(entries[0].group,'AI 에이전트');
 });
 
 test('existing installed apps share GitHub but retain independent app sections and routes',()=>{
- const entries=['rea','editor'].map(name=>{
+ const entries=['retired','editor'].map(name=>{
   const original=menu(name,'projects/app/'+name);
   const [result]=installedNavigation({id:'external_'+name,install_revision:'v1',group:{title:name}},[original]);
   assert.equal(result.hash,original.hash);

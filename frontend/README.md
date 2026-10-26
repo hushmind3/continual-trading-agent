@@ -8,10 +8,8 @@
 | API·공통 상태 | [src/data/](src/data/README.md) |
 | 화면 소유 경로 안내 | [src/pages/](src/pages/README.md) |
 | 버튼·입력·패널·공통 디자인 | [src/ui/](src/ui/README.md), [tailwind.css](src/tailwind.css) |
-| 금융 화면 | [modules/finance/frontend/](../modules/finance/frontend/README.md) |
-| REA 화면 | [modules/rea/frontend/](../modules/rea/frontend/README.md) |
-| Hermes 화면 | [modules/hermes/frontend/](../modules/hermes/frontend/README.md) |
-| 원본 Hermes·OpenClaw | [Hermes 원본](../modules/ai_agent/HermesOriginal/README.md) · [OpenClaw 원본](../modules/ai_agent/OpenClawOriginal/README.md) |
+| Hermes 화면 | [frontend/src/pages/ai_agent/choki/](../frontend/src/pages/ai_agent/choki/README.md) |
+| 원본 Hermes·OpenClaw | [Hermes 원본](../backend/ai_agent/hermes_original/README.md) · [OpenClaw 원본](../backend/ai_agent/openclaw_original/README.md) |
 | 오버로드 / 나자릭 | [modules/nazarick/frontend/](../modules/nazarick/frontend/README.md) |
 | 프로젝트 설치·앱 화면 | [modules/projects/](../modules/projects/README.md) |
 
@@ -21,7 +19,7 @@
 
 ## 실행·확인
 
-운영: 루트 `서버켜기.cmd` → http://127.0.0.1:8766/ . 루트 package-lock.json과 node_modules는 플랫폼 frontend workspace의 설치 위치이며 REA/Hermes의 Node 실행 패키지는 각 모듈 내부에 있습니다.
+운영: 루트 `서버켜기.cmd` → http://127.0.0.1:8766/ . 루트 package-lock.json과 node_modules는 플랫폼 frontend workspace의 설치 위치이며 Choki의 Node 실행 패키지는 각 모듈 내부에 있습니다.
 
 - 설치: 루트에서 `npm ci`.
 - 개발: `npm run dev --workspace frontend` → 5173; API는 8766으로 전달.
@@ -29,6 +27,6 @@
 - 타입: `npm run typecheck --workspace frontend`.
 - API·브라우저 검사: `npm run test:api --workspace frontend`, `npm run test:browser --workspace frontend`.
 
-검사는 사용자 지시에 따라 실행하며 빌드·서버 적용·화면 표시·실제 업무 실행을 구분합니다. `dist/`는 빌드 산출물입니다. 현재 모듈 분리 확인은 [모듈 안내](../modules/README.md), Hermes UI의 최근 확인은 [대화 안내](../modules/hermes/frontend/chat/README.md), 모델 추론 실측은 [모델 안내](../modules/hermes/backend/models/README.md)를 따릅니다. 특정 UI 검사의 통과를 전체 금융·REA 업무 실행 완료로 확대하지 않습니다. 기본 모듈 독립 소스 내보내기는 공통 UI 소스 복사본을 포함하며 다른 플랫폼 폴더를 참조하지 않습니다. 현재 단독 실행 확인 범위는 프로젝트 관리 README를 따릅니다.
+검사는 사용자 지시에 따라 실행하며 빌드·서버 적용·화면 표시·실제 업무 실행을 구분합니다. `dist/`는 빌드 산출물입니다. 현재 모듈 분리 확인은 [모듈 안내](../modules/README.md), Choki UI의 최근 확인은 [대화 안내](../frontend/src/pages/ai_agent/choki/chat/README.md), 모델 추론 실측은 [모델 안내](../backend/ai_agent/choki/models/README.md)를 따릅니다. 특정 UI 검사의 통과를 전체 금융 업무 실행 완료로 확대하지 않습니다. 기본 모듈 독립 소스 내보내기는 공통 UI 소스 복사본을 포함하며 다른 플랫폼 폴더를 참조하지 않습니다. 현재 단독 실행 확인 범위는 프로젝트 관리 README를 따릅니다.
 
-Hermes 공식 UI 플러그인은 해당 모듈이 존재할 때만 불러옵니다. 공식 디자인 시스템의 Tailwind import·source는 플러그인이 공통 tailwind.css에 주입합니다. 금융·REA 독립 내보내기처럼 Hermes가 없는 배포본은 Hermes 빌드 파일을 강제 참조하지 않습니다.
+Choki 공식 UI 플러그인은 해당 모듈이 존재할 때만 불러옵니다. 공식 디자인 시스템의 Tailwind import·source는 플러그인이 공통 tailwind.css에 주입합니다. 금융 독립 내보내기처럼 Choki가 없는 배포본은 Choki 빌드 파일을 강제 참조하지 않습니다.

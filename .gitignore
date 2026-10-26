@@ -35,9 +35,7 @@ configs/local/
 results/
 
 
-/backend/rea/project_explorer/saved_projects/
 
-/backend/rea/node_modules/
 /node_modules/
 /.runtime/ui-preview/
 # Generated installation adapters; source/config/history live in ignored runtime/.
@@ -46,7 +44,6 @@ results/
 /modules/*/.venv/
 /modules/*/node_modules/
 /modules/*/configs/local/
-/modules/rea/configs/rea.json
 
 # Every module owns its installed Node packages; never publish installation output.
 node_modules/

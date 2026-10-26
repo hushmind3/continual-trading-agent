@@ -1,4 +1,4 @@
-"""Host HTTP context; no finance, REA or agent business libraries."""
+"""Host HTTP context; no finance or agent business libraries."""
 import json
 from fastapi import APIRouter,FastAPI,HTTPException,Request
 from fastapi.responses import FileResponse,JSONResponse

@@ -36,7 +36,7 @@ def wait_registration(present, timeout=180):
     while time.monotonic() < deadline:
         try:
             ids = {item['id'] for item in api('platform/modules')['items']}
-            assert {'finance', 'rea'} <= ids, ids
+            assert {'finance'} <= ids, ids
             with urllib.request.urlopen(BASE, timeout=10) as response:
                 html = response.read().decode()
             asset = re.search(r'src="(/assets/index-[^"]+\.js)"', html)
@@ -52,7 +52,7 @@ def wait_registration(present, timeout=180):
 
 
 def main():
-    program = ROOT / 'modules/hermes'
+    program = ROOT / 'backend/ai_agent/choki'
     parked = ROOT / 'runtime/platform/module-detach/hermes'
     assert program.is_dir() and not parked.exists(), 'Unexpected detach paths'
     assert parked.resolve().is_relative_to((ROOT / 'runtime/platform').resolve())
@@ -68,7 +68,7 @@ def main():
     try:
         record('initial_registration', wait_registration(True))
         assert api('platform/modules/prepare-detach', {'id': 'hermes'})['ready']
-        state = ROOT / 'runtime/ai_agent/Hermes'
+        state = ROOT / 'runtime/ai_agent/choki'
         persistent = [state / name for name in ('platform-settings.json', 'config.yaml', 'state.db')]
         saved = digest(persistent)
         assert saved, 'No persistent state found to verify'
@@ -76,7 +76,7 @@ def main():
         program.rename(parked)
         record('removed_registration_and_frontend', wait_registration(False))
         try:
-            api('ai_agent/Hermes/sessions')
+            api('ai_agent/choki/sessions')
         except urllib.error.HTTPError as exc:
             assert exc.code == 404, exc.code
         else:
@@ -87,7 +87,7 @@ def main():
         record('restored_registration_and_frontend', wait_registration(True))
         assert digest(persistent) == saved, 'Persistent state changed during restoration'
         record('persistent_files_unchanged', list(saved))
-        sessions = api('ai_agent/Hermes/sessions')
+        sessions = api('ai_agent/choki/sessions')
         record('restored_sessions_api', type(sessions).__name__)
         assert digest(central) == before, 'Central source edited during detach test'
         record('central_source_edits', 0)

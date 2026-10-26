@@ -11,12 +11,12 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'backend'))
 from platform_modules import mount_namespaces
 mount_namespaces()
-from ai_agent.Hermes.chat import project_commands as commands
+from ai_agent.choki.chat import project_commands as commands
 
 
 class ProjectCommandTests(unittest.TestCase):
     def setUp(self):
-        checks=ROOT/'runtime/ai_agent/Hermes/verification';checks.mkdir(parents=True,exist_ok=True)
+        checks=ROOT/'runtime/ai_agent/choki/verification';checks.mkdir(parents=True,exist_ok=True)
         self.temp=tempfile.TemporaryDirectory(prefix='project-command-',dir=checks);self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
         self.worker=SimpleNamespace(company_link={'workspace':str(self.root)},stopping=False)
